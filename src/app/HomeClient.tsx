@@ -58,7 +58,6 @@ export default function HomeClient() {
 
   return (
     <>
-      <Header />
 
       <main className="min-h-screen bg-[#050814] text-white">
         <div id="top" />
@@ -96,14 +95,14 @@ export default function HomeClient() {
 
                 <div className="mt-8 flex flex-col sm:flex-row gap-3">
                   <a
-                    href="#demos"
+                    href="/#demos"
                     className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold hover:bg-[#E0C15A] transition"
                   >
                     Listen to demos
                   </a>
 
                   <a
-                    href="#contact"
+                    href="/#contact"
                     className="inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold hover:border-white/60 transition"
                   >
                     Request availability
@@ -202,48 +201,76 @@ export default function HomeClient() {
         {/* CONTENT */}
         <div className="max-w-6xl mx-auto px-6 py-14">
           {/* DEMOS */}
-<section id="demos" className="mt-2">
-  <h2 className="text-3xl font-bold">Featured demos</h2>
-  <p className="mt-2 text-white/70">
-    Short, targeted clips. Click play and you will know fast.
-  </p>
-
-  <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    {demos.map((demo, index) => (
-      <div
-        key={demo.title}
-        className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg hover:border-[#D4AF37]/50 transition"
-      >
-        <p className="font-semibold text-lg text-white">{demo.title}</p>
-        <p className="mt-1 text-sm text-white/70">{demo.desc}</p>
-
-        {demo.src ? (
-          <div className="mt-4 rounded-lg bg-[#050814] p-3 border border-[#1A2550]">
-            <audio
-              controls
-              className="w-full"
-              ref={(el) => {
-                audioRefs.current[index] = el;
-              }}
-              onPlay={() => handlePlay(index)}
-            >
-              <source src={demo.src} type="audio/mpeg" />
-              Your browser does not support the audio element.
-            </audio>
-          </div>
-        ) : (
-          <div className="mt-4 rounded-lg border border-[#1A2550] bg-[#050814] p-4">
-            <p className="text-sm text-white/70">Demo link not added yet.</p>
-            <p className="mt-1 text-xs text-white/50">
-              Paste an MP3 URL into this demo’s <code>src</code> to enable playback.
+          <section id="demos" className="mt-2">
+            <h2 className="text-3xl font-bold">Featured demos</h2>
+            <p className="mt-2 text-white/70">
+              Short, targeted clips. Click play and you will know fast.
             </p>
-          </div>
-        )}
-      </div>
-    ))}
-  </div>
-</section>
 
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {demos.map((demo, index) => (
+                <div
+                  key={demo.title}
+                  className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg hover:border-[#D4AF37]/50 transition"
+                >
+                  <p className="font-semibold text-lg text-white">{demo.title}</p>
+                  <p className="mt-1 text-sm text-white/70">{demo.desc}</p>
+
+                  {demo.src ? (
+                    <div className="mt-4 rounded-lg bg-[#050814] p-3 border border-[#1A2550]">
+                      <audio
+                        controls
+                        className="w-full"
+                        ref={(el) => {
+                          audioRefs.current[index] = el;
+                        }}
+                        onPlay={() => handlePlay(index)}
+                      >
+                        <source src={demo.src} type="audio/mpeg" />
+                        Your browser does not support the audio element.
+                      </audio>
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-lg border border-[#1A2550] bg-[#050814] p-4">
+                      <p className="text-sm text-white/70">Demo link not added yet.</p>
+                      <p className="mt-1 text-xs text-white/50">
+                        Paste an MP3 URL into this demo’s <code>src</code> to enable playback.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* TIKTOK SLIDER SECTION */}
+          <section id="tiktok" className="mt-20">
+            <h2 className="text-3xl font-bold">Latest on TikTok</h2>
+            <p className="mt-2 text-white/70 mb-8">
+              Narration snippets, voice acting tips, behind-the-scenes, and more. Follow{" "}
+              <a
+                href="https://www.tiktok.com/@deanmillernarration"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#D4AF37] hover:underline"
+              >
+                @deanmillernarration
+              </a>{" "}
+              for regular updates!
+            </p>
+
+            {/* Common Ninja TikTok Slider */}
+            <div
+              className="commonninja_component pid-02edfc2b-9cd6-4970-aae7-b4d5b880eb88"
+              style={{ width: "100%", minHeight: "500px" }}
+            ></div>
+
+            {/* Common Ninja SDK script */}
+            <script
+              src="https://cdn.commoninja.com/sdk/latest/commonninja.js"
+              defer
+            />
+          </section>
 
           {/* ABOUT */}
           <section id="about" className="mt-20">
@@ -258,7 +285,6 @@ I’ve always been drawn to voice and performance, from early character work to 
 I record from a professional home studio with a broadcast-quality workflow, delivering clean, consistent audio and clear communication throughout every project.
 
 For me, narration is about connection. It’s the moment a listener forgets there’s a narrator at all and simply feels the story.
-
                 </p>
 
                 <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
