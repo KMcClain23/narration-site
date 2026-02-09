@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Header from "./components/Header";  // ← Adjust path if needed (e.g. "./components/Header")
+import Header from "./components/Header";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,7 +15,20 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Dean Miller Narrator",
-  description: "Professional audiobook narrator specializing in character-driven stories",
+  description: "Professional audiobook narrator specializing in character-driven stories.",
+  // These additions ensure your opengraph-image.png is used correctly
+  openGraph: {
+    title: "Dean Miller Narrator",
+    description: "Character-driven narration for Dark Romance, Romantasy, and Drama.",
+    url: "https://narration-site.vercel.app/",
+    siteName: "Dean Miller Narrator",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Dean Miller Narrator",
+    description: "Professional audiobook narrator specializing in character-driven stories.",
+  },
 };
 
 export default function RootLayout({
@@ -26,7 +39,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth scroll-pt-24">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Header />  {/* ← Header now appears on EVERY page */}
+        <Header />
         {children}
       </body>
     </html>
