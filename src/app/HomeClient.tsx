@@ -2,10 +2,10 @@
 
 import Header from "./components/Header";
 import Image from "next/image";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function HomeClient() {
+function HomeContent() {
   const searchParams = useSearchParams();
   const sent = searchParams.get("sent") === "1";
 
@@ -358,7 +358,6 @@ export default function HomeClient() {
                   name="_subject"
                   value="New Narration Inquiry from Website"
                 />
-                {/* Updated: Added Production URL for redirect */}
                 <input
                   type="hidden"
                   name="_redirect"
@@ -457,5 +456,14 @@ export default function HomeClient() {
         </div>
       </main>
     </>
+  );
+}
+
+// Wrapping the full content in Suspense to prevent build errors
+export default function HomeClient() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#050814]" />}>
+      <HomeContent />
+    </Suspense>
   );
 }
