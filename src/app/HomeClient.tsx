@@ -2,7 +2,7 @@
 
 import Header from "./components/Header";
 import Image from "next/image";
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
 export default function HomeClient() {
@@ -10,6 +10,20 @@ export default function HomeClient() {
   const sent = searchParams.get("sent") === "1";
 
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
+
+  // Fix: Handle anchor scrolling on initial load from other pages
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash) {
+      const element = document.querySelector(hash);
+      if (element) {
+        // Small timeout to allow the browser to finish rendering
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      }
+    }
+  }, [searchParams]);
 
   const handlePlay = (index: number) => {
     audioRefs.current.forEach((audio, i) => {
@@ -37,8 +51,6 @@ export default function HomeClient() {
       desc: "Somber, reflective",
       src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Male%20(SomberDepressed)%2C%20Reflective.mp3",
     },
-
-    // Add 3 more demo slots (replace src with your links)
     {
       title: "British Accent",
       desc: "Intimate, dominant",
@@ -58,7 +70,6 @@ export default function HomeClient() {
 
   return (
     <>
-
       <main className="min-h-screen bg-[#050814] text-white">
         <div id="top" />
 
@@ -279,12 +290,10 @@ export default function HomeClient() {
               <div className="md:col-span-8">
                 <p className="text-white/80 leading-relaxed">
                   I’m Dean Miller, a professional audiobook narrator specializing in character-driven stories with strong emotional arcs.
-
-I’ve always been drawn to voice and performance, from early character work to years of theatrical and musical storytelling. That foundation shaped the way I approach narration today: with intention, precision, and respect for the emotional truth of the story.
-
-I record from a professional home studio with a broadcast-quality workflow, delivering clean, consistent audio and clear communication throughout every project.
-
-For me, narration is about connection. It’s the moment a listener forgets there’s a narrator at all and simply feels the story.
+                  I’ve always been drawn to voice and performance, from early character work to years of theatrical and musical storytelling. 
+                  That foundation shaped the way I approach narration today: with intention, precision, and respect for the emotional truth of the story.
+                  I record from a professional home studio with a broadcast-quality workflow, delivering clean, consistent audio and clear communication throughout every project.
+                  For me, narration is about connection. It’s the moment a listener forgets there’s a narrator at all and simply feels the story.
                 </p>
 
                 <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -349,10 +358,11 @@ For me, narration is about connection. It’s the moment a listener forgets ther
                   name="_subject"
                   value="New Narration Inquiry from Website"
                 />
+                {/* Updated: Added Production URL for redirect */}
                 <input
                   type="hidden"
                   name="_redirect"
-                  value="http://localhost:3000/?sent=1#contact"
+                  value="https://narration-site.vercel.app/?sent=1#contact"
                 />
 
                 {sent && (
