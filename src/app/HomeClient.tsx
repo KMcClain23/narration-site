@@ -1,6 +1,5 @@
 "use client";
 
-import Header from "./components/Header";
 import Image from "next/image";
 import { useRef, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -461,9 +460,5 @@ function HomeContent() {
 
 // Wrapping the full content in Suspense to prevent build errors
 export default function HomeClient() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-[#050814]" />}>
-      <HomeContent />
-    </Suspense>
-  );
+  return <HomeContent />;
 }
