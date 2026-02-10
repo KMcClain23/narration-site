@@ -65,19 +65,19 @@ function HomeContent() {
       src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Male%20(SomberDepressed)%2C%20Reflective.mp3",
     },
     {
-      title: "British Accent",
-      desc: "Intimate, dominant",
-      src: "",
+      title: "Fated Lovers",
+      desc: "British Accent",
+      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/British.mp3",
     },
     {
-      title: "Thriller / Suspense",
-      desc: "Tense, controlled",
-      src: "",
+      title: "Child POV Drama",
+      desc: "Raw, Emotionally Intense",
+      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Child%20(5-year-old%20boy)%2C%20Emotional%20TraumaWitness%20-%20Sample.mp3",
     },
     {
-      title: "Contemporary Romance",
-      desc: "Warm, grounded",
-      src: "",
+      title: "Multi-Character Text Dialogue",
+      desc: "Vocal Range, Coversation",
+      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/4%20Characters.mp3",
     },
   ];
 
