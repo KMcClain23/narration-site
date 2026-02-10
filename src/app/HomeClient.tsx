@@ -381,11 +381,6 @@ function HomeContent() {
             style={{ width: "100%", minHeight: "500px" }}
           />
 
-          <p className="mt-4 text-sm text-white/70">
-            A fast way to hear range, responsiveness, and character choices in real
-            time.
-          </p>
-
           <Script
             src="https://cdn.commoninja.com/sdk/latest/commonninja.js"
             strategy="afterInteractive"
