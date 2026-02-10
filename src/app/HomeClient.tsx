@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Script from "next/script";
-import { useRef, useEffect, Suspense } from "react";
+import { useRef, useEffect, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 /**
@@ -22,8 +22,65 @@ function SentMessage() {
   );
 }
 
+function MediaLightbox({
+  isOpen,
+  onClose,
+  title,
+  src,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  src: string;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <div
+        className="relative w-full max-w-3xl rounded-2xl border border-[#1A2550] bg-[#050814] p-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-sm font-semibold text-white">{title}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-white/20 px-3 py-1 text-sm text-white/80 hover:border-white/40 hover:text-white transition"
+            aria-label="Close"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mt-4 relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-[#1A2550] bg-black/30">
+          <Image src={src} alt={title} fill className="object-contain" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HomeContent() {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
+
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState("");
+  const [lightboxTitle, setLightboxTitle] = useState("");
+
+  const openLightbox = (src: string, title: string) => {
+    setLightboxSrc(src);
+    setLightboxTitle(title);
+    setLightboxOpen(true);
+  };
+
+  const closeLightbox = () => setLightboxOpen(false);
 
   // Handle anchor scrolling on initial load from other pages
   useEffect(() => {
@@ -51,32 +108,32 @@ function HomeContent() {
   const demos = [
     {
       title: "LGBTQ+ Romance",
-      desc: "Bright, playful",
+      desc: "Bright pacing, playful emotional tone",
       src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20LGBTQ%2B%20Romance%20-%20Male%20(BrightPlayful)%2C%20Confident%2C%20Sex-PositiveFlirtatious.mp3",
     },
     {
       title: "Romantasy",
-      desc: "Possessive, haunted",
+      desc: "Atmospheric delivery, grounded fantasy emotion",
       src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Romantasy%20-%20Male%20(PossessiveHaunted)%2C%20Harsh%20Control%20to%20Remorse%2C%20Deep%20Loss.mp3",
     },
     {
       title: "Drama",
-      desc: "Somber, reflective",
+      desc: "Controlled intensity, reflective pacing",
       src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Male%20(SomberDepressed)%2C%20Reflective.mp3",
     },
     {
       title: "Fated Lovers",
-      desc: "British Accent",
+      desc: "British accent, romantic restraint",
       src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/British.mp3",
     },
     {
       title: "Child POV Drama",
-      desc: "Raw, Emotionally Intense",
+      desc: "Raw emotion, age-appropriate delivery",
       src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Child%20(5-year-old%20boy)%2C%20Emotional%20TraumaWitness%20-%20Sample.mp3",
     },
     {
       title: "Multi-Character Text Dialogue",
-      desc: "Vocal Range, Coversation",
+      desc: "Clear character separation and vocal range",
       src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/4%20Characters.mp3",
     },
   ];
@@ -102,7 +159,7 @@ function HomeContent() {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-10 items-center">
             <div className="md:col-span-7">
               <p className="text-xs tracking-[0.28em] text-white/70 uppercase">
-                Audiobook Narrator
+                Audiobook narrator for fiction and narrative nonfiction.
               </p>
 
               <h1 className="mt-4 text-4xl md:text-6xl font-bold leading-tight">
@@ -110,8 +167,14 @@ function HomeContent() {
               </h1>
 
               <p className="mt-5 text-lg md:text-xl text-white/80 max-w-2xl">
-                Character-driven narration with clear emotional beats, clean
-                character separation, consistent audio, and fast communication.
+                Character-driven audiobook narration with clear emotional beats,
+                clean character separation, consistent audio, and fast, reliable
+                communication.
+              </p>
+
+              <p className="mt-3 text-sm text-white/70 max-w-2xl">
+                Particularly strong in romance, romantasy, drama, thriller, and
+                multi-character dialogue.
               </p>
 
               <div className="mt-8 flex flex-col sm:flex-row gap-3">
@@ -156,62 +219,96 @@ function HomeContent() {
               </div>
             </div>
 
+            {/* RIGHT HERO CARD (Updated At-a-glance) */}
             <div className="md:col-span-5">
               <div className="relative rounded-2xl border border-[#1A2550] bg-[#050814] p-6 shadow-xl">
-                <div className="flex items-center gap-4">
-                  <div className="relative h-16 w-16 rounded-xl overflow-hidden border border-[#1A2550] bg-[#0B1224]">
-                    <Image
-                      src="/dean-profile.png"
-                      alt="Dean Miller profile logo"
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-[#D4AF37]">
-                      Brand
-                    </p>
-                    <p className="text-lg font-semibold text-white">
-                      Dean Miller Narrator
-                    </p>
-                    <p className="text-sm text-white/70">
-                      Demos, availability, inquiries
-                    </p>
-                  </div>
-                </div>
+                <p className="text-xs uppercase tracking-[0.22em] text-[#D4AF37]">
+                  At a glance
+                </p>
 
-                <div className="mt-6 flex items-center gap-4">
-                  <div className="relative h-24 w-24 rounded-2xl overflow-hidden border border-[#1A2550] bg-[#0B1224]">
-                    <Image
-                      src="/dean-headshot.jpg"
-                      alt="Dean Miller headshot"
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-[#D4AF37]">
-                      Headshot
-                    </p>
-                    <p className="text-base font-semibold text-white">
-                      Professional and approachable
-                    </p>
-                    <p className="text-sm text-white/70">
-                      Ideal for producers and author sites
-                    </p>
-                  </div>
-                </div>
+                <p className="mt-2 text-lg font-semibold text-white">
+                  Dean Miller, Audiobook Narrator
+                </p>
 
-                <div className="mt-6 rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
-                  <p className="text-xs uppercase tracking-wide text-[#D4AF37]">
-                    Quick booking info
-                  </p>
-                  <p className="mt-1 text-sm text-white/80">
-                    Include genre, word count, deadline, and any character notes.
-                  </p>
+                <p className="mt-1 text-sm text-white/70">
+                  Character-forward performance, clean audio, and direction-friendly
+                  workflow.
+                </p>
+
+                <div className="mt-5 grid grid-cols-1 gap-4">
+                  <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
+                    <p className="text-xs uppercase tracking-wide text-[#D4AF37]">
+                      Focus
+                    </p>
+                    <p className="mt-2 text-sm text-white/80">
+                      Fiction and narrative nonfiction. Strong in romance,
+                      romantasy, drama, thriller, and multi-character dialogue.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
+                    <p className="text-xs uppercase tracking-wide text-[#D4AF37]">
+                      Studio
+                    </p>
+                    <p className="mt-2 text-sm text-white/80">
+                      Broadcast-ready home studio. Shure MV7+, treated space,
+                      consistent edits.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
+                    <p className="text-xs uppercase tracking-wide text-[#D4AF37]">
+                      Media kit
+                    </p>
+
+                    <p className="mt-2 text-sm text-white/70">Click to enlarge.</p>
+
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+  {/* LEFT: 50% images */}
+  <div className="grid grid-cols-2 gap-4">
+    <button
+      type="button"
+      onClick={() => openLightbox("/dean-profile.png", "Logo")}
+      className="relative h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] hover:border-[#D4AF37]/60 transition"
+      aria-label="Open logo"
+    >
+      <Image
+        src="/dean-profile.png"
+        alt="Dean Miller logo"
+        fill
+        className="object-contain p-2"
+      />
+    </button>
+
+    <button
+      type="button"
+      onClick={() => openLightbox("/dean-headshot.jpg", "Headshot")}
+      className="relative h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] hover:border-[#D4AF37]/60 transition"
+      aria-label="Open headshot"
+    >
+      <Image
+        src="/dean-headshot.jpg"
+        alt="Dean Miller headshot"
+        fill
+        className="object-cover"
+      />
+    </button>
+  </div>
+
+  {/* RIGHT: 50% text */}
+  <div className="md:pl-2">
+    <p className="text-sm text-white/80 leading-relaxed">
+      Logo and headshot available for producer packets and author sites.
+    </p>
+
+  </div>
+</div>
+
+                  </div>
                 </div>
               </div>
             </div>
+            {/* END RIGHT HERO CARD */}
           </div>
         </div>
       </section>
@@ -266,7 +363,8 @@ function HomeContent() {
         <section id="tiktok" className="mt-20">
           <h2 className="text-3xl font-bold">Latest on TikTok</h2>
           <p className="mt-2 text-white/70 mb-8">
-            Narration snippets, voice acting tips, behind-the-scenes, and more. Follow{" "}
+            Short-form performance clips showcasing character work, emotional range,
+            and voice acting challenges. Follow{" "}
             <a
               href="https://www.tiktok.com/@deanmillernarration"
               target="_blank"
@@ -275,13 +373,18 @@ function HomeContent() {
             >
               @deanmillernarration
             </a>{" "}
-            for regular updates!
+            for regular updates.
           </p>
 
           <div
             className="commonninja_component pid-02edfc2b-9cd6-4970-aae7-b4d5b880eb88"
             style={{ width: "100%", minHeight: "500px" }}
           />
+
+          <p className="mt-4 text-sm text-white/70">
+            A fast way to hear range, responsiveness, and character choices in real
+            time.
+          </p>
 
           <Script
             src="https://cdn.commoninja.com/sdk/latest/commonninja.js"
@@ -295,23 +398,29 @@ function HomeContent() {
           <div className="mt-6 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
             <div className="md:col-span-8">
               <p className="text-white/80 leading-relaxed">
-                I’m Dean Miller, a professional audiobook narrator specializing
-                in character-driven stories with strong emotional arcs. I’ve always
-                been drawn to voice and performance, from early character work to
-                years of theatrical and musical storytelling. That foundation shaped
-                the way I approach narration today: with intention, precision, and
-                respect for the emotional truth of the story. I record from a
-                professional home studio with a broadcast-quality workflow,
-                delivering clean, consistent audio and clear communication throughout
-                every project. For me, narration is about connection. It’s the moment
-                a listener forgets there’s a narrator at all and simply feels the story.
+                I’m Dean Miller, a professional audiobook narrator specializing in
+                character-driven stories with strong emotional arcs. I’ve always been
+                drawn to voice and performance, from early character work to years of
+                theatrical and musical storytelling. That foundation shaped the way I
+                approach narration today: with intention, precision, and respect for
+                the emotional truth of the story. I record from a professional home
+                studio with a broadcast-quality workflow, delivering clean, consistent
+                audio and clear communication throughout every project. For me,
+                narration is about connection. It’s the moment a listener forgets
+                there’s a narrator at all and simply feels the story.
               </p>
+
+              <ul className="mt-6 space-y-2 text-sm text-white/80">
+                <li>• Broadcast-quality home studio</li>
+                <li>• Long-form audiobook experience</li>
+                <li>• Reliable communication and revisions</li>
+              </ul>
 
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg">
                   <p className="font-semibold text-white">Genres</p>
                   <p className="mt-1 text-sm text-white/70">
-                    Dark romance, romantasy, drama, thriller
+                    Romance, romantasy, drama, thriller, narrative nonfiction
                   </p>
                 </div>
 
@@ -417,8 +526,12 @@ function HomeContent() {
                 type="submit"
                 className="mt-5 inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold hover:bg-[#E0C15A] transition w-full"
               >
-                Send inquiry
+                Request availability
               </button>
+
+              <p className="mt-3 text-xs text-white/60">
+                Typical response within 24 to 48 hours.
+              </p>
 
               <div className="mt-4 text-xs text-white/60">
                 Prefer email:
@@ -437,7 +550,7 @@ function HomeContent() {
               <p className="text-sm text-white/70">Best results if you include:</p>
 
               <ul className="mt-4 space-y-2 text-white/80 text-sm">
-                <li>• Genre and tone (dark romance, thriller, etc.)</li>
+                <li>• Genre and tone (romance, thriller, etc.)</li>
                 <li>• Word count (or estimated finished hours)</li>
                 <li>• Deadline and preferred schedule</li>
                 <li>• POV and character count</li>
@@ -461,6 +574,13 @@ function HomeContent() {
           © {new Date().getFullYear()} Dean Miller. All rights reserved.
         </footer>
       </div>
+
+      <MediaLightbox
+        isOpen={lightboxOpen}
+        onClose={closeLightbox}
+        title={lightboxTitle}
+        src={lightboxSrc}
+      />
     </main>
   );
 }
