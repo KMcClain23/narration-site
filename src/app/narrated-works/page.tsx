@@ -60,7 +60,7 @@ export default function NarratedWorks() {
       cover: "/covers/merciless-punks.jpg",
     },
     {
-      title: "Heir of Emberscale",
+      title: "Heir of the Emberscale",
       author: "Shelby Gardner",
       link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB",
       cover: "/covers/heir-of-emberscale.jpg",

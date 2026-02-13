@@ -433,9 +433,9 @@ function HomeContent() {
                 <p className="text-sm text-white/70">Preferred contact</p>
                 <a
                   className="mt-2 inline-block text-base font-semibold text-[#D4AF37] hover:underline"
-                  href="mailto:DeanMillerNarrator@gmail.com"
+                  href="mailto:Dean@DMNarration.com"
                 >
-                  DeanMillerNarrator@gmail.com
+                  Dean@DMNarration.com
                 </a>
 
                 <p className="mt-4 text-sm text-white/70">
@@ -533,9 +533,9 @@ function HomeContent() {
                 <div>
                   <a
                     className="text-[#D4AF37] hover:underline"
-                    href="mailto:DeanMillerNarrator@gmail.com"
+                    href="mailto:Dean@DMNarration.com"
                   >
-                    DeanMillerNarrator@gmail.com
+                    Dean@DMNarration.com
                   </a>
                 </div>
               </div>
@@ -556,9 +556,9 @@ function HomeContent() {
                 <p className="text-sm text-white/70">Direct email</p>
                 <a
                   className="mt-1 inline-block text-lg font-semibold text-[#D4AF37] hover:underline"
-                  href="mailto:DeanMillerNarrator@gmail.com"
+                  href="mailto:Dean@DMNarration.com"
                 >
-                  DeanMillerNarrator@gmail.com
+                  Dean@DMNarration.com
                 </a>
               </div>
             </div>

@@ -49,7 +49,7 @@ export default function Header() {
             <a href="https://www.instagram.com/deanmillernarrator" target="_blank" rel="noopener noreferrer" className="text-white/80 hover:text-[#D4AF37] transition" aria-label="Instagram">
               <FaInstagram />
             </a>
-            <a href="https://discord.com/users/edgetoruin" target="_blank" rel="noopener noreferrer" className="text-white/80 hover:text-[#D4AF37] transition" aria-label="Discord">
+            <a href="https://discord.com/users/1425271466538045512" target="_blank" rel="noopener noreferrer" className="text-white/80 hover:text-[#D4AF37] transition" aria-label="Discord">
               <FaDiscord />
             </a>
           </div>
@@ -73,8 +73,8 @@ export default function Header() {
               key={link.name} 
               className="text-white/80 hover:text-white text-lg font-medium" 
               href={link.href}
-              onClick={() => setIsOpen(false)} // Close menu on click
-            >
+              onClick={() => setIsOpen(false)}
+            > 
               {link.name}
             </a>
           ))}
