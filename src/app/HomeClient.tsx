@@ -189,27 +189,29 @@ function HomeContent() {
                 multi-character dialogue.
               </p>
 
-              <div className="mt-8 flex flex-col sm:flex-row gap-3">
+             <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <a
                   href="/#demos"
-                  className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold hover:bg-[#E0C15A] transition"
+                  className="w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold hover:bg-[#E0C15A] transition"
                 >
                   Listen to demos
                 </a>
 
                 <a
                   href="/#contact"
-                  className="inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold hover:border-white/60 transition"
+                  className="w-full inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold hover:border-white/60 transition"
                 >
                   Request availability
                 </a>
+
                 <a
                   href="/audiobook-narrator"
-                  className="inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold hover:border-white/60 transition"
+                  className="w-full inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold hover:border-white/60 transition"
                 >
                   Audiobook narrator for hire
                 </a>
               </div>
+
 
               <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg hover:border-[#D4AF37]/50 transition">
