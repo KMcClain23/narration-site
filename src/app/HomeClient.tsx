@@ -203,6 +203,12 @@ function HomeContent() {
                 >
                   Request availability
                 </a>
+                <a
+                  href="/audiobook-narrator"
+                  className="inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold hover:border-white/60 transition"
+                >
+                  Audiobook narrator for hire
+                </a>
               </div>
 
               <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
