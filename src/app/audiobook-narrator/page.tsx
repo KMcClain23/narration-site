@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function AudiobookNarratorPage() {
   return (
-    <main className="mx-auto max-w-3xl px-6 py-16 space-y-12">
+    <main className="mx-auto max-w-3xl px-6 py-16 space-y-16">
       <section className="space-y-4">
         <h1 className="text-4xl font-bold">Professional Audiobook Narrator for Hire</h1>
 
