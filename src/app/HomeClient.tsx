@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import Image from "next/image";
 import Script from "next/script";
 import { useRef, useEffect, Suspense, useState } from "react";
@@ -172,6 +173,17 @@ function HomeContent() {
                 communication.
               </p>
 
+              {/* NEW INTERNAL LINK TO THE HIGH-INTENT SERVICE PAGE */}
+              <p className="mt-4 text-sm text-white/70 max-w-2xl">
+                Looking to hire a professional audiobook narrator?{" "}
+                <Link
+                  href="/audiobook-narrator"
+                  className="text-[#D4AF37] hover:underline"
+                >
+                  Learn more about my audiobook narration services.
+                </Link>
+              </p>
+
               <p className="mt-3 text-sm text-white/70 max-w-2xl">
                 Particularly strong in romance, romantasy, drama, thriller, and
                 multi-character dialogue.
@@ -264,46 +276,47 @@ function HomeContent() {
                     <p className="mt-2 text-sm text-white/70">Click to enlarge.</p>
 
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-  {/* LEFT: 50% images */}
-  <div className="grid grid-cols-2 gap-4">
-    <button
-      type="button"
-      onClick={() => openLightbox("/dean-profile.png", "Logo")}
-      className="relative h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] hover:border-[#D4AF37]/60 transition"
-      aria-label="Open logo"
-    >
-      <Image
-        src="/dean-profile.png"
-        alt="Dean Miller logo"
-        fill
-        className="object-contain p-2"
-      />
-    </button>
+                      {/* LEFT: 50% images */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <button
+                          type="button"
+                          onClick={() => openLightbox("/dean-profile.png", "Logo")}
+                          className="relative h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] hover:border-[#D4AF37]/60 transition"
+                          aria-label="Open logo"
+                        >
+                          <Image
+                            src="/dean-profile.png"
+                            alt="Dean Miller logo"
+                            fill
+                            className="object-contain p-2"
+                          />
+                        </button>
 
-    <button
-      type="button"
-      onClick={() => openLightbox("/dean-headshot.jpg", "Headshot")}
-      className="relative h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] hover:border-[#D4AF37]/60 transition"
-      aria-label="Open headshot"
-    >
-      <Image
-        src="/dean-headshot.jpg"
-        alt="Dean Miller headshot"
-        fill
-        className="object-cover"
-      />
-    </button>
-  </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openLightbox("/dean-headshot.jpg", "Headshot")
+                          }
+                          className="relative h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] hover:border-[#D4AF37]/60 transition"
+                          aria-label="Open headshot"
+                        >
+                          <Image
+                            src="/dean-headshot.jpg"
+                            alt="Dean Miller headshot"
+                            fill
+                            className="object-cover"
+                          />
+                        </button>
+                      </div>
 
-  {/* RIGHT: 50% text */}
-  <div className="md:pl-2">
-    <p className="text-sm text-white/80 leading-relaxed">
-      Logo and headshot available for producer packets and author sites.
-    </p>
-
-  </div>
-</div>
-
+                      {/* RIGHT: 50% text */}
+                      <div className="md:pl-2">
+                        <p className="text-sm text-white/80 leading-relaxed">
+                          Logo and headshot available for producer packets and
+                          author sites.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
