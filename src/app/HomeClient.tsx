@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import Script from "next/script";
 import { useRef, useEffect, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import TikTokCarousel from "./components/TikTokCarousel"; // ← Adjust path if your component is in a different folder
 
 /**
  * Isolated component to handle the "sent" success message.
@@ -238,7 +238,7 @@ function HomeContent() {
               </div>
             </div>
 
-            {/* RIGHT HERO CARD (Updated At-a-glance) */}
+            {/* RIGHT HERO CARD */}
             <div className="md:col-span-5">
               <div className="relative rounded-2xl border border-[#1A2550] bg-[#050814] p-6 shadow-xl">
                 <p className="text-xs uppercase tracking-[0.22em] text-[#D4AF37]">
@@ -283,7 +283,6 @@ function HomeContent() {
                     <p className="mt-2 text-sm text-white/70">Click to enlarge.</p>
 
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                      {/* LEFT: 50% images */}
                       <div className="grid grid-cols-2 gap-4">
                         <button
                           type="button"
@@ -314,7 +313,6 @@ function HomeContent() {
                         </button>
                       </div>
 
-                      {/* RIGHT: 50% text */}
                       <div className="md:pl-2">
                         <p className="text-sm text-white/80 leading-relaxed">
                           Logo and headshot available for producer packets and author sites.
@@ -325,7 +323,6 @@ function HomeContent() {
                 </div>
               </div>
             </div>
-            {/* END RIGHT HERO CARD */}
           </div>
         </div>
       </section>
@@ -375,25 +372,36 @@ function HomeContent() {
           </div>
         </section>
 
-        {/* TIKTOK CAROUSEL SECTION */}
-        <section id="tiktok" className="mt-20">
-          <h2 className="text-3xl font-bold">Latest on TikTok</h2>
-          <p className="mt-2 text-white/70 mb-8">
-            Short-form performance clips showcasing character work, emotional range,
-            and voice acting challenges. Follow{" "}
-            <a
-              href="https://www.tiktok.com/@deanmillernarration"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#D4AF37] hover:underline"
-            >
-              @deanmillernarration
-            </a>{" "}
-            for regular updates.
-          </p>
+            {/* TIKTOK WALL WIDGET SECTION */}
+            <section id="tiktok" className="mt-20">
+              <h2 className="text-3xl font-bold">Latest on TikTok</h2>
+              <p className="mt-2 text-white/70 mb-8">
+                Short-form performance clips showcasing character work, emotional range,
+                and voice acting challenges. Follow{" "}
+                <a
+                  href="https://www.tiktok.com/@deanmillernarration"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#D4AF37] hover:underline"
+                >
+                  @deanmillernarration
+                </a>{" "}
+                for regular updates.
+              </p>
 
-          <TikTokCarousel />
-        </section>
+              {/* RSS.app Wall Widget Embed */}
+              <div className="w-full min-h-[600px] rounded-2xl overflow-hidden border border-[#1A2550] bg-[#0B1224] shadow-lg">
+                {/* @ts-ignore - rssapp-wall is a custom web component loaded by external script */}
+                <rssapp-wall id="5PMV3hn65x16ilVo"></rssapp-wall>
+              </div>
+
+              {/* Load the RSS.app widget script */}
+              <Script
+                src="https://widget.rss.app/v1/wall.js"
+                strategy="afterInteractive"
+                type="text/javascript"
+              />
+            </section>
 
         {/* ABOUT */}
         <section id="about" className="mt-20">
@@ -486,7 +494,6 @@ function HomeContent() {
                 value="https://narration-site.vercel.app/?sent=1#contact"
               />
 
-              {/* Suspense wrapper here fixes the build error */}
               <Suspense fallback={null}>
                 <SentMessage />
               </Suspense>
