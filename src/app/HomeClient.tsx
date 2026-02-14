@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import Script from "next/script";
 import { useRef, useEffect, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -75,9 +74,6 @@ function HomeContent() {
   const [lightboxSrc, setLightboxSrc] = useState("");
   const [lightboxTitle, setLightboxTitle] = useState("");
 
-  // Ensures 3rd-party embeds mount only after hydration
-  const [tiktokReady, setTiktokReady] = useState(false);
-
   const openLightbox = (src: string, title: string) => {
     setLightboxSrc(src);
     setLightboxTitle(title);
@@ -97,11 +93,6 @@ function HomeContent() {
         }, 100);
       }
     }
-  }, []);
-
-  // Allow TikTok embed to initialize only after the component mounts
-  useEffect(() => {
-    setTiktokReady(true);
   }, []);
 
   const handlePlay = (index: number) => {
@@ -309,9 +300,7 @@ function HomeContent() {
 
                         <button
                           type="button"
-                          onClick={() =>
-                            openLightbox("/dean-headshot.jpg", "Headshot")
-                          }
+                          onClick={() => openLightbox("/dean-headshot.jpg", "Headshot")}
                           className="relative h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] hover:border-[#D4AF37]/60 transition"
                           aria-label="Open headshot"
                         >
@@ -327,8 +316,7 @@ function HomeContent() {
                       {/* RIGHT: 50% text */}
                       <div className="md:pl-2">
                         <p className="text-sm text-white/80 leading-relaxed">
-                          Logo and headshot available for producer packets and
-                          author sites.
+                          Logo and headshot available for producer packets and author sites.
                         </p>
                       </div>
                     </div>
@@ -377,8 +365,7 @@ function HomeContent() {
                   <div className="mt-4 rounded-lg border border-[#1A2550] bg-[#050814] p-4">
                     <p className="text-sm text-white/70">Demo link not added yet.</p>
                     <p className="mt-1 text-xs text-white/50">
-                      Paste an MP3 URL into this demo’s <code>src</code> to enable
-                      playback.
+                      Paste an MP3 URL into this demo’s <code>src</code> to enable playback.
                     </p>
                   </div>
                 )}
@@ -404,19 +391,10 @@ function HomeContent() {
             for regular updates.
           </p>
 
-          {tiktokReady && (
-            <>
-              <div
-                className="commonninja_component pid-02edfc2b-9cd6-4970-aae7-b4d5b880eb88"
-                style={{ width: "100%", minHeight: "500px" }}
-              />
-
-              <Script
-                src="https://cdn.commoninja.com/sdk/latest/commonninja.js"
-                strategy="afterInteractive"
-              />
-            </>
-          )}
+          <div
+            className="commonninja_component pid-02edfc2b-9cd6-4970-aae7-b4d5b880eb88"
+            style={{ width: "100%", minHeight: "500px" }}
+          ></div>
         </section>
 
         {/* ABOUT */}
