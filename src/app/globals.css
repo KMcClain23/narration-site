@@ -1,80 +1,26 @@
-/* Force RSS.app wall to single horizontal row with sideways scroll – stronger overrides */
-.rssapp-wall,
-.rssapp-wall > div,
-.rssapp-wall .rssapp-wall-container,
-.rssapp-wall .rssapp-items-container,
-.rssapp-wall .rssapp-items,
-.rssapp-wall .rssapp-item-wrapper,
-.rssapp-wall .rssapp-post,
-.rssapp-wall .rssapp-item,
-.rssapp-wall .rssapp-card,
-.rssapp-wall * {
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: nowrap !important;
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
-  gap: 24px !important;
-  width: max-content !important;
-  min-width: 100% !important;
-  white-space: nowrap !important;
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
 }
 
-/* Individual post cards – fixed width for consistent row size */
-.rssapp-wall .rssapp-item,
-.rssapp-wall .rssapp-post,
-.rssapp-wall .rssapp-card,
-.rssapp-wall .rssapp-thumbnail-container,
-.rssapp-wall .rssapp-content {
-  flex: 0 0 auto !important;
-  width: 320px !important; /* Adjust: 280px for more visible posts, 400px for larger */
-  min-width: 320px !important;
-  max-width: 320px !important;
-  scroll-snap-align: start !important;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
 
-/* Container forces horizontal only */
-.rssapp-wall {
-  scroll-snap-type: x mandatory !important;
-  scroll-behavior: smooth !important;
-  scrollbar-width: thin !important;
-  scrollbar-color: #D4AF37 #050814 !important;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
 }
 
-/* Custom scrollbar */
-.rssapp-wall::-webkit-scrollbar,
-.overflow-x-auto::-webkit-scrollbar {
-  height: 8px !important;
-}
-
-.rssapp-wall::-webkit-scrollbar-track,
-.overflow-x-auto::-webkit-scrollbar-track {
-  background: #050814 !important;
-  border-radius: 4px !important;
-}
-
-.rssapp-wall::-webkit-scrollbar-thumb,
-.overflow-x-auto::-webkit-scrollbar-thumb {
-  background: #D4AF37 !important;
-  border-radius: 4px !important;
-}
-
-.rssapp-wall::-webkit-scrollbar-thumb:hover,
-.overflow-x-auto::-webkit-scrollbar-thumb:hover {
-  background: #E0C15A !important;
-}
-
-/* Touch support & hide vertical scroll */
-.overflow-x-auto,
-.rssapp-wall {
-  -webkit-overflow-scrolling: touch !important;
-  -ms-overflow-style: none !important; /* IE/Edge */
-}
-
-.rssapp-wall {
-  scrollbar-width: none !important; /* Firefox */
-}
-
-.rssapp-wall::-webkit-scrollbar {
-  display: none !important; /* Hide if not needed */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
 }
