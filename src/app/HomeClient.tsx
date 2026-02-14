@@ -77,8 +77,10 @@ function CommonNinjaLoader() {
       w.CommonNinja?.init?.();
     };
 
-    // Try immediately, then again shortly after mount for timing reliability
+    // Run once immediately in case script is already cached/loaded
     init();
+
+    // Run again shortly after mount to catch timing issues
     const t = window.setTimeout(init, 300);
 
     return () => window.clearTimeout(t);
@@ -86,6 +88,7 @@ function CommonNinjaLoader() {
 
   return (
     <Script
+      id="commonninja-sdk"
       src="https://cdn.commoninja.com/sdk/latest/commonninja.js"
       strategy="afterInteractive"
       onLoad={() => {
@@ -95,6 +98,7 @@ function CommonNinjaLoader() {
     />
   );
 }
+
 
 function HomeContent() {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
@@ -403,28 +407,31 @@ function HomeContent() {
           </div>
         </section>
 
-        {/* TIKTOK SLIDER SECTION */}
-        <section id="tiktok" className="mt-20">
-          <h2 className="text-3xl font-bold">Latest on TikTok</h2>
-          <p className="mt-2 text-white/70 mb-8">
-            Short-form performance clips showcasing character work, emotional range,
-            and voice acting challenges. Follow{" "}
-            <a
-              href="https://www.tiktok.com/@deanmillernarration"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#D4AF37] hover:underline"
-            >
-              @deanmillernarration
-            </a>{" "}
-            for regular updates.
-          </p>
+{/* TIKTOK SLIDER SECTION */}
+<section id="tiktok" className="mt-20">
+  <h2 className="text-3xl font-bold">Latest on TikTok</h2>
+  <p className="mt-2 text-white/70 mb-8">
+    Short-form performance clips showcasing character work, emotional range, and
+    voice acting challenges. Follow{" "}
+    <a
+      href="https://www.tiktok.com/@deanmillernarration"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-[#D4AF37] hover:underline"
+    >
+      @deanmillernarration
+    </a>{" "}
+    for regular updates.
+  </p>
 
-          <div
-            className="commonninja_component pid-02edfc2b-9cd6-4970-aae7-b4d5b880eb88"
-            style={{ width: "100%", minHeight: "500px" }}
-          ></div>
-        </section>
+  <div
+    className="commonninja_component pid-02edfc2b-9cd6-4970-aae7-b4d5b880eb88"
+    style={{ width: "100%", minHeight: "500px" }}
+  ></div>
+
+  <CommonNinjaLoader />
+</section>
+
 
         {/* ABOUT */}
         <section id="about" className="mt-20">
