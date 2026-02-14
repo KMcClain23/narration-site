@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import Script from "next/script";
 import { useRef, useEffect, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -64,6 +65,34 @@ function MediaLightbox({
         </div>
       </div>
     </div>
+  );
+}
+
+function CommonNinjaLoader() {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const init = () => {
+      const w = window as unknown as { CommonNinja?: { init?: () => void } };
+      w.CommonNinja?.init?.();
+    };
+
+    // Try immediately, then again shortly after mount for timing reliability
+    init();
+    const t = window.setTimeout(init, 300);
+
+    return () => window.clearTimeout(t);
+  }, []);
+
+  return (
+    <Script
+      src="https://cdn.commoninja.com/sdk/latest/commonninja.js"
+      strategy="afterInteractive"
+      onLoad={() => {
+        const w = window as unknown as { CommonNinja?: { init?: () => void } };
+        w.CommonNinja?.init?.();
+      }}
+    />
   );
 }
 
