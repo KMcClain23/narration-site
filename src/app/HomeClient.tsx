@@ -372,36 +372,35 @@ function HomeContent() {
           </div>
         </section>
 
-            {/* TIKTOK WALL WIDGET SECTION */}
-            <section id="tiktok" className="mt-20">
-              <h2 className="text-3xl font-bold">Latest on TikTok</h2>
-              <p className="mt-2 text-white/70 mb-8">
-                Short-form performance clips showcasing character work, emotional range,
-                and voice acting challenges. Follow{" "}
-                <a
-                  href="https://www.tiktok.com/@deanmillernarration"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[#D4AF37] hover:underline"
-                >
-                  @deanmillernarration
-                </a>{" "}
-                for regular updates.
-              </p>
+{/* TIKTOK CAROUSEL WIDGET SECTION */}
+<section id="tiktok" className="mt-20">
+  <h2 className="text-3xl font-bold">Latest on TikTok</h2>
+  <p className="mt-2 text-white/70 mb-8">
+    Short-form performance clips showcasing character work, emotional range,
+    and voice acting challenges. Follow{" "}
+    <a
+      href="https://www.tiktok.com/@deanmillernarration"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-[#D4AF37] hover:underline"
+    >
+      @deanmillernarration
+    </a>{" "}
+    for regular updates.
+  </p>
 
-              {/* RSS.app Wall Widget Embed */}
-              <div className="w-full min-h-[600px] rounded-2xl overflow-hidden border border-[#1A2550] bg-[#0B1224] shadow-lg">
-                {/* @ts-ignore - rssapp-wall is a custom web component loaded by external script */}
-                <rssapp-wall id="5PMV3hn65x16ilVo"></rssapp-wall>
-              </div>
+  {/* RSS.app Carousel Widget Embed */}
+  <div className="w-full min-h-[500px] rounded-2xl overflow-hidden border border-[#1A2550] bg-[#0B1224] shadow-lg">
+    {/* @ts-ignore - rssapp-carousel is a custom web component */}
+    <rssapp-carousel id="YOUR_NEW_CAROUSEL_ID_HERE"></rssapp-carousel>
+  </div>
 
-              {/* Load the RSS.app widget script */}
-              <Script
-                src="https://widget.rss.app/v1/wall.js"
-                strategy="afterInteractive"
-                type="text/javascript"
-              />
-            </section>
+  <Script
+    src="https://widget.rss.app/v1/carousel.js"  // or v1/wall.js if they share the script
+    strategy="afterInteractive"
+    type="text/javascript"
+  />
+</section>
 
         {/* ABOUT */}
         <section id="about" className="mt-20">
