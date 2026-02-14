@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import Script from "next/script";
 import { useRef, useEffect, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import TikTokCarousel from './components/TikTokCarousel'
+import TikTokCarousel from "./components/TikTokCarousel"; // ← Adjust path if your component is in a different folder
 
 /**
  * Isolated component to handle the "sent" success message.
@@ -68,9 +67,6 @@ function MediaLightbox({
     </div>
   );
 }
-
-
-
 
 function HomeContent() {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
@@ -379,27 +375,25 @@ function HomeContent() {
           </div>
         </section>
 
-{/* TIKTOK SLIDER SECTION */}
-<section id="tiktok" className="mt-20">
-  <h2 className="text-3xl font-bold">Latest on TikTok</h2>
-  <p className="mt-2 text-white/70 mb-8">
-    Short-form performance clips showcasing character work, emotional range, and
-    voice acting challenges. Follow{" "}
-    <a
-      href="https://www.tiktok.com/@deanmillernarration"
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-[#D4AF37] hover:underline"
-    >
-      @deanmillernarration
-    </a>{" "}
-    for regular updates.
-  </p>
+        {/* TIKTOK CAROUSEL SECTION */}
+        <section id="tiktok" className="mt-20">
+          <h2 className="text-3xl font-bold">Latest on TikTok</h2>
+          <p className="mt-2 text-white/70 mb-8">
+            Short-form performance clips showcasing character work, emotional range,
+            and voice acting challenges. Follow{" "}
+            <a
+              href="https://www.tiktok.com/@deanmillernarration"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#D4AF37] hover:underline"
+            >
+              @deanmillernarration
+            </a>{" "}
+            for regular updates.
+          </p>
 
-  {/* === Replace everything below with your custom component === */}
-  <TikTokCarousel />
-</section>
-
+          <TikTokCarousel />
+        </section>
 
         {/* ABOUT */}
         <section id="about" className="mt-20">
