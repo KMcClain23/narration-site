@@ -5,6 +5,7 @@ import Image from "next/image";
 import Script from "next/script";
 import { useRef, useEffect, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import TikTokCarousel from './components/TikTokCarousel'
 
 /**
  * Isolated component to handle the "sent" success message.
@@ -68,36 +69,7 @@ function MediaLightbox({
   );
 }
 
-function CommonNinjaLoader() {
-  useEffect(() => {
-    if (typeof window === "undefined") return;
 
-    const init = () => {
-      const w = window as unknown as { CommonNinja?: { init?: () => void } };
-      w.CommonNinja?.init?.();
-    };
-
-    // Run once immediately in case script is already cached/loaded
-    init();
-
-    // Run again shortly after mount to catch timing issues
-    const t = window.setTimeout(init, 300);
-
-    return () => window.clearTimeout(t);
-  }, []);
-
-  return (
-    <Script
-      id="commonninja-sdk"
-      src="https://cdn.commoninja.com/sdk/latest/commonninja.js"
-      strategy="afterInteractive"
-      onLoad={() => {
-        const w = window as unknown as { CommonNinja?: { init?: () => void } };
-        w.CommonNinja?.init?.();
-      }}
-    />
-  );
-}
 
 
 function HomeContent() {
@@ -424,12 +396,8 @@ function HomeContent() {
     for regular updates.
   </p>
 
-  <div
-    className="commonninja_component pid-02edfc2b-9cd6-4970-aae7-b4d5b880eb88"
-    style={{ width: "100%", minHeight: "500px" }}
-  ></div>
-
-  <CommonNinjaLoader />
+  {/* === Replace everything below with your custom component === */}
+  <TikTokCarousel />
 </section>
 
 
