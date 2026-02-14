@@ -16,10 +16,7 @@ export default function AudiobookNarratorPage() {
         <h1 className="text-4xl font-bold">Professional Audiobook Narrator for Hire</h1>
 
         <p className="text-lg">
-          I am Dean Miller, a professional audiobook narrator specializing in
-          character driven, emotionally immersive storytelling. I work with
-          authors and publishers to bring fiction to life through grounded
-          performance, natural dialogue, and clean, broadcast quality audio.
+          I am Dean Miller, a professional audiobook narrator working with authors and publishers on character driven, emotionally immersive fiction. I specialize in grounded performance, natural dialogue, and clean, broadcast quality audio that supports long-form listening. My focus is on clear communication, reliable turnaround, and performances that respect the emotional truth of the story.
         </p>
 
         {/* PRIMARY CTA: jump to the homepage contact section */}
@@ -82,16 +79,6 @@ export default function AudiobookNarratorPage() {
           timelines, or rate information, please reach out using the contact
           form on this site.
         </p>
-
-        {/* SECONDARY CTA: catches readers at the bottom */}
-        <div className="pt-2">
-          <a
-            href="/#contact"
-            className="inline-flex items-center justify-center rounded-md border border-black/20 px-6 py-3 font-semibold hover:border-black/40 transition"
-          >
-            Request availability
-          </a>
-        </div>
       </section>
     </main>
   );

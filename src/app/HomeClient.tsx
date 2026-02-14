@@ -75,6 +75,9 @@ function HomeContent() {
   const [lightboxSrc, setLightboxSrc] = useState("");
   const [lightboxTitle, setLightboxTitle] = useState("");
 
+  // Ensures 3rd-party embeds mount only after hydration
+  const [tiktokReady, setTiktokReady] = useState(false);
+
   const openLightbox = (src: string, title: string) => {
     setLightboxSrc(src);
     setLightboxTitle(title);
@@ -94,6 +97,11 @@ function HomeContent() {
         }, 100);
       }
     }
+  }, []);
+
+  // Allow TikTok embed to initialize only after the component mounts
+  useEffect(() => {
+    setTiktokReady(true);
   }, []);
 
   const handlePlay = (index: number) => {
@@ -173,7 +181,6 @@ function HomeContent() {
                 communication.
               </p>
 
-              {/* NEW INTERNAL LINK TO THE HIGH-INTENT SERVICE PAGE */}
               <p className="mt-4 text-sm text-white/70 max-w-2xl">
                 Looking to hire a professional audiobook narrator?{" "}
                 <Link
@@ -189,7 +196,8 @@ function HomeContent() {
                 multi-character dialogue.
               </p>
 
-             <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* EVENLY SPACED CTAs */}
+              <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <a
                   href="/#demos"
                   className="w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold hover:bg-[#E0C15A] transition"
@@ -211,7 +219,6 @@ function HomeContent() {
                   Audiobook narrator for hire
                 </a>
               </div>
-
 
               <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg hover:border-[#D4AF37]/50 transition">
@@ -397,15 +404,19 @@ function HomeContent() {
             for regular updates.
           </p>
 
-          <div
-            className="commonninja_component pid-02edfc2b-9cd6-4970-aae7-b4d5b880eb88"
-            style={{ width: "100%", minHeight: "500px" }}
-          />
+          {tiktokReady && (
+            <>
+              <div
+                className="commonninja_component pid-02edfc2b-9cd6-4970-aae7-b4d5b880eb88"
+                style={{ width: "100%", minHeight: "500px" }}
+              />
 
-          <Script
-            src="https://cdn.commoninja.com/sdk/latest/commonninja.js"
-            strategy="afterInteractive"
-          />
+              <Script
+                src="https://cdn.commoninja.com/sdk/latest/commonninja.js"
+                strategy="afterInteractive"
+              />
+            </>
+          )}
         </section>
 
         {/* ABOUT */}
