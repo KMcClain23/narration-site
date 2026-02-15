@@ -238,7 +238,7 @@ function HomeContent() {
               </div>
             </div>
 
-            {/* RIGHT HERO CARD (Updated At-a-glance) */}
+            {/* RIGHT HERO CARD */}
             <div className="md:col-span-5">
               <div className="relative rounded-2xl border border-[#1A2550] bg-[#050814] p-6 shadow-xl">
                 <p className="text-xs uppercase tracking-[0.22em] text-[#D4AF37]">
@@ -375,6 +375,37 @@ function HomeContent() {
           </div>
         </section>
 
+        {/* TIKTOK CAROUSEL WIDGET SECTION */}
+        <section id="tiktok" className="mt-20">
+          <h2 className="text-3xl font-bold">Latest on TikTok</h2>
+          <p className="mt-2 text-white/70 mb-8">
+            Short-form performance clips showcasing character work, emotional range,
+            and voice acting challenges. Follow{" "}
+            <a
+              href="https://www.tiktok.com/@deanmillernarration"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#D4AF37] hover:underline"
+            >
+              @deanmillernarration
+            </a>{" "}
+            for regular updates.
+          </p>
+
+          {/* RSS.app Carousel Widget Embed */}
+          <div className="w-full min-h-[500px] rounded-2xl overflow-hidden border border-[#1A2550] bg-[#0B1224] shadow-lg">
+            {/* @ts-ignore - rssapp-carousel is a custom web component loaded by external script */}
+            <rssapp-carousel id="5PMV3hn65x16ilVo"></rssapp-carousel>
+          </div>
+
+          {/* Load the RSS.app carousel script */}
+          <Script
+            src="https://widget.rss.app/v1/carousel.js"
+            strategy="afterInteractive"
+            type="text/javascript"
+          />
+        </section>
+
         {/* ABOUT */}
         <section id="about" className="mt-20">
           <h2 className="text-3xl font-bold">About</h2>
@@ -466,7 +497,6 @@ function HomeContent() {
                 value="https://narration-site.vercel.app/?sent=1#contact"
               />
 
-              {/* Suspense wrapper here fixes the build error */}
               <Suspense fallback={null}>
                 <SentMessage />
               </Suspense>
