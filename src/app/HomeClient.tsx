@@ -376,43 +376,6 @@ function HomeContent() {
           </div>
         </section>
 
-          {/* TIKTOK CAROUSEL WIDGET SECTION – Auto-height, snug fit, small margin/border */}
-          <section id="tiktok" className="mt-20">
-            <h2 className="text-3xl font-bold">Latest on TikTok</h2>
-            <p className="mt-2 text-white/70 mb-8">
-              Short-form performance clips showcasing character work, emotional range,
-              and voice acting challenges. Follow{" "}
-              <a
-                href="https://www.tiktok.com/@deanmillernarration"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#D4AF37] hover:underline"
-              >
-                @deanmillernarration
-              </a>{" "}
-              for regular updates.
-            </p>
-
-            {/* Outer container: centered, max width, small margin from sides */}
-            <div className="mx-4 sm:mx-6 lg:mx-8 max-w-7xl">
-              {/* Inner card: snug fit, subtle border & shadow */}
-              <div className="rounded-2xl border border-[#1A2550]/70 bg-[#0B1224] shadow-lg overflow-hidden">
-                {/* Padding around carousel so cards don't touch edges */}
-                <div className="p-4 sm:p-6">
-                  {/* @ts-ignore - rssapp-carousel is a custom web component */}
-                  <rssapp-carousel id="5PMV3hn65x16ilVo"></rssapp-carousel>
-                </div>
-              </div>
-            </div>
-
-            {/* Load the RSS.app carousel script */}
-            <Script
-              src="https://widget.rss.app/v1/carousel.js"
-              strategy="afterInteractive"
-              type="text/javascript"
-            />
-          </section>
-
         {/* ABOUT */}
         <section id="about" className="mt-20">
           <h2 className="text-3xl font-bold">About</h2>
