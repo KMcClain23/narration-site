@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import Script from "next/script";
+import TikTokCarousel from './components/TikTokCarousel';
 import { useRef, useEffect, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -375,7 +376,7 @@ function HomeContent() {
           </div>
         </section>
 
-          {/* TIKTOK CAROUSEL WIDGET SECTION – Fits content better with small margin/border */}
+          {/* TIKTOK CAROUSEL WIDGET SECTION – Auto-height, snug fit, small margin/border */}
           <section id="tiktok" className="mt-20">
             <h2 className="text-3xl font-bold">Latest on TikTok</h2>
             <p className="mt-2 text-white/70 mb-8">
@@ -392,12 +393,15 @@ function HomeContent() {
               for regular updates.
             </p>
 
-            {/* Container fits content + small margin/border */}
-            <div className="w-full rounded-2xl border border-[#1A2550]/80 bg-[#0B1224] shadow-lg overflow-hidden mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              {/* Inner wrapper with small padding/margin around the carousel */}
-              <div className="p-4 sm:p-6 lg:p-8">
-                {/* @ts-ignore - rssapp-carousel is a custom web component */}
-                <rssapp-carousel id="5PMV3hn65x16ilVo"></rssapp-carousel>
+            {/* Outer container: centered, max width, small margin from sides */}
+            <div className="mx-4 sm:mx-6 lg:mx-8 max-w-7xl">
+              {/* Inner card: snug fit, subtle border & shadow */}
+              <div className="rounded-2xl border border-[#1A2550]/70 bg-[#0B1224] shadow-lg overflow-hidden">
+                {/* Padding around carousel so cards don't touch edges */}
+                <div className="p-4 sm:p-6">
+                  {/* @ts-ignore - rssapp-carousel is a custom web component */}
+                  <rssapp-carousel id="5PMV3hn65x16ilVo"></rssapp-carousel>
+                </div>
               </div>
             </div>
 
