@@ -67,6 +67,121 @@ function MediaLightbox({
   );
 }
 
+function ProofPoints() {
+  return (
+    <>
+      {/* Mobile: single clean strip */}
+      <div className="sm:hidden mt-7 rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg">
+        <p className="text-sm font-semibold text-white">Quick highlights</p>
+        <ul className="mt-2 space-y-2 text-sm text-white/75">
+          <li>• Broadcast-ready workflow</li>
+          <li>• Reliable turnaround</li>
+          <li>• Easy to direct</li>
+        </ul>
+      </div>
+
+      {/* Desktop: three cards */}
+      <div className="hidden sm:grid mt-8 grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50">
+          <p className="font-semibold text-white">Broadcast-ready workflow</p>
+          <p className="mt-1 text-sm text-white/70">Clean, consistent delivery</p>
+        </div>
+
+        <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50">
+          <p className="font-semibold text-white">Reliable turnaround</p>
+          <p className="mt-1 text-sm text-white/70">Clear deadlines and updates</p>
+        </div>
+
+        <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50">
+          <p className="font-semibold text-white">Easy to direct</p>
+          <p className="mt-1 text-sm text-white/70">Notes, pickups, fast revisions</p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function AtAGlanceCard({
+  onOpenLightbox,
+}: {
+  onOpenLightbox: (src: string, title: string) => void;
+}) {
+  return (
+    <div className="relative rounded-2xl border border-[#1A2550] bg-[#050814] p-6 shadow-xl">
+      <p className="text-xs uppercase tracking-[0.22em] text-[#D4AF37]">At a glance</p>
+
+      <p className="mt-2 text-lg font-semibold text-white">
+        Dean Miller, Audiobook Narrator
+      </p>
+
+      <p className="mt-1 text-sm text-white/70 leading-relaxed">
+        Character-forward performance, clean audio, and direction-friendly workflow.
+      </p>
+
+      <div className="mt-5 grid grid-cols-1 gap-4">
+        <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
+          <p className="text-xs uppercase tracking-wide text-[#D4AF37]">Focus</p>
+          <p className="mt-2 text-sm text-white/80 leading-relaxed">
+            Fiction and narrative nonfiction. Strong in romance, romantasy, drama,
+            thriller, and multi-character dialogue.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
+          <p className="text-xs uppercase tracking-wide text-[#D4AF37]">Studio</p>
+          <p className="mt-2 text-sm text-white/80 leading-relaxed">
+            Broadcast-ready home studio. Shure MV7+, treated space, consistent edits.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
+          <p className="text-xs uppercase tracking-wide text-[#D4AF37]">Media kit</p>
+
+          <p className="mt-2 text-sm text-white/70">Click to enlarge.</p>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => onOpenLightbox("/dean-profile.png", "Logo")}
+                className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60"
+                aria-label="Open logo"
+              >
+                <Image
+                  src="/dean-profile.png"
+                  alt="Dean Miller logo"
+                  fill
+                  className="object-contain p-2"
+                />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onOpenLightbox("/dean-headshot.jpg", "Headshot")}
+                className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60"
+                aria-label="Open headshot"
+              >
+                <Image
+                  src="/dean-headshot.jpg"
+                  alt="Dean Miller headshot"
+                  fill
+                  className="object-cover"
+                />
+              </button>
+            </div>
+
+            <div className="md:pl-2">
+              <p className="text-sm text-white/80 leading-relaxed">
+                Logo and headshot available for producer packets and author sites.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HomeContent() {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
 
@@ -155,39 +270,34 @@ function HomeContent() {
           <div className="absolute inset-0 bg-gradient-to-b from-[#050814]/85 via-[#050814]/75 to-[#050814]" />
         </div>
 
-        <div className="relative max-w-6xl mx-auto px-5 sm:px-6 py-12 sm:py-16 md:py-20">
+        <div className="relative max-w-6xl mx-auto px-5 sm:px-6 py-10 sm:py-14 md:py-20">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-10 items-start">
             {/* LEFT HERO */}
             <div className="md:col-span-7">
-              {/* Mobile-friendly kicker (hide your all-caps line on mobile) */}
-              <p className="hidden sm:block text-xs tracking-[0.28em] text-white/70 uppercase">
-                Audiobook narrator for fiction and narrative nonfiction.
-              </p>
-
-              {/* Mobile kicker alternative */}
               <p className="sm:hidden text-[11px] tracking-[0.18em] text-white/65 uppercase">
                 Audiobook Narrator
+              </p>
+              <p className="hidden sm:block text-xs tracking-[0.28em] text-white/70 uppercase">
+                Audiobook narrator for fiction and narrative nonfiction.
               </p>
 
               <h1 className="mt-3 sm:mt-4 text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.05]">
                 Dean Miller
               </h1>
 
-              {/* Tight mobile value prop, larger desktop paragraph */}
               <p className="mt-4 text-base sm:text-lg md:text-xl text-white/85 max-w-2xl leading-relaxed">
                 <span className="sm:hidden">
-                  Character-driven narration with clean character separation and
-                  clear emotional beats.
+                  Character-driven narration with clean character separation and clear
+                  emotional beats.
                 </span>
                 <span className="hidden sm:inline">
-                  Character-driven audiobook narration with clear emotional beats,
-                  clean character separation, consistent audio, and fast, reliable
-                  communication.
+                  Character-driven audiobook narration with clear emotional beats, clean
+                  character separation, consistent audio, and fast, reliable communication.
                 </span>
               </p>
 
-              {/* CTAs (2 buttons on mobile, third becomes a link) */}
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Clean CTAs */}
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
                 <a
                   href="/#demos"
                   className="w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A]"
@@ -201,18 +311,10 @@ function HomeContent() {
                 >
                   Request availability
                 </a>
-
-                {/* Desktop-only third button */}
-                <a
-                  href="/audiobook-narrator"
-                  className="hidden sm:inline-flex w-full items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold transition hover:border-white/60"
-                >
-                  Audiobook narrator for hire
-                </a>
               </div>
 
-              {/* Mobile-only services link */}
-              <div className="mt-4 sm:hidden">
+              {/* One clean link, no extra paragraphs above the fold */}
+              <div className="mt-4">
                 <Link
                   href="/audiobook-narrator"
                   className="text-sm text-[#D4AF37] hover:underline"
@@ -221,150 +323,18 @@ function HomeContent() {
                 </Link>
               </div>
 
-              {/* Move dense copy below CTAs, and clean up */}
-              <div className="mt-6 space-y-3 max-w-2xl">
-                <p className="text-sm text-white/70 leading-relaxed">
-                  Looking to hire a professional audiobook narrator?{" "}
-                  <Link
-                    href="/audiobook-narrator"
-                    className="hidden sm:inline text-[#D4AF37] hover:underline"
-                  >
-                    Learn more about my audiobook narration services.
-                  </Link>
-                </p>
+              {/* Optional supporting line, kept short */}
+              <p className="mt-3 text-sm text-white/70 max-w-2xl leading-relaxed">
+                Strong in romance, romantasy, drama, thriller, and multi-character dialogue.
+              </p>
 
-                <p className="text-sm text-white/70 leading-relaxed">
-                  Particularly strong in romance, romantasy, drama, thriller, and
-                  multi-character dialogue.
-                </p>
-              </div>
-
-              {/* Quick proof row (reads clean on mobile) */}
-              <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg transition hover:border-[#D4AF37]/50">
-                  <p className="font-semibold text-white text-sm">
-                    Broadcast-ready workflow
-                  </p>
-                  <p className="mt-1 text-xs text-white/70">
-                    Clean, consistent delivery
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg transition hover:border-[#D4AF37]/50">
-                  <p className="font-semibold text-white text-sm">
-                    Reliable turnaround
-                  </p>
-                  <p className="mt-1 text-xs text-white/70">
-                    Clear deadlines and updates
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg transition hover:border-[#D4AF37]/50">
-                  <p className="font-semibold text-white text-sm">Easy to direct</p>
-                  <p className="mt-1 text-xs text-white/70">
-                    Notes, pickups, fast revisions
-                  </p>
-                </div>
-              </div>
+              <ProofPoints />
             </div>
 
-            {/* RIGHT HERO CARD */}
-            <div className="md:col-span-5">
-              <div className="relative rounded-2xl border border-[#1A2550] bg-[#050814] p-5 sm:p-6 shadow-xl">
-                <p className="text-xs uppercase tracking-[0.22em] text-[#D4AF37]">
-                  At a glance
-                </p>
-
-                <p className="mt-2 text-lg font-semibold text-white">
-                  Dean Miller, Audiobook Narrator
-                </p>
-
-                <p className="mt-1 text-sm text-white/70 leading-relaxed">
-                  Character-forward performance, clean audio, and direction-friendly
-                  workflow.
-                </p>
-
-                <div className="mt-5 grid grid-cols-1 gap-4">
-                  <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
-                    <p className="text-xs uppercase tracking-wide text-[#D4AF37]">
-                      Focus
-                    </p>
-                    <p className="mt-2 text-sm text-white/80 leading-relaxed">
-                      Fiction and narrative nonfiction. Strong in romance,
-                      romantasy, drama, thriller, and multi-character dialogue.
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
-                    <p className="text-xs uppercase tracking-wide text-[#D4AF37]">
-                      Studio
-                    </p>
-                    <p className="mt-2 text-sm text-white/80 leading-relaxed">
-                      Broadcast-ready home studio. Shure MV7+, treated space,
-                      consistent edits.
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
-                    <p className="text-xs uppercase tracking-wide text-[#D4AF37]">
-                      Media kit
-                    </p>
-
-                    <p className="mt-2 text-sm text-white/70">Click to enlarge.</p>
-
-                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
-                      <div className="grid grid-cols-2 gap-4">
-                        <button
-                          type="button"
-                          onClick={() => openLightbox("/dean-profile.png", "Logo")}
-                          className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60"
-                          aria-label="Open logo"
-                        >
-                          <Image
-                            src="/dean-profile.png"
-                            alt="Dean Miller logo"
-                            fill
-                            className="object-contain p-2"
-                          />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => openLightbox("/dean-headshot.jpg", "Headshot")}
-                          className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60"
-                          aria-label="Open headshot"
-                        >
-                          <Image
-                            src="/dean-headshot.jpg"
-                            alt="Dean Miller headshot"
-                            fill
-                            className="object-cover"
-                          />
-                        </button>
-                      </div>
-
-                      <div className="sm:pl-2">
-                        <p className="text-sm text-white/80 leading-relaxed">
-                          Logo and headshot available for producer packets and author
-                          sites.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Mobile-only quick link to demos */}
-                  <div className="sm:hidden">
-                    <a
-                      href="/#demos"
-                      className="inline-flex w-full items-center justify-center rounded-md border border-white/25 px-4 py-2 text-sm font-semibold transition hover:border-white/60"
-                    >
-                      Jump to demos
-                    </a>
-                  </div>
-                </div>
-              </div>
+            {/* RIGHT HERO CARD (desktop only for clean mobile) */}
+            <div className="hidden md:block md:col-span-5">
+              <AtAGlanceCard onOpenLightbox={openLightbox} />
             </div>
-            {/* END RIGHT HERO CARD */}
           </div>
         </div>
       </section>
@@ -405,14 +375,18 @@ function HomeContent() {
                   <div className="mt-4 rounded-lg border border-[#1A2550] bg-[#050814] p-4">
                     <p className="text-sm text-white/70">Demo link not added yet.</p>
                     <p className="mt-1 text-xs text-white/50">
-                      Paste an MP3 URL into this demo’s <code>src</code> to enable
-                      playback.
+                      Paste an MP3 URL into this demo’s <code>src</code> to enable playback.
                     </p>
                   </div>
                 )}
               </div>
             ))}
           </div>
+        </section>
+
+        {/* AT A GLANCE (mobile only, placed after demos for cleaner hero) */}
+        <section className="mt-14 md:hidden">
+          <AtAGlanceCard onOpenLightbox={openLightbox} />
         </section>
 
         {/* ABOUT */}
