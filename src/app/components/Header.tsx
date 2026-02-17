@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FaTiktok, FaInstagram, FaDiscord } from "react-icons/fa";
-import { HiMenu, HiX } from "react-icons/hi"; // Hamburger and Close icons
+import { HiMenu, HiX } from "react-icons/hi";
+import { usePathname } from "next/navigation";
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
 
-  const toggleMenu = () => setIsOpen(!isOpen);
+  const toggleMenu = () => setIsOpen((v) => !v);
+  const closeMenu = () => setIsOpen(false);
 
   const navLinks = [
     { name: "Demos", href: "/#demos" },
@@ -16,11 +19,44 @@ export default function Header() {
     { name: "Contact", href: "/#contact" },
   ];
 
+  // Close mobile menu on route change (works for non-hash navigation)
+  useEffect(() => {
+    closeMenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  // Close on Escape
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeMenu();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // Handle same-page hash navigation with smooth scroll + close menu
+  const handleNavClick = (href: string) => {
+    closeMenu();
+
+    const isHashLink = href.includes("#");
+    const isHome = pathname === "/";
+
+    if (isHashLink && isHome) {
+      const hash = href.split("#")[1];
+      if (!hash) return;
+
+      requestAnimationFrame(() => {
+        const el = document.getElementById(hash);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  };
+
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-black/60 backdrop-blur">
-      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-black/50 backdrop-blur">
+      <div className="max-w-6xl mx-auto px-5 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
         {/* Logo / Name */}
-        <a href="/" className="flex items-center gap-3">
+        <a href="/" className="flex items-center gap-3" onClick={closeMenu}>
           <div className="h-9 w-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center text-sm font-semibold text-white">
             DM
           </div>
@@ -30,56 +66,161 @@ export default function Header() {
           </div>
         </a>
 
-        {/* Right Section: Desktop Nav + Socials + Hamburger */}
-        <div className="flex items-center gap-6">
-          {/* Desktop Nav Links (Hidden on small screens) */}
+        {/* Right Section */}
+        <div className="flex items-center gap-4 sm:gap-6">
+          {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-6 text-sm text-white/80">
             {navLinks.map((link) => (
-              <a key={link.name} className="hover:text-white transition" href={link.href}>
+              <a
+                key={link.name}
+                className="hover:text-white transition"
+                href={link.href}
+                onClick={() => handleNavClick(link.href)}
+              >
                 {link.name}
               </a>
             ))}
           </nav>
 
-          {/* Social Icons (Visible on all screens) */}
+          {/* Desktop CTA */}
+          <a
+            href="/#contact"
+            onClick={() => handleNavClick("/#contact")}
+            className="hidden md:inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-2 text-sm font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
+          >
+            Request availability
+          </a>
+
+          {/* Social Icons */}
           <div className="flex items-center gap-4 text-xl">
-            <a href="https://www.tiktok.com/@deanmillernarration" target="_blank" rel="noopener noreferrer" className="text-white/80 hover:text-[#D4AF37] transition" aria-label="TikTok">
+            {/* Mobile: only TikTok */}
+            <a
+              href="https://www.tiktok.com/@deanmillernarration"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="md:hidden text-white/80 hover:text-[#D4AF37] transition"
+              aria-label="TikTok"
+            >
               <FaTiktok />
             </a>
-            <a href="https://www.instagram.com/deanmillernarrator" target="_blank" rel="noopener noreferrer" className="text-white/80 hover:text-[#D4AF37] transition" aria-label="Instagram">
-              <FaInstagram />
-            </a>
-            <a href="https://discord.com/users/1425271466538045512" target="_blank" rel="noopener noreferrer" className="text-white/80 hover:text-[#D4AF37] transition" aria-label="Discord">
-              <FaDiscord />
-            </a>
+
+            {/* Desktop: all socials */}
+            <div className="hidden md:flex items-center gap-4 text-xl">
+              <a
+                href="https://www.tiktok.com/@deanmillernarration"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white/80 hover:text-[#D4AF37] transition"
+                aria-label="TikTok"
+              >
+                <FaTiktok />
+              </a>
+              <a
+                href="https://www.instagram.com/deanmillernarrator"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white/80 hover:text-[#D4AF37] transition"
+                aria-label="Instagram"
+              >
+                <FaInstagram />
+              </a>
+              <a
+                href="https://discord.com/users/1425271466538045512"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white/80 hover:text-[#D4AF37] transition"
+                aria-label="Discord"
+              >
+                <FaDiscord />
+              </a>
+            </div>
           </div>
 
           {/* Hamburger Button (Mobile only) */}
-          <button 
-            className="md:hidden text-2xl text-white/80 hover:text-white"
+          <button
+            className="md:hidden text-2xl text-white/80 hover:text-white transition"
             onClick={toggleMenu}
             aria-label="Toggle Menu"
+            aria-expanded={isOpen}
           >
             {isOpen ? <HiX /> : <HiMenu />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Menu Dropdown (Animated visibility) */}
-      <div className={`${isOpen ? "block" : "hidden"} md:hidden bg-black/90 border-t border-white/10`}>
-        <nav className="flex flex-col p-6 gap-4">
-          {navLinks.map((link) => (
-            <a 
-              key={link.name} 
-              className="text-white/80 hover:text-white text-lg font-medium" 
-              href={link.href}
-              onClick={() => setIsOpen(false)}
-            > 
-              {link.name}
-            </a>
-          ))}
-        </nav>
-      </div>
+      {/* Mobile Menu */}
+      {isOpen ? (
+        <div className="md:hidden border-t border-white/10 bg-black/70 backdrop-blur">
+          <nav className="max-w-6xl mx-auto px-5 sm:px-6 py-4">
+            {/* Mobile socials moved into menu */}
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-[0.22em] text-white/60">
+                Social
+              </p>
+              <div className="flex items-center gap-4 text-xl">
+                <a
+                  href="https://www.tiktok.com/@deanmillernarration"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white/80 hover:text-[#D4AF37] transition"
+                  aria-label="TikTok"
+                >
+                  <FaTiktok />
+                </a>
+                <a
+                  href="https://www.instagram.com/deanmillernarrator"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white/80 hover:text-[#D4AF37] transition"
+                  aria-label="Instagram"
+                >
+                  <FaInstagram />
+                </a>
+                <a
+                  href="https://discord.com/users/1425271466538045512"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white/80 hover:text-[#D4AF37] transition"
+                  aria-label="Discord"
+                >
+                  <FaDiscord />
+                </a>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-2">
+              {navLinks.map((link) => (
+                <a
+                  key={link.name}
+                  className="rounded-lg px-3 py-3 text-white/85 hover:text-white hover:bg-white/5 transition text-base font-medium"
+                  href={link.href}
+                  onClick={() => handleNavClick(link.href)}
+                >
+                  {link.name}
+                </a>
+              ))}
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <a
+                href="/#demos"
+                onClick={() => handleNavClick("/#demos")}
+                className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-4 py-3 font-semibold transition hover:bg-[#E0C15A]"
+              >
+                Listen to demos
+              </a>
+
+              <a
+                href="/#contact"
+                onClick={() => handleNavClick("/#contact")}
+                className="inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-3 font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
+              >
+                Request availability
+              </a>
+            </div>
+          </nav>
+        </div>
+      ) : null}
     </header>
   );
 }
