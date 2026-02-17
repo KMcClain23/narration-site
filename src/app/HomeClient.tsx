@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import Script from "next/script";
 import { useRef, useEffect, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -53,7 +52,7 @@ function MediaLightbox({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-white/20 px-3 py-1 text-sm text-white/80 hover:border-white/40 hover:text-white transition"
+            className="rounded-md border border-white/20 px-3 py-1 text-sm text-white/80 transition hover:border-white/40 hover:text-white"
             aria-label="Close"
           >
             Close
@@ -156,82 +155,113 @@ function HomeContent() {
           <div className="absolute inset-0 bg-gradient-to-b from-[#050814]/85 via-[#050814]/75 to-[#050814]" />
         </div>
 
-        <div className="relative max-w-6xl mx-auto px-6 py-16 md:py-20">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-10 items-center">
+        <div className="relative max-w-6xl mx-auto px-5 sm:px-6 py-12 sm:py-16 md:py-20">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-10 items-start">
+            {/* LEFT HERO */}
             <div className="md:col-span-7">
-              <p className="text-xs tracking-[0.28em] text-white/70 uppercase">
+              {/* Mobile-friendly kicker (hide your all-caps line on mobile) */}
+              <p className="hidden sm:block text-xs tracking-[0.28em] text-white/70 uppercase">
                 Audiobook narrator for fiction and narrative nonfiction.
               </p>
 
-              <h1 className="mt-4 text-4xl md:text-6xl font-bold leading-tight">
+              {/* Mobile kicker alternative */}
+              <p className="sm:hidden text-[11px] tracking-[0.18em] text-white/65 uppercase">
+                Audiobook Narrator
+              </p>
+
+              <h1 className="mt-3 sm:mt-4 text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.05]">
                 Dean Miller
               </h1>
 
-              <p className="mt-5 text-lg md:text-xl text-white/80 max-w-2xl">
-                Character-driven audiobook narration with clear emotional beats,
-                clean character separation, consistent audio, and fast, reliable
-                communication.
+              {/* Tight mobile value prop, larger desktop paragraph */}
+              <p className="mt-4 text-base sm:text-lg md:text-xl text-white/85 max-w-2xl leading-relaxed">
+                <span className="sm:hidden">
+                  Character-driven narration with clean character separation and
+                  clear emotional beats.
+                </span>
+                <span className="hidden sm:inline">
+                  Character-driven audiobook narration with clear emotional beats,
+                  clean character separation, consistent audio, and fast, reliable
+                  communication.
+                </span>
               </p>
 
-              <p className="mt-4 text-sm text-white/70 max-w-2xl">
-                Looking to hire a professional audiobook narrator?{" "}
-                <Link
-                  href="/audiobook-narrator"
-                  className="text-[#D4AF37] hover:underline"
-                >
-                  Learn more about my audiobook narration services.
-                </Link>
-              </p>
-
-              <p className="mt-3 text-sm text-white/70 max-w-2xl">
-                Particularly strong in romance, romantasy, drama, thriller, and
-                multi-character dialogue.
-              </p>
-
-              {/* EVENLY SPACED CTAs */}
-              <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* CTAs (2 buttons on mobile, third becomes a link) */}
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <a
                   href="/#demos"
-                  className="w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold hover:bg-[#E0C15A] transition"
+                  className="w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A]"
                 >
                   Listen to demos
                 </a>
 
                 <a
                   href="/#contact"
-                  className="w-full inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold hover:border-white/60 transition"
+                  className="w-full inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold transition hover:border-white/60"
                 >
                   Request availability
                 </a>
 
+                {/* Desktop-only third button */}
                 <a
                   href="/audiobook-narrator"
-                  className="w-full inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold hover:border-white/60 transition"
+                  className="hidden sm:inline-flex w-full items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold transition hover:border-white/60"
                 >
                   Audiobook narrator for hire
                 </a>
               </div>
 
-              <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg hover:border-[#D4AF37]/50 transition">
-                  <p className="font-semibold text-white">
+              {/* Mobile-only services link */}
+              <div className="mt-4 sm:hidden">
+                <Link
+                  href="/audiobook-narrator"
+                  className="text-sm text-[#D4AF37] hover:underline"
+                >
+                  Learn about services and rates
+                </Link>
+              </div>
+
+              {/* Move dense copy below CTAs, and clean up */}
+              <div className="mt-6 space-y-3 max-w-2xl">
+                <p className="text-sm text-white/70 leading-relaxed">
+                  Looking to hire a professional audiobook narrator?{" "}
+                  <Link
+                    href="/audiobook-narrator"
+                    className="hidden sm:inline text-[#D4AF37] hover:underline"
+                  >
+                    Learn more about my audiobook narration services.
+                  </Link>
+                </p>
+
+                <p className="text-sm text-white/70 leading-relaxed">
+                  Particularly strong in romance, romantasy, drama, thriller, and
+                  multi-character dialogue.
+                </p>
+              </div>
+
+              {/* Quick proof row (reads clean on mobile) */}
+              <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg transition hover:border-[#D4AF37]/50">
+                  <p className="font-semibold text-white text-sm">
                     Broadcast-ready workflow
                   </p>
-                  <p className="mt-1 text-sm text-white/70">
+                  <p className="mt-1 text-xs text-white/70">
                     Clean, consistent delivery
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg hover:border-[#D4AF37]/50 transition">
-                  <p className="font-semibold text-white">Reliable turnaround</p>
-                  <p className="mt-1 text-sm text-white/70">
+                <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg transition hover:border-[#D4AF37]/50">
+                  <p className="font-semibold text-white text-sm">
+                    Reliable turnaround
+                  </p>
+                  <p className="mt-1 text-xs text-white/70">
                     Clear deadlines and updates
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg hover:border-[#D4AF37]/50 transition">
-                  <p className="font-semibold text-white">Easy to direct</p>
-                  <p className="mt-1 text-sm text-white/70">
+                <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg transition hover:border-[#D4AF37]/50">
+                  <p className="font-semibold text-white text-sm">Easy to direct</p>
+                  <p className="mt-1 text-xs text-white/70">
                     Notes, pickups, fast revisions
                   </p>
                 </div>
@@ -240,7 +270,7 @@ function HomeContent() {
 
             {/* RIGHT HERO CARD */}
             <div className="md:col-span-5">
-              <div className="relative rounded-2xl border border-[#1A2550] bg-[#050814] p-6 shadow-xl">
+              <div className="relative rounded-2xl border border-[#1A2550] bg-[#050814] p-5 sm:p-6 shadow-xl">
                 <p className="text-xs uppercase tracking-[0.22em] text-[#D4AF37]">
                   At a glance
                 </p>
@@ -249,7 +279,7 @@ function HomeContent() {
                   Dean Miller, Audiobook Narrator
                 </p>
 
-                <p className="mt-1 text-sm text-white/70">
+                <p className="mt-1 text-sm text-white/70 leading-relaxed">
                   Character-forward performance, clean audio, and direction-friendly
                   workflow.
                 </p>
@@ -259,7 +289,7 @@ function HomeContent() {
                     <p className="text-xs uppercase tracking-wide text-[#D4AF37]">
                       Focus
                     </p>
-                    <p className="mt-2 text-sm text-white/80">
+                    <p className="mt-2 text-sm text-white/80 leading-relaxed">
                       Fiction and narrative nonfiction. Strong in romance,
                       romantasy, drama, thriller, and multi-character dialogue.
                     </p>
@@ -269,7 +299,7 @@ function HomeContent() {
                     <p className="text-xs uppercase tracking-wide text-[#D4AF37]">
                       Studio
                     </p>
-                    <p className="mt-2 text-sm text-white/80">
+                    <p className="mt-2 text-sm text-white/80 leading-relaxed">
                       Broadcast-ready home studio. Shure MV7+, treated space,
                       consistent edits.
                     </p>
@@ -282,13 +312,12 @@ function HomeContent() {
 
                     <p className="mt-2 text-sm text-white/70">Click to enlarge.</p>
 
-                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                      {/* LEFT: 50% images */}
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
                       <div className="grid grid-cols-2 gap-4">
                         <button
                           type="button"
                           onClick={() => openLightbox("/dean-profile.png", "Logo")}
-                          className="relative h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] hover:border-[#D4AF37]/60 transition"
+                          className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60"
                           aria-label="Open logo"
                         >
                           <Image
@@ -302,7 +331,7 @@ function HomeContent() {
                         <button
                           type="button"
                           onClick={() => openLightbox("/dean-headshot.jpg", "Headshot")}
-                          className="relative h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] hover:border-[#D4AF37]/60 transition"
+                          className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60"
                           aria-label="Open headshot"
                         >
                           <Image
@@ -314,13 +343,23 @@ function HomeContent() {
                         </button>
                       </div>
 
-                      {/* RIGHT: 50% text */}
-                      <div className="md:pl-2">
+                      <div className="sm:pl-2">
                         <p className="text-sm text-white/80 leading-relaxed">
-                          Logo and headshot available for producer packets and author sites.
+                          Logo and headshot available for producer packets and author
+                          sites.
                         </p>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Mobile-only quick link to demos */}
+                  <div className="sm:hidden">
+                    <a
+                      href="/#demos"
+                      className="inline-flex w-full items-center justify-center rounded-md border border-white/25 px-4 py-2 text-sm font-semibold transition hover:border-white/60"
+                    >
+                      Jump to demos
+                    </a>
                   </div>
                 </div>
               </div>
@@ -331,9 +370,9 @@ function HomeContent() {
       </section>
 
       {/* CONTENT */}
-      <div className="max-w-6xl mx-auto px-6 py-14">
+      <div className="max-w-6xl mx-auto px-5 sm:px-6 py-12 sm:py-14">
         {/* DEMOS */}
-        <section id="demos" className="mt-2">
+        <section id="demos" className="mt-2 scroll-mt-24">
           <h2 className="text-3xl font-bold">Featured demos</h2>
           <p className="mt-2 text-white/70">
             Short, targeted clips. Click play and you will know fast.
@@ -343,7 +382,7 @@ function HomeContent() {
             {demos.map((demo, index) => (
               <div
                 key={demo.title}
-                className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg hover:border-[#D4AF37]/50 transition"
+                className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50"
               >
                 <p className="font-semibold text-lg text-white">{demo.title}</p>
                 <p className="mt-1 text-sm text-white/70">{demo.desc}</p>
@@ -366,7 +405,8 @@ function HomeContent() {
                   <div className="mt-4 rounded-lg border border-[#1A2550] bg-[#050814] p-4">
                     <p className="text-sm text-white/70">Demo link not added yet.</p>
                     <p className="mt-1 text-xs text-white/50">
-                      Paste an MP3 URL into this demo’s <code>src</code> to enable playback.
+                      Paste an MP3 URL into this demo’s <code>src</code> to enable
+                      playback.
                     </p>
                   </div>
                 )}
@@ -376,7 +416,7 @@ function HomeContent() {
         </section>
 
         {/* ABOUT */}
-        <section id="about" className="mt-20">
+        <section id="about" className="mt-20 scroll-mt-24">
           <h2 className="text-3xl font-bold">About</h2>
           <div className="mt-6 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
             <div className="md:col-span-8">
@@ -435,7 +475,7 @@ function HomeContent() {
         </section>
 
         {/* CONTACT */}
-        <section id="contact" className="mt-20">
+        <section id="contact" className="mt-20 scroll-mt-24">
           <h2 className="text-3xl font-bold">Contact</h2>
           <p className="mt-2 text-white/70">
             Send word count, deadline, genre, and any character notes. I will reply
@@ -506,7 +546,7 @@ function HomeContent() {
 
               <button
                 type="submit"
-                className="mt-5 inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold hover:bg-[#E0C15A] transition w-full"
+                className="mt-5 inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A] w-full"
               >
                 Request availability
               </button>
@@ -569,4 +609,4 @@ function HomeContent() {
 
 export default function HomeClient() {
   return <HomeContent />;
-} 
+}
