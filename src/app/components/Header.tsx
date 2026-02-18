@@ -22,13 +22,11 @@ export default function Header() {
     { name: "Contact", href: "/#contact" },
   ];
 
-  // Close mobile menu on route change
   useEffect(() => {
     closeMenu();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  // Close on Escape
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeMenu();
@@ -37,7 +35,6 @@ export default function Header() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Smooth scroll for hash links when already on home
   const handleNavClick = (href: string) => {
     closeMenu();
 
@@ -56,7 +53,14 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-black/50 backdrop-blur">
+    <header
+      className="
+        sticky top-0 z-50
+        border-b border-white/10
+        bg-gradient-to-b from-black/70 via-black/55 to-black/35
+        backdrop-blur-xl
+      "
+    >
       <div className="max-w-6xl mx-auto px-5 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
         {/* Logo / Name */}
         <a href="/" className="flex items-center gap-3" onClick={closeMenu}>
@@ -85,12 +89,20 @@ export default function Header() {
             ))}
           </nav>
 
-          {/* Desktop CTA: goes to Bookings */}
+          {/* Desktop CTA */}
           <a
             href={BOOKINGS_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden md:inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-2 text-sm font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
+            className="
+              hidden md:inline-flex items-center justify-center
+              rounded-md border border-white/20
+              bg-white/5
+              px-4 py-2 text-sm font-semibold
+              text-white/90
+              hover:border-white/40 hover:bg-white/10 hover:text-white
+              transition
+            "
           >
             Request availability
           </a>
@@ -140,7 +152,7 @@ export default function Header() {
             </div>
           </div>
 
-          {/* Hamburger Button */}
+          {/* Hamburger */}
           <button
             className="md:hidden text-2xl text-white/80 hover:text-white transition"
             onClick={toggleMenu}
@@ -154,7 +166,7 @@ export default function Header() {
 
       {/* Mobile Menu */}
       {isOpen ? (
-        <div className="md:hidden border-t border-white/10 bg-black/70 backdrop-blur">
+        <div className="md:hidden border-t border-white/10 bg-black/75 backdrop-blur-xl">
           <nav className="max-w-6xl mx-auto px-5 sm:px-6 py-4">
             {/* Mobile socials in menu */}
             <div className="flex items-center justify-between">
