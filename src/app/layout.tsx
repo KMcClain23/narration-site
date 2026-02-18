@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import Script from "next/script";
-import { Geist, Geist_Mono } from "next/font/google";
 import Header from "./components/Header";
 import "./globals.css";
+import { Geist, Geist_Mono } from "next/font/google";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,13 +15,10 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://dmnarration.com"),
-
   title:
     "Hire Dean Miller | Professional Audiobook Narrator | Character Driven Performance",
-
   description:
     "Professional audiobook narrator delivering emotionally grounded, character driven performances across fiction genres. Broadcast quality audio, fast turnaround, and collaborative production.",
-
   openGraph: {
     title:
       "Hire Dean Miller | Professional Audiobook Narrator | Character Driven Performance",
@@ -41,7 +37,6 @@ export const metadata: Metadata = {
     locale: "en_US",
     type: "website",
   },
-
   twitter: {
     card: "summary_large_image",
     title:
@@ -83,8 +78,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="scroll-smooth scroll-pt-24">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html
+      lang="en"
+      className={`scroll-smooth scroll-pt-24 ${geistSans.variable} ${geistMono.variable}`}
+    >
+      <body className="antialiased bg-[#050814] text-white min-h-screen">
         <Header />
 
         <script

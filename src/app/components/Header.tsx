@@ -23,13 +23,11 @@ export default function Header() {
     { name: "Contact", href: "/#contact" },
   ];
 
-  // Close mobile menu on route change
   useEffect(() => {
     closeMenu();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  // Close on Escape
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeMenu();
@@ -38,17 +36,13 @@ export default function Header() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Track scroll state so header blends with hero (no gray bar)
   useEffect(() => {
-    const onScroll = () => {
-      setIsScrolled(window.scrollY > 8);
-    };
+    const onScroll = () => setIsScrolled(window.scrollY > 10);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Smooth scroll for hash links when already on home
   const handleNavClick = (href: string) => {
     closeMenu();
 
@@ -69,17 +63,15 @@ export default function Header() {
   const headerBase =
     "sticky top-0 z-50 transition-colors duration-200 backdrop-blur-xl";
 
-  // Color system:
-  // Not scrolled: transparent (so the hero shows through, no bar)
-  // Scrolled: dark glass with subtle border
+  // Not scrolled: very subtle tint so it blends with hero and never reveals white
+  // Scrolled: darker glass, still not gray
   const headerStyle = isScrolled
-    ? "bg-[#050814]/85 border-b border-white/10"
-    : "bg-transparent border-b border-transparent";
+    ? "bg-[#050814]/90 border-b border-white/10"
+    : "bg-[#050814]/35 border-b border-white/0";
 
   return (
     <header className={`${headerBase} ${headerStyle}`}>
       <div className="max-w-6xl mx-auto px-5 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-        {/* Logo / Name */}
         <a href="/" className="flex items-center gap-3" onClick={closeMenu}>
           <div className="h-9 w-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center text-sm font-semibold text-white">
             DM
@@ -90,9 +82,7 @@ export default function Header() {
           </div>
         </a>
 
-        {/* Right Section */}
         <div className="flex items-center gap-4 sm:gap-6">
-          {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-6 text-sm text-white/80">
             {navLinks.map((link) => (
               <a
@@ -106,7 +96,6 @@ export default function Header() {
             ))}
           </nav>
 
-          {/* Desktop CTA */}
           <a
             href={BOOKINGS_URL}
             target="_blank"
@@ -124,9 +113,7 @@ export default function Header() {
             Request availability
           </a>
 
-          {/* Social Icons */}
           <div className="flex items-center gap-4 text-xl">
-            {/* Mobile: only TikTok */}
             <a
               href="https://www.tiktok.com/@deanmillernarration"
               target="_blank"
@@ -137,7 +124,6 @@ export default function Header() {
               <FaTiktok />
             </a>
 
-            {/* Desktop: all socials */}
             <div className="hidden md:flex items-center gap-4 text-xl">
               <a
                 href="https://www.tiktok.com/@deanmillernarration"
@@ -169,7 +155,6 @@ export default function Header() {
             </div>
           </div>
 
-          {/* Hamburger */}
           <button
             className="md:hidden text-2xl text-white/80 hover:text-white transition"
             onClick={toggleMenu}
@@ -181,11 +166,9 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Mobile Menu */}
       {isOpen ? (
         <div className="md:hidden border-t border-white/10 bg-[#050814]/95 backdrop-blur-xl">
           <nav className="max-w-6xl mx-auto px-5 sm:px-6 py-4">
-            {/* Mobile socials in menu */}
             <div className="flex items-center justify-between">
               <p className="text-xs uppercase tracking-[0.22em] text-white/60">
                 Social
