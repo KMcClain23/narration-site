@@ -5,6 +5,9 @@ import Image from "next/image";
 import { useRef, useEffect, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
+const BOOKINGS_URL =
+  "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
+
 /**
  * Isolated component to handle the "sent" success message.
  * This prevents the entire page from failing the static build.
@@ -108,20 +111,22 @@ function AtAGlanceCard({
 }) {
   return (
     <div className="relative rounded-2xl border border-[#1A2550] bg-[#050814] p-6 shadow-xl">
-      <p className="text-xs uppercase tracking-[0.22em] text-[#D4AF37]">At a glance</p>
+      <p className="text-xs uppercase tracking-[0.22em] text-[#D4AF37]">
+        At a glance
+      </p>
 
       <p className="mt-2 text-lg font-semibold text-white">
         Dean Miller, Audiobook Narrator
       </p>
 
-      <p className="mt-1 text-sm text-white/70 leading-relaxed">
+      <p className="mt-1 text-sm text-white/70">
         Character-forward performance, clean audio, and direction-friendly workflow.
       </p>
 
       <div className="mt-5 grid grid-cols-1 gap-4">
         <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
           <p className="text-xs uppercase tracking-wide text-[#D4AF37]">Focus</p>
-          <p className="mt-2 text-sm text-white/80 leading-relaxed">
+          <p className="mt-2 text-sm text-white/80">
             Fiction and narrative nonfiction. Strong in romance, romantasy, drama,
             thriller, and multi-character dialogue.
           </p>
@@ -129,7 +134,7 @@ function AtAGlanceCard({
 
         <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
           <p className="text-xs uppercase tracking-wide text-[#D4AF37]">Studio</p>
-          <p className="mt-2 text-sm text-white/80 leading-relaxed">
+          <p className="mt-2 text-sm text-white/80">
             Broadcast-ready home studio. Shure MV7+, treated space, consistent edits.
           </p>
         </div>
@@ -306,14 +311,16 @@ function HomeContent() {
                 </a>
 
                 <a
-                  href="/#contact"
+                  href={BOOKINGS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="w-full inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold transition hover:border-white/60"
                 >
                   Request availability
                 </a>
               </div>
 
-              {/* One clean link, no extra paragraphs above the fold */}
+              {/* One clean link */}
               <div className="mt-4">
                 <Link
                   href="/audiobook-narrator"
@@ -323,7 +330,6 @@ function HomeContent() {
                 </Link>
               </div>
 
-              {/* Optional supporting line, kept short */}
               <p className="mt-3 text-sm text-white/70 max-w-2xl leading-relaxed">
                 Strong in romance, romantasy, drama, thriller, and multi-character dialogue.
               </p>
@@ -384,7 +390,7 @@ function HomeContent() {
           </div>
         </section>
 
-        {/* AT A GLANCE (mobile only, placed after demos for cleaner hero) */}
+        {/* AT A GLANCE (mobile only, placed after demos) */}
         <section className="mt-14 md:hidden">
           <AtAGlanceCard onOpenLightbox={openLightbox} />
         </section>
@@ -433,11 +439,23 @@ function HomeContent() {
             <div className="md:col-span-4">
               <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
                 <p className="text-sm text-white/70">Preferred contact</p>
+
+                {/* Mobile only: show email */}
                 <a
-                  className="mt-2 inline-block text-base font-semibold text-[#D4AF37] hover:underline"
+                  className="mt-2 inline-block text-base font-semibold text-[#D4AF37] hover:underline md:hidden"
                   href="mailto:Dean@DMNarration.com"
                 >
                   Dean@DMNarration.com
+                </a>
+
+                {/* Desktop: show booking button instead of repeating email */}
+                <a
+                  href={BOOKINGS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 hidden md:inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-2 text-sm font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
+                >
+                  Request availability
                 </a>
 
                 <p className="mt-4 text-sm text-white/70">
@@ -474,10 +492,12 @@ function HomeContent() {
                 name="_subject"
                 value="New Narration Inquiry from Website"
               />
+
+              {/* Optional: If you still want the form success message, update the redirect to your live domain */}
               <input
                 type="hidden"
                 name="_redirect"
-                value="https://narration-site.vercel.app/?sent=1#contact"
+                value="https://dmnarration.com/?sent=1#contact"
               />
 
               <Suspense fallback={null}>
@@ -522,14 +542,15 @@ function HomeContent() {
                 type="submit"
                 className="mt-5 inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A] w-full"
               >
-                Request availability
+                Send inquiry
               </button>
 
               <p className="mt-3 text-xs text-white/60">
                 Typical response within 24 to 48 hours.
               </p>
 
-              <div className="mt-4 text-xs text-white/60">
+              {/* Mobile only: email as backup */}
+              <div className="mt-4 text-xs text-white/60 md:hidden">
                 Prefer email:
                 <div>
                   <a
@@ -539,6 +560,18 @@ function HomeContent() {
                     Dean@DMNarration.com
                   </a>
                 </div>
+              </div>
+
+              {/* Booking CTA inside the form for desktop too, without repeating email */}
+              <div className="mt-5">
+                <a
+                  href={BOOKINGS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-3 font-semibold text-white/90 hover:border-white/40 hover:text-white transition w-full"
+                >
+                  Or book a 15-minute call
+                </a>
               </div>
             </form>
 
@@ -561,6 +594,18 @@ function HomeContent() {
                 >
                   Dean@DMNarration.com
                 </a>
+
+                <div className="mt-4">
+                  <p className="text-sm text-white/70">Prefer to schedule?</p>
+                  <a
+                    href={BOOKINGS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-2 text-sm font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
+                  >
+                    Book a 15-minute inquiry call
+                  </a>
+                </div>
               </div>
             </div>
           </div>

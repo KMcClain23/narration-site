@@ -5,6 +5,9 @@ import { FaTiktok, FaInstagram, FaDiscord } from "react-icons/fa";
 import { HiMenu, HiX } from "react-icons/hi";
 import { usePathname } from "next/navigation";
 
+const BOOKINGS_URL =
+  "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
+
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
@@ -19,7 +22,7 @@ export default function Header() {
     { name: "Contact", href: "/#contact" },
   ];
 
-  // Close mobile menu on route change (works for non-hash navigation)
+  // Close mobile menu on route change
   useEffect(() => {
     closeMenu();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -34,7 +37,7 @@ export default function Header() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Handle same-page hash navigation with smooth scroll + close menu
+  // Smooth scroll for hash links when already on home
   const handleNavClick = (href: string) => {
     closeMenu();
 
@@ -82,10 +85,11 @@ export default function Header() {
             ))}
           </nav>
 
-          {/* Desktop CTA */}
+          {/* Desktop CTA: goes to Bookings */}
           <a
-            href="/#contact"
-            onClick={() => handleNavClick("/#contact")}
+            href={BOOKINGS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="hidden md:inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-2 text-sm font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
           >
             Request availability
@@ -136,7 +140,7 @@ export default function Header() {
             </div>
           </div>
 
-          {/* Hamburger Button (Mobile only) */}
+          {/* Hamburger Button */}
           <button
             className="md:hidden text-2xl text-white/80 hover:text-white transition"
             onClick={toggleMenu}
@@ -152,7 +156,7 @@ export default function Header() {
       {isOpen ? (
         <div className="md:hidden border-t border-white/10 bg-black/70 backdrop-blur">
           <nav className="max-w-6xl mx-auto px-5 sm:px-6 py-4">
-            {/* Mobile socials moved into menu */}
+            {/* Mobile socials in menu */}
             <div className="flex items-center justify-between">
               <p className="text-xs uppercase tracking-[0.22em] text-white/60">
                 Social
@@ -211,8 +215,9 @@ export default function Header() {
               </a>
 
               <a
-                href="/#contact"
-                onClick={() => handleNavClick("/#contact")}
+                href={BOOKINGS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-3 font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
               >
                 Request availability
