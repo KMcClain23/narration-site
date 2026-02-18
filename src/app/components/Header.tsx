@@ -10,6 +10,7 @@ const BOOKINGS_URL =
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const pathname = usePathname();
 
   const toggleMenu = () => setIsOpen((v) => !v);
@@ -22,11 +23,13 @@ export default function Header() {
     { name: "Contact", href: "/#contact" },
   ];
 
+  // Close mobile menu on route change
   useEffect(() => {
     closeMenu();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
+  // Close on Escape
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeMenu();
@@ -35,6 +38,17 @@ export default function Header() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  // Track scroll state so header blends with hero (no gray bar)
+  useEffect(() => {
+    const onScroll = () => {
+      setIsScrolled(window.scrollY > 8);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Smooth scroll for hash links when already on home
   const handleNavClick = (href: string) => {
     closeMenu();
 
@@ -52,15 +66,18 @@ export default function Header() {
     }
   };
 
+  const headerBase =
+    "sticky top-0 z-50 transition-colors duration-200 backdrop-blur-xl";
+
+  // Color system:
+  // Not scrolled: transparent (so the hero shows through, no bar)
+  // Scrolled: dark glass with subtle border
+  const headerStyle = isScrolled
+    ? "bg-[#050814]/85 border-b border-white/10"
+    : "bg-transparent border-b border-transparent";
+
   return (
-    <header
-      className="
-        sticky top-0 z-50
-        border-b border-white/10
-        bg-gradient-to-b from-black/70 via-black/55 to-black/35
-        backdrop-blur-xl
-      "
-    >
+    <header className={`${headerBase} ${headerStyle}`}>
       <div className="max-w-6xl mx-auto px-5 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
         {/* Logo / Name */}
         <a href="/" className="flex items-center gap-3" onClick={closeMenu}>
@@ -100,7 +117,7 @@ export default function Header() {
               bg-white/5
               px-4 py-2 text-sm font-semibold
               text-white/90
-              hover:border-white/40 hover:bg-white/10 hover:text-white
+              hover:border-[#D4AF37]/60 hover:bg-white/10 hover:text-white
               transition
             "
           >
@@ -166,7 +183,7 @@ export default function Header() {
 
       {/* Mobile Menu */}
       {isOpen ? (
-        <div className="md:hidden border-t border-white/10 bg-black/75 backdrop-blur-xl">
+        <div className="md:hidden border-t border-white/10 bg-[#050814]/95 backdrop-blur-xl">
           <nav className="max-w-6xl mx-auto px-5 sm:px-6 py-4">
             {/* Mobile socials in menu */}
             <div className="flex items-center justify-between">
@@ -230,7 +247,7 @@ export default function Header() {
                 href={BOOKINGS_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-3 font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
+                className="inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-3 font-semibold text-white/90 hover:border-[#D4AF37]/60 hover:text-white transition"
               >
                 Request availability
               </a>
