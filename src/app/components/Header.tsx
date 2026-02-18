@@ -61,17 +61,20 @@ export default function Header() {
   };
 
   const headerBase =
-    "sticky top-0 z-50 transition-colors duration-200 backdrop-blur-xl";
+    "sticky top-0 z-50 transition-all duration-200 backdrop-blur-xl";
 
-  // Not scrolled: very subtle tint so it blends with hero and never reveals white
-  // Scrolled: darker glass, still not gray
+  /**
+   * Key change: use a vertical gradient + very dark base.
+   * This prevents the “flat gray strip” look.
+   */
   const headerStyle = isScrolled
-    ? "bg-[#050814]/90 border-b border-white/10"
-    : "bg-[#050814]/35 border-b border-white/0";
+    ? "bg-[#050814]/92 border-b border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
+    : "bg-gradient-to-b from-[#050814]/85 via-[#050814]/55 to-transparent border-b border-transparent";
 
   return (
     <header className={`${headerBase} ${headerStyle}`}>
       <div className="max-w-6xl mx-auto px-5 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+        {/* Logo / Name */}
         <a href="/" className="flex items-center gap-3" onClick={closeMenu}>
           <div className="h-9 w-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center text-sm font-semibold text-white">
             DM
@@ -82,7 +85,9 @@ export default function Header() {
           </div>
         </a>
 
+        {/* Right Section */}
         <div className="flex items-center gap-4 sm:gap-6">
+          {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-6 text-sm text-white/80">
             {navLinks.map((link) => (
               <a
@@ -96,6 +101,7 @@ export default function Header() {
             ))}
           </nav>
 
+          {/* Desktop CTA */}
           <a
             href={BOOKINGS_URL}
             target="_blank"
@@ -113,7 +119,9 @@ export default function Header() {
             Request availability
           </a>
 
+          {/* Social Icons */}
           <div className="flex items-center gap-4 text-xl">
+            {/* Mobile: only TikTok */}
             <a
               href="https://www.tiktok.com/@deanmillernarration"
               target="_blank"
@@ -124,6 +132,7 @@ export default function Header() {
               <FaTiktok />
             </a>
 
+            {/* Desktop: all socials */}
             <div className="hidden md:flex items-center gap-4 text-xl">
               <a
                 href="https://www.tiktok.com/@deanmillernarration"
@@ -155,6 +164,7 @@ export default function Header() {
             </div>
           </div>
 
+          {/* Hamburger */}
           <button
             className="md:hidden text-2xl text-white/80 hover:text-white transition"
             onClick={toggleMenu}
@@ -166,6 +176,7 @@ export default function Header() {
         </div>
       </div>
 
+      {/* Mobile Menu */}
       {isOpen ? (
         <div className="md:hidden border-t border-white/10 bg-[#050814]/95 backdrop-blur-xl">
           <nav className="max-w-6xl mx-auto px-5 sm:px-6 py-4">
