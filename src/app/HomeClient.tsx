@@ -402,16 +402,11 @@ function HomeContent() {
           <div className="mt-6 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
             <div className="md:col-span-8">
               <p className="text-white/80 leading-relaxed">
-                I’m Dean Miller, a professional audiobook narrator specializing in
-                character-driven stories with strong emotional arcs. I’ve always been
-                drawn to voice and performance, from early character work to years of
-                theatrical and musical storytelling. That foundation shaped the way I
-                approach narration today: with intention, precision, and respect for
-                the emotional truth of the story. I record from a professional home
-                studio with a broadcast-quality workflow, delivering clean, consistent
-                audio and clear communication throughout every project. For me,
-                narration is about connection. It’s the moment a listener forgets
-                there’s a narrator at all and simply feels the story.
+I’m Dean Miller, a professional audiobook narrator drawn to character-driven stories with emotional depth, quiet tension, and honest human connection. I have always been fascinated by voice and performance, especially the way small choices in pacing and tone can change how a story is felt.
+
+My background in long-form storytelling shaped an approach focused on intention, restraint, and emotional truth rather than overt performance. I aim for narration that feels natural and immersive, where listeners stop noticing the voice and simply live inside the story.
+
+I record from a broadcast-quality home studio and value clear communication and collaboration throughout each project. For me, successful narration is when the listener forgets there is a narrator at all and walks away feeling the story instead.
               </p>
 
               <ul className="mt-6 space-y-2 text-sm text-white/80">
