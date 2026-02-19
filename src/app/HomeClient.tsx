@@ -237,9 +237,9 @@ function HomeContent() {
       src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Romantasy%20-%20Male%20(PossessiveHaunted)%2C%20Harsh%20Control%20to%20Remorse%2C%20Deep%20Loss.mp3",
     },
     {
-      title: "Drama",
-      desc: "Controlled intensity, reflective pacing",
-      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Male%20(SomberDepressed)%2C%20Reflective.mp3",
+      title: "Femminine Voice",
+      desc: "Male & Female Dialogue",
+      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Female%20Voice%202.mp3",
     },
     {
       title: "Romance Duet",
@@ -263,7 +263,8 @@ function HomeContent() {
       <div id="top" />
 
       {/* HERO */}
-      <section className="relative overflow-hidden">
+      {/* Key change: pull the hero background up under the sticky header */}
+      <section className="relative overflow-hidden -mt-16 pt-16">
         <div className="absolute inset-0">
           <Image
             src="/dean-banner.png"
@@ -492,8 +493,6 @@ function HomeContent() {
                 name="_subject"
                 value="New Narration Inquiry from Website"
               />
-
-              {/* Optional: If you still want the form success message, update the redirect to your live domain */}
               <input
                 type="hidden"
                 name="_redirect"
@@ -549,7 +548,6 @@ function HomeContent() {
                 Typical response within 24 to 48 hours.
               </p>
 
-              {/* Mobile only: email as backup */}
               <div className="mt-4 text-xs text-white/60 md:hidden">
                 Prefer email:
                 <div>
@@ -562,7 +560,6 @@ function HomeContent() {
                 </div>
               </div>
 
-              {/* Booking CTA inside the form for desktop too, without repeating email */}
               <div className="mt-5">
                 <a
                   href={BOOKINGS_URL}
