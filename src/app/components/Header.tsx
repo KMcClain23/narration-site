@@ -60,20 +60,18 @@ export default function Header() {
     }
   };
 
-  /**
-   * Key idea:
-   * - At top: no visible header bar (transparent)
-   * - On scroll: minimal dark glass just for readability
-   * - No “gray slab” background at all
-   */
-  const headerClass = isScrolled
-    ? "bg-black/35 border-b border-white/10 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
-    : "bg-transparent border-b border-transparent";
+  const headerBase =
+    "sticky top-0 z-50 transition-all duration-200";
+
+  const headerTop =
+    "bg-gradient-to-b from-[#050814]/95 via-[#050814]/55 to-transparent";
+
+  const headerScrolled =
+    "bg-[#050814]/85 backdrop-blur-xl border-b border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)]";
 
   return (
-    <header className={`sticky top-0 z-50 transition-all duration-200 ${headerClass}`}>
+    <header className={`${headerBase} ${isScrolled ? headerScrolled : headerTop}`}>
       <div className="max-w-6xl mx-auto px-5 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-        {/* Logo / Name */}
         <a href="/" className="flex items-center gap-3" onClick={closeMenu}>
           <div className="h-9 w-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center text-sm font-semibold text-white">
             DM
@@ -84,9 +82,7 @@ export default function Header() {
           </div>
         </a>
 
-        {/* Right Section */}
         <div className="flex items-center gap-4 sm:gap-6">
-          {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-6 text-sm text-white/80">
             {navLinks.map((link) => (
               <a
@@ -100,7 +96,6 @@ export default function Header() {
             ))}
           </nav>
 
-          {/* Desktop CTA */}
           <a
             href={BOOKINGS_URL}
             target="_blank"
@@ -118,9 +113,7 @@ export default function Header() {
             Request availability
           </a>
 
-          {/* Social Icons */}
           <div className="flex items-center gap-4 text-xl">
-            {/* Mobile: only TikTok */}
             <a
               href="https://www.tiktok.com/@deanmillernarration"
               target="_blank"
@@ -131,7 +124,6 @@ export default function Header() {
               <FaTiktok />
             </a>
 
-            {/* Desktop: all socials */}
             <div className="hidden md:flex items-center gap-4 text-xl">
               <a
                 href="https://www.tiktok.com/@deanmillernarration"
@@ -163,7 +155,6 @@ export default function Header() {
             </div>
           </div>
 
-          {/* Hamburger */}
           <button
             className="md:hidden text-2xl text-white/80 hover:text-white transition"
             onClick={toggleMenu}
@@ -175,46 +166,10 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Mobile Menu */}
       {isOpen ? (
-        <div className="md:hidden border-t border-white/10 bg-black/60 backdrop-blur-xl">
+        <div className="md:hidden border-t border-white/10 bg-[#050814]/90 backdrop-blur-xl">
           <nav className="max-w-6xl mx-auto px-5 sm:px-6 py-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-[0.22em] text-white/60">
-                Social
-              </p>
-              <div className="flex items-center gap-4 text-xl">
-                <a
-                  href="https://www.tiktok.com/@deanmillernarration"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-white/80 hover:text-[#D4AF37] transition"
-                  aria-label="TikTok"
-                >
-                  <FaTiktok />
-                </a>
-                <a
-                  href="https://www.instagram.com/deanmillernarrator"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-white/80 hover:text-[#D4AF37] transition"
-                  aria-label="Instagram"
-                >
-                  <FaInstagram />
-                </a>
-                <a
-                  href="https://discord.com/users/1425271466538045512"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-white/80 hover:text-[#D4AF37] transition"
-                  aria-label="Discord"
-                >
-                  <FaDiscord />
-                </a>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-2">
+            <div className="grid gap-2">
               {navLinks.map((link) => (
                 <a
                   key={link.name}
