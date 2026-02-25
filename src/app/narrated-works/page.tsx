@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+
 export default function NarratedWorks() {
   const completed = [
     {
@@ -58,6 +59,9 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Unmasked-Hearts-K-Noel-ebook/dp/B0FMKP92Y9",
       cover: "/covers/unmasked-hearts.jpg",
     },
+  ];
+
+  const comingSoon = [
     {
       title: "Beating For You",
       author: "L.L. McAlister",
@@ -79,12 +83,15 @@ export default function NarratedWorks() {
           Narrated Works
         </h1>
         <p className="text-center text-white/70 text-lg mb-16 max-w-3xl mx-auto">
-          A showcase of audiobook projects I've completed and those I'm currently narrating.
+          A showcase of audiobook projects I've completed and those I'm currently
+          narrating.
         </p>
 
         {/* Completed Projects */}
         <section className="mb-20">
-          <h2 className="text-3xl font-bold mb-8 text-center">Completed Projects</h2>
+          <h2 className="text-3xl font-bold mb-8 text-center">
+            Completed Projects
+          </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8">
             {completed.map((book, index) => (
               <a
@@ -103,6 +110,7 @@ export default function NarratedWorks() {
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                   />
                 </div>
+
                 <div className="p-4 text-center">
                   <h3 className="font-semibold text-base leading-tight text-white">
                     {book.title}
@@ -114,6 +122,7 @@ export default function NarratedWorks() {
                     {book.author}
                   </p>
                 </div>
+
                 {book.note && (
                   <div className="absolute top-2 right-2 bg-yellow-600/80 text-white text-xs px-2 py-1 rounded">
                     Note
@@ -125,8 +134,10 @@ export default function NarratedWorks() {
         </section>
 
         {/* Currently Narrating */}
-        <section>
-          <h2 className="text-3xl font-bold mb-8 text-center">Currently Narrating</h2>
+        <section className="mb-20">
+          <h2 className="text-3xl font-bold mb-8 text-center">
+            Currently Narrating
+          </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8">
             {inProgress.map((book, index) => (
               <a
@@ -145,9 +156,50 @@ export default function NarratedWorks() {
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                   />
                 </div>
+
                 <div className="absolute top-2 right-2 bg-[#D4AF37] text-black text-xs font-semibold px-2 py-1 rounded">
                   In Progress
                 </div>
+
+                <div className="p-4 text-center">
+                  <h3 className="font-semibold text-base leading-tight text-white">
+                    {book.title}
+                  </h3>
+                  <p className="text-sm mt-1 text-[#D4AF37] font-medium">
+                    {book.author}
+                  </p>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+
+        {/* Coming Soon */}
+        <section className="mb-20">
+          <h2 className="text-3xl font-bold mb-8 text-center">Coming Soon</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8">
+            {comingSoon.map((book, index) => (
+              <a
+                key={index}
+                href={book.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group relative rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-[#1A2550] bg-[#0B1224]"
+              >
+                <div className="relative aspect-[3/4.5] w-full">
+                  <Image
+                    src={book.cover}
+                    alt={`${book.title} cover`}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                  />
+                </div>
+
+                <div className="absolute top-2 right-2 bg-white/15 text-white text-xs font-semibold px-2 py-1 rounded">
+                  Coming Soon
+                </div>
+
                 <div className="p-4 text-center">
                   <h3 className="font-semibold text-base leading-tight text-white">
                     {book.title}
