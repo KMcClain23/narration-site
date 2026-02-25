@@ -35,22 +35,10 @@ export default function NarratedWorks() {
 
   const inProgress = [
     {
-      title: "Unmasked Hearts",
-      author: "K.E. Noel",
-      link: "https://www.amazon.com/Unmasked-Hearts-K-Noel-ebook/dp/B0FMKP92Y9",
-      cover: "/covers/unmasked-hearts.jpg",
-    },
-    {
       title: "No One to Hold Me",
       author: "Noelle Rahn-Johnson",
       link: "https://www.amazon.com/No-One-Hold-Noelle-Rahn-Johnson-ebook/dp/B088RMPLYX",
       cover: "/covers/no-one-to-hold-me.jpg",
-    },
-    {
-      title: "Beating For You",
-      author: "L.L. McAlister",
-      link: "https://www.amazon.com/Beating-You-Body-Nobody-That-ebook/dp/B0FNQ2F6P4",
-      cover: "/covers/beating-for-you.jpg",
     },
     {
       title: "Merciless Punks",
@@ -63,6 +51,24 @@ export default function NarratedWorks() {
       author: "Shelby Gardner",
       link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB",
       cover: "/covers/heir-of-emberscale.jpg",
+    },
+    {
+      title: "Unmasked Hearts",
+      author: "K.E. Noel",
+      link: "https://www.amazon.com/Unmasked-Hearts-K-Noel-ebook/dp/B0FMKP92Y9",
+      cover: "/covers/unmasked-hearts.jpg",
+    },
+    {
+      title: "Beating For You",
+      author: "L.L. McAlister",
+      link: "https://www.amazon.com/Beating-You-Body-Nobody-That-ebook/dp/B0FNQ2F6P4",
+      cover: "/covers/beating-for-you.jpg",
+    },
+    {
+      title: "Whiskey & Lies",
+      author: "E.A. Harper",
+      link: "https://www.amazon.com/dp/B0FBT3XW76",
+      cover: "/covers/whiskey-and-lies.jpg",
     },
   ];
 
