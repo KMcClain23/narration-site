@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import React from "react";
 
 export default function NarratedWorks() {
   const completed = [
@@ -76,11 +77,8 @@ export default function NarratedWorks() {
     },
   ];
 
-  // Reusable card component to avoid repetition
-  const BookCard = ({ book, statusBadge = null }: { 
-    book: any; 
-    statusBadge?: React.ReactNode 
-  }) => (
+  // Reusable card component
+  const BookCard = ({ book, statusBadge = null }: { book: any; statusBadge?: React.ReactNode }) => (
     <a
       href={book.link}
       target="_blank"
@@ -130,75 +128,69 @@ export default function NarratedWorks() {
           Narrated Works
         </h1>
         <p className="text-center text-white/70 text-lg mb-16 max-w-3xl mx-auto">
-          A showcase of audiobook projects I've completed and those I'm currently
-          narrating.
+          A showcase of audiobook projects I've completed and those I'm currently narrating.
         </p>
 
-        {/* Completed Projects */}
+        {/* --- Completed Projects --- */}
         <section className="mb-20">
-          <h2 className="text-3xl font-bold mb-8 text-center">
-            Completed Projects
-          </h2>
-          <div 
-            className="flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth scrollbar-thin scrollbar-thumb-[#1A2550] scrollbar-track-[#0B1224] gap-6 px-1"
-          >
-            {completed.map((book, index) => (
-              <BookCard 
-                key={index} 
-                book={book} 
-                statusBadge={null} // or add "Completed" if desired
-              />
-            ))}
-            {/* Optional: empty space at end so last card isn't cut off */}
-            <div className="flex-shrink-0 w-4 sm:w-8" />
+          <h2 className="text-3xl font-bold mb-8 text-center">Completed Projects</h2>
+          <div className="relative">
+            {/* Gradient Overlays */}
+            <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
+            
+            <div className="flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth hide-scrollbar gap-6 px-4">
+              {completed.map((book, index) => (
+                <BookCard key={index} book={book} />
+              ))}
+              <div className="flex-shrink-0 w-4 sm:w-8" />
+            </div>
           </div>
         </section>
 
-        {/* Currently Narrating */}
+        {/* --- Currently Narrating --- */}
         <section className="mb-20">
-          <h2 className="text-3xl font-bold mb-8 text-center">
-            Currently Narrating
-          </h2>
-          <div 
-            className="flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth scrollbar-thin scrollbar-thumb-[#1A2550] scrollbar-track-[#0B1224] gap-6 px-1"
-          >
-            {inProgress.map((book, index) => (
-              <BookCard 
-                key={index} 
-                book={book} 
-                statusBadge={
-                  <span className="bg-[#D4AF37] text-black">In Progress</span>
-                }
-              />
-            ))}
-            <div className="flex-shrink-0 w-4 sm:w-8" />
+          <h2 className="text-3xl font-bold mb-8 text-center">Currently Narrating</h2>
+          <div className="relative">
+            <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
+            
+            <div className="flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth hide-scrollbar gap-6 px-4">
+              {inProgress.map((book, index) => (
+                <BookCard 
+                  key={index} 
+                  book={book} 
+                  statusBadge={<span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded">In Progress</span>} 
+                />
+              ))}
+              <div className="flex-shrink-0 w-4 sm:w-8" />
+            </div>
           </div>
         </section>
 
-        {/* Coming Soon */}
+        {/* --- Coming Soon --- */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">Coming Soon</h2>
-          <div 
-            className="flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth scrollbar-thin scrollbar-thumb-[#1A2550] scrollbar-track-[#0B1224] gap-6 px-1"
-          >
-            {comingSoon.map((book, index) => (
-              <BookCard 
-                key={index} 
-                book={book} 
-                statusBadge={
-                  <span className="bg-white/20 text-white">Coming Soon</span>
-                }
-              />
-            ))}
-            <div className="flex-shrink-0 w-4 sm:w-8" />
+          <div className="relative">
+            <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
+            
+            <div className="flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth hide-scrollbar gap-6 px-4">
+              {comingSoon.map((book, index) => (
+                <BookCard 
+                  key={index} 
+                  book={book} 
+                  statusBadge={<span className="bg-white/20 text-white px-2 py-0.5 rounded">Coming Soon</span>} 
+                />
+              ))}
+              <div className="flex-shrink-0 w-4 sm:w-8" />
+            </div>
           </div>
         </section>
 
         {/* Call to Action */}
         <div className="mt-16 text-center">
-          <p className="text-white/70 mb-6 text-lg">
-            Ready to bring your story to life?
-          </p>
+          <p className="text-white/70 mb-6 text-lg">Ready to bring your story to life?</p>
           <Link
             href="/#contact"
             className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-8 py-4 font-semibold hover:bg-[#E0C15A] transition text-lg shadow-lg hover:shadow-2xl"
