@@ -76,9 +76,56 @@ export default function NarratedWorks() {
     },
   ];
 
+  // Reusable card component to avoid repetition
+  const BookCard = ({ book, statusBadge = null }: { 
+    book: any; 
+    statusBadge?: React.ReactNode 
+  }) => (
+    <a
+      href={book.link}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group relative rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-[#1A2550] bg-[#0B1224] flex-shrink-0 w-56 sm:w-64 snap-start"
+    >
+      <div className="relative aspect-[3/4.5] w-full">
+        <Image
+          src={book.cover}
+          alt={`${book.title} cover`}
+          fill
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          sizes="(max-width: 640px) 70vw, 240px"
+        />
+      </div>
+
+      {statusBadge && (
+        <div className="absolute top-3 right-3 bg-opacity-90 text-xs font-semibold px-2.5 py-1 rounded">
+          {statusBadge}
+        </div>
+      )}
+
+      <div className="p-4 text-center">
+        <h3 className="font-semibold text-base leading-tight text-white">
+          {book.title}
+        </h3>
+        {book.subtitle && (
+          <p className="text-sm text-white/80 mt-0.5">{book.subtitle}</p>
+        )}
+        <p className="text-sm mt-1.5 text-[#D4AF37] font-medium">
+          {book.author}
+        </p>
+      </div>
+
+      {book.note && (
+        <div className="absolute top-3 left-3 bg-yellow-600/80 text-white text-xs px-2 py-1 rounded">
+          Note
+        </div>
+      )}
+    </a>
+  );
+
   return (
     <main className="min-h-screen bg-[#050814] text-white">
-      <div className="max-w-6xl mx-auto px-6 py-16 md:py-20">
+      <div className="max-w-7xl mx-auto px-6 py-16 md:py-20">
         <h1 className="text-4xl md:text-5xl font-bold text-center mb-4">
           Narrated Works
         </h1>
@@ -92,44 +139,18 @@ export default function NarratedWorks() {
           <h2 className="text-3xl font-bold mb-8 text-center">
             Completed Projects
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8">
+          <div 
+            className="flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth scrollbar-thin scrollbar-thumb-[#1A2550] scrollbar-track-[#0B1224] gap-6 px-1"
+          >
             {completed.map((book, index) => (
-              <a
-                key={index}
-                href={book.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group relative rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-[#1A2550] bg-[#0B1224]"
-              >
-                <div className="relative aspect-[3/4.5] w-full">
-                  <Image
-                    src={book.cover}
-                    alt={`${book.title} cover`}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                  />
-                </div>
-
-                <div className="p-4 text-center">
-                  <h3 className="font-semibold text-base leading-tight text-white">
-                    {book.title}
-                  </h3>
-                  {book.subtitle && (
-                    <p className="text-sm text-white/80">{book.subtitle}</p>
-                  )}
-                  <p className="text-sm mt-1 text-[#D4AF37] font-medium">
-                    {book.author}
-                  </p>
-                </div>
-
-                {book.note && (
-                  <div className="absolute top-2 right-2 bg-yellow-600/80 text-white text-xs px-2 py-1 rounded">
-                    Note
-                  </div>
-                )}
-              </a>
+              <BookCard 
+                key={index} 
+                book={book} 
+                statusBadge={null} // or add "Completed" if desired
+              />
             ))}
+            {/* Optional: empty space at end so last card isn't cut off */}
+            <div className="flex-shrink-0 w-4 sm:w-8" />
           </div>
         </section>
 
@@ -138,78 +159,38 @@ export default function NarratedWorks() {
           <h2 className="text-3xl font-bold mb-8 text-center">
             Currently Narrating
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8">
+          <div 
+            className="flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth scrollbar-thin scrollbar-thumb-[#1A2550] scrollbar-track-[#0B1224] gap-6 px-1"
+          >
             {inProgress.map((book, index) => (
-              <a
-                key={index}
-                href={book.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group relative rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-[#1A2550] bg-[#0B1224]"
-              >
-                <div className="relative aspect-[3/4.5] w-full">
-                  <Image
-                    src={book.cover}
-                    alt={`${book.title} cover`}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                  />
-                </div>
-
-                <div className="absolute top-2 right-2 bg-[#D4AF37] text-black text-xs font-semibold px-2 py-1 rounded">
-                  In Progress
-                </div>
-
-                <div className="p-4 text-center">
-                  <h3 className="font-semibold text-base leading-tight text-white">
-                    {book.title}
-                  </h3>
-                  <p className="text-sm mt-1 text-[#D4AF37] font-medium">
-                    {book.author}
-                  </p>
-                </div>
-              </a>
+              <BookCard 
+                key={index} 
+                book={book} 
+                statusBadge={
+                  <span className="bg-[#D4AF37] text-black">In Progress</span>
+                }
+              />
             ))}
+            <div className="flex-shrink-0 w-4 sm:w-8" />
           </div>
         </section>
 
         {/* Coming Soon */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">Coming Soon</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8">
+          <div 
+            className="flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth scrollbar-thin scrollbar-thumb-[#1A2550] scrollbar-track-[#0B1224] gap-6 px-1"
+          >
             {comingSoon.map((book, index) => (
-              <a
-                key={index}
-                href={book.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group relative rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-[#1A2550] bg-[#0B1224]"
-              >
-                <div className="relative aspect-[3/4.5] w-full">
-                  <Image
-                    src={book.cover}
-                    alt={`${book.title} cover`}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                  />
-                </div>
-
-                <div className="absolute top-2 right-2 bg-white/15 text-white text-xs font-semibold px-2 py-1 rounded">
-                  Coming Soon
-                </div>
-
-                <div className="p-4 text-center">
-                  <h3 className="font-semibold text-base leading-tight text-white">
-                    {book.title}
-                  </h3>
-                  <p className="text-sm mt-1 text-[#D4AF37] font-medium">
-                    {book.author}
-                  </p>
-                </div>
-              </a>
+              <BookCard 
+                key={index} 
+                book={book} 
+                statusBadge={
+                  <span className="bg-white/20 text-white">Coming Soon</span>
+                }
+              />
             ))}
+            <div className="flex-shrink-0 w-4 sm:w-8" />
           </div>
         </section>
 
