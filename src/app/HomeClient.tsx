@@ -215,6 +215,7 @@ function DemoPlayer({
 
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [buffering, setBuffering] = useState(false);
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
 
@@ -229,10 +230,11 @@ function DemoPlayer({
     if (!a) return;
 
     try {
+      if (!ready) setBuffering(true);
       await a.play();
       setActiveIndex(index);
     } catch {
-      // Autoplay restrictions or user gesture issues. Ignore silently.
+      setBuffering(false);
     }
   };
 
@@ -264,6 +266,16 @@ function DemoPlayer({
     const onLoaded = () => {
       setReady(true);
       setDuration(Number.isFinite(a.duration) ? a.duration : 0);
+      setBuffering(false);
+    };
+
+    const onCanPlay = () => {
+      setReady(true);
+      setBuffering(false);
+    };
+
+    const onWaiting = () => {
+      setBuffering(true);
     };
 
     const onTime = () => {
@@ -273,17 +285,24 @@ function DemoPlayer({
     const onPlay = () => {
       setPlaying(true);
       setActiveIndex(index);
+      setBuffering(false);
     };
 
-    const onPause = () => setPlaying(false);
+    const onPause = () => {
+      setPlaying(false);
+      setBuffering(false);
+    };
 
     const onEnded = () => {
       setPlaying(false);
+      setBuffering(false);
       setCurrent(0);
       if (activeIndex === index) setActiveIndex(null);
     };
 
     a.addEventListener("loadedmetadata", onLoaded);
+    a.addEventListener("canplay", onCanPlay);
+    a.addEventListener("waiting", onWaiting);
     a.addEventListener("timeupdate", onTime);
     a.addEventListener("play", onPlay);
     a.addEventListener("pause", onPause);
@@ -291,6 +310,8 @@ function DemoPlayer({
 
     return () => {
       a.removeEventListener("loadedmetadata", onLoaded);
+      a.removeEventListener("canplay", onCanPlay);
+      a.removeEventListener("waiting", onWaiting);
       a.removeEventListener("timeupdate", onTime);
       a.removeEventListener("play", onPlay);
       a.removeEventListener("pause", onPause);
@@ -300,6 +321,34 @@ function DemoPlayer({
   }, [index, activeIndex]);
 
   const pct = duration ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
+
+  // Chunky, Apple Podcasts style: thick ring + inner fill + subtle gloss
+  const PlayIcon = ({ className = "" }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M9 7.2v9.6c0 1 1.1 1.6 2 1.1l7.7-4.8c.9-.6.9-1.8 0-2.4L11 6.1c-.9-.5-2 .1-2 1.1Z"
+      />
+    </svg>
+  );
+
+  const PauseIcon = ({ className = "" }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M8 6.8c0-.7.6-1.3 1.3-1.3h.9c.7 0 1.3.6 1.3 1.3v10.4c0 .7-.6 1.3-1.3 1.3h-.9c-.7 0-1.3-.6-1.3-1.3V6.8Zm6.4 0c0-.7.6-1.3 1.3-1.3h.9c.7 0 1.3.6 1.3 1.3v10.4c0 .7-.6 1.3-1.3 1.3h-.9c-.7 0-1.3-.6-1.3-1.3V6.8Z"
+      />
+    </svg>
+  );
+
+  const SpinnerIcon = ({ className = "" }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M12 4a8 8 0 0 1 7.7 6.1c.1.5-.2.9-.7 1-.5.1-.9-.2-1-.7A6.2 6.2 0 0 0 12 5.8c-3.4 0-6.2 2.8-6.2 6.2S8.6 18.2 12 18.2c2.1 0 4-.9 5.1-2.4.3-.4.8-.5 1.2-.2.4.3.5.8.2 1.2A8 8 0 1 1 12 4Z"
+      />
+    </svg>
+  );
 
   return (
     <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50">
@@ -327,14 +376,32 @@ function DemoPlayer({
             type="button"
             onClick={toggle}
             className={[
-              "h-11 w-11 rounded-full flex items-center justify-center font-semibold transition",
-              "border border-white/15 bg-white/5 text-white",
-              "hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/10",
+              // Chunkier: bigger + thicker ring + inner fill + stronger shadow
+              "relative h-16 w-16 rounded-full flex items-center justify-center transition",
+              "border-2 border-white/25 bg-white/10 text-white",
+              "shadow-[0_10px_30px_rgba(0,0,0,0.45)]",
+              "hover:border-[#D4AF37]/70 hover:bg-[#D4AF37]/10",
+              "active:scale-[0.98]",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814]",
+              !src ? "opacity-60 pointer-events-none" : "",
             ].join(" ")}
             aria-label={playing ? `Pause ${title}` : `Play ${title}`}
           >
-            {playing ? "❚❚" : "▶"}
+            {/* Inner disk for Apple-ish depth */}
+            <span className="absolute inset-[6px] rounded-full border border-white/10 bg-white/10" />
+
+            {/* Subtle top gloss */}
+            <span className="absolute left-[10px] right-[10px] top-[10px] h-[18px] rounded-full bg-white/10 blur-[0.2px]" />
+
+            <span className="relative">
+              {buffering ? (
+                <SpinnerIcon className="h-8 w-8 animate-spin" />
+              ) : playing ? (
+                <PauseIcon className="h-9 w-9" />
+              ) : (
+                <PlayIcon className="h-9 w-9 translate-x-[1px]" />
+              )}
+            </span>
           </button>
 
           <div className="flex-1">
@@ -356,14 +423,14 @@ function DemoPlayer({
 
             <div className="mt-2 flex items-center justify-between text-xs text-white/60">
               <span>{formatTime(current)}</span>
-              <span>{ready ? formatTime(duration) : "Loading..."}</span>
+              <span>{formatTime(duration)}</span>
             </div>
           </div>
         </div>
 
         {/* Hidden native audio element */}
         <audio
-          preload="none"
+          preload="metadata"
           ref={(el) => {
             audioRefs.current[index] = el;
           }}
