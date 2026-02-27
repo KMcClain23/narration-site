@@ -80,9 +80,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`scroll-smooth scroll-pt-24 bg-[#050814] text-white ${geistSans.variable} ${geistMono.variable}`}
+      className={`scroll-smooth scroll-pt-24 ${geistSans.variable} ${geistMono.variable}`}
     >
-      <body className="antialiased bg-[#050814] text-white min-h-screen">
+      <body className="min-h-screen bg-[#050814] text-white antialiased">
+        <a href="#top" className="skip-link">
+          Skip to content
+        </a>
+
         <Header />
 
         <script
