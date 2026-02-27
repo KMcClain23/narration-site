@@ -25,6 +25,13 @@ function SentMessage() {
   );
 }
 
+function formatTime(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 function MediaLightbox({
   isOpen,
   onClose,
@@ -187,8 +194,190 @@ function AtAGlanceCard({
   );
 }
 
+function DemoPlayer({
+  title,
+  desc,
+  src,
+  index,
+  activeIndex,
+  setActiveIndex,
+  audioRefs,
+}: {
+  title: string;
+  desc: string;
+  src: string;
+  index: number;
+  activeIndex: number | null;
+  setActiveIndex: (v: number | null) => void;
+  audioRefs: React.MutableRefObject<(HTMLAudioElement | null)[]>;
+}) {
+  const isActive = activeIndex === index;
+
+  const [ready, setReady] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [current, setCurrent] = useState(0);
+
+  const pauseSelf = () => {
+    const a = audioRefs.current[index];
+    if (!a) return;
+    a.pause();
+  };
+
+  const playSelf = async () => {
+    const a = audioRefs.current[index];
+    if (!a) return;
+
+    try {
+      await a.play();
+      setActiveIndex(index);
+    } catch {
+      // Autoplay restrictions or user gesture issues. Ignore silently.
+    }
+  };
+
+  const toggle = async () => {
+    const a = audioRefs.current[index];
+    if (!a) return;
+
+    if (!playing) {
+      await playSelf();
+    } else {
+      pauseSelf();
+    }
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const a = audioRefs.current[index];
+    if (!a || !duration) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.min(Math.max(0, e.clientX - rect.left), rect.width);
+    const pct = rect.width ? x / rect.width : 0;
+    a.currentTime = pct * duration;
+  };
+
+  useEffect(() => {
+    const a = audioRefs.current[index];
+    if (!a) return;
+
+    const onLoaded = () => {
+      setReady(true);
+      setDuration(Number.isFinite(a.duration) ? a.duration : 0);
+    };
+
+    const onTime = () => {
+      setCurrent(a.currentTime || 0);
+    };
+
+    const onPlay = () => {
+      setPlaying(true);
+      setActiveIndex(index);
+    };
+
+    const onPause = () => setPlaying(false);
+
+    const onEnded = () => {
+      setPlaying(false);
+      setCurrent(0);
+      if (activeIndex === index) setActiveIndex(null);
+    };
+
+    a.addEventListener("loadedmetadata", onLoaded);
+    a.addEventListener("timeupdate", onTime);
+    a.addEventListener("play", onPlay);
+    a.addEventListener("pause", onPause);
+    a.addEventListener("ended", onEnded);
+
+    return () => {
+      a.removeEventListener("loadedmetadata", onLoaded);
+      a.removeEventListener("timeupdate", onTime);
+      a.removeEventListener("play", onPlay);
+      a.removeEventListener("pause", onPause);
+      a.removeEventListener("ended", onEnded);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, activeIndex]);
+
+  const pct = duration ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
+
+  return (
+    <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-semibold text-lg text-white">{title}</p>
+          <p className="mt-1 text-sm text-white/70">{desc}</p>
+        </div>
+
+        <span
+          className={[
+            "shrink-0 rounded-full border px-3 py-1 text-xs",
+            isActive
+              ? "border-[#D4AF37]/40 bg-[#D4AF37]/10 text-[#F5DE85]"
+              : "border-white/10 bg-white/5 text-white/60",
+          ].join(" ")}
+        >
+          {isActive ? "Now playing" : "Demo"}
+        </span>
+      </div>
+
+      <div className="mt-5 rounded-xl border border-[#1A2550] bg-[#050814] p-4">
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={toggle}
+            className={[
+              "h-11 w-11 rounded-full flex items-center justify-center font-semibold transition",
+              "border border-white/15 bg-white/5 text-white",
+              "hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/10",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814]",
+            ].join(" ")}
+            aria-label={playing ? `Pause ${title}` : `Play ${title}`}
+          >
+            {playing ? "❚❚" : "▶"}
+          </button>
+
+          <div className="flex-1">
+            <button
+              type="button"
+              onClick={handleSeek}
+              className={[
+                "relative w-full h-3 rounded-full overflow-hidden",
+                "border border-white/10 bg-white/5",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814]",
+              ].join(" ")}
+              aria-label={`Seek ${title}`}
+            >
+              <div
+                className="absolute left-0 top-0 h-full bg-[#D4AF37]/70"
+                style={{ width: `${pct}%` }}
+              />
+            </button>
+
+            <div className="mt-2 flex items-center justify-between text-xs text-white/60">
+              <span>{formatTime(current)}</span>
+              <span>{ready ? formatTime(duration) : "Loading..."}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Hidden native audio element */}
+        <audio
+          preload="none"
+          ref={(el) => {
+            audioRefs.current[index] = el;
+          }}
+        >
+          <source src={src} type="audio/mpeg" />
+        </audio>
+      </div>
+    </div>
+  );
+}
+
 function HomeContent() {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState("");
@@ -215,15 +404,17 @@ function HomeContent() {
     }
   }, []);
 
-  const handlePlay = (index: number) => {
+  // Only one demo plays at a time
+  useEffect(() => {
     audioRefs.current.forEach((audio, i) => {
       if (!audio) return;
-      if (i !== index) {
+      if (activeIndex === null) return;
+      if (i !== activeIndex) {
         audio.pause();
         audio.currentTime = 0;
       }
     });
-  };
+  }, [activeIndex]);
 
   const demos = [
     {
@@ -263,7 +454,6 @@ function HomeContent() {
       <div id="top" />
 
       {/* HERO */}
-      {/* Key change: pull the hero background up under the sticky header */}
       <section className="relative overflow-hidden -mt-16 pt-16">
         <div className="absolute inset-0">
           <Image
@@ -302,7 +492,7 @@ function HomeContent() {
                 </span>
               </p>
 
-              {/* TRUST CHIPS (Step 1) */}
+              {/* TRUST CHIPS */}
               <div className="mt-5 flex flex-wrap gap-2 max-w-2xl">
                 {[
                   "24 to 48h reply",
@@ -339,7 +529,6 @@ function HomeContent() {
                 </a>
               </div>
 
-              {/* One clean link */}
               <div className="mt-4">
                 <Link
                   href="/audiobook-narrator"
@@ -356,7 +545,7 @@ function HomeContent() {
               <ProofPoints />
             </div>
 
-            {/* RIGHT HERO CARD (desktop only for clean mobile) */}
+            {/* RIGHT HERO CARD */}
             <div className="hidden md:block md:col-span-5">
               <AtAGlanceCard onOpenLightbox={openLightbox} />
             </div>
@@ -375,42 +564,21 @@ function HomeContent() {
 
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {demos.map((demo, index) => (
-              <div
+              <DemoPlayer
                 key={demo.title}
-                className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50"
-              >
-                <p className="font-semibold text-lg text-white">{demo.title}</p>
-                <p className="mt-1 text-sm text-white/70">{demo.desc}</p>
-
-                {demo.src ? (
-                  <div className="mt-4 rounded-lg bg-[#050814] p-3 border border-[#1A2550]">
-                    <audio
-                      controls
-                      preload="none"
-                      className="w-full"
-                      ref={(el) => {
-                        audioRefs.current[index] = el;
-                      }}
-                      onPlay={() => handlePlay(index)}
-                    >
-                      <source src={demo.src} type="audio/mpeg" />
-                      Your browser does not support the audio element.
-                    </audio>
-                  </div>
-                ) : (
-                  <div className="mt-4 rounded-lg border border-[#1A2550] bg-[#050814] p-4">
-                    <p className="text-sm text-white/70">Demo link not added yet.</p>
-                    <p className="mt-1 text-xs text-white/50">
-                      Paste an MP3 URL into this demo’s <code>src</code> to enable playback.
-                    </p>
-                  </div>
-                )}
-              </div>
+                title={demo.title}
+                desc={demo.desc}
+                src={demo.src}
+                index={index}
+                activeIndex={activeIndex}
+                setActiveIndex={setActiveIndex}
+                audioRefs={audioRefs}
+              />
             ))}
           </div>
         </section>
 
-        {/* AT A GLANCE (mobile only, placed after demos) */}
+        {/* AT A GLANCE (mobile only) */}
         <section className="mt-14 md:hidden">
           <AtAGlanceCard onOpenLightbox={openLightbox} />
         </section>
@@ -455,7 +623,6 @@ function HomeContent() {
               <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
                 <p className="text-sm text-white/70">Preferred contact</p>
 
-                {/* Mobile only: show email */}
                 <a
                   className="mt-2 inline-block text-base font-semibold text-[#D4AF37] hover:underline md:hidden"
                   href="mailto:Dean@DMNarration.com"
@@ -463,7 +630,6 @@ function HomeContent() {
                   Dean@DMNarration.com
                 </a>
 
-                {/* Desktop: show booking button instead of repeating email */}
                 <a
                   href={BOOKINGS_URL}
                   target="_blank"
