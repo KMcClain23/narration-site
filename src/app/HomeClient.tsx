@@ -219,6 +219,23 @@ function DemoPlayer({
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
 
+  const getEffectiveDuration = (a: HTMLAudioElement) => {
+    const d = a.duration;
+
+    if (Number.isFinite(d) && d > 0) return d;
+
+    try {
+      if (a.seekable && a.seekable.length > 0) {
+        const end = a.seekable.end(a.seekable.length - 1);
+        if (Number.isFinite(end) && end > 0) return end;
+      }
+    } catch {
+      // ignore
+    }
+
+    return 0;
+  };
+
   const pauseSelf = () => {
     const a = audioRefs.current[index];
     if (!a) return;
@@ -251,27 +268,40 @@ function DemoPlayer({
 
   const handleSeek = (e: React.MouseEvent<HTMLButtonElement>) => {
     const a = audioRefs.current[index];
-    if (!a || !duration) return;
+    if (!a) return;
+
+    const effectiveDuration = getEffectiveDuration(a);
+    if (!effectiveDuration) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = Math.min(Math.max(0, e.clientX - rect.left), rect.width);
     const pctLocal = rect.width ? x / rect.width : 0;
-    a.currentTime = pctLocal * duration;
+    a.currentTime = pctLocal * effectiveDuration;
   };
 
   useEffect(() => {
     const a = audioRefs.current[index];
     if (!a) return;
 
+    const updateDurationIfAvailable = () => {
+      const d = getEffectiveDuration(a);
+      if (d && d !== duration) setDuration(d);
+    };
+
     const onLoaded = () => {
       setReady(true);
-      setDuration(Number.isFinite(a.duration) ? a.duration : 0);
+      updateDurationIfAvailable();
       setBuffering(false);
     };
 
     const onCanPlay = () => {
       setReady(true);
+      updateDurationIfAvailable();
       setBuffering(false);
+    };
+
+    const onDurationChange = () => {
+      updateDurationIfAvailable();
     };
 
     const onWaiting = () => {
@@ -280,12 +310,14 @@ function DemoPlayer({
 
     const onTime = () => {
       setCurrent(a.currentTime || 0);
+      updateDurationIfAvailable();
     };
 
     const onPlay = () => {
       setPlaying(true);
       setActiveIndex(index);
       setBuffering(false);
+      updateDurationIfAvailable();
     };
 
     const onPause = () => {
@@ -302,6 +334,7 @@ function DemoPlayer({
 
     a.addEventListener("loadedmetadata", onLoaded);
     a.addEventListener("canplay", onCanPlay);
+    a.addEventListener("durationchange", onDurationChange);
     a.addEventListener("waiting", onWaiting);
     a.addEventListener("timeupdate", onTime);
     a.addEventListener("play", onPlay);
@@ -311,6 +344,7 @@ function DemoPlayer({
     return () => {
       a.removeEventListener("loadedmetadata", onLoaded);
       a.removeEventListener("canplay", onCanPlay);
+      a.removeEventListener("durationchange", onDurationChange);
       a.removeEventListener("waiting", onWaiting);
       a.removeEventListener("timeupdate", onTime);
       a.removeEventListener("play", onPlay);
@@ -318,9 +352,10 @@ function DemoPlayer({
       a.removeEventListener("ended", onEnded);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, activeIndex]);
+  }, [index, activeIndex, duration]);
 
-  const pct = duration ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
+  const pct =
+    duration > 0 ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
 
   const PlayIcon = ({ className = "" }: { className?: string }) => (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
@@ -370,7 +405,6 @@ function DemoPlayer({
       </div>
 
       <div className="mt-5 rounded-xl border border-[#1A2550] bg-[#050814] p-4">
-        {/* Key fixes: items-start + min-w-0 so bar can render, and progress area takes full width */}
         <div className="flex items-start gap-4">
           <button
             type="button"
@@ -424,7 +458,6 @@ function DemoPlayer({
           </div>
         </div>
 
-        {/* Hidden native audio element */}
         <audio
           preload="metadata"
           ref={(el) => {
