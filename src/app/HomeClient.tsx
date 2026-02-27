@@ -302,6 +302,24 @@ function HomeContent() {
                 </span>
               </p>
 
+              {/* TRUST CHIPS (Step 1) */}
+              <div className="mt-5 flex flex-wrap gap-2 max-w-2xl">
+                {[
+                  "24 to 48h reply",
+                  "Pickups within 24h",
+                  "ACX-ready delivery",
+                  "Broadcast-ready studio",
+                  "Romance, romantasy, drama, thriller",
+                ].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 backdrop-blur-sm transition hover:border-[#D4AF37]/40 hover:bg-[#D4AF37]/10"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+
               {/* Clean CTAs */}
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
                 <a
@@ -368,6 +386,7 @@ function HomeContent() {
                   <div className="mt-4 rounded-lg bg-[#050814] p-3 border border-[#1A2550]">
                     <audio
                       controls
+                      preload="none"
                       className="w-full"
                       ref={(el) => {
                         audioRefs.current[index] = el;
@@ -402,11 +421,11 @@ function HomeContent() {
           <div className="mt-6 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
             <div className="md:col-span-8">
               <p className="text-white/80 leading-relaxed">
-I’m Dean Miller, a professional audiobook narrator drawn to character-driven stories with emotional depth, quiet tension, and honest human connection. I have always been fascinated by voice and performance, especially the way small choices in pacing and tone can change how a story is felt.
+                I’m Dean Miller, a professional audiobook narrator drawn to character-driven stories with emotional depth, quiet tension, and honest human connection. I have always been fascinated by voice and performance, especially the way small choices in pacing and tone can change how a story is felt.
 
-My background in long-form storytelling shaped an approach focused on intention, restraint, and emotional truth rather than overt performance. I aim for narration that feels natural and immersive, where listeners stop noticing the voice and simply live inside the story.
+                My background in long-form storytelling shaped an approach focused on intention, restraint, and emotional truth rather than overt performance. I aim for narration that feels natural and immersive, where listeners stop noticing the voice and simply live inside the story.
 
-I record from a broadcast-quality home studio and value clear communication and collaboration throughout each project. For me, successful narration is when the listener forgets there is a narrator at all and walks away feeling the story instead.
+                I record from a broadcast-quality home studio and value clear communication and collaboration throughout each project. For me, successful narration is when the listener forgets there is a narrator at all and walks away feeling the story instead.
               </p>
 
               <ul className="mt-6 space-y-2 text-sm text-white/80">
