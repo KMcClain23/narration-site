@@ -255,8 +255,8 @@ function DemoPlayer({
 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = Math.min(Math.max(0, e.clientX - rect.left), rect.width);
-    const pct = rect.width ? x / rect.width : 0;
-    a.currentTime = pct * duration;
+    const pctLocal = rect.width ? x / rect.width : 0;
+    a.currentTime = pctLocal * duration;
   };
 
   useEffect(() => {
@@ -322,7 +322,6 @@ function DemoPlayer({
 
   const pct = duration ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
 
-  // Chunky, Apple Podcasts style: thick ring + inner fill + subtle gloss
   const PlayIcon = ({ className = "" }: { className?: string }) => (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
       <path
@@ -371,12 +370,12 @@ function DemoPlayer({
       </div>
 
       <div className="mt-5 rounded-xl border border-[#1A2550] bg-[#050814] p-4">
-        <div className="flex items-center gap-4">
+        {/* Key fixes: items-start + min-w-0 so bar can render, and progress area takes full width */}
+        <div className="flex items-start gap-4">
           <button
             type="button"
             onClick={toggle}
             className={[
-              // Chunkier: bigger + thicker ring + inner fill + stronger shadow
               "relative h-16 w-16 rounded-full flex items-center justify-center transition",
               "border-2 border-white/25 bg-white/10 text-white",
               "shadow-[0_10px_30px_rgba(0,0,0,0.45)]",
@@ -387,10 +386,7 @@ function DemoPlayer({
             ].join(" ")}
             aria-label={playing ? `Pause ${title}` : `Play ${title}`}
           >
-            {/* Inner disk for Apple-ish depth */}
             <span className="absolute inset-[6px] rounded-full border border-white/10 bg-white/10" />
-
-            {/* Subtle top gloss */}
             <span className="absolute left-[10px] right-[10px] top-[10px] h-[18px] rounded-full bg-white/10 blur-[0.2px]" />
 
             <span className="relative">
@@ -404,12 +400,12 @@ function DemoPlayer({
             </span>
           </button>
 
-          <div className="flex-1">
+          <div className="flex-1 min-w-0 w-full">
             <button
               type="button"
               onClick={handleSeek}
               className={[
-                "relative w-full h-3 rounded-full overflow-hidden",
+                "relative block w-full h-4 rounded-full overflow-hidden",
                 "border border-white/10 bg-white/5",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814]",
               ].join(" ")}
