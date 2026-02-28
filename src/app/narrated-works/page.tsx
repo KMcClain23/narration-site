@@ -1,3 +1,5 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useRef, useState } from "react";
@@ -77,7 +79,6 @@ export default function NarratedWorks() {
     },
   ];
 
-  // Reusable card component
   const BookCard = ({
     book,
     statusBadge = null,
@@ -114,7 +115,9 @@ export default function NarratedWorks() {
         {book.subtitle && (
           <p className="text-sm text-white/80 mt-0.5">{book.subtitle}</p>
         )}
-        <p className="text-sm mt-1.5 text-[#D4AF37] font-medium">{book.author}</p>
+        <p className="text-sm mt-1.5 text-[#D4AF37] font-medium">
+          {book.author}
+        </p>
       </div>
 
       {book.note && (
@@ -125,13 +128,10 @@ export default function NarratedWorks() {
     </a>
   );
 
-  function HorizontalScroller({
-    children,
-  }: {
-    children: React.ReactNode;
-  }) {
+  function HorizontalScroller({ children }: { children: React.ReactNode }) {
     const scrollerRef = useRef<HTMLDivElement | null>(null);
     const [isDragging, setIsDragging] = useState(false);
+
     const dragState = useRef({
       startX: 0,
       startScrollLeft: 0,
@@ -144,7 +144,6 @@ export default function NarratedWorks() {
       if (!el) return;
 
       const onPointerDown = (e: PointerEvent) => {
-        // Only left click or touch/pen
         if (e.pointerType === "mouse" && e.button !== 0) return;
 
         dragState.current.pointerId = e.pointerId;
@@ -201,16 +200,11 @@ export default function NarratedWorks() {
         ref={scrollerRef}
         className={[
           "flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth gap-6 px-4",
-          // Do not rely on hide-scrollbar unless you are 100% sure it does not set overflow:hidden
           "hide-scrollbar",
-          // Drag polish
           "select-none",
           isDragging ? "cursor-grabbing" : "cursor-grab",
         ].join(" ")}
-        style={{
-          // Allows vertical page scroll while we handle horizontal drag
-          touchAction: "pan-y",
-        }}
+        style={{ touchAction: "pan-y" }}
         aria-label="Horizontal carousel"
       >
         {children}
@@ -225,16 +219,15 @@ export default function NarratedWorks() {
           Narrated Works
         </h1>
         <p className="text-center text-white/70 text-lg mb-16 max-w-3xl mx-auto">
-          A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.
+          A showcase of audiobook projects I&apos;ve completed and those I&apos;m
+          currently narrating.
         </p>
 
-        {/* --- Completed Projects --- */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">
             Completed Projects
           </h2>
           <div className="relative">
-            {/* Gradient Overlays */}
             <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
             <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
@@ -247,7 +240,6 @@ export default function NarratedWorks() {
           </div>
         </section>
 
-        {/* --- Currently Narrating --- */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">
             Currently Narrating
@@ -273,7 +265,6 @@ export default function NarratedWorks() {
           </div>
         </section>
 
-        {/* --- Coming Soon --- */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">Coming Soon</h2>
           <div className="relative">
@@ -297,9 +288,10 @@ export default function NarratedWorks() {
           </div>
         </section>
 
-        {/* Call to Action */}
         <div className="mt-16 text-center">
-          <p className="text-white/70 mb-6 text-lg">Ready to bring your story to life?</p>
+          <p className="text-white/70 mb-6 text-lg">
+            Ready to bring your story to life?
+          </p>
           <Link
             href="/#contact"
             className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-8 py-4 font-semibold hover:bg-[#E0C15A] transition text-lg shadow-lg hover:shadow-2xl"
