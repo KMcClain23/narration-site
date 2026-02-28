@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 export default function NarratedWorks() {
   const completed = [
@@ -78,7 +78,13 @@ export default function NarratedWorks() {
   ];
 
   // Reusable card component
-  const BookCard = ({ book, statusBadge = null }: { book: any; statusBadge?: React.ReactNode }) => (
+  const BookCard = ({
+    book,
+    statusBadge = null,
+  }: {
+    book: any;
+    statusBadge?: React.ReactNode;
+  }) => (
     <a
       href={book.link}
       target="_blank"
@@ -108,9 +114,7 @@ export default function NarratedWorks() {
         {book.subtitle && (
           <p className="text-sm text-white/80 mt-0.5">{book.subtitle}</p>
         )}
-        <p className="text-sm mt-1.5 text-[#D4AF37] font-medium">
-          {book.author}
-        </p>
+        <p className="text-sm mt-1.5 text-[#D4AF37] font-medium">{book.author}</p>
       </div>
 
       {book.note && (
@@ -121,6 +125,99 @@ export default function NarratedWorks() {
     </a>
   );
 
+  function HorizontalScroller({
+    children,
+  }: {
+    children: React.ReactNode;
+  }) {
+    const scrollerRef = useRef<HTMLDivElement | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const dragState = useRef({
+      startX: 0,
+      startScrollLeft: 0,
+      moved: false,
+      pointerId: -1,
+    });
+
+    useEffect(() => {
+      const el = scrollerRef.current;
+      if (!el) return;
+
+      const onPointerDown = (e: PointerEvent) => {
+        // Only left click or touch/pen
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+
+        dragState.current.pointerId = e.pointerId;
+        dragState.current.startX = e.clientX;
+        dragState.current.startScrollLeft = el.scrollLeft;
+        dragState.current.moved = false;
+
+        setIsDragging(true);
+        el.setPointerCapture(e.pointerId);
+      };
+
+      const onPointerMove = (e: PointerEvent) => {
+        if (!isDragging) return;
+        if (dragState.current.pointerId !== e.pointerId) return;
+
+        const dx = e.clientX - dragState.current.startX;
+        if (Math.abs(dx) > 4) dragState.current.moved = true;
+
+        el.scrollLeft = dragState.current.startScrollLeft - dx;
+      };
+
+      const endDrag = (e: PointerEvent) => {
+        if (dragState.current.pointerId !== e.pointerId) return;
+        setIsDragging(false);
+        dragState.current.pointerId = -1;
+      };
+
+      const onClickCapture = (e: MouseEvent) => {
+        // If we dragged, prevent accidental link clicks
+        if (dragState.current.moved) {
+          e.preventDefault();
+          e.stopPropagation();
+          dragState.current.moved = false;
+        }
+      };
+
+      el.addEventListener("pointerdown", onPointerDown);
+      el.addEventListener("pointermove", onPointerMove);
+      el.addEventListener("pointerup", endDrag);
+      el.addEventListener("pointercancel", endDrag);
+      el.addEventListener("click", onClickCapture, true);
+
+      return () => {
+        el.removeEventListener("pointerdown", onPointerDown);
+        el.removeEventListener("pointermove", onPointerMove);
+        el.removeEventListener("pointerup", endDrag);
+        el.removeEventListener("pointercancel", endDrag);
+        el.removeEventListener("click", onClickCapture, true);
+      };
+    }, [isDragging]);
+
+    return (
+      <div
+        ref={scrollerRef}
+        className={[
+          "flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth gap-6 px-4",
+          // Do not rely on hide-scrollbar unless you are 100% sure it does not set overflow:hidden
+          "hide-scrollbar",
+          // Drag polish
+          "select-none",
+          isDragging ? "cursor-grabbing" : "cursor-grab",
+        ].join(" ")}
+        style={{
+          // Allows vertical page scroll while we handle horizontal drag
+          touchAction: "pan-y",
+        }}
+        aria-label="Horizontal carousel"
+      >
+        {children}
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#050814] text-white">
       <div className="max-w-7xl mx-auto px-6 py-16 md:py-20">
@@ -128,43 +225,51 @@ export default function NarratedWorks() {
           Narrated Works
         </h1>
         <p className="text-center text-white/70 text-lg mb-16 max-w-3xl mx-auto">
-          A showcase of audiobook projects I've completed and those I'm currently narrating.
+          A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.
         </p>
 
         {/* --- Completed Projects --- */}
         <section className="mb-20">
-          <h2 className="text-3xl font-bold mb-8 text-center">Completed Projects</h2>
+          <h2 className="text-3xl font-bold mb-8 text-center">
+            Completed Projects
+          </h2>
           <div className="relative">
             {/* Gradient Overlays */}
             <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
             <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
-            
-            <div className="flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth hide-scrollbar gap-6 px-4">
+
+            <HorizontalScroller>
               {completed.map((book, index) => (
                 <BookCard key={index} book={book} />
               ))}
               <div className="flex-shrink-0 w-4 sm:w-8" />
-            </div>
+            </HorizontalScroller>
           </div>
         </section>
 
         {/* --- Currently Narrating --- */}
         <section className="mb-20">
-          <h2 className="text-3xl font-bold mb-8 text-center">Currently Narrating</h2>
+          <h2 className="text-3xl font-bold mb-8 text-center">
+            Currently Narrating
+          </h2>
           <div className="relative">
             <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
             <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
-            
-            <div className="flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth hide-scrollbar gap-6 px-4">
+
+            <HorizontalScroller>
               {inProgress.map((book, index) => (
-                <BookCard 
-                  key={index} 
-                  book={book} 
-                  statusBadge={<span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded">In Progress</span>} 
+                <BookCard
+                  key={index}
+                  book={book}
+                  statusBadge={
+                    <span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded">
+                      In Progress
+                    </span>
+                  }
                 />
               ))}
               <div className="flex-shrink-0 w-4 sm:w-8" />
-            </div>
+            </HorizontalScroller>
           </div>
         </section>
 
@@ -174,17 +279,21 @@ export default function NarratedWorks() {
           <div className="relative">
             <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
             <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
-            
-            <div className="flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth hide-scrollbar gap-6 px-4">
+
+            <HorizontalScroller>
               {comingSoon.map((book, index) => (
-                <BookCard 
-                  key={index} 
-                  book={book} 
-                  statusBadge={<span className="bg-white/20 text-white px-2 py-0.5 rounded">Coming Soon</span>} 
+                <BookCard
+                  key={index}
+                  book={book}
+                  statusBadge={
+                    <span className="bg-white/20 text-white px-2 py-0.5 rounded">
+                      Coming Soon
+                    </span>
+                  }
                 />
               ))}
               <div className="flex-shrink-0 w-4 sm:w-8" />
-            </div>
+            </HorizontalScroller>
           </div>
         </section>
 
