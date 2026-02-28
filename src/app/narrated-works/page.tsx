@@ -33,6 +33,12 @@ export default function NarratedWorks() {
       cover: "/covers/sultry-secrets-tease.jpg",
       note: false,
     },
+    {
+      title: "Heir of the Emberscale",
+      author: "Shelby Gardner",
+      link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB",
+      cover: "/covers/heir-of-emberscale.jpg",
+    },
   ];
 
   const inProgress = [
@@ -47,12 +53,6 @@ export default function NarratedWorks() {
       author: "Madeline Fay",
       link: "https://www.amazon.com/Merciless-Punks-Enemies-romance-douchebags-ebook/dp/B09Z9P3C7V",
       cover: "/covers/merciless-punks.jpg",
-    },
-    {
-      title: "Heir of the Emberscale",
-      author: "Shelby Gardner",
-      link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB",
-      cover: "/covers/heir-of-emberscale.jpg",
     },
     {
       title: "Unmasked Hearts",
