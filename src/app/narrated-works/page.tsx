@@ -32,6 +32,12 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         w-64 sm:w-72 snap-start select-none
       "
       onDragStart={(e) => e.preventDefault()}
+      onClick={(e) => {
+        // If the global dragging flag is true, prevent the link from opening
+        if (window.isGlobalDragging) {
+          e.preventDefault();
+        }
+      }}
     >
       <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
         <Image
@@ -71,6 +77,13 @@ function BookCard({ book, statusBadge }: BookCardProps) {
   );
 }
 
+// Global flag to coordinate between scroller and cards
+declare global {
+  interface Window {
+    isGlobalDragging: boolean;
+  }
+}
+
 interface HorizontalScrollerProps {
   children: React.ReactNode;
   ariaLabel: string;
@@ -83,7 +96,6 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   const [progress, setProgress] = useState(0);
   const [showBar, setShowBar] = useState(false);
 
-  // Desktop Mouse Drag State
   const isDown = useRef(false);
   const startX = useRef(0);
   const scrollLeftStart = useRef(0);
@@ -115,15 +127,16 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, [checkOverflow, updateProgress]);
 
-  // --- MOUSE ONLY DRAG LOGIC ---
+  // --- Pointer Handlers ---
   const onPointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
-    // IMPORTANT: If this is touch, exit. Let the browser handle native scrolling.
+    // Mobile stays native
     if (e.pointerType !== 'mouse') return;
 
     const el = scrollerRef.current;
     if (!el) return;
 
     isDown.current = true;
+    window.isGlobalDragging = false; // Reset drag flag on every new click
     startX.current = e.pageX;
     scrollLeftStart.current = el.scrollLeft;
 
@@ -138,11 +151,14 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     const el = scrollerRef.current;
     const delta = e.pageX - startX.current;
 
+    // Threshold: Only consider it a "drag" if moved more than 5px
+    if (Math.abs(delta) > 5) {
+      window.isGlobalDragging = true;
+    }
+
     if (target === 'container') {
-      // Mouse drags cards (inverted movement)
       el.scrollLeft = scrollLeftStart.current - delta;
     } else {
-      // Mouse drags scrollbar thumb (direct movement)
       const maxScroll = el.scrollWidth - el.clientWidth;
       const trackWidth = trackRef.current?.clientWidth || 1;
       const scrollRatio = maxScroll / trackWidth;
@@ -152,22 +168,28 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
   const onPointerUp = (e: React.PointerEvent) => {
     if (e.pointerType !== 'mouse') return;
+    
     isDown.current = false;
     if (scrollerRef.current) {
       scrollerRef.current.style.scrollSnapType = "x mandatory";
       scrollerRef.current.style.scrollBehavior = "smooth";
     }
+
+    // We keep window.isGlobalDragging as 'true' for a split second 
+    // to ensure the 'onClick' event on the <a> tag sees it and cancels.
+    // Then we reset it for the next interaction.
+    setTimeout(() => {
+      window.isGlobalDragging = false;
+    }, 50);
   };
 
   return (
     <div className="relative group/scroller">
-      {/* Gradients */}
       <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
       <div
         ref={scrollerRef}
-        // Attaching listeners but they exit immediately if e.pointerType === 'touch'
         onPointerDown={(e) => onPointerDown(e, 'container')}
         onPointerMove={(e) => onPointerMove(e, 'container')}
         onPointerUp={onPointerUp}
@@ -178,9 +200,8 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
           scroll-smooth gap-6 sm:gap-8 px-10 sm:px-20
           hide-scrollbar cursor-grab active:cursor-grabbing
         "
-        // touchAction: "pan-x" is the secret sauce for mobile scrolling
         style={{ 
-          touchAction: "pan-x", 
+          touchAction: "pan-y", 
           WebkitOverflowScrolling: "touch",
           scrollbarWidth: 'none' 
         }}
@@ -222,13 +243,13 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   );
 }
 
-// --- Main Section Component ---
+// --- Main Page Component ---
 export default function NarratedWorks() {
   const completed: Book[] = [
     { title: "The Final Guardian", subtitle: "The Citadel of the Mind and the Garden", author: "Alexander Kamenetsky", link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H", cover: "/covers/the-final-guardian.jpg" },
     { title: "Santa Promised", subtitle: "A Christmas Novella", author: "Laetitia Clark", link: "https://www.amazon.com/Santa-Promised-A-Christmas-Novella/dp/B0G6GLQGHK", cover: "/covers/santa-promised.jpg" },
     { title: "The Circle", subtitle: "Rituals & Ruins", author: "Lilian Monroe, Kayla Gerdes", link: "https://www.amazon.com/Audible-The-Circle-Rituals-Ruins/dp/B0GKQY7N27", cover: "/covers/the-circle-rituals-and-ruins.jpg" },
-    { title: "Sultry Secrets: Tease", subtitle: "Sultry Secrets Book 4", author: "Bethanie Loren", link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L", cover: "/covers/sultry-secrets-tease.jpg", note: true },
+    { title: "Sultry Secrets: Tease", subtitle: "Sultry Secrets Book 4", author: "Bethanie Loren", link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L", cover: "/covers/sultry-secrets-tease.jpg",
     { title: "Heir of the Emberscale", author: "Shelby Gardner", link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB", cover: "/covers/heir-of-emberscale.jpg" },
   ];
 
