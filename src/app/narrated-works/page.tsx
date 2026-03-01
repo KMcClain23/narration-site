@@ -118,7 +118,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, [updateLayout, updateProgress]);
 
-  // Thumb drag only (simplified, no card drag to avoid capture conflicts)
+  // Thumb drag
   useEffect(() => {
     const thumb = thumbRef.current;
     if (!thumb) return;
@@ -139,7 +139,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
       const dx = e.clientX - startX;
       const trackWidth = trackRef.current?.offsetWidth || 1;
       const max = getMaxScroll();
-      const newScroll = startScroll + (dx / trackWidth) * max * -1; // invert for natural drag direction
+      const newScroll = startScroll - (dx / trackWidth) * max; // invert dx for natural direction
       scrollerRef.current?.scrollTo({
         left: Math.max(0, Math.min(max, newScroll)),
         behavior: "instant",
@@ -187,10 +187,11 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
       <div
         ref={scrollerRef}
+        tabIndex={0}  // Enables keyboard focus & arrow keys
         className="
           flex overflow-x-auto pb-8 sm:pb-10 
           snap-x snap-mandatory scroll-smooth gap-5 sm:gap-7 px-4 sm:px-6
-          hide-scrollbar
+          scrollbar-hide select-none touch-pan-x
         "
         style={{ touchAction: "pan-y pinch-zoom", WebkitOverflowScrolling: "touch" }}
         aria-label={ariaLabel}
