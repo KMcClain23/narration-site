@@ -39,7 +39,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 640px) 70vw, 256px"
-          // placeholder="blur"       // ← enable when you add blurDataURL
+          // placeholder="blur"          // enable when blurDataURL is added
           // blurDataURL={book.blurDataURL}
         />
       </div>
@@ -103,7 +103,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     updateProgress();
   }, [getMaxScroll, updateProgress]);
 
-  // Layout watchers
+  // Resize / scroll / layout observers
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -123,7 +123,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, [updateLayout, updateProgress]);
 
-  // Drag the cards directly
+  // Drag the cards row (mouse / touch)
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -143,7 +143,8 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     const onPointerMove = (e: PointerEvent) => {
       if (!el.hasPointerCapture(e.pointerId)) return;
       const dx = e.clientX - startX;
-      el.scrollLeft = startScrollLeft - dx;
+      const newLeft = startScrollLeft - dx;
+      el.scrollTo({ left: newLeft, behavior: "instant" });
     };
 
     const onPointerUp = () => {
@@ -164,7 +165,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, []);
 
-  // Drag the thumb (improved delta-based version)
+  // Drag the thumb
   useEffect(() => {
     const thumb = thumbRef.current;
     if (!thumb) return;
@@ -175,10 +176,8 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     const onPointerDown = (e: PointerEvent) => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
       e.preventDefault();
-
       initialClientX = e.clientX;
       initialScrollLeft = scrollerRef.current?.scrollLeft ?? 0;
-
       thumb.setPointerCapture(e.pointerId);
       setIsDragging(true);
     };
@@ -187,22 +186,21 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
       if (!thumb.hasPointerCapture(e.pointerId)) return;
 
       const deltaX = e.clientX - initialClientX;
-      const trackWidth = trackRef.current?.offsetWidth ?? 1;
+      const trackWidth = trackRef.current?.offsetWidth ?? 300;
       const maxScroll = getMaxScroll();
-
       const scrollDelta = (deltaX / trackWidth) * maxScroll;
       const targetScroll = initialScrollLeft + scrollDelta;
 
       if (scrollerRef.current) {
-        scrollerRef.current.scrollLeft = Math.max(0, Math.min(maxScroll, targetScroll));
+        scrollerRef.current.scrollTo({
+          left: Math.max(0, Math.min(maxScroll, targetScroll)),
+          behavior: "instant",
+        });
         updateProgress();
       }
     };
 
-    const onPointerUp = (e: PointerEvent) => {
-      if (thumb.hasPointerCapture(e.pointerId)) {
-        thumb.releasePointerCapture(e.pointerId);
-      }
+    const onPointerUp = () => {
       setIsDragging(false);
     };
 
@@ -219,7 +217,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, [getMaxScroll, updateProgress]);
 
-  // Click anywhere on track to jump
+  // Click on scrollbar track to jump
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
@@ -228,14 +226,14 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
       if (e.target === thumbRef.current) return;
 
       const rect = track.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const pct = clickX / rect.width;
+      const pct = (e.clientX - rect.left) / rect.width;
       const maxScroll = getMaxScroll();
 
-      if (scrollerRef.current) {
-        scrollerRef.current.scrollLeft = pct * maxScroll;
-        updateProgress();
-      }
+      scrollerRef.current?.scrollTo({
+        left: pct * maxScroll,
+        behavior: "instant",
+      });
+      updateProgress();
     };
 
     track.addEventListener("pointerdown", onPointerDown);
@@ -244,6 +242,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
   return (
     <div className="relative">
+      {/* Fade gradients */}
       <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
@@ -251,11 +250,12 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
         ref={scrollerRef}
         className={`
           flex overflow-x-auto pb-8 sm:pb-10 
-          snap-x snap-mandatory scroll-smooth gap-5 sm:gap-7 px-4 sm:px-6
+          snap-x snap-mandatory ${isDragging ? "scroll-auto" : "scroll-smooth"} 
+          gap-5 sm:gap-7 px-4 sm:px-6
           hide-scrollbar select-none touch-pan-x
           ${isDragging ? "cursor-grabbing" : "cursor-grab active:cursor-grabbing"}
         `}
-        style={{ touchAction: "pan-y pinch-zoom" }}
+        style={{ touchAction: "pan-y pinch-zoom", WebkitOverflowScrolling: "touch" }}
         aria-label={ariaLabel}
       >
         {children}
@@ -287,9 +287,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
                   transition-all duration-150
                   ${isDragging ? "scale-115 shadow-xl" : ""}
                 `}
-                style={{
-                  left: `calc(${progress}% - 20px)`,
-                }}
+                style={{ left: `calc(${progress}% - 20px)` }}
                 aria-label="Drag to scroll"
               />
             </div>
@@ -407,7 +405,7 @@ export default function NarratedWorks() {
                 key={index}
                 book={book}
                 statusBadge={
-                  <span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded">
+                  <span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded font-medium">
                     In Progress
                   </span>
                 }
