@@ -2,10 +2,295 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
+
+type Book = {
+  title: string;
+  subtitle?: string;
+  author: string;
+  link: string;
+  cover: string;
+  note?: boolean;
+};
+
+interface BookCardProps {
+  book: Book;
+  statusBadge?: React.ReactNode;
+}
+
+function BookCard({ book, statusBadge }: BookCardProps) {
+  return (
+    <a
+      href={book.link}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`View ${book.title} by ${book.author} on Amazon`}
+      className="
+        group relative rounded-xl overflow-hidden shadow-lg 
+        hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 
+        border border-[#1A2550] bg-[#0B1224] flex-shrink-0 
+        w-56 sm:w-64 snap-start
+      "
+    >
+      <div className="relative aspect-[3/4.5] w-full bg-gray-900/40">
+        <Image
+          src={book.cover}
+          alt={`${book.title} book cover`}
+          fill
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          sizes="(max-width: 640px) 70vw, 256px"
+          // placeholder="blur"          // ← uncomment + add blurDataURL when you implement it
+          // blurDataURL={book.blurDataURL}
+        />
+      </div>
+
+      {statusBadge && (
+        <div className="absolute top-3 right-3 bg-opacity-90 text-xs font-semibold px-2.5 py-1 rounded pointer-events-none">
+          {statusBadge}
+        </div>
+      )}
+
+      {book.note && (
+        <div className="absolute top-3 left-3 bg-yellow-600/80 text-white text-xs px-2 py-1 rounded pointer-events-none">
+          Note
+        </div>
+      )}
+
+      <div className="p-4 text-center">
+        <h3 className="font-semibold text-base leading-tight text-white group-hover:text-[#D4AF37] transition-colors">
+          {book.title}
+        </h3>
+        {book.subtitle && (
+          <p className="text-sm text-white/75 mt-0.5">{book.subtitle}</p>
+        )}
+        <p className="text-sm mt-2 text-[#D4AF37] font-medium">
+          {book.author}
+        </p>
+      </div>
+    </a>
+  );
+}
+
+interface HorizontalScrollerProps {
+  children: React.ReactNode;
+  ariaLabel: string;
+}
+
+function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const thumbRef = useRef<HTMLDivElement>(null);
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [showBar, setShowBar] = useState(false);
+
+  const getMaxScroll = useCallback(() => {
+    const el = scrollerRef.current;
+    return el ? Math.max(0, el.scrollWidth - el.clientWidth) : 0;
+  }, []);
+
+  const updateProgress = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const max = getMaxScroll();
+    setProgress(max > 0 ? (el.scrollLeft / max) * 100 : 0);
+  }, [getMaxScroll]);
+
+  const updateLayout = useCallback(() => {
+    const max = getMaxScroll();
+    setShowBar(max > 4);
+    updateProgress();
+  }, [getMaxScroll, updateProgress]);
+
+  // Layout / resize / scroll listeners
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+
+    const ro = new ResizeObserver(updateLayout);
+    ro.observe(el);
+
+    el.addEventListener("scroll", updateProgress, { passive: true });
+    window.addEventListener("resize", updateLayout);
+
+    updateLayout(); // initial check
+
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", updateProgress);
+      window.removeEventListener("resize", updateLayout);
+    };
+  }, [updateLayout, updateProgress]);
+
+  // Drag to scroll the cards
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+
+    let startX = 0;
+    let startScrollLeft = 0;
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      startX = e.clientX;
+      startScrollLeft = el.scrollLeft;
+      setIsDragging(true);
+      el.setPointerCapture(e.pointerId);
+      el.style.userSelect = "none";
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!el.hasPointerCapture(e.pointerId)) return;
+      const dx = e.clientX - startX;
+      el.scrollLeft = startScrollLeft - dx;
+    };
+
+    const onPointerUp = () => {
+      setIsDragging(false);
+      el.style.userSelect = "";
+    };
+
+    el.addEventListener("pointerdown", onPointerDown);
+    el.addEventListener("pointermove", onPointerMove);
+    el.addEventListener("pointerup", onPointerUp);
+    el.addEventListener("pointercancel", onPointerUp);
+
+    return () => {
+      el.removeEventListener("pointerdown", onPointerDown);
+      el.removeEventListener("pointermove", onPointerMove);
+      el.removeEventListener("pointerup", onPointerUp);
+      el.removeEventListener("pointercancel", onPointerUp);
+    };
+  }, []);
+
+  // Thumb drag
+  useEffect(() => {
+    const thumb = thumbRef.current;
+    if (!thumb) return;
+
+    const moveToClientX = (clientX: number) => {
+      const track = trackRef.current;
+      const scroller = scrollerRef.current;
+      if (!track || !scroller) return;
+
+      const rect = track.getBoundingClientRect();
+      const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+      const pct = x / rect.width;
+      scroller.scrollLeft = pct * getMaxScroll();
+      updateProgress();
+    };
+
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      thumb.setPointerCapture(e.pointerId);
+      setIsDragging(true);
+      moveToClientX(e.clientX);
+    };
+
+    const onMove = (e: PointerEvent) => {
+      if (!thumb.hasPointerCapture(e.pointerId)) return;
+      moveToClientX(e.clientX);
+    };
+
+    const onUp = () => {
+      setIsDragging(false);
+    };
+
+    thumb.addEventListener("pointerdown", onDown);
+    thumb.addEventListener("pointermove", onMove);
+    thumb.addEventListener("pointerup", onUp);
+    thumb.addEventListener("pointercancel", onUp);
+
+    return () => {
+      thumb.removeEventListener("pointerdown", onDown);
+      thumb.removeEventListener("pointermove", onMove);
+      thumb.removeEventListener("pointerup", onUp);
+      thumb.removeEventListener("pointercancel", onUp);
+    };
+  }, [getMaxScroll, updateProgress]);
+
+  // Click on track to jump
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    const onDown = (e: PointerEvent) => {
+      if (e.target === thumbRef.current) return;
+      const rect = track.getBoundingClientRect();
+      const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+      const pct = x / rect.width;
+      const scroller = scrollerRef.current;
+      if (scroller) {
+        scroller.scrollLeft = pct * getMaxScroll();
+        updateProgress();
+      }
+    };
+
+    track.addEventListener("pointerdown", onDown);
+    return () => track.removeEventListener("pointerdown", onDown);
+  }, [getMaxScroll, updateProgress]);
+
+  return (
+    <div className="relative">
+      {/* Fade edges */}
+      <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
+
+      <div
+        ref={scrollerRef}
+        className={`
+          flex overflow-x-auto pb-8 sm:pb-10 
+          snap-x snap-mandatory scroll-smooth gap-5 sm:gap-7 px-4 sm:px-6
+          hide-scrollbar select-none touch-pan-x
+          ${isDragging ? "cursor-grabbing" : "cursor-grab active:cursor-grabbing"}
+        `}
+        aria-label={ariaLabel}
+      >
+        {children}
+        <div className="flex-shrink-0 w-12 sm:w-20" />
+      </div>
+
+      {showBar && (
+        <div className="mt-5 sm:mt-6 flex justify-center px-4">
+          <div className="w-full max-w-md">
+            <div
+              ref={trackRef}
+              className="relative h-3.5 sm:h-4 rounded-full bg-white/10 border border-white/10 cursor-pointer"
+              role="slider"
+              aria-label={`${ariaLabel} scrollbar`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(progress)}
+              tabIndex={0}
+            >
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-[#D4AF37]/30 transition-all"
+                style={{ width: `${progress}%` }}
+              />
+              <div
+                ref={thumbRef}
+                className={`
+                  absolute top-1/2 -translate-y-1/2 h-5 w-10 sm:h-6 sm:w-12 
+                  rounded-full bg-[#D4AF37] shadow-md cursor-grab active:cursor-grabbing
+                  transition-transform duration-150
+                  ${isDragging ? "scale-110 shadow-xl" : ""}
+                `}
+                style={{
+                  left: `calc(${progress}% - ${progress > 90 ? 48 : 24}px)`,
+                }}
+                aria-label="Drag to scroll"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function NarratedWorks() {
-  const completed = [
+  const completed: Book[] = [
     {
       title: "The Final Guardian",
       subtitle: "The Citadel of the Mind and the Garden",
@@ -33,7 +318,7 @@ export default function NarratedWorks() {
       author: "Bethanie Loren",
       link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L",
       cover: "/covers/sultry-secrets-tease.jpg",
-      note: false,
+      note: true,
     },
     {
       title: "Heir of the Emberscale",
@@ -43,7 +328,7 @@ export default function NarratedWorks() {
     },
   ];
 
-  const inProgress = [
+  const inProgress: Book[] = [
     {
       title: "No One to Hold Me",
       author: "Noelle Rahn-Johnson",
@@ -64,7 +349,7 @@ export default function NarratedWorks() {
     },
   ];
 
-  const comingSoon = [
+  const comingSoon: Book[] = [
     {
       title: "Beating For You",
       author: "L.L. McAlister",
@@ -79,366 +364,6 @@ export default function NarratedWorks() {
     },
   ];
 
-  const BookCard = ({
-    book,
-    statusBadge = null,
-  }: {
-    book: any;
-    statusBadge?: React.ReactNode;
-  }) => (
-    <a
-      href={book.link}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group relative rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-[#1A2550] bg-[#0B1224] flex-shrink-0 w-56 sm:w-64 snap-start"
-    >
-      <div className="relative aspect-[3/4.5] w-full">
-        <Image
-          src={book.cover}
-          alt={`${book.title} cover`}
-          fill
-          draggable={false}
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-          sizes="(max-width: 640px) 70vw, 240px"
-        />
-      </div>
-
-      {statusBadge && (
-        <div className="absolute top-3 right-3 bg-opacity-90 text-xs font-semibold px-2.5 py-1 rounded">
-          {statusBadge}
-        </div>
-      )}
-
-      <div className="p-4 text-center">
-        <h3 className="font-semibold text-base leading-tight text-white">
-          {book.title}
-        </h3>
-        {book.subtitle && (
-          <p className="text-sm text-white/80 mt-0.5">{book.subtitle}</p>
-        )}
-        <p className="text-sm mt-1.5 text-[#D4AF37] font-medium">
-          {book.author}
-        </p>
-      </div>
-
-      {book.note && (
-        <div className="absolute top-3 left-3 bg-yellow-600/80 text-white text-xs px-2 py-1 rounded">
-          Note
-        </div>
-      )}
-    </a>
-  );
-
-  function HorizontalScroller({
-    children,
-    ariaLabel,
-  }: {
-    children: React.ReactNode;
-    ariaLabel: string;
-  }) {
-    const scrollerRef = useRef<HTMLDivElement | null>(null);
-    const trackRef = useRef<HTMLDivElement | null>(null);
-    const thumbRef = useRef<HTMLDivElement | null>(null);
-
-    // drag state for the cards row
-    const draggingCardsRef = useRef(false);
-    const cardsDrag = useRef({
-      startX: 0,
-      startScrollLeft: 0,
-      moved: false,
-      pointerId: -1,
-    });
-
-    // drag state for the thumb scrubber
-    const draggingThumbRef = useRef(false);
-    const thumbDrag = useRef({
-      pointerId: -1,
-    });
-
-    const [cursorDragging, setCursorDragging] = useState(false);
-    const [progressPct, setProgressPct] = useState(0);
-    const [needsBar, setNeedsBar] = useState(false);
-    const [thumbLeftPx, setThumbLeftPx] = useState(0);
-
-    const THUMB_WIDTH = 44; // px (matches w-11-ish; we set inline width below)
-    const clamp = (v: number, min: number, max: number) =>
-      Math.min(max, Math.max(min, v));
-
-    const getMaxScroll = () => {
-      const el = scrollerRef.current;
-      if (!el) return 0;
-      return Math.max(0, el.scrollWidth - el.clientWidth);
-    };
-
-    const computeNeedsBarAndSync = () => {
-      const el = scrollerRef.current;
-      const track = trackRef.current;
-      if (!el || !track) return;
-
-      const maxScroll = getMaxScroll();
-      const shouldShow = maxScroll > 2;
-      setNeedsBar(shouldShow);
-
-      // progress pct from scroll
-      const pct = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
-      const pctClamped = Math.min(100, Math.max(0, pct));
-      setProgressPct(pctClamped);
-
-      // thumb position from pct (clamped)
-      const trackW = track.getBoundingClientRect().width;
-      const usable = Math.max(0, trackW - THUMB_WIDTH);
-      const left = usable * (pctClamped / 100);
-      setThumbLeftPx(clamp(left, 0, usable));
-    };
-
-    const syncFromScroll = () => {
-      const el = scrollerRef.current;
-      const track = trackRef.current;
-      if (!el || !track) return;
-
-      const maxScroll = getMaxScroll();
-      const pct = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
-      const pctClamped = Math.min(100, Math.max(0, pct));
-      setProgressPct(pctClamped);
-
-      const trackW = track.getBoundingClientRect().width;
-      const usable = Math.max(0, trackW - THUMB_WIDTH);
-      const left = usable * (pctClamped / 100);
-      setThumbLeftPx(clamp(left, 0, usable));
-    };
-
-    const setScrollFromThumbLeft = (leftPx: number) => {
-      const el = scrollerRef.current;
-      const track = trackRef.current;
-      if (!el || !track) return;
-
-      const trackW = track.getBoundingClientRect().width;
-      const usable = Math.max(0, trackW - THUMB_WIDTH);
-      const left = clamp(leftPx, 0, usable);
-
-      const ratio = usable > 0 ? left / usable : 0;
-      const maxScroll = getMaxScroll();
-
-      el.scrollLeft = ratio * maxScroll;
-      // scroll event will sync, but we update immediately for responsiveness
-      const pct = ratio * 100;
-      setProgressPct(pct);
-      setThumbLeftPx(left);
-    };
-
-    const setScrollFromClientXOnTrack = (clientX: number) => {
-      const track = trackRef.current;
-      if (!track) return;
-
-      const rect = track.getBoundingClientRect();
-
-      // center thumb under the pointer
-      const desiredLeft = clientX - rect.left - THUMB_WIDTH / 2;
-      setScrollFromThumbLeft(desiredLeft);
-    };
-
-    // Detect overflow + keep in sync (images loading, resize, etc.)
-    useEffect(() => {
-      const el = scrollerRef.current;
-      if (!el) return;
-
-      // Initial sync after mount
-      // Use rAF to let layout settle
-      const raf = requestAnimationFrame(() => computeNeedsBarAndSync());
-
-      el.addEventListener("scroll", syncFromScroll, { passive: true });
-      window.addEventListener("resize", computeNeedsBarAndSync);
-
-      const ro = new ResizeObserver(() => computeNeedsBarAndSync());
-      ro.observe(el);
-
-      return () => {
-        cancelAnimationFrame(raf);
-        el.removeEventListener("scroll", syncFromScroll);
-        window.removeEventListener("resize", computeNeedsBarAndSync);
-        ro.disconnect();
-      };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    // Drag to scroll the cards
-    useEffect(() => {
-      const el = scrollerRef.current;
-      if (!el) return;
-
-      const onPointerDown = (e: PointerEvent) => {
-        if (e.pointerType === "mouse" && e.button !== 0) return;
-
-        draggingCardsRef.current = true;
-        setCursorDragging(true);
-
-        cardsDrag.current.pointerId = e.pointerId;
-        cardsDrag.current.startX = e.clientX;
-        cardsDrag.current.startScrollLeft = el.scrollLeft;
-        cardsDrag.current.moved = false;
-
-        el.setPointerCapture(e.pointerId);
-      };
-
-      const onPointerMove = (e: PointerEvent) => {
-        if (!draggingCardsRef.current) return;
-        if (cardsDrag.current.pointerId !== e.pointerId) return;
-
-        const dx = e.clientX - cardsDrag.current.startX;
-        if (Math.abs(dx) > 6) cardsDrag.current.moved = true;
-
-        el.scrollLeft = cardsDrag.current.startScrollLeft - dx;
-      };
-
-      const endDrag = (e: PointerEvent) => {
-        if (cardsDrag.current.pointerId !== e.pointerId) return;
-
-        draggingCardsRef.current = false;
-        setCursorDragging(false);
-        cardsDrag.current.pointerId = -1;
-      };
-
-      const onClickCapture = (e: MouseEvent) => {
-        if (cardsDrag.current.moved) {
-          e.preventDefault();
-          e.stopPropagation();
-          cardsDrag.current.moved = false;
-        }
-      };
-
-      el.addEventListener("pointerdown", onPointerDown);
-      el.addEventListener("pointermove", onPointerMove);
-      el.addEventListener("pointerup", endDrag);
-      el.addEventListener("pointercancel", endDrag);
-      el.addEventListener("click", onClickCapture, true);
-
-      return () => {
-        el.removeEventListener("pointerdown", onPointerDown);
-        el.removeEventListener("pointermove", onPointerMove);
-        el.removeEventListener("pointerup", endDrag);
-        el.removeEventListener("pointercancel", endDrag);
-        el.removeEventListener("click", onClickCapture, true);
-      };
-    }, []);
-
-    // Drag the thumb to scrub
-    useEffect(() => {
-      const thumb = thumbRef.current;
-      if (!thumb) return;
-
-      const onPointerDown = (e: PointerEvent) => {
-        if (e.pointerType === "mouse" && e.button !== 0) return;
-
-        draggingThumbRef.current = true;
-        thumbDrag.current.pointerId = e.pointerId;
-
-        thumb.setPointerCapture(e.pointerId);
-      };
-
-      const onPointerMove = (e: PointerEvent) => {
-        if (!draggingThumbRef.current) return;
-        if (thumbDrag.current.pointerId !== e.pointerId) return;
-
-        // Move thumb by pointer position on track
-        setScrollFromClientXOnTrack(e.clientX);
-      };
-
-      const endThumb = (e: PointerEvent) => {
-        if (thumbDrag.current.pointerId !== e.pointerId) return;
-
-        draggingThumbRef.current = false;
-        thumbDrag.current.pointerId = -1;
-      };
-
-      thumb.addEventListener("pointerdown", onPointerDown);
-      thumb.addEventListener("pointermove", onPointerMove);
-      thumb.addEventListener("pointerup", endThumb);
-      thumb.addEventListener("pointercancel", endThumb);
-
-      return () => {
-        thumb.removeEventListener("pointerdown", onPointerDown);
-        thumb.removeEventListener("pointermove", onPointerMove);
-        thumb.removeEventListener("pointerup", endThumb);
-        thumb.removeEventListener("pointercancel", endThumb);
-      };
-    }, []);
-
-    // Clicking the track jumps (when visible)
-    useEffect(() => {
-      const track = trackRef.current;
-      if (!track) return;
-
-      const onPointerDown = (e: PointerEvent) => {
-        if (e.pointerType === "mouse" && e.button !== 0) return;
-        // If click is on the thumb, thumb handler takes over
-        if (e.target === thumbRef.current) return;
-
-        setScrollFromClientXOnTrack(e.clientX);
-      };
-
-      track.addEventListener("pointerdown", onPointerDown);
-
-      return () => {
-        track.removeEventListener("pointerdown", onPointerDown);
-      };
-    }, []);
-
-    return (
-      <div className="relative">
-        <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
-
-        <div
-          ref={scrollerRef}
-          className={[
-            "flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth gap-6 px-4",
-            "hide-scrollbar select-none",
-            cursorDragging ? "cursor-grabbing" : "cursor-grab",
-          ].join(" ")}
-          style={{ touchAction: "pan-y" }}
-          aria-label={ariaLabel}
-        >
-          {children}
-          <div className="flex-shrink-0 w-4 sm:w-8" />
-        </div>
-
-        {needsBar && (
-          <div className="mt-4 flex justify-center">
-            <div className="w-1/2 max-w-sm">
-              <div
-                ref={trackRef}
-                className="relative h-3.5 rounded-full bg-white/10 border border-white/10"
-                role="slider"
-                aria-label={`${ariaLabel} scroll position`}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(progressPct)}
-              >
-                {/* subtle filled track */}
-                <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-[#D4AF37]/25"
-                  style={{ width: `${progressPct}%` }}
-                />
-
-                {/* thumb (grab handle) */}
-                <div
-                  ref={thumbRef}
-                  className="absolute top-1/2 -translate-y-1/2 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
-                  style={{
-                    width: `${THUMB_WIDTH}px`,
-                    height: "18px",
-                    left: `${thumbLeftPx}px`,
-                  }}
-                  aria-label="Scroll thumb"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
     <main className="min-h-screen bg-[#050814] text-white">
       <div className="max-w-7xl mx-auto px-6 py-16 md:py-20">
@@ -446,7 +371,7 @@ export default function NarratedWorks() {
           Narrated Works
         </h1>
         <p className="text-center text-white/70 text-lg mb-16 max-w-3xl mx-auto">
-          A showcase of audiobook projects I&apos;ve completed and those I&apos;ve
+          A showcase of audiobook projects I&apos;ve completed and those I&apos;m
           currently narrating.
         </p>
 
@@ -454,7 +379,6 @@ export default function NarratedWorks() {
           <h2 className="text-3xl font-bold mb-8 text-center">
             Completed Projects
           </h2>
-
           <HorizontalScroller ariaLabel="Completed projects carousel">
             {completed.map((book, index) => (
               <BookCard key={index} book={book} />
@@ -466,7 +390,6 @@ export default function NarratedWorks() {
           <h2 className="text-3xl font-bold mb-8 text-center">
             Currently Narrating
           </h2>
-
           <HorizontalScroller ariaLabel="Currently narrating carousel">
             {inProgress.map((book, index) => (
               <BookCard
@@ -484,7 +407,6 @@ export default function NarratedWorks() {
 
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">Coming Soon</h2>
-
           <HorizontalScroller ariaLabel="Coming soon carousel">
             {comingSoon.map((book, index) => (
               <BookCard
