@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useRef, useEffect, Suspense, useState } from "react";
+import { useRef, useEffect, Suspense, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 
 const BOOKINGS_URL =
@@ -213,259 +213,174 @@ function DemoPlayer({
 }) {
   const isActive = activeIndex === index;
 
-  const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
+  const [volume, setVolume] = useState(1);
 
-  const getEffectiveDuration = (a: HTMLAudioElement) => {
-    const d = a.duration;
-
-    if (Number.isFinite(d) && d > 0) return d;
-
-    try {
-      if (a.seekable && a.seekable.length > 0) {
-        const end = a.seekable.end(a.seekable.length - 1);
-        if (Number.isFinite(end) && end > 0) return end;
-      }
-    } catch {
-      // ignore
-    }
-
-    return 0;
-  };
-
-  const pauseSelf = () => {
+  const toggle = (e: React.MouseEvent) => {
+    e.preventDefault();
     const a = audioRefs.current[index];
     if (!a) return;
-    a.pause();
-  };
-
-  const playSelf = async () => {
-    const a = audioRefs.current[index];
-    if (!a) return;
-
-    try {
-      if (!ready) setBuffering(true);
-      await a.play();
-      setActiveIndex(index);
-    } catch {
-      setBuffering(false);
-    }
-  };
-
-  const toggle = async () => {
-    const a = audioRefs.current[index];
-    if (!a) return;
-
-    if (!playing) {
-      await playSelf();
+    if (a.paused) {
+      a.play().catch(() => {});
     } else {
-      pauseSelf();
+      a.pause();
     }
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLButtonElement>) => {
     const a = audioRefs.current[index];
-    if (!a) return;
-
-    const effectiveDuration = getEffectiveDuration(a);
-    if (!effectiveDuration) return;
+    if (!a || !duration) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = Math.min(Math.max(0, e.clientX - rect.left), rect.width);
-    const pctLocal = rect.width ? x / rect.width : 0;
-    a.currentTime = pctLocal * effectiveDuration;
+    const pctLocal = x / rect.width;
+    a.currentTime = pctLocal * duration;
+  };
+
+  const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    setVolume(val);
+    const a = audioRefs.current[index];
+    if (a) a.volume = val;
   };
 
   useEffect(() => {
     const a = audioRefs.current[index];
     if (!a) return;
 
-    const updateDurationIfAvailable = () => {
-      const d = getEffectiveDuration(a);
-      if (d && d !== duration) setDuration(d);
-    };
-
-    const onLoaded = () => {
-      setReady(true);
-      updateDurationIfAvailable();
-      setBuffering(false);
-    };
-
-    const onCanPlay = () => {
-      setReady(true);
-      updateDurationIfAvailable();
-      setBuffering(false);
-    };
-
-    const onDurationChange = () => {
-      updateDurationIfAvailable();
-    };
-
-    const onWaiting = () => {
-      setBuffering(true);
-    };
-
-    const onTime = () => {
-      setCurrent(a.currentTime || 0);
-      updateDurationIfAvailable();
-    };
-
+    const onTimeUpdate = () => setCurrent(a.currentTime);
+    const onDurationChange = () => setDuration(a.duration);
     const onPlay = () => {
       setPlaying(true);
+      setBuffering(false);
       setActiveIndex(index);
-      setBuffering(false);
-      updateDurationIfAvailable();
     };
-
-    const onPause = () => {
-      setPlaying(false);
-      setBuffering(false);
-    };
-
+    const onPause = () => setPlaying(false);
+    const onWaiting = () => setBuffering(true);
+    const onPlaying = () => setBuffering(false);
     const onEnded = () => {
       setPlaying(false);
-      setBuffering(false);
       setCurrent(0);
-      if (activeIndex === index) setActiveIndex(null);
+      setActiveIndex(null);
     };
 
-    a.addEventListener("loadedmetadata", onLoaded);
-    a.addEventListener("canplay", onCanPlay);
+    a.addEventListener("timeupdate", onTimeUpdate);
     a.addEventListener("durationchange", onDurationChange);
-    a.addEventListener("waiting", onWaiting);
-    a.addEventListener("timeupdate", onTime);
     a.addEventListener("play", onPlay);
     a.addEventListener("pause", onPause);
+    a.addEventListener("waiting", onWaiting);
+    a.addEventListener("playing", onPlaying);
     a.addEventListener("ended", onEnded);
 
     return () => {
-      a.removeEventListener("loadedmetadata", onLoaded);
-      a.removeEventListener("canplay", onCanPlay);
+      a.removeEventListener("timeupdate", onTimeUpdate);
       a.removeEventListener("durationchange", onDurationChange);
-      a.removeEventListener("waiting", onWaiting);
-      a.removeEventListener("timeupdate", onTime);
       a.removeEventListener("play", onPlay);
       a.removeEventListener("pause", onPause);
+      a.removeEventListener("waiting", onWaiting);
+      a.removeEventListener("playing", onPlaying);
       a.removeEventListener("ended", onEnded);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, activeIndex, duration]);
+  }, [index, setActiveIndex, audioRefs]);
 
-  const pct =
-    duration > 0 ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
-
-  const PlayIcon = ({ className = "" }: { className?: string }) => (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M9 7.2v9.6c0 1 1.1 1.6 2 1.1l7.7-4.8c.9-.6.9-1.8 0-2.4L11 6.1c-.9-.5-2 .1-2 1.1Z"
-      />
-    </svg>
-  );
-
-  const PauseIcon = ({ className = "" }: { className?: string }) => (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M8 6.8c0-.7.6-1.3 1.3-1.3h.9c.7 0 1.3.6 1.3 1.3v10.4c0 .7-.6 1.3-1.3 1.3h-.9c-.7 0-1.3-.6-1.3-1.3V6.8Zm6.4 0c0-.7.6-1.3 1.3-1.3h.9c.7 0 1.3.6 1.3 1.3v10.4c0 .7-.6 1.3-1.3 1.3h-.9c-.7 0-1.3-.6-1.3-1.3V6.8Z"
-      />
-    </svg>
-  );
-
-  const SpinnerIcon = ({ className = "" }: { className?: string }) => (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M12 4a8 8 0 0 1 7.7 6.1c.1.5-.2.9-.7 1-.5.1-.9-.2-1-.7A6.2 6.2 0 0 0 12 5.8c-3.4 0-6.2 2.8-6.2 6.2S8.6 18.2 12 18.2c2.1 0 4-.9 5.1-2.4.3-.4.8-.5 1.2-.2.4.3.5.8.2 1.2A8 8 0 1 1 12 4Z"
-      />
-    </svg>
-  );
+  const pct = duration > 0 ? (current / duration) * 100 : 0;
 
   return (
-    <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="font-semibold text-lg text-white">{title}</p>
+    <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50 flex flex-col h-full">
+      {/* Header with Fixed Height to prevent shift */}
+      <div className="relative flex items-start justify-between gap-4 min-h-[64px]">
+        <div className="flex-1">
+          <p className="font-semibold text-lg text-white leading-tight">{title}</p>
           <p className="mt-1 text-sm text-white/70">{desc}</p>
         </div>
 
-        <span
-          className={[
-            "shrink-0 rounded-full border px-3 py-1 text-xs",
-            isActive
-              ? "border-[#D4AF37]/40 bg-[#D4AF37]/10 text-[#F5DE85]"
-              : "border-white/10 bg-white/5 text-white/60",
-          ].join(" ")}
-        >
-          {isActive ? "Now playing" : "Demo"}
-        </span>
+        <div className="shrink-0 pt-1">
+          <span
+            className={[
+              "rounded-full border px-3 py-1 text-[10px] uppercase tracking-wider font-bold transition-colors duration-300",
+              isActive
+                ? "border-[#D4AF37]/40 bg-[#D4AF37]/10 text-[#F5DE85]"
+                : "border-white/10 bg-white/5 text-white/40",
+            ].join(" ")}
+          >
+            {isActive ? "Now playing" : "Demo"}
+          </span>
+        </div>
       </div>
 
-      <div className="mt-5 rounded-xl border border-[#1A2550] bg-[#050814] p-4">
-        <div className="flex items-start gap-4">
-          <button
-            type="button"
-            onClick={toggle}
-            className={[
-              "relative h-16 w-16 rounded-full flex items-center justify-center transition",
-              "border-2 border-white/25 bg-white/10 text-white",
-              "shadow-[0_10px_30px_rgba(0,0,0,0.45)]",
-              "hover:border-[#D4AF37]/70 hover:bg-[#D4AF37]/10",
-              "active:scale-[0.98]",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814]",
-              !src ? "opacity-60 pointer-events-none" : "",
-            ].join(" ")}
-            aria-label={playing ? `Pause ${title}` : `Play ${title}`}
-          >
-            <span className="absolute inset-[6px] rounded-full border border-white/10 bg-white/10" />
-            <span className="absolute left-[10px] right-[10px] top-[10px] h-[18px] rounded-full bg-white/10 blur-[0.2px]" />
-
-            <span className="relative">
-              {buffering ? (
-                <SpinnerIcon className="h-8 w-8 animate-spin" />
-              ) : playing ? (
-                <PauseIcon className="h-9 w-9" />
-              ) : (
-                <PlayIcon className="h-9 w-9 translate-x-[1px]" />
-              )}
-            </span>
-          </button>
-
-          <div className="flex-1 min-w-0 w-full">
+      {/* Player content pushed to bottom */}
+      <div className="mt-auto pt-6">
+        <div className="rounded-xl border border-[#1A2550] bg-[#050814] p-4">
+          <div className="flex items-center gap-4">
             <button
               type="button"
-              onClick={handleSeek}
+              onClick={toggle}
               className={[
-                "relative block w-full h-4 rounded-full overflow-hidden",
-                "border border-white/10 bg-white/5",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814]",
+                "relative h-14 w-14 shrink-0 rounded-full flex items-center justify-center transition active:scale-95",
+                "border-2 border-white/20 bg-white/5 text-white shadow-xl hover:border-[#D4AF37]/70",
+                !src ? "opacity-50 pointer-events-none" : "cursor-pointer",
               ].join(" ")}
-              aria-label={`Seek ${title}`}
+              aria-label={playing ? "Pause" : "Play"}
             >
-              <div
-                className="absolute left-0 top-0 h-full bg-[#D4AF37]/70"
-                style={{ width: `${pct}%` }}
-              />
+              {buffering ? (
+                <div className="h-6 w-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
+              ) : playing ? (
+                <svg className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5h3v14H8zM13 5h3v14h-3z" />
+                </svg>
+              ) : (
+                <svg className="h-7 w-7 translate-x-0.5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5.14v13.72l11-6.86L8 5.14z" />
+                </svg>
+              )}
             </button>
 
-            <div className="mt-2 flex items-center justify-between text-xs text-white/60">
-              <span>{formatTime(current)}</span>
-              <span>{formatTime(duration)}</span>
+            <div className="flex-1 min-w-0">
+              <button
+                type="button"
+                onClick={handleSeek}
+                className="relative block w-full h-2 rounded-full overflow-hidden bg-white/10 cursor-pointer"
+              >
+                <div
+                  className="absolute left-0 top-0 h-full bg-[#D4AF37]"
+                  style={{ width: `${pct}%` }}
+                />
+              </button>
+              <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-white/40 tracking-tighter">
+                <span>{formatTime(current)}</span>
+                <span>{formatTime(duration)}</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <audio
-          preload="metadata"
-          ref={(el) => {
-            audioRefs.current[index] = el;
-          }}
-        >
-          <source src={src} type="audio/mpeg" />
-        </audio>
+          {/* Volume Control */}
+          <div className="mt-4 flex items-center gap-3 border-t border-white/5 pt-3">
+            <svg className="h-4 w-4 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volume}
+              onChange={handleVolume}
+              className="flex-1 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#D4AF37]"
+            />
+          </div>
+
+          <audio
+            ref={(el) => {
+              audioRefs.current[index] = el;
+            }}
+            src={src}
+            preload="metadata"
+          />
+        </div>
       </div>
     </div>
   );
@@ -566,10 +481,7 @@ function HomeContent() {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-10 items-start">
             {/* LEFT HERO */}
             <div className="md:col-span-7">
-              <p className="sm:hidden text-[11px] tracking-[0.18em] text-white/65 uppercase">
-                Audiobook Narrator
-              </p>
-              <p className="hidden sm:block text-xs tracking-[0.28em] text-white/70 uppercase">
+              <p className="text-xs tracking-[0.28em] text-white/70 uppercase">
                 Audiobook narrator for fiction and narrative nonfiction.
               </p>
 
@@ -578,14 +490,8 @@ function HomeContent() {
               </h1>
 
               <p className="mt-4 text-base sm:text-lg md:text-xl text-white/85 max-w-2xl leading-relaxed">
-                <span className="sm:hidden">
-                  Character-driven narration with clean character separation and clear
-                  emotional beats.
-                </span>
-                <span className="hidden sm:inline">
-                  Character-driven audiobook narration with clear emotional beats, clean
-                  character separation, consistent audio, and fast, reliable communication.
-                </span>
+                Character-driven audiobook narration with clear emotional beats, clean
+                character separation, consistent audio, and fast, reliable communication.
               </p>
 
               {/* TRUST CHIPS */}
@@ -606,7 +512,7 @@ function HomeContent() {
                 ))}
               </div>
 
-              {/* Clean CTAs */}
+              {/* CTAs */}
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
                 <a
                   href="/#demos"
@@ -633,10 +539,6 @@ function HomeContent() {
                   Learn about services and rates
                 </Link>
               </div>
-
-              <p className="mt-3 text-sm text-white/70 max-w-2xl leading-relaxed">
-                Strong in romance, romantasy, drama, thriller, and multi-character dialogue.
-              </p>
 
               <ProofPoints />
             </div>
@@ -674,29 +576,14 @@ function HomeContent() {
           </div>
         </section>
 
-        {/* AT A GLANCE (mobile only) */}
-        <section className="mt-14 md:hidden">
-          <AtAGlanceCard onOpenLightbox={openLightbox} />
-        </section>
-
         {/* ABOUT */}
         <section id="about" className="mt-20 scroll-mt-24">
           <h2 className="text-3xl font-bold">About</h2>
           <div className="mt-6 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
             <div className="md:col-span-8">
               <p className="text-white/80 leading-relaxed">
-                I’m Dean Miller, a professional audiobook narrator drawn to character-driven stories with emotional depth, quiet tension, and honest human connection. I have always been fascinated by voice and performance, especially the way small choices in pacing and tone can change how a story is felt.
-
-                My background in long-form storytelling shaped an approach focused on intention, restraint, and emotional truth rather than overt performance. I aim for narration that feels natural and immersive, where listeners stop noticing the voice and simply live inside the story.
-
-                I record from a broadcast-quality home studio and value clear communication and collaboration throughout each project. For me, successful narration is when the listener forgets there is a narrator at all and walks away feeling the story instead.
+                I’m Dean Miller, a professional audiobook narrator drawn to character-driven stories with emotional depth, quiet tension, and honest human connection. I aim for narration that feels natural and immersive, where listeners stop noticing the voice and simply live inside the story.
               </p>
-
-              <ul className="mt-6 space-y-2 text-sm text-white/80">
-                <li>• Broadcast-quality home studio</li>
-                <li>• Long-form audiobook experience</li>
-                <li>• Reliable communication and revisions</li>
-              </ul>
 
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg">
@@ -716,27 +603,16 @@ function HomeContent() {
             </div>
 
             <div className="md:col-span-4">
-              <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
+              <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg text-center">
                 <p className="text-sm text-white/70">Preferred contact</p>
-
                 <a
-                  className="mt-2 inline-block text-base font-semibold text-[#D4AF37] hover:underline md:hidden"
+                  className="mt-2 inline-block text-lg font-semibold text-[#D4AF37] hover:underline"
                   href="mailto:Dean@DMNarration.com"
                 >
                   Dean@DMNarration.com
                 </a>
-
-                <a
-                  href={BOOKINGS_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-4 hidden md:inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-2 text-sm font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
-                >
-                  Request availability
-                </a>
-
-                <p className="mt-4 text-sm text-white/70">
-                  Include word count, deadline, genre, POV, and any character notes.
+                <p className="mt-4 text-xs text-white/50 italic">
+                  Include word count, deadline, and character notes for a quote.
                 </p>
               </div>
             </div>
@@ -746,35 +622,12 @@ function HomeContent() {
         {/* CONTACT */}
         <section id="contact" className="mt-20 scroll-mt-24">
           <h2 className="text-3xl font-bold">Contact</h2>
-          <p className="mt-2 text-white/70">
-            Send word count, deadline, genre, and any character notes. I will reply
-            with availability and a quote.
-          </p>
-
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <form
               action="https://formspree.io/f/mdalkedn"
               method="POST"
               className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg"
             >
-              <input
-                type="text"
-                name="_gotcha"
-                tabIndex={-1}
-                autoComplete="off"
-                style={{ display: "none" }}
-              />
-              <input
-                type="hidden"
-                name="_subject"
-                value="New Narration Inquiry from Website"
-              />
-              <input
-                type="hidden"
-                name="_redirect"
-                value="https://dmnarration.com/?sent=1#contact"
-              />
-
               <Suspense fallback={null}>
                 <SentMessage />
               </Suspense>
@@ -784,7 +637,7 @@ function HomeContent() {
                 <input
                   name="name"
                   required
-                  className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-[#D4AF37]/70"
+                  className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70"
                   placeholder="Your name"
                 />
               </label>
@@ -795,7 +648,7 @@ function HomeContent() {
                   name="email"
                   type="email"
                   required
-                  className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-[#D4AF37]/70"
+                  className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70"
                   placeholder="you@example.com"
                 />
               </label>
@@ -806,85 +659,43 @@ function HomeContent() {
                   name="message"
                   required
                   rows={6}
-                  className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-[#D4AF37]/70"
-                  placeholder={`Genre, word count, deadline, POV, accents, any notes.\nExample: 85k romantasy, dual POV, delivery by June 15, 2 character accents.`}
+                  className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70"
+                  placeholder="Genre, word count, deadline, etc."
                 />
               </label>
 
-              <input type="hidden" name="source" value="narration-site" />
-
               <button
                 type="submit"
-                className="mt-5 inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A] w-full"
+                className="mt-5 w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A]"
               >
                 Send inquiry
               </button>
+            </form>
 
-              <p className="mt-3 text-xs text-white/60">
-                Typical response within 24 to 48 hours.
-              </p>
-
-              <div className="mt-4 text-xs text-white/60 md:hidden">
-                Prefer email:
-                <div>
-                  <a
-                    className="text-[#D4AF37] hover:underline"
-                    href="mailto:Dean@DMNarration.com"
-                  >
-                    Dean@DMNarration.com
-                  </a>
-                </div>
-              </div>
-
-              <div className="mt-5">
+            <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
+              <p className="text-sm text-white/70">Direct email</p>
+              <a
+                className="mt-1 inline-block text-lg font-semibold text-[#D4AF37] hover:underline"
+                href="mailto:Dean@DMNarration.com"
+              >
+                Dean@DMNarration.com
+              </a>
+              <div className="mt-6 border-t border-[#1A2550] pt-5">
+                <p className="text-sm text-white/70">Prefer to schedule?</p>
                 <a
                   href={BOOKINGS_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-3 font-semibold text-white/90 hover:border-white/40 hover:text-white transition w-full"
+                  className="mt-2 inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-2 text-sm font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
                 >
-                  Or book a 15-minute call
+                  Book a 15-minute call
                 </a>
-              </div>
-            </form>
-
-            <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
-              <p className="text-sm text-white/70">Best results if you include:</p>
-
-              <ul className="mt-4 space-y-2 text-white/80 text-sm">
-                <li>• Genre and tone (romance, thriller, etc.)</li>
-                <li>• Word count (or estimated finished hours)</li>
-                <li>• Deadline and preferred schedule</li>
-                <li>• POV and character count</li>
-                <li>• Accent notes and pronunciation guide</li>
-              </ul>
-
-              <div className="mt-6 border-t border-[#1A2550] pt-5">
-                <p className="text-sm text-white/70">Direct email</p>
-                <a
-                  className="mt-1 inline-block text-lg font-semibold text-[#D4AF37] hover:underline"
-                  href="mailto:Dean@DMNarration.com"
-                >
-                  Dean@DMNarration.com
-                </a>
-
-                <div className="mt-4">
-                  <p className="text-sm text-white/70">Prefer to schedule?</p>
-                  <a
-                    href={BOOKINGS_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-2 text-sm font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
-                  >
-                    Book a 15-minute inquiry call
-                  </a>
-                </div>
               </div>
             </div>
           </div>
         </section>
 
-        <footer className="mt-20 py-10 text-sm text-white/50">
+        <footer className="mt-20 py-10 text-sm text-white/50 text-center">
           © {new Date().getFullYear()} Dean Miller. All rights reserved.
         </footer>
       </div>
