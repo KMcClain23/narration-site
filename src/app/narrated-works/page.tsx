@@ -21,23 +21,16 @@ interface BookCardProps {
 // --- Book Card Component ---
 function BookCard({ book, statusBadge }: BookCardProps) {
   return (
-    <a
-      href={book.link}
-      target="_blank"
-      rel="noopener noreferrer"
+    <div
+      // Data attribute so the scroller knows which link to open on click
+      data-link={book.link}
       className="
+        book-card-link
         group relative rounded-xl overflow-hidden shadow-lg 
         hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 
         border border-[#1A2550] bg-[#0B1224] flex-shrink-0 
-        w-64 sm:w-72 snap-start select-none
+        w-64 sm:w-72 snap-start select-none cursor-pointer
       "
-      onDragStart={(e) => e.preventDefault()}
-      onClick={(e) => {
-        // If the global dragging flag is true, prevent the link from opening
-        if (window.isGlobalDragging) {
-          e.preventDefault();
-        }
-      }}
     >
       <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
         <Image
@@ -73,15 +66,8 @@ function BookCard({ book, statusBadge }: BookCardProps) {
           {book.author}
         </p>
       </div>
-    </a>
+    </div>
   );
-}
-
-// Global flag to coordinate between scroller and cards
-declare global {
-  interface Window {
-    isGlobalDragging: boolean;
-  }
 }
 
 interface HorizontalScrollerProps {
@@ -99,6 +85,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   const isDown = useRef(false);
   const startX = useRef(0);
   const scrollLeftStart = useRef(0);
+  const hasMoved = useRef(false);
 
   const updateProgress = useCallback(() => {
     const el = scrollerRef.current;
@@ -127,16 +114,15 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, [checkOverflow, updateProgress]);
 
-  // --- Pointer Handlers ---
-  const onPointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
-    // Mobile stays native
-    if (e.pointerType !== 'mouse') return;
+  // Handle Pointer Down
+  const handlePointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
+    if (e.pointerType === 'touch' && target === 'container') return;
 
     const el = scrollerRef.current;
     if (!el) return;
 
     isDown.current = true;
-    window.isGlobalDragging = false; // Reset drag flag on every new click
+    hasMoved.current = false;
     startX.current = e.pageX;
     scrollLeftStart.current = el.scrollLeft;
 
@@ -145,15 +131,16 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     el.style.scrollBehavior = "auto";
   };
 
-  const onPointerMove = (e: React.PointerEvent, target: 'container' | 'thumb') => {
-    if (!isDown.current || !scrollerRef.current || e.pointerType !== 'mouse') return;
-
+  const handlePointerMove = (e: React.PointerEvent, target: 'container' | 'thumb') => {
+    if (!isDown.current || !scrollerRef.current || e.pointerType === 'touch') return;
+    
     const el = scrollerRef.current;
-    const delta = e.pageX - startX.current;
+    const x = e.pageX;
+    const delta = x - startX.current;
 
-    // Threshold: Only consider it a "drag" if moved more than 5px
+    // Threshold for drag detection
     if (Math.abs(delta) > 5) {
-      window.isGlobalDragging = true;
+      hasMoved.current = true;
     }
 
     if (target === 'container') {
@@ -166,45 +153,47 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     }
   };
 
-  const onPointerUp = (e: React.PointerEvent) => {
-    if (e.pointerType !== 'mouse') return;
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
     
     isDown.current = false;
-    if (scrollerRef.current) {
-      scrollerRef.current.style.scrollSnapType = "x mandatory";
-      scrollerRef.current.style.scrollBehavior = "smooth";
+    const el = scrollerRef.current;
+    if (el) {
+      el.style.scrollSnapType = "x mandatory";
+      el.style.scrollBehavior = "smooth";
     }
 
-    // We keep window.isGlobalDragging as 'true' for a split second 
-    // to ensure the 'onClick' event on the <a> tag sees it and cancels.
-    // Then we reset it for the next interaction.
-    setTimeout(() => {
-      window.isGlobalDragging = false;
-    }, 50);
+    // IF WE DIDN'T MOVE, TREAT AS CLICK
+    if (!hasMoved.current) {
+      const target = e.target as HTMLElement;
+      // Find the closest parent that has the data-link attribute
+      const card = target.closest('[data-link]');
+      const link = card?.getAttribute('data-link');
+      if (link) {
+        window.open(link, '_blank', 'noopener,noreferrer');
+      }
+    }
   };
 
   return (
     <div className="relative group/scroller">
+      {/* Gradients */}
       <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
       <div
         ref={scrollerRef}
-        onPointerDown={(e) => onPointerDown(e, 'container')}
-        onPointerMove={(e) => onPointerMove(e, 'container')}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onPointerDown={(e) => handlePointerDown(e, 'container')}
+        onPointerMove={(e) => handlePointerMove(e, 'container')}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         className="
           flex overflow-x-auto pb-10 
           snap-x snap-mandatory 
           scroll-smooth gap-6 sm:gap-8 px-10 sm:px-20
-          hide-scrollbar cursor-grab active:cursor-grabbing
+          hide-scrollbar cursor-grab active:cursor-grabbing select-none
         "
-        style={{ 
-          touchAction: "pan-y", 
-          WebkitOverflowScrolling: "touch",
-          scrollbarWidth: 'none' 
-        }}
+        style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
         aria-label={ariaLabel}
       >
         {children}
@@ -221,11 +210,11 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
               <div
                 onPointerDown={(e) => {
                   e.stopPropagation();
-                  onPointerDown(e, 'thumb');
+                  handlePointerDown(e, 'thumb');
                 }}
-                onPointerMove={(e) => onPointerMove(e, 'thumb')}
-                onPointerUp={onPointerUp}
-                onPointerCancel={onPointerUp}
+                onPointerMove={(e) => handlePointerMove(e, 'thumb')}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
                 className="
                   absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] 
                   shadow-[0_0_15px_rgba(212,175,55,0.4)] cursor-grab active:cursor-grabbing 
@@ -243,13 +232,12 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   );
 }
 
-// --- Main Page Component ---
 export default function NarratedWorks() {
   const completed: Book[] = [
     { title: "The Final Guardian", subtitle: "The Citadel of the Mind and the Garden", author: "Alexander Kamenetsky", link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H", cover: "/covers/the-final-guardian.jpg" },
     { title: "Santa Promised", subtitle: "A Christmas Novella", author: "Laetitia Clark", link: "https://www.amazon.com/Santa-Promised-A-Christmas-Novella/dp/B0G6GLQGHK", cover: "/covers/santa-promised.jpg" },
     { title: "The Circle", subtitle: "Rituals & Ruins", author: "Lilian Monroe, Kayla Gerdes", link: "https://www.amazon.com/Audible-The-Circle-Rituals-Ruins/dp/B0GKQY7N27", cover: "/covers/the-circle-rituals-and-ruins.jpg" },
-    { title: "Sultry Secrets: Tease", subtitle: "Sultry Secrets Book 4", author: "Bethanie Loren", link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L", cover: "/covers/sultry-secrets-tease.jpg",
+    { title: "Sultry Secrets: Tease", subtitle: "Sultry Secrets Book 4", author: "Bethanie Loren", link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L", cover: "/covers/sultry-secrets-tease.jpg"},
     { title: "Heir of the Emberscale", author: "Shelby Gardner", link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB", cover: "/covers/heir-of-emberscale.jpg" },
   ];
 
