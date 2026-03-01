@@ -30,9 +30,8 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         group relative rounded-xl overflow-hidden shadow-lg 
         hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 
         border border-[#1A2550] bg-[#0B1224] flex-shrink-0 
-        w-56 sm:w-64 snap-start select-none
+        w-56 sm:w-64 snap-center sm:snap-start select-none
       "
-      // Prevents browser from initiating a file-drag instead of a scroll-drag
       onDragStart={(e) => e.preventDefault()}
     >
       <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
@@ -85,7 +84,6 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   const [progress, setProgress] = useState(0);
   const [showBar, setShowBar] = useState(false);
 
-  // Drag State Management
   const isDown = useRef(false);
   const startX = useRef(0);
   const scrollLeftStart = useRef(0);
@@ -118,7 +116,6 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, [checkOverflow, updateProgress]);
 
-  // Unified Pointer Logic
   const handlePointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -130,7 +127,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 
-    // Disable snapping during active drag for smooth movement
+    // Remove snapping completely while dragging to allow "continuous" feel
     el.style.scrollSnapType = "none";
     el.style.scrollBehavior = "auto";
     el.style.cursor = "grabbing";
@@ -158,8 +155,9 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   const handlePointerUp = (e: React.PointerEvent) => {
     isDown.current = false;
     if (scrollerRef.current) {
-      // Re-enable native snapping once the user lets go
-      scrollerRef.current.style.scrollSnapType = "x mandatory";
+      // Use snap-proximity on mobile for "soft" snapping, snap-mandatory on desktop
+      const isMobile = window.innerWidth < 640;
+      scrollerRef.current.style.scrollSnapType = isMobile ? "x proximity" : "x mandatory";
       scrollerRef.current.style.scrollBehavior = "smooth";
       scrollerRef.current.style.cursor = "grab";
     }
@@ -175,7 +173,6 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
   return (
     <div className="relative group/scroller">
-      {/* Visual Gradients */}
       <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
@@ -187,17 +184,21 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
         onPointerCancel={handlePointerUp}
         className="
           flex overflow-x-auto pb-6 sm:pb-10 
-          snap-x snap-mandatory scroll-smooth gap-5 sm:gap-7 px-8 sm:px-12
+          snap-x snap-proximity sm:snap-mandatory 
+          scroll-smooth gap-5 sm:gap-7 px-8 sm:px-12
           hide-scrollbar cursor-grab active:cursor-grabbing select-none
         "
-        style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
+        style={{ 
+            touchAction: "pan-y", 
+            WebkitOverflowScrolling: "touch",
+            scrollbarWidth: 'none'
+        }}
         aria-label={ariaLabel}
       >
         {children}
         <div className="flex-shrink-0 w-8 sm:w-20" />
       </div>
 
-      {/* MODIFIED: hidden sm:flex keeps it off mobile screens */}
       {showBar && (
         <div className="hidden sm:flex mt-6 justify-center px-4">
           <div className="w-full max-w-md">
@@ -234,7 +235,6 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   );
 }
 
-// --- Main Page Component ---
 export default function NarratedWorks() {
   const completed: Book[] = [
     {
@@ -320,7 +320,6 @@ export default function NarratedWorks() {
           A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.
         </p>
 
-        {/* Section 1 */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">Completed Projects</h2>
           <HorizontalScroller ariaLabel="Completed projects">
@@ -330,7 +329,6 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        {/* Section 2 */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">Currently Narrating</h2>
           <HorizontalScroller ariaLabel="Currently narrating">
@@ -348,7 +346,6 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        {/* Section 3 */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">Coming Soon</h2>
           <HorizontalScroller ariaLabel="Coming soon">
