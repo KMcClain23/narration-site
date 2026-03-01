@@ -20,6 +20,8 @@ interface BookCardProps {
 
 // --- Book Card Component ---
 function BookCard({ book, statusBadge }: BookCardProps) {
+  const isDraggingInternal = useRef(false);
+
   return (
     <a
       href={book.link}
@@ -32,6 +34,12 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         w-64 sm:w-72 snap-start select-none
       "
       onDragStart={(e) => e.preventDefault()}
+      onClick={(e) => {
+        // If the parent scroller says we are dragging, don't follow the link
+        if (window.isGlobalDragging) {
+          e.preventDefault();
+        }
+      }}
     >
       <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
         <Image
@@ -45,13 +53,13 @@ function BookCard({ book, statusBadge }: BookCardProps) {
       </div>
 
       {statusBadge && (
-        <div className="absolute top-3 right-3 bg-opacity-90 text-xs font-semibold px-2.5 py-1 rounded pointer-events-none">
+        <div className="absolute top-3 right-3 bg-[#D4AF37] text-black text-[10px] font-bold px-2 py-0.5 rounded uppercase pointer-events-none z-20">
           {statusBadge}
         </div>
       )}
 
       {book.note && (
-        <div className="absolute top-3 left-3 bg-yellow-600/80 text-white text-xs px-2 py-1 rounded pointer-events-none">
+        <div className="absolute top-3 left-3 bg-yellow-600/80 text-white text-[10px] px-2 py-0.5 rounded pointer-events-none z-20">
           Note
         </div>
       )}
@@ -71,6 +79,13 @@ function BookCard({ book, statusBadge }: BookCardProps) {
   );
 }
 
+// Helper to prevent link clicks during drag
+declare global {
+  interface Window {
+    isGlobalDragging: boolean;
+  }
+}
+
 interface HorizontalScrollerProps {
   children: React.ReactNode;
   ariaLabel: string;
@@ -86,7 +101,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   const isDown = useRef(false);
   const startX = useRef(0);
   const scrollLeftStart = useRef(0);
-  const hasMoved = useRef(false);
+  const moved = useRef(false);
 
   const updateProgress = useCallback(() => {
     const el = scrollerRef.current;
@@ -115,67 +130,71 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, [checkOverflow, updateProgress]);
 
-  // --- DRAG LOGIC (Optimized for Mouse/Desktop) ---
+  // Pointer Handlers
   const handlePointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
-    // Detect if this is a touch event. If so, let the browser handle it natively.
-    if (e.pointerType === 'touch') return;
-
     const el = scrollerRef.current;
     if (!el) return;
 
     isDown.current = true;
-    hasMoved.current = false;
+    moved.current = false;
+    window.isGlobalDragging = false;
     startX.current = e.pageX;
     scrollLeftStart.current = el.scrollLeft;
 
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-
-    // Disable snapping temporarily for smooth JS dragging
-    el.style.scrollSnapType = "none";
-    el.style.scrollBehavior = "auto";
+    // Capture pointer only for Mouse. Touch relies on native scroll.
+    if (e.pointerType === 'mouse') {
+      el.setPointerCapture(e.pointerId);
+      el.style.scrollSnapType = "none";
+      el.style.scrollBehavior = "auto";
+      el.style.cursor = "grabbing";
+    }
   };
 
   const handlePointerMove = (e: React.PointerEvent, target: 'container' | 'thumb') => {
-    if (!isDown.current || !scrollerRef.current || e.pointerType === 'touch') return;
+    if (!isDown.current || !scrollerRef.current) return;
     
     const el = scrollerRef.current;
     const x = e.pageX;
-    const walk = (x - startX.current) * 1.2; // Sensitivity boost
+    const walk = x - startX.current;
 
-    if (Math.abs(walk) > 5) hasMoved.current = true;
+    // If moved more than 10px, it's a drag
+    if (Math.abs(walk) > 10) {
+      moved.current = true;
+      window.isGlobalDragging = true;
+    }
 
-    if (target === 'container') {
-      el.scrollLeft = scrollLeftStart.current - walk;
-    } else {
-      const maxScroll = el.scrollWidth - el.clientWidth;
-      const trackWidth = trackRef.current?.clientWidth || 1;
-      const scrollRatio = maxScroll / trackWidth;
-      el.scrollLeft = scrollLeftStart.current + (walk * scrollRatio);
+    // Only apply manual scroll logic to Mouse. 
+    // Touch is handled by the browser natively via overflow-x-auto.
+    if (e.pointerType === 'mouse') {
+      if (target === 'container') {
+        el.scrollLeft = scrollLeftStart.current - walk;
+      } else {
+        const maxScroll = el.scrollWidth - el.clientWidth;
+        const trackWidth = trackRef.current?.clientWidth || 1;
+        const scrollRatio = maxScroll / trackWidth;
+        el.scrollLeft = scrollLeftStart.current + (walk * scrollRatio);
+      }
     }
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (e.pointerType === 'touch') return;
-    
     isDown.current = false;
-    if (scrollerRef.current) {
-      // Restore snapping after drag ends
-      scrollerRef.current.style.scrollSnapType = "x mandatory";
-      scrollerRef.current.style.scrollBehavior = "smooth";
+    const el = scrollerRef.current;
+    if (el) {
+      el.style.scrollSnapType = "x mandatory";
+      el.style.scrollBehavior = "smooth";
+      el.style.cursor = "grab";
     }
 
-    if (hasMoved.current) {
-      const preventClick = (e: MouseEvent) => {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-      };
-      document.addEventListener("click", preventClick, { capture: true, once: true });
-    }
+    // Small delay to ensure the click event is blocked
+    setTimeout(() => {
+      window.isGlobalDragging = false;
+    }, 10);
   };
 
   return (
     <div className="relative group/scroller">
-      {/* Visual Gradients */}
+      {/* Gradients */}
       <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-r from-[#050814] via-[#050814]/40 to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-l from-[#050814] via-[#050814]/40 to-transparent z-10 pointer-events-none" />
 
@@ -191,31 +210,23 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
           scroll-smooth gap-6 sm:gap-8 px-10 sm:px-20
           hide-scrollbar cursor-grab active:cursor-grabbing select-none
         "
-        // touch-action: auto allows the browser to use its native, fluid momentum on mobile
         style={{ 
           touchAction: "pan-y", 
           WebkitOverflowScrolling: "touch",
-          scrollbarWidth: 'none'
         }}
         aria-label={ariaLabel}
       >
         {children}
-        {/* Extra padding at the end */}
         <div className="flex-shrink-0 w-10 sm:w-20" />
       </div>
 
-      {/* Scrollbar - Desktop Only */}
       {showBar && (
         <div className="hidden sm:flex mt-6 justify-center px-4">
           <div className="w-full max-w-md">
             <div
               ref={trackRef}
-              className="relative h-2 rounded-full bg-white/5 border border-white/5 select-none touch-none"
+              className="relative h-2 rounded-full bg-white/5 select-none touch-none"
             >
-              <div
-                className="absolute inset-y-0 left-0 rounded-full bg-[#D4AF37]/10"
-                style={{ width: `${progress}%` }}
-              />
               <div
                 onPointerDown={(e) => {
                   e.stopPropagation();
@@ -227,7 +238,6 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
                 className="
                   absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] 
                   shadow-[0_0_15px_rgba(212,175,55,0.4)] cursor-grab active:cursor-grabbing 
-                  hover:bg-[#E0C15A] transition-colors
                 "
                 style={{ 
                   left: `${progress}%`, 
@@ -244,145 +254,59 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
 export default function NarratedWorks() {
   const completed: Book[] = [
-    {
-      title: "The Final Guardian",
-      subtitle: "The Citadel of the Mind and the Garden",
-      author: "Alexander Kamenetsky",
-      link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H",
-      cover: "/covers/the-final-guardian.jpg",
-    },
-    {
-      title: "Santa Promised",
-      subtitle: "A Christmas Novella",
-      author: "Laetitia Clark",
-      link: "https://www.amazon.com/Santa-Promised-A-Christmas-Novella/dp/B0G6GLQGHK",
-      cover: "/covers/santa-promised.jpg",
-    },
-    {
-      title: "The Circle",
-      subtitle: "Rituals & Ruins",
-      author: "Lilian Monroe, Kayla Gerdes",
-      link: "https://www.amazon.com/Audible-The-Circle-Rituals-Ruins/dp/B0GKQY7N27",
-      cover: "/covers/the-circle-rituals-and-ruins.jpg",
-    },
-    {
-      title: "Sultry Secrets: Tease",
-      subtitle: "Sultry Secrets Book 4",
-      author: "Bethanie Loren",
-      link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L",
-      cover: "/covers/sultry-secrets-tease.jpg",
-      note: true,
-    },
-    {
-      title: "Heir of the Emberscale",
-      author: "Shelby Gardner",
-      link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB",
-      cover: "/covers/heir-of-emberscale.jpg",
-    },
+    { title: "The Final Guardian", subtitle: "The Citadel of the Mind and the Garden", author: "Alexander Kamenetsky", link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H", cover: "/covers/the-final-guardian.jpg" },
+    { title: "Santa Promised", subtitle: "A Christmas Novella", author: "Laetitia Clark", link: "https://www.amazon.com/Santa-Promised-A-Christmas-Novella/dp/B0G6GLQGHK", cover: "/covers/santa-promised.jpg" },
+    { title: "The Circle", subtitle: "Rituals & Ruins", author: "Lilian Monroe, Kayla Gerdes", link: "https://www.amazon.com/Audible-The-Circle-Rituals-Ruins/dp/B0GKQY7N27", cover: "/covers/the-circle-rituals-and-ruins.jpg" },
+    { title: "Sultry Secrets: Tease", subtitle: "Sultry Secrets Book 4", author: "Bethanie Loren", link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L", cover: "/covers/sultry-secrets-tease.jpg", note: true },
+    { title: "Heir of the Emberscale", author: "Shelby Gardner", link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB", cover: "/covers/heir-of-emberscale.jpg" },
   ];
 
   const inProgress: Book[] = [
-    {
-      title: "No One to Hold Me",
-      author: "Noelle Rahn-Johnson",
-      link: "https://www.amazon.com/No-One-Hold-Noelle-Rahn-Johnson-ebook/dp/B088RMPLYX",
-      cover: "/covers/no-one-to-hold-me.jpg",
-    },
-    {
-      title: "Merciless Punks",
-      author: "Madeline Fay",
-      link: "https://www.amazon.com/Merciless-Punks-Enemies-romance-douchebags-ebook/dp/B09Z9P3C7V",
-      cover: "/covers/merciless-punks.jpg",
-    },
-    {
-      title: "Unmasked Hearts",
-      author: "K.E. Noel",
-      link: "https://www.amazon.com/Unmasked-Hearts-K-Noel-ebook/dp/B0FMKP92Y9",
-      cover: "/covers/unmasked-hearts.jpg",
-    },
+    { title: "No One to Hold Me", author: "Noelle Rahn-Johnson", link: "https://www.amazon.com/No-One-Hold-Noelle-Rahn-Johnson-ebook/dp/B088RMPLYX", cover: "/covers/no-one-to-hold-me.jpg" },
+    { title: "Merciless Punks", author: "Madeline Fay", link: "https://www.amazon.com/Merciless-Punks-Enemies-romance-douchebags-ebook/dp/B09Z9P3C7V", cover: "/covers/merciless-punks.jpg" },
+    { title: "Unmasked Hearts", author: "K.E. Noel", link: "https://www.amazon.com/Unmasked-Hearts-K-Noel-ebook/dp/B0FMKP92Y9", cover: "/covers/unmasked-hearts.jpg" },
   ];
 
   const comingSoon: Book[] = [
-    {
-      title: "Beating For You",
-      author: "L.L. McAlister",
-      link: "https://www.amazon.com/Beating-You-Body-Nobody-That-ebook/dp/B0FNQ2F6P4",
-      cover: "/covers/beating-for-you.jpg",
-    },
-    {
-      title: "Whiskey & Lies",
-      author: "E.A. Harper",
-      link: "https://www.amazon.com/dp/B0FBT3XW76",
-      cover: "/covers/whiskey-and-lies.jpg",
-    },
+    { title: "Beating For You", author: "L.L. McAlister", link: "https://www.amazon.com/Beating-You-Body-Nobody-That-ebook/dp/B0FNQ2F6P4", cover: "/covers/beating-for-you.jpg" },
+    { title: "Whiskey & Lies", author: "E.A. Harper", link: "https://www.amazon.com/dp/B0FBT3XW76", cover: "/covers/whiskey-and-lies.jpg" },
   ];
 
   return (
     <main className="min-h-screen bg-[#050814] text-white overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 py-16 md:py-24">
-        <header className="mb-20">
-          <h1 className="text-5xl md:text-6xl font-bold text-center mb-6 tracking-tight">
-            Narrated Works
-          </h1>
-          <p className="text-center text-white/60 text-xl max-w-2xl mx-auto font-light">
-            A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.
-          </p>
+        <header className="mb-20 text-center">
+          <h1 className="text-5xl md:text-6xl font-bold mb-6">Narrated Works</h1>
+          <p className="text-white/60 text-xl max-w-2xl mx-auto">A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.</p>
         </header>
 
         <section className="mb-24">
-          <h2 className="text-3xl font-bold mb-10 text-center text-[#D4AF37]/90 uppercase tracking-widest text-sm">
-            Completed Projects
-          </h2>
+          <h2 className="text-2xl font-bold mb-10 text-center uppercase tracking-[0.2em] text-white/80">Completed Projects</h2>
           <HorizontalScroller ariaLabel="Completed projects">
-            {completed.map((book, index) => (
-              <BookCard key={index} book={book} />
-            ))}
+            {completed.map((book, index) => <BookCard key={index} book={book} />)}
           </HorizontalScroller>
         </section>
 
         <section className="mb-24">
-          <h2 className="text-3xl font-bold mb-10 text-center text-[#D4AF37]/90 uppercase tracking-widest text-sm">
-            Currently Narrating
-          </h2>
+          <h2 className="text-2xl font-bold mb-10 text-center uppercase tracking-[0.2em] text-white/80">Currently Narrating</h2>
           <HorizontalScroller ariaLabel="Currently narrating">
             {inProgress.map((book, index) => (
-              <BookCard
-                key={index}
-                book={book}
-                statusBadge={
-                  <span className="bg-[#D4AF37] text-black px-2.5 py-1 rounded font-bold uppercase text-[10px]">
-                    In Progress
-                  </span>
-                }
-              />
+              <BookCard key={index} book={book} statusBadge="In Progress" />
             ))}
           </HorizontalScroller>
         </section>
 
         <section className="mb-24">
-          <h2 className="text-3xl font-bold mb-10 text-center text-[#D4AF37]/90 uppercase tracking-widest text-sm">
-            Coming Soon
-          </h2>
+          <h2 className="text-2xl font-bold mb-10 text-center uppercase tracking-[0.2em] text-white/80">Coming Soon</h2>
           <HorizontalScroller ariaLabel="Coming soon">
             {comingSoon.map((book, index) => (
-              <BookCard
-                key={index}
-                book={book}
-                statusBadge={
-                  <span className="bg-white/5 text-white/60 px-2.5 py-1 rounded border border-white/10 font-bold uppercase text-[10px]">
-                    Soon
-                  </span>
-                }
-              />
+              <BookCard key={index} book={book} statusBadge="Coming Soon" />
             ))}
           </HorizontalScroller>
         </section>
 
         <footer className="mt-32 text-center">
-          <Link
-            href="/#contact"
-            className="group relative inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-12 py-5 font-bold transition-all hover:bg-[#E0C15A] hover:shadow-[0_0_30px_rgba(212,175,55,0.3)] transform hover:-translate-y-1"
-          >
+          <Link href="/#contact" className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-12 py-5 font-bold transition-all hover:scale-105 shadow-lg">
             Contact Me
           </Link>
         </footer>
