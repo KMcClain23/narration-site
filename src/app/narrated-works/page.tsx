@@ -137,63 +137,70 @@ export default function NarratedWorks() {
     ariaLabel: string;
   }) {
     const scrollerRef = useRef<HTMLDivElement | null>(null);
-    const barRef = useRef<HTMLDivElement | null>(null);
+    const trackRef = useRef<HTMLDivElement | null>(null);
+    const thumbRef = useRef<HTMLDivElement | null>(null);
 
     // drag state for the cards row
-    const draggingRef = useRef(false);
-    const dragState = useRef({
+    const draggingCardsRef = useRef(false);
+    const cardsDrag = useRef({
       startX: 0,
       startScrollLeft: 0,
       moved: false,
       pointerId: -1,
     });
 
-    // drag state for the scrubber bar
-    const scrubbingRef = useRef(false);
-    const scrubState = useRef({
+    // drag state for the thumb scrubber
+    const draggingThumbRef = useRef(false);
+    const thumbDrag = useRef({
       pointerId: -1,
     });
 
     const [cursorDragging, setCursorDragging] = useState(false);
     const [progressPct, setProgressPct] = useState(0);
 
-    const updateProgress = () => {
+    const getMaxScroll = () => {
+      const el = scrollerRef.current;
+      if (!el) return 0;
+      return Math.max(0, el.scrollWidth - el.clientWidth);
+    };
+
+    const setProgressFromScroll = () => {
       const el = scrollerRef.current;
       if (!el) return;
-
-      const maxScroll = el.scrollWidth - el.clientWidth;
+      const maxScroll = getMaxScroll();
       const pct = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
       setProgressPct(Math.min(100, Math.max(0, pct)));
     };
 
-    const setScrollFromBarClientX = (clientX: number) => {
+    const setScrollFromClientXOnTrack = (clientX: number) => {
       const el = scrollerRef.current;
-      const bar = barRef.current;
-      if (!el || !bar) return;
+      const track = trackRef.current;
+      if (!el || !track) return;
 
-      const rect = bar.getBoundingClientRect();
+      const rect = track.getBoundingClientRect();
       const x = Math.min(Math.max(0, clientX - rect.left), rect.width);
       const ratio = rect.width > 0 ? x / rect.width : 0;
 
-      const maxScroll = el.scrollWidth - el.clientWidth;
+      const maxScroll = getMaxScroll();
       el.scrollLeft = ratio * maxScroll;
-      updateProgress();
+      setProgressFromScroll();
     };
 
     useEffect(() => {
       const el = scrollerRef.current;
       if (!el) return;
 
-      updateProgress();
-      el.addEventListener("scroll", updateProgress, { passive: true });
-      window.addEventListener("resize", updateProgress);
+      setProgressFromScroll();
+      el.addEventListener("scroll", setProgressFromScroll, { passive: true });
+      window.addEventListener("resize", setProgressFromScroll);
 
       return () => {
-        el.removeEventListener("scroll", updateProgress);
-        window.removeEventListener("resize", updateProgress);
+        el.removeEventListener("scroll", setProgressFromScroll);
+        window.removeEventListener("resize", setProgressFromScroll);
       };
     }, []);
 
+    // Drag to scroll the cards themselves
     useEffect(() => {
       const el = scrollerRef.current;
       if (!el) return;
@@ -201,41 +208,40 @@ export default function NarratedWorks() {
       const onPointerDown = (e: PointerEvent) => {
         if (e.pointerType === "mouse" && e.button !== 0) return;
 
-        draggingRef.current = true;
+        draggingCardsRef.current = true;
         setCursorDragging(true);
 
-        dragState.current.pointerId = e.pointerId;
-        dragState.current.startX = e.clientX;
-        dragState.current.startScrollLeft = el.scrollLeft;
-        dragState.current.moved = false;
+        cardsDrag.current.pointerId = e.pointerId;
+        cardsDrag.current.startX = e.clientX;
+        cardsDrag.current.startScrollLeft = el.scrollLeft;
+        cardsDrag.current.moved = false;
 
         el.setPointerCapture(e.pointerId);
       };
 
       const onPointerMove = (e: PointerEvent) => {
-        if (!draggingRef.current) return;
-        if (dragState.current.pointerId !== e.pointerId) return;
+        if (!draggingCardsRef.current) return;
+        if (cardsDrag.current.pointerId !== e.pointerId) return;
 
-        const dx = e.clientX - dragState.current.startX;
+        const dx = e.clientX - cardsDrag.current.startX;
+        if (Math.abs(dx) > 6) cardsDrag.current.moved = true;
 
-        if (Math.abs(dx) > 6) dragState.current.moved = true;
-
-        el.scrollLeft = dragState.current.startScrollLeft - dx;
+        el.scrollLeft = cardsDrag.current.startScrollLeft - dx;
       };
 
       const endDrag = (e: PointerEvent) => {
-        if (dragState.current.pointerId !== e.pointerId) return;
+        if (cardsDrag.current.pointerId !== e.pointerId) return;
 
-        draggingRef.current = false;
+        draggingCardsRef.current = false;
         setCursorDragging(false);
-        dragState.current.pointerId = -1;
+        cardsDrag.current.pointerId = -1;
       };
 
       const onClickCapture = (e: MouseEvent) => {
-        if (dragState.current.moved) {
+        if (cardsDrag.current.moved) {
           e.preventDefault();
           e.stopPropagation();
-          dragState.current.moved = false;
+          cardsDrag.current.moved = false;
         }
       };
 
@@ -254,50 +260,70 @@ export default function NarratedWorks() {
       };
     }, []);
 
+    // Drag the thumb (grab handle) to scrub
     useEffect(() => {
-      const bar = barRef.current;
-      if (!bar) return;
+      const thumb = thumbRef.current;
+      const track = trackRef.current;
+      if (!thumb || !track) return;
 
       const onPointerDown = (e: PointerEvent) => {
         if (e.pointerType === "mouse" && e.button !== 0) return;
 
-        scrubbingRef.current = true;
-        scrubState.current.pointerId = e.pointerId;
+        draggingThumbRef.current = true;
+        thumbDrag.current.pointerId = e.pointerId;
 
-        bar.setPointerCapture(e.pointerId);
-        setScrollFromBarClientX(e.clientX);
+        thumb.setPointerCapture(e.pointerId);
+        setScrollFromClientXOnTrack(e.clientX);
       };
 
       const onPointerMove = (e: PointerEvent) => {
-        if (!scrubbingRef.current) return;
-        if (scrubState.current.pointerId !== e.pointerId) return;
+        if (!draggingThumbRef.current) return;
+        if (thumbDrag.current.pointerId !== e.pointerId) return;
 
-        setScrollFromBarClientX(e.clientX);
+        setScrollFromClientXOnTrack(e.clientX);
       };
 
-      const endScrub = (e: PointerEvent) => {
-        if (scrubState.current.pointerId !== e.pointerId) return;
+      const endThumb = (e: PointerEvent) => {
+        if (thumbDrag.current.pointerId !== e.pointerId) return;
 
-        scrubbingRef.current = false;
-        scrubState.current.pointerId = -1;
+        draggingThumbRef.current = false;
+        thumbDrag.current.pointerId = -1;
       };
 
-      bar.addEventListener("pointerdown", onPointerDown);
-      bar.addEventListener("pointermove", onPointerMove);
-      bar.addEventListener("pointerup", endScrub);
-      bar.addEventListener("pointercancel", endScrub);
+      thumb.addEventListener("pointerdown", onPointerDown);
+      thumb.addEventListener("pointermove", onPointerMove);
+      thumb.addEventListener("pointerup", endThumb);
+      thumb.addEventListener("pointercancel", endThumb);
 
       return () => {
-        bar.removeEventListener("pointerdown", onPointerDown);
-        bar.removeEventListener("pointermove", onPointerMove);
-        bar.removeEventListener("pointerup", endScrub);
-        bar.removeEventListener("pointercancel", endScrub);
+        thumb.removeEventListener("pointerdown", onPointerDown);
+        thumb.removeEventListener("pointermove", onPointerMove);
+        thumb.removeEventListener("pointerup", endThumb);
+        thumb.removeEventListener("pointercancel", endThumb);
+      };
+    }, []);
+
+    // Click on track jumps too (nice bonus)
+    useEffect(() => {
+      const track = trackRef.current;
+      if (!track) return;
+
+      const onPointerDown = (e: PointerEvent) => {
+        // If you click track (not thumb) jump there
+        if (e.target === thumbRef.current) return;
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        setScrollFromClientXOnTrack(e.clientX);
+      };
+
+      track.addEventListener("pointerdown", onPointerDown);
+
+      return () => {
+        track.removeEventListener("pointerdown", onPointerDown);
       };
     }, []);
 
     return (
       <div className="relative">
-        {/* Gradient Overlays */}
         <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
         <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
@@ -315,26 +341,32 @@ export default function NarratedWorks() {
           <div className="flex-shrink-0 w-4 sm:w-8" />
         </div>
 
-        {/* Custom scroll indicator: thicker, rounded, draggable scrubber */}
+        {/* Track + thumb (grab handle) */}
         <div className="mt-4 flex justify-center">
           <div className="w-1/2 max-w-sm">
             <div
-              ref={barRef}
-              className={[
-                "h-2.5 rounded-full overflow-hidden",
-                "bg-white/10 border border-white/10",
-                "cursor-pointer",
-              ].join(" ")}
+              ref={trackRef}
+              className="relative h-3 rounded-full bg-white/10 border border-white/10"
               role="slider"
               aria-label={`${ariaLabel} scroll position`}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={Math.round(progressPct)}
-              tabIndex={0}
             >
+              {/* Filled portion */}
               <div
-                className="h-full rounded-full bg-[#D4AF37] transition-[width] duration-150"
+                className="absolute left-0 top-0 h-full rounded-full bg-[#D4AF37]/35"
                 style={{ width: `${progressPct}%` }}
+              />
+
+              {/* Thumb you can grab */}
+              <div
+                ref={thumbRef}
+                className="absolute top-1/2 -translate-y-1/2 h-4 w-10 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
+                style={{
+                  left: `calc(${progressPct}% - 20px)`,
+                }}
+                aria-label="Scroll thumb"
               />
             </div>
           </div>
@@ -354,7 +386,6 @@ export default function NarratedWorks() {
           currently narrating.
         </p>
 
-        {/* Completed Projects */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">
             Completed Projects
@@ -367,7 +398,6 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        {/* Currently Narrating */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">
             Currently Narrating
@@ -388,7 +418,6 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        {/* Coming Soon */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">Coming Soon</h2>
 
@@ -407,7 +436,6 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        {/* CTA */}
         <div className="mt-16 text-center">
           <p className="text-white/70 mb-6 text-lg">
             Ready to bring your story to life?
