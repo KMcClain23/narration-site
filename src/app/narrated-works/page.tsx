@@ -22,16 +22,44 @@ interface BookCardProps {
 function BookCard({ book, statusBadge }: BookCardProps) {
   return (
     <div
-      // Data attribute so the scroller knows which link to open on click
-      data-link={book.link}
       className="
-        book-card-link
         group relative rounded-xl overflow-hidden shadow-lg 
-        hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 
+        transition-all duration-300 hover:-translate-y-2 
         border border-[#1A2550] bg-[#0B1224] flex-shrink-0 
-        w-64 sm:w-72 snap-start select-none cursor-pointer
+        w-64 sm:w-72 snap-start select-none
       "
     >
+      {/* Clickable Amazon Link Button */}
+      <a
+        href={book.link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="
+          absolute top-3 left-3 z-30
+          bg-[#D4AF37] hover:bg-[#E0C15A] text-black 
+          p-2 rounded-full shadow-lg transition-transform 
+          active:scale-90 hover:scale-110
+        "
+        aria-label={`View ${book.title} on Amazon`}
+      >
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          width="18" 
+          height="18" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="2.5" 
+          strokeLinecap="round" 
+          strokeLinejoin="round"
+        >
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+          <polyline points="15 3 21 3 21 9" />
+          <line x1="10" y1="14" x2="21" y2="3" />
+        </svg>
+      </a>
+
+      {/* Book Cover Container */}
       <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
         <Image
           src={book.cover}
@@ -50,7 +78,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
       )}
 
       {book.note && (
-        <div className="absolute top-3 left-3 bg-yellow-600/80 text-white text-[10px] px-2 py-0.5 rounded z-20">
+        <div className="absolute top-[44px] left-3 bg-yellow-600/90 text-white text-[10px] px-2 py-0.5 rounded z-20">
           Note
         </div>
       )}
@@ -85,7 +113,6 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   const isDown = useRef(false);
   const startX = useRef(0);
   const scrollLeftStart = useRef(0);
-  const hasMoved = useRef(false);
 
   const updateProgress = useCallback(() => {
     const el = scrollerRef.current;
@@ -114,15 +141,13 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, [checkOverflow, updateProgress]);
 
-  // Handle Pointer Down
-  const handlePointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
+  const onPointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
     if (e.pointerType === 'touch' && target === 'container') return;
 
     const el = scrollerRef.current;
     if (!el) return;
 
     isDown.current = true;
-    hasMoved.current = false;
     startX.current = e.pageX;
     scrollLeftStart.current = el.scrollLeft;
 
@@ -131,17 +156,12 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     el.style.scrollBehavior = "auto";
   };
 
-  const handlePointerMove = (e: React.PointerEvent, target: 'container' | 'thumb') => {
+  const onPointerMove = (e: React.PointerEvent, target: 'container' | 'thumb') => {
     if (!isDown.current || !scrollerRef.current || e.pointerType === 'touch') return;
     
     const el = scrollerRef.current;
     const x = e.pageX;
     const delta = x - startX.current;
-
-    // Threshold for drag detection
-    if (Math.abs(delta) > 5) {
-      hasMoved.current = true;
-    }
 
     if (target === 'container') {
       el.scrollLeft = scrollLeftStart.current - delta;
@@ -153,40 +173,26 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     }
   };
 
-  const handlePointerUp = (e: React.PointerEvent) => {
+  const onPointerUp = (e: React.PointerEvent) => {
     if (e.pointerType === 'touch') return;
-    
     isDown.current = false;
-    const el = scrollerRef.current;
-    if (el) {
-      el.style.scrollSnapType = "x mandatory";
-      el.style.scrollBehavior = "smooth";
-    }
-
-    // IF WE DIDN'T MOVE, TREAT AS CLICK
-    if (!hasMoved.current) {
-      const target = e.target as HTMLElement;
-      // Find the closest parent that has the data-link attribute
-      const card = target.closest('[data-link]');
-      const link = card?.getAttribute('data-link');
-      if (link) {
-        window.open(link, '_blank', 'noopener,noreferrer');
-      }
+    if (scrollerRef.current) {
+      scrollerRef.current.style.scrollSnapType = "x mandatory";
+      scrollerRef.current.style.scrollBehavior = "smooth";
     }
   };
 
   return (
     <div className="relative group/scroller">
-      {/* Gradients */}
       <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
       <div
         ref={scrollerRef}
-        onPointerDown={(e) => handlePointerDown(e, 'container')}
-        onPointerMove={(e) => handlePointerMove(e, 'container')}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        onPointerDown={(e) => onPointerDown(e, 'container')}
+        onPointerMove={(e) => onPointerMove(e, 'container')}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
         className="
           flex overflow-x-auto pb-10 
           snap-x snap-mandatory 
@@ -203,26 +209,14 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
       {showBar && (
         <div className="hidden sm:flex mt-6 justify-center px-4">
           <div className="w-full max-w-md">
-            <div
-              ref={trackRef}
-              className="relative h-2 rounded-full bg-white/5 select-none touch-none"
-            >
+            <div ref={trackRef} className="relative h-2 rounded-full bg-white/5 select-none">
               <div
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  handlePointerDown(e, 'thumb');
-                }}
-                onPointerMove={(e) => handlePointerMove(e, 'thumb')}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerUp}
-                className="
-                  absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] 
-                  shadow-[0_0_15px_rgba(212,175,55,0.4)] cursor-grab active:cursor-grabbing 
-                "
-                style={{ 
-                  left: `${progress}%`, 
-                  transform: `translate(-${progress}%, -50%)` 
-                }}
+                onPointerDown={(e) => { e.stopPropagation(); onPointerDown(e, 'thumb'); }}
+                onPointerMove={(e) => onPointerMove(e, 'thumb')}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
+                className="absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
+                style={{ left: `${progress}%`, transform: `translate(-${progress}%, -50%)` }}
               />
             </div>
           </div>
@@ -257,7 +251,9 @@ export default function NarratedWorks() {
       <div className="max-w-7xl mx-auto px-4 py-16 md:py-24">
         <header className="mb-20 text-center">
           <h1 className="text-5xl md:text-6xl font-bold mb-6">Narrated Works</h1>
-          <p className="text-white/60 text-xl max-w-2xl mx-auto">A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.</p>
+          <p className="text-white/60 text-xl max-w-2xl mx-auto font-light tracking-wide">
+            A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.
+          </p>
         </header>
 
         <section className="mb-24">
