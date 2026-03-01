@@ -157,11 +157,25 @@ export default function NarratedWorks() {
 
     const [cursorDragging, setCursorDragging] = useState(false);
     const [progressPct, setProgressPct] = useState(0);
+    const [needsBar, setNeedsBar] = useState(false);
 
     const getMaxScroll = () => {
       const el = scrollerRef.current;
       if (!el) return 0;
       return Math.max(0, el.scrollWidth - el.clientWidth);
+    };
+
+    const computeNeedsBar = () => {
+      const el = scrollerRef.current;
+      if (!el) return;
+
+      const maxScroll = getMaxScroll();
+      const shouldShow = maxScroll > 2; // tiny threshold avoids flicker from rounding
+      setNeedsBar(shouldShow);
+
+      // also keep progress in sync when layout changes
+      const pct = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
+      setProgressPct(Math.min(100, Math.max(0, pct)));
     };
 
     const setProgressFromScroll = () => {
@@ -186,18 +200,27 @@ export default function NarratedWorks() {
       setProgressFromScroll();
     };
 
+    // Detect overflow (needsBar) and keep in sync on resize/content changes
     useEffect(() => {
       const el = scrollerRef.current;
       if (!el) return;
 
-      setProgressFromScroll();
+      computeNeedsBar();
+
+      // Keep updated on scroll + resize
       el.addEventListener("scroll", setProgressFromScroll, { passive: true });
-      window.addEventListener("resize", setProgressFromScroll);
+      window.addEventListener("resize", computeNeedsBar);
+
+      // Watch for changes inside the scroller (images loading, font changes, etc.)
+      const ro = new ResizeObserver(() => computeNeedsBar());
+      ro.observe(el);
 
       return () => {
         el.removeEventListener("scroll", setProgressFromScroll);
-        window.removeEventListener("resize", setProgressFromScroll);
+        window.removeEventListener("resize", computeNeedsBar);
+        ro.disconnect();
       };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Drag to scroll the cards themselves
@@ -303,13 +326,12 @@ export default function NarratedWorks() {
       };
     }, []);
 
-    // Click on track jumps too (nice bonus)
+    // Clicking the track jumps too (only when bar is visible)
     useEffect(() => {
       const track = trackRef.current;
       if (!track) return;
 
       const onPointerDown = (e: PointerEvent) => {
-        // If you click track (not thumb) jump there
         if (e.target === thumbRef.current) return;
         if (e.pointerType === "mouse" && e.button !== 0) return;
         setScrollFromClientXOnTrack(e.clientX);
@@ -341,36 +363,36 @@ export default function NarratedWorks() {
           <div className="flex-shrink-0 w-4 sm:w-8" />
         </div>
 
-        {/* Track + thumb (grab handle) */}
-        <div className="mt-4 flex justify-center">
-          <div className="w-1/2 max-w-sm">
-            <div
-              ref={trackRef}
-              className="relative h-3 rounded-full bg-white/10 border border-white/10"
-              role="slider"
-              aria-label={`${ariaLabel} scroll position`}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round(progressPct)}
-            >
-              {/* Filled portion */}
+        {/* Only show bar if overflow exists */}
+        {needsBar && (
+          <div className="mt-4 flex justify-center">
+            <div className="w-1/2 max-w-sm">
               <div
-                className="absolute left-0 top-0 h-full rounded-full bg-[#D4AF37]/35"
-                style={{ width: `${progressPct}%` }}
-              />
+                ref={trackRef}
+                className="relative h-3 rounded-full bg-white/10 border border-white/10"
+                role="slider"
+                aria-label={`${ariaLabel} scroll position`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(progressPct)}
+              >
+                <div
+                  className="absolute left-0 top-0 h-full rounded-full bg-[#D4AF37]/35"
+                  style={{ width: `${progressPct}%` }}
+                />
 
-              {/* Thumb you can grab */}
-              <div
-                ref={thumbRef}
-                className="absolute top-1/2 -translate-y-1/2 h-4 w-10 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
-                style={{
-                  left: `calc(${progressPct}% - 20px)`,
-                }}
-                aria-label="Scroll thumb"
-              />
+                <div
+                  ref={thumbRef}
+                  className="absolute top-1/2 -translate-y-1/2 h-4 w-10 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
+                  style={{
+                    left: `calc(${progressPct}% - 20px)`,
+                  }}
+                  aria-label="Scroll thumb"
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     );
   }
