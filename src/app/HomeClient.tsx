@@ -63,7 +63,6 @@ function MediaLightbox({
             type="button"
             onClick={onClose}
             className="rounded-md border border-white/20 px-3 py-1 text-sm text-white/80 transition hover:border-white/40 hover:text-white"
-            aria-label="Close"
           >
             Close
           </button>
@@ -80,7 +79,6 @@ function MediaLightbox({
 function ProofPoints() {
   return (
     <>
-      {/* Mobile: single clean strip */}
       <div className="sm:hidden mt-7 rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg">
         <p className="text-sm font-semibold text-white">Quick highlights</p>
         <ul className="mt-2 space-y-2 text-sm text-white/75">
@@ -90,7 +88,6 @@ function ProofPoints() {
         </ul>
       </div>
 
-      {/* Desktop: three cards */}
       <div className="hidden sm:grid mt-8 grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50">
           <p className="font-semibold text-white">Broadcast-ready workflow</p>
@@ -157,11 +154,10 @@ function AtAGlanceCard({
                 type="button"
                 onClick={() => onOpenLightbox("/dean-profile.png", "Logo")}
                 className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60"
-                aria-label="Open logo"
               >
                 <Image
                   src="/dean-profile.png"
-                  alt="Dean Miller logo"
+                  alt="Logo"
                   fill
                   className="object-contain p-2"
                 />
@@ -171,11 +167,10 @@ function AtAGlanceCard({
                 type="button"
                 onClick={() => onOpenLightbox("/dean-headshot.jpg", "Headshot")}
                 className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60"
-                aria-label="Open headshot"
               >
                 <Image
                   src="/dean-headshot.jpg"
-                  alt="Dean Miller headshot"
+                  alt="Headshot"
                   fill
                   className="object-cover"
                 />
@@ -290,7 +285,6 @@ function DemoPlayer({
 
   return (
     <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50 flex flex-col h-full">
-      {/* Header with Fixed Height to prevent shift */}
       <div className="relative flex items-start justify-between gap-4 min-h-[64px]">
         <div className="flex-1">
           <p className="font-semibold text-lg text-white leading-tight">{title}</p>
@@ -311,7 +305,6 @@ function DemoPlayer({
         </div>
       </div>
 
-      {/* Player content pushed to bottom */}
       <div className="mt-auto pt-6">
         <div className="rounded-xl border border-[#1A2550] bg-[#050814] p-4">
           <div className="flex items-center gap-4">
@@ -323,7 +316,6 @@ function DemoPlayer({
                 "border-2 border-white/20 bg-white/5 text-white shadow-xl hover:border-[#D4AF37]/70",
                 !src ? "opacity-50 pointer-events-none" : "cursor-pointer",
               ].join(" ")}
-              aria-label={playing ? "Pause" : "Play"}
             >
               {buffering ? (
                 <div className="h-6 w-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
@@ -342,7 +334,7 @@ function DemoPlayer({
               <button
                 type="button"
                 onClick={handleSeek}
-                className="relative block w-full h-2 rounded-full overflow-hidden bg-white/10 cursor-pointer"
+                className="relative block w-full h-2 rounded-full overflow-hidden bg-white/10 cursor-pointer z-10"
               >
                 <div
                   className="absolute left-0 top-0 h-full bg-[#D4AF37]"
@@ -356,9 +348,8 @@ function DemoPlayer({
             </div>
           </div>
 
-          {/* Volume Control */}
           <div className="mt-4 flex items-center gap-3 border-t border-white/5 pt-3">
-            <svg className="h-4 w-4 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="h-4 w-4 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
               <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
             </svg>
@@ -402,20 +393,6 @@ function HomeContent() {
 
   const closeLightbox = () => setLightboxOpen(false);
 
-  // Handle anchor scrolling on initial load from other pages
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash) {
-      const element = document.querySelector(hash);
-      if (element) {
-        setTimeout(() => {
-          element.scrollIntoView({ behavior: "smooth" });
-        }, 100);
-      }
-    }
-  }, []);
-
-  // Only one demo plays at a time
   useEffect(() => {
     audioRefs.current.forEach((audio, i) => {
       if (!audio) return;
@@ -494,7 +471,6 @@ function HomeContent() {
                 character separation, consistent audio, and fast, reliable communication.
               </p>
 
-              {/* TRUST CHIPS */}
               <div className="mt-5 flex flex-wrap gap-2 max-w-2xl">
                 {[
                   "24 to 48h reply",
@@ -512,7 +488,6 @@ function HomeContent() {
                 ))}
               </div>
 
-              {/* CTAs */}
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
                 <a
                   href="/#demos"
@@ -611,9 +586,6 @@ function HomeContent() {
                 >
                   Dean@DMNarration.com
                 </a>
-                <p className="mt-4 text-xs text-white/50 italic">
-                  Include word count, deadline, and character notes for a quote.
-                </p>
               </div>
             </div>
           </div>
