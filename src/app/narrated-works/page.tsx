@@ -158,6 +158,11 @@ export default function NarratedWorks() {
     const [cursorDragging, setCursorDragging] = useState(false);
     const [progressPct, setProgressPct] = useState(0);
     const [needsBar, setNeedsBar] = useState(false);
+    const [thumbLeftPx, setThumbLeftPx] = useState(0);
+
+    const THUMB_WIDTH = 44; // px (matches w-11-ish; we set inline width below)
+    const clamp = (v: number, min: number, max: number) =>
+      Math.min(max, Math.max(min, v));
 
     const getMaxScroll = () => {
       const el = scrollerRef.current;
@@ -165,65 +170,98 @@ export default function NarratedWorks() {
       return Math.max(0, el.scrollWidth - el.clientWidth);
     };
 
-    const computeNeedsBar = () => {
-      const el = scrollerRef.current;
-      if (!el) return;
-
-      const maxScroll = getMaxScroll();
-      const shouldShow = maxScroll > 2; // tiny threshold avoids flicker from rounding
-      setNeedsBar(shouldShow);
-
-      // also keep progress in sync when layout changes
-      const pct = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
-      setProgressPct(Math.min(100, Math.max(0, pct)));
-    };
-
-    const setProgressFromScroll = () => {
-      const el = scrollerRef.current;
-      if (!el) return;
-      const maxScroll = getMaxScroll();
-      const pct = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
-      setProgressPct(Math.min(100, Math.max(0, pct)));
-    };
-
-    const setScrollFromClientXOnTrack = (clientX: number) => {
+    const computeNeedsBarAndSync = () => {
       const el = scrollerRef.current;
       const track = trackRef.current;
       if (!el || !track) return;
 
-      const rect = track.getBoundingClientRect();
-      const x = Math.min(Math.max(0, clientX - rect.left), rect.width);
-      const ratio = rect.width > 0 ? x / rect.width : 0;
-
       const maxScroll = getMaxScroll();
-      el.scrollLeft = ratio * maxScroll;
-      setProgressFromScroll();
+      const shouldShow = maxScroll > 2;
+      setNeedsBar(shouldShow);
+
+      // progress pct from scroll
+      const pct = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
+      const pctClamped = Math.min(100, Math.max(0, pct));
+      setProgressPct(pctClamped);
+
+      // thumb position from pct (clamped)
+      const trackW = track.getBoundingClientRect().width;
+      const usable = Math.max(0, trackW - THUMB_WIDTH);
+      const left = usable * (pctClamped / 100);
+      setThumbLeftPx(clamp(left, 0, usable));
     };
 
-    // Detect overflow (needsBar) and keep in sync on resize/content changes
+    const syncFromScroll = () => {
+      const el = scrollerRef.current;
+      const track = trackRef.current;
+      if (!el || !track) return;
+
+      const maxScroll = getMaxScroll();
+      const pct = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
+      const pctClamped = Math.min(100, Math.max(0, pct));
+      setProgressPct(pctClamped);
+
+      const trackW = track.getBoundingClientRect().width;
+      const usable = Math.max(0, trackW - THUMB_WIDTH);
+      const left = usable * (pctClamped / 100);
+      setThumbLeftPx(clamp(left, 0, usable));
+    };
+
+    const setScrollFromThumbLeft = (leftPx: number) => {
+      const el = scrollerRef.current;
+      const track = trackRef.current;
+      if (!el || !track) return;
+
+      const trackW = track.getBoundingClientRect().width;
+      const usable = Math.max(0, trackW - THUMB_WIDTH);
+      const left = clamp(leftPx, 0, usable);
+
+      const ratio = usable > 0 ? left / usable : 0;
+      const maxScroll = getMaxScroll();
+
+      el.scrollLeft = ratio * maxScroll;
+      // scroll event will sync, but we update immediately for responsiveness
+      const pct = ratio * 100;
+      setProgressPct(pct);
+      setThumbLeftPx(left);
+    };
+
+    const setScrollFromClientXOnTrack = (clientX: number) => {
+      const track = trackRef.current;
+      if (!track) return;
+
+      const rect = track.getBoundingClientRect();
+
+      // center thumb under the pointer
+      const desiredLeft = clientX - rect.left - THUMB_WIDTH / 2;
+      setScrollFromThumbLeft(desiredLeft);
+    };
+
+    // Detect overflow + keep in sync (images loading, resize, etc.)
     useEffect(() => {
       const el = scrollerRef.current;
       if (!el) return;
 
-      computeNeedsBar();
+      // Initial sync after mount
+      // Use rAF to let layout settle
+      const raf = requestAnimationFrame(() => computeNeedsBarAndSync());
 
-      // Keep updated on scroll + resize
-      el.addEventListener("scroll", setProgressFromScroll, { passive: true });
-      window.addEventListener("resize", computeNeedsBar);
+      el.addEventListener("scroll", syncFromScroll, { passive: true });
+      window.addEventListener("resize", computeNeedsBarAndSync);
 
-      // Watch for changes inside the scroller (images loading, font changes, etc.)
-      const ro = new ResizeObserver(() => computeNeedsBar());
+      const ro = new ResizeObserver(() => computeNeedsBarAndSync());
       ro.observe(el);
 
       return () => {
-        el.removeEventListener("scroll", setProgressFromScroll);
-        window.removeEventListener("resize", computeNeedsBar);
+        cancelAnimationFrame(raf);
+        el.removeEventListener("scroll", syncFromScroll);
+        window.removeEventListener("resize", computeNeedsBarAndSync);
         ro.disconnect();
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Drag to scroll the cards themselves
+    // Drag to scroll the cards
     useEffect(() => {
       const el = scrollerRef.current;
       if (!el) return;
@@ -283,11 +321,10 @@ export default function NarratedWorks() {
       };
     }, []);
 
-    // Drag the thumb (grab handle) to scrub
+    // Drag the thumb to scrub
     useEffect(() => {
       const thumb = thumbRef.current;
-      const track = trackRef.current;
-      if (!thumb || !track) return;
+      if (!thumb) return;
 
       const onPointerDown = (e: PointerEvent) => {
         if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -296,13 +333,13 @@ export default function NarratedWorks() {
         thumbDrag.current.pointerId = e.pointerId;
 
         thumb.setPointerCapture(e.pointerId);
-        setScrollFromClientXOnTrack(e.clientX);
       };
 
       const onPointerMove = (e: PointerEvent) => {
         if (!draggingThumbRef.current) return;
         if (thumbDrag.current.pointerId !== e.pointerId) return;
 
+        // Move thumb by pointer position on track
         setScrollFromClientXOnTrack(e.clientX);
       };
 
@@ -326,14 +363,16 @@ export default function NarratedWorks() {
       };
     }, []);
 
-    // Clicking the track jumps too (only when bar is visible)
+    // Clicking the track jumps (when visible)
     useEffect(() => {
       const track = trackRef.current;
       if (!track) return;
 
       const onPointerDown = (e: PointerEvent) => {
-        if (e.target === thumbRef.current) return;
         if (e.pointerType === "mouse" && e.button !== 0) return;
+        // If click is on the thumb, thumb handler takes over
+        if (e.target === thumbRef.current) return;
+
         setScrollFromClientXOnTrack(e.clientX);
       };
 
@@ -363,29 +402,32 @@ export default function NarratedWorks() {
           <div className="flex-shrink-0 w-4 sm:w-8" />
         </div>
 
-        {/* Only show bar if overflow exists */}
         {needsBar && (
           <div className="mt-4 flex justify-center">
             <div className="w-1/2 max-w-sm">
               <div
                 ref={trackRef}
-                className="relative h-3 rounded-full bg-white/10 border border-white/10"
+                className="relative h-3.5 rounded-full bg-white/10 border border-white/10"
                 role="slider"
                 aria-label={`${ariaLabel} scroll position`}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={Math.round(progressPct)}
               >
+                {/* subtle filled track */}
                 <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-[#D4AF37]/35"
+                  className="absolute left-0 top-0 h-full rounded-full bg-[#D4AF37]/25"
                   style={{ width: `${progressPct}%` }}
                 />
 
+                {/* thumb (grab handle) */}
                 <div
                   ref={thumbRef}
-                  className="absolute top-1/2 -translate-y-1/2 h-4 w-10 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
+                  className="absolute top-1/2 -translate-y-1/2 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
                   style={{
-                    left: `calc(${progressPct}% - 20px)`,
+                    width: `${THUMB_WIDTH}px`,
+                    height: "18px",
+                    left: `${thumbLeftPx}px`,
                   }}
                   aria-label="Scroll thumb"
                 />
@@ -404,7 +446,7 @@ export default function NarratedWorks() {
           Narrated Works
         </h1>
         <p className="text-center text-white/70 text-lg mb-16 max-w-3xl mx-auto">
-          A showcase of audiobook projects I&apos;ve completed and those I&apos;m
+          A showcase of audiobook projects I&apos;ve completed and those I&apos;ve
           currently narrating.
         </p>
 
