@@ -97,6 +97,7 @@ export default function NarratedWorks() {
           src={book.cover}
           alt={`${book.title} cover`}
           fill
+          draggable={false}
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 640px) 70vw, 240px"
         />
@@ -160,7 +161,9 @@ export default function NarratedWorks() {
         if (dragState.current.pointerId !== e.pointerId) return;
 
         const dx = e.clientX - dragState.current.startX;
-        if (Math.abs(dx) > 4) dragState.current.moved = true;
+
+        // Threshold before we treat it as a real drag
+        if (Math.abs(dx) > 6) dragState.current.moved = true;
 
         el.scrollLeft = dragState.current.startScrollLeft - dx;
       };
@@ -171,8 +174,8 @@ export default function NarratedWorks() {
         dragState.current.pointerId = -1;
       };
 
+      // Prevent accidental link opens after dragging
       const onClickCapture = (e: MouseEvent) => {
-        // If we dragged, prevent accidental link clicks
         if (dragState.current.moved) {
           e.preventDefault();
           e.stopPropagation();
@@ -200,11 +203,14 @@ export default function NarratedWorks() {
         ref={scrollerRef}
         className={[
           "flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth gap-6 px-4",
-          "hide-scrollbar",
-          "select-none",
-          isDragging ? "cursor-grabbing" : "cursor-grab",
+          "hide-scrollbar select-none",
+          "cursor-grab active:cursor-grabbing",
+          isDragging ? "cursor-grabbing" : "",
         ].join(" ")}
-        style={{ touchAction: "pan-y" }}
+        style={{
+          // Let page scroll vertically on touch, while we drag horizontally
+          touchAction: "pan-y",
+        }}
         aria-label="Horizontal carousel"
       >
         {children}

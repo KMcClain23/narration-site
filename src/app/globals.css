@@ -6,13 +6,6 @@
   --foreground: #ffffff;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
 /* Force dark always */
 @media (prefers-color-scheme: dark) {
   :root {
@@ -53,16 +46,30 @@ body {
   color: #fff;
   font-size: 14px;
 }
+
 .skip-link:focus {
   left: 12px;
 }
 
 /* Hide scrollbar but keep scrolling functionality */
 .hide-scrollbar {
-  -ms-overflow-style: none; /* IE and Edge */
+  -ms-overflow-style: none; /* IE and Edge legacy */
   scrollbar-width: none; /* Firefox */
 }
 
 .hide-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
+}
+
+/* Optional: reusable polish for horizontal drag scrollers */
+.drag-scroll {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent native image dragging "ghost" inside carousels (WebKit only) */
+.drag-scroll img,
+.hide-scrollbar img {
+  -webkit-user-drag: none;
 }
