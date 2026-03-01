@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image"; //
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { FaTiktok, FaInstagram, FaDiscord } from "react-icons/fa";
@@ -29,7 +30,6 @@ export default function Header() {
 
   useEffect(() => {
     closeMenu();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   useEffect(() => {
@@ -78,8 +78,16 @@ export default function Header() {
       <div className="max-w-6xl mx-auto px-5 sm:px-6 h-16 flex items-center justify-between">
         {/* Brand */}
         <Link href="/" className="flex items-center gap-3 group" onClick={closeMenu}>
-          <div className="h-9 w-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center text-sm font-semibold text-white transition group-hover:border-[#D4AF37]/50 group-hover:bg-[#D4AF37]/10">
-            DM
+          <div className="h-9 w-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center overflow-hidden transition group-hover:border-[#D4AF37]/50 group-hover:bg-[#D4AF37]/10">
+            {/* The profile image replaces the text DM */}
+            <Image 
+              src="/dean-profile.png" 
+              alt="Dean Miller" 
+              width={36} 
+              height={36} 
+              className="object-cover"
+              priority 
+            />
           </div>
           <div className="leading-tight">
             <p className="text-sm font-semibold text-white">Dean Miller</p>
@@ -87,7 +95,7 @@ export default function Header() {
           </div>
         </Link>
 
-        {/* Right */}
+        {/* Right Section */}
         <div className="flex items-center gap-4 sm:gap-6">
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-6 text-sm">
@@ -135,7 +143,7 @@ export default function Header() {
             Request availability
           </a>
 
-          {/* Social */}
+          {/* Social Links */}
           <div className="flex items-center gap-4 text-xl">
             <a
               href="https://www.tiktok.com/@deanmillernarration"
@@ -178,7 +186,7 @@ export default function Header() {
             </div>
           </div>
 
-          {/* Hamburger */}
+          {/* Hamburger Menu Toggle */}
           <button
             className="md:hidden text-2xl text-white/80 hover:text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814] rounded"
             onClick={toggleMenu}
@@ -190,7 +198,7 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu Overlay */}
       {isOpen ? (
         <div className="md:hidden border-t border-white/10 bg-[#050814]/75 backdrop-blur-xl">
           <nav className="max-w-6xl mx-auto px-5 sm:px-6 py-4">
