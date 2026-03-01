@@ -34,11 +34,14 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         href={book.link}
         target="_blank"
         rel="noopener noreferrer"
+        // STOP PROPAGATION: This prevents the scroller from capturing the pointer
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
         className="
           absolute top-3 left-3 z-30
           bg-[#D4AF37] hover:bg-[#E0C15A] text-black 
           p-2 rounded-full shadow-lg transition-transform 
-          active:scale-90 hover:scale-110
+          active:scale-90 hover:scale-110 cursor-pointer
         "
         aria-label={`View ${book.title} on Amazon`}
       >
@@ -184,6 +187,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
   return (
     <div className="relative group/scroller">
+      {/* Visual Gradients */}
       <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
@@ -209,13 +213,13 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
       {showBar && (
         <div className="hidden sm:flex mt-6 justify-center px-4">
           <div className="w-full max-w-md">
-            <div ref={trackRef} className="relative h-2 rounded-full bg-white/5 select-none">
+            <div ref={trackRef} className="relative h-2 rounded-full bg-white/5 select-none touch-none">
               <div
                 onPointerDown={(e) => { e.stopPropagation(); onPointerDown(e, 'thumb'); }}
                 onPointerMove={(e) => onPointerMove(e, 'thumb')}
                 onPointerUp={onPointerUp}
                 onPointerCancel={onPointerUp}
-                className="absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
+                className="absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing hover:bg-[#E0C15A] transition-colors"
                 style={{ left: `${progress}%`, transform: `translate(-${progress}%, -50%)` }}
               />
             </div>
@@ -231,7 +235,7 @@ export default function NarratedWorks() {
     { title: "The Final Guardian", subtitle: "The Citadel of the Mind and the Garden", author: "Alexander Kamenetsky", link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H", cover: "/covers/the-final-guardian.jpg" },
     { title: "Santa Promised", subtitle: "A Christmas Novella", author: "Laetitia Clark", link: "https://www.amazon.com/Santa-Promised-A-Christmas-Novella/dp/B0G6GLQGHK", cover: "/covers/santa-promised.jpg" },
     { title: "The Circle", subtitle: "Rituals & Ruins", author: "Lilian Monroe, Kayla Gerdes", link: "https://www.amazon.com/Audible-The-Circle-Rituals-Ruins/dp/B0GKQY7N27", cover: "/covers/the-circle-rituals-and-ruins.jpg" },
-    { title: "Sultry Secrets: Tease", subtitle: "Sultry Secrets Book 4", author: "Bethanie Loren", link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L", cover: "/covers/sultry-secrets-tease.jpg"},
+    { title: "Sultry Secrets: Tease", subtitle: "Sultry Secrets Book 4", author: "Bethanie Loren", link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L", cover: "/covers/sultry-secrets-tease.jpg", note: true },
     { title: "Heir of the Emberscale", author: "Shelby Gardner", link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB", cover: "/covers/heir-of-emberscale.jpg" },
   ];
 
@@ -249,7 +253,7 @@ export default function NarratedWorks() {
   return (
     <main className="min-h-screen bg-[#050814] text-white overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 py-16 md:py-24">
-        <header className="mb-20 text-center">
+        <header className="mb-20 text-center px-6">
           <h1 className="text-5xl md:text-6xl font-bold mb-6">Narrated Works</h1>
           <p className="text-white/60 text-xl max-w-2xl mx-auto font-light tracking-wide">
             A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.
@@ -282,7 +286,7 @@ export default function NarratedWorks() {
         </section>
 
         <footer className="mt-32 text-center">
-          <Link href="/#contact" className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-12 py-5 font-bold transition-all hover:scale-105 shadow-lg">
+          <Link href="/#contact" className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-12 py-5 font-bold transition-all hover:scale-105 shadow-[0_0_20px_rgba(212,175,55,0.2)]">
             Contact Me
           </Link>
         </footer>
