@@ -131,14 +131,18 @@ export default function NarratedWorks() {
 
   function HorizontalScroller({ children }: { children: React.ReactNode }) {
     const scrollerRef = useRef<HTMLDivElement | null>(null);
-    const [isDragging, setIsDragging] = useState(false);
 
+    // Use refs for drag state so pointermove works immediately
+    const draggingRef = useRef(false);
     const dragState = useRef({
       startX: 0,
       startScrollLeft: 0,
       moved: false,
       pointerId: -1,
     });
+
+    // Purely for cursor styling
+    const [cursorDragging, setCursorDragging] = useState(false);
 
     useEffect(() => {
       const el = scrollerRef.current;
@@ -147,22 +151,24 @@ export default function NarratedWorks() {
       const onPointerDown = (e: PointerEvent) => {
         if (e.pointerType === "mouse" && e.button !== 0) return;
 
+        draggingRef.current = true;
+        setCursorDragging(true);
+
         dragState.current.pointerId = e.pointerId;
         dragState.current.startX = e.clientX;
         dragState.current.startScrollLeft = el.scrollLeft;
         dragState.current.moved = false;
 
-        setIsDragging(true);
         el.setPointerCapture(e.pointerId);
       };
 
       const onPointerMove = (e: PointerEvent) => {
-        if (!isDragging) return;
+        if (!draggingRef.current) return;
         if (dragState.current.pointerId !== e.pointerId) return;
 
         const dx = e.clientX - dragState.current.startX;
 
-        // Threshold before we treat it as a real drag
+        // threshold so clicks still click
         if (Math.abs(dx) > 6) dragState.current.moved = true;
 
         el.scrollLeft = dragState.current.startScrollLeft - dx;
@@ -170,7 +176,9 @@ export default function NarratedWorks() {
 
       const endDrag = (e: PointerEvent) => {
         if (dragState.current.pointerId !== e.pointerId) return;
-        setIsDragging(false);
+
+        draggingRef.current = false;
+        setCursorDragging(false);
         dragState.current.pointerId = -1;
       };
 
@@ -196,19 +204,19 @@ export default function NarratedWorks() {
         el.removeEventListener("pointercancel", endDrag);
         el.removeEventListener("click", onClickCapture, true);
       };
-    }, [isDragging]);
+    }, []);
 
     return (
       <div
         ref={scrollerRef}
         className={[
           "flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth gap-6 px-4",
-          "hide-scrollbar select-none",
-          "cursor-grab active:cursor-grabbing",
-          isDragging ? "cursor-grabbing" : "",
+          // Scrollbar is now visible because we are not applying hide-scrollbar here
+          "select-none",
+          cursorDragging ? "cursor-grabbing" : "cursor-grab",
         ].join(" ")}
         style={{
-          // Let page scroll vertically on touch, while we drag horizontally
+          // Allow normal vertical page scroll on touch devices
           touchAction: "pan-y",
         }}
         aria-label="Horizontal carousel"
