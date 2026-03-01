@@ -18,6 +18,7 @@ interface BookCardProps {
   statusBadge?: React.ReactNode;
 }
 
+// --- Book Card Component ---
 function BookCard({ book, statusBadge }: BookCardProps) {
   return (
     <a
@@ -31,7 +32,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         border border-[#1A2550] bg-[#0B1224] flex-shrink-0 
         w-56 sm:w-64 snap-start select-none
       "
-      // Crucial: prevents the browser from trying to "pick up" the link/image
+      // Prevents browser from initiating a file-drag instead of a scroll-drag
       onDragStart={(e) => e.preventDefault()}
     >
       <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
@@ -77,13 +78,14 @@ interface HorizontalScrollerProps {
   ariaLabel: string;
 }
 
+// --- Horizontal Scroller Component ---
 function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const [showBar, setShowBar] = useState(false);
 
-  // Drag State Refs
+  // Drag State Management
   const isDown = useRef(false);
   const startX = useRef(0);
   const scrollLeftStart = useRef(0);
@@ -99,7 +101,6 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   const checkOverflow = useCallback(() => {
     const el = scrollerRef.current;
     if (el) {
-      // Show bar only if content is wider than container
       setShowBar(el.scrollWidth > el.clientWidth + 10);
       updateProgress();
     }
@@ -117,7 +118,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, [checkOverflow, updateProgress]);
 
-  // Pointer Logic
+  // Unified Pointer Logic
   const handlePointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -127,9 +128,10 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     startX.current = e.pageX;
     scrollLeftStart.current = el.scrollLeft;
 
-    // Forces the element to "keep" the mouse/touch even if it leaves the bounds
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 
+    // Disable snapping during active drag for smooth movement
+    el.style.scrollSnapType = "none";
     el.style.scrollBehavior = "auto";
     el.style.cursor = "grabbing";
   };
@@ -146,7 +148,6 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     if (target === 'container') {
       el.scrollLeft = scrollLeftStart.current - walk;
     } else {
-      // Scroller thumb math
       const maxScroll = el.scrollWidth - el.clientWidth;
       const trackWidth = trackRef.current?.clientWidth || 1;
       const scrollRatio = maxScroll / trackWidth;
@@ -157,11 +158,12 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   const handlePointerUp = (e: React.PointerEvent) => {
     isDown.current = false;
     if (scrollerRef.current) {
+      // Re-enable native snapping once the user lets go
+      scrollerRef.current.style.scrollSnapType = "x mandatory";
       scrollerRef.current.style.scrollBehavior = "smooth";
       scrollerRef.current.style.cursor = "grab";
     }
 
-    // If user dragged, block the link click from firing
     if (hasMoved.current) {
       const preventClick = (e: MouseEvent) => {
         e.preventDefault();
@@ -173,9 +175,9 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
   return (
     <div className="relative group/scroller">
-      {/* Gradients */}
-      <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
-      <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
+      {/* Visual Gradients */}
+      <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
       <div
         ref={scrollerRef}
@@ -184,7 +186,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         className="
-          flex overflow-x-auto pb-8 sm:pb-10 
+          flex overflow-x-auto pb-6 sm:pb-10 
           snap-x snap-mandatory scroll-smooth gap-5 sm:gap-7 px-8 sm:px-12
           hide-scrollbar cursor-grab active:cursor-grabbing select-none
         "
@@ -192,18 +194,19 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
         aria-label={ariaLabel}
       >
         {children}
-        <div className="flex-shrink-0 w-12 sm:w-20" />
+        <div className="flex-shrink-0 w-8 sm:w-20" />
       </div>
 
+      {/* MODIFIED: hidden sm:flex keeps it off mobile screens */}
       {showBar && (
-        <div className="mt-5 sm:mt-6 flex justify-center px-4">
+        <div className="hidden sm:flex mt-6 justify-center px-4">
           <div className="w-full max-w-md">
             <div
               ref={trackRef}
-              className="relative h-3.5 sm:h-4 rounded-full bg-white/10 border border-white/10 select-none touch-none"
+              className="relative h-3 rounded-full bg-white/10 border border-white/5 select-none touch-none"
             >
               <div
-                className="absolute inset-y-0 left-0 rounded-full bg-[#D4AF37]/30 transition-all"
+                className="absolute inset-y-0 left-0 rounded-full bg-[#D4AF37]/20"
                 style={{ width: `${progress}%` }}
               />
               <div
@@ -215,9 +218,8 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
                 onPointerUp={handlePointerUp}
                 onPointerCancel={handlePointerUp}
                 className="
-                  absolute top-1/2 h-5 w-10 sm:h-6 sm:w-12 
-                  rounded-full bg-[#D4AF37] shadow-md cursor-grab active:cursor-grabbing
-                  transition-colors hover:bg-[#E0C15A]
+                  absolute top-1/2 h-5 w-12 rounded-full bg-[#D4AF37] 
+                  shadow-lg cursor-grab active:cursor-grabbing hover:bg-[#E0C15A] transition-colors
                 "
                 style={{ 
                   left: `${progress}%`, 
@@ -232,6 +234,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   );
 }
 
+// --- Main Page Component ---
 export default function NarratedWorks() {
   const completed: Book[] = [
     {
@@ -308,7 +311,7 @@ export default function NarratedWorks() {
   ];
 
   return (
-    <main className="min-h-screen bg-[#050814] text-white">
+    <main className="min-h-screen bg-[#050814] text-white overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-6 py-16 md:py-20">
         <h1 className="text-4xl md:text-5xl font-bold text-center mb-4">
           Narrated Works
@@ -317,24 +320,26 @@ export default function NarratedWorks() {
           A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.
         </p>
 
+        {/* Section 1 */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">Completed Projects</h2>
-          <HorizontalScroller ariaLabel="Completed projects carousel">
+          <HorizontalScroller ariaLabel="Completed projects">
             {completed.map((book, index) => (
               <BookCard key={index} book={book} />
             ))}
           </HorizontalScroller>
         </section>
 
+        {/* Section 2 */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">Currently Narrating</h2>
-          <HorizontalScroller ariaLabel="Currently narrating carousel">
+          <HorizontalScroller ariaLabel="Currently narrating">
             {inProgress.map((book, index) => (
               <BookCard
                 key={index}
                 book={book}
                 statusBadge={
-                  <span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded font-medium">
+                  <span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded font-bold uppercase tracking-wider text-[10px]">
                     In Progress
                   </span>
                 }
@@ -343,16 +348,17 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
+        {/* Section 3 */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">Coming Soon</h2>
-          <HorizontalScroller ariaLabel="Coming soon carousel">
+          <HorizontalScroller ariaLabel="Coming soon">
             {comingSoon.map((book, index) => (
               <BookCard
                 key={index}
                 book={book}
                 statusBadge={
-                  <span className="bg-white/15 text-white px-2 py-0.5 rounded border border-white/10">
-                    Coming Soon
+                  <span className="bg-white/10 text-white/80 px-2 py-0.5 rounded border border-white/10 text-[10px] uppercase">
+                    Soon
                   </span>
                 }
               />
@@ -360,11 +366,10 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        <div className="mt-16 text-center">
-          <p className="text-white/70 mb-6 text-lg">Ready to bring your story to life?</p>
+        <div className="mt-20 text-center">
           <Link
             href="/#contact"
-            className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-8 py-4 font-semibold hover:bg-[#E0C15A] transition text-lg shadow-lg hover:shadow-2xl"
+            className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-10 py-4 font-bold hover:bg-[#E0C15A] transition-all transform hover:scale-105 shadow-[0_0_20px_rgba(212,175,55,0.2)]"
           >
             Contact Me
           </Link>
