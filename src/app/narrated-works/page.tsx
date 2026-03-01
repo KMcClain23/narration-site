@@ -129,10 +129,16 @@ export default function NarratedWorks() {
     </a>
   );
 
-  function HorizontalScroller({ children }: { children: React.ReactNode }) {
+  function HorizontalScroller({
+    children,
+    ariaLabel,
+  }: {
+    children: React.ReactNode;
+    ariaLabel: string;
+  }) {
     const scrollerRef = useRef<HTMLDivElement | null>(null);
 
-    // Use refs for drag state so pointermove works immediately
+    // Drag state must be ref-based so pointermove works immediately
     const draggingRef = useRef(false);
     const dragState = useRef({
       startX: 0,
@@ -141,8 +147,28 @@ export default function NarratedWorks() {
       pointerId: -1,
     });
 
-    // Purely for cursor styling
     const [cursorDragging, setCursorDragging] = useState(false);
+    const [progressPct, setProgressPct] = useState(0);
+
+    useEffect(() => {
+      const el = scrollerRef.current;
+      if (!el) return;
+
+      const updateProgress = () => {
+        const maxScroll = el.scrollWidth - el.clientWidth;
+        const pct = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
+        setProgressPct(Math.min(100, Math.max(0, pct)));
+      };
+
+      updateProgress();
+      el.addEventListener("scroll", updateProgress, { passive: true });
+      window.addEventListener("resize", updateProgress);
+
+      return () => {
+        el.removeEventListener("scroll", updateProgress);
+        window.removeEventListener("resize", updateProgress);
+      };
+    }, []);
 
     useEffect(() => {
       const el = scrollerRef.current;
@@ -168,7 +194,7 @@ export default function NarratedWorks() {
 
         const dx = e.clientX - dragState.current.startX;
 
-        // threshold so clicks still click
+        // Threshold so a normal click still opens the link
         if (Math.abs(dx) > 6) dragState.current.moved = true;
 
         el.scrollLeft = dragState.current.startScrollLeft - dx;
@@ -182,7 +208,7 @@ export default function NarratedWorks() {
         dragState.current.pointerId = -1;
       };
 
-      // Prevent accidental link opens after dragging
+      // Block accidental link opens after dragging
       const onClickCapture = (e: MouseEvent) => {
         if (dragState.current.moved) {
           e.preventDefault();
@@ -207,21 +233,36 @@ export default function NarratedWorks() {
     }, []);
 
     return (
-      <div
-        ref={scrollerRef}
-        className={[
-          "flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth gap-6 px-4",
-          // Scrollbar is now visible because we are not applying hide-scrollbar here
-          "select-none",
-          cursorDragging ? "cursor-grabbing" : "cursor-grab",
-        ].join(" ")}
-        style={{
-          // Allow normal vertical page scroll on touch devices
-          touchAction: "pan-y",
-        }}
-        aria-label="Horizontal carousel"
-      >
-        {children}
+      <div className="relative">
+        {/* Gradient Overlays */}
+        <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
+
+        <div
+          ref={scrollerRef}
+          className={[
+            "flex overflow-x-auto pb-6 snap-x snap-mandatory scroll-smooth gap-6 px-4",
+            "hide-scrollbar select-none",
+            cursorDragging ? "cursor-grabbing" : "cursor-grab",
+          ].join(" ")}
+          style={{ touchAction: "pan-y" }}
+          aria-label={ariaLabel}
+        >
+          {children}
+          <div className="flex-shrink-0 w-4 sm:w-8" />
+        </div>
+
+        {/* Custom scroll indicator: half width, centered, themed */}
+        <div className="mt-3 flex justify-center">
+          <div className="w-1/2 max-w-sm">
+            <div className="h-1.5 rounded-full bg-white/10 border border-white/10 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[#D4AF37] transition-[width] duration-150"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -237,71 +278,60 @@ export default function NarratedWorks() {
           currently narrating.
         </p>
 
+        {/* Completed Projects */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">
             Completed Projects
           </h2>
-          <div className="relative">
-            <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
-            <HorizontalScroller>
-              {completed.map((book, index) => (
-                <BookCard key={index} book={book} />
-              ))}
-              <div className="flex-shrink-0 w-4 sm:w-8" />
-            </HorizontalScroller>
-          </div>
+          <HorizontalScroller ariaLabel="Completed projects carousel">
+            {completed.map((book, index) => (
+              <BookCard key={index} book={book} />
+            ))}
+          </HorizontalScroller>
         </section>
 
+        {/* Currently Narrating */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">
             Currently Narrating
           </h2>
-          <div className="relative">
-            <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
-            <HorizontalScroller>
-              {inProgress.map((book, index) => (
-                <BookCard
-                  key={index}
-                  book={book}
-                  statusBadge={
-                    <span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded">
-                      In Progress
-                    </span>
-                  }
-                />
-              ))}
-              <div className="flex-shrink-0 w-4 sm:w-8" />
-            </HorizontalScroller>
-          </div>
+          <HorizontalScroller ariaLabel="Currently narrating carousel">
+            {inProgress.map((book, index) => (
+              <BookCard
+                key={index}
+                book={book}
+                statusBadge={
+                  <span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded">
+                    In Progress
+                  </span>
+                }
+              />
+            ))}
+          </HorizontalScroller>
         </section>
 
+        {/* Coming Soon */}
         <section className="mb-20">
           <h2 className="text-3xl font-bold mb-8 text-center">Coming Soon</h2>
-          <div className="relative">
-            <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
-            <HorizontalScroller>
-              {comingSoon.map((book, index) => (
-                <BookCard
-                  key={index}
-                  book={book}
-                  statusBadge={
-                    <span className="bg-white/20 text-white px-2 py-0.5 rounded">
-                      Coming Soon
-                    </span>
-                  }
-                />
-              ))}
-              <div className="flex-shrink-0 w-4 sm:w-8" />
-            </HorizontalScroller>
-          </div>
+          <HorizontalScroller ariaLabel="Coming soon carousel">
+            {comingSoon.map((book, index) => (
+              <BookCard
+                key={index}
+                book={book}
+                statusBadge={
+                  <span className="bg-white/15 text-white px-2 py-0.5 rounded border border-white/10">
+                    Coming Soon
+                  </span>
+                }
+              />
+            ))}
+          </HorizontalScroller>
         </section>
 
+        {/* CTA */}
         <div className="mt-16 text-center">
           <p className="text-white/70 mb-6 text-lg">
             Ready to bring your story to life?
