@@ -39,7 +39,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 640px) 70vw, 256px"
-          // placeholder="blur"          // ← uncomment + add blurDataURL when you implement it
+          // placeholder="blur"       // ← enable when you add blurDataURL
           // blurDataURL={book.blurDataURL}
         />
       </div>
@@ -103,7 +103,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     updateProgress();
   }, [getMaxScroll, updateProgress]);
 
-  // Layout / resize / scroll listeners
+  // Layout watchers
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -114,7 +114,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     el.addEventListener("scroll", updateProgress, { passive: true });
     window.addEventListener("resize", updateLayout);
 
-    updateLayout(); // initial check
+    updateLayout(); // initial
 
     return () => {
       ro.disconnect();
@@ -123,7 +123,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, [updateLayout, updateProgress]);
 
-  // Drag to scroll the cards
+  // Drag the cards directly
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -164,76 +164,86 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, []);
 
-  // Thumb drag
+  // Drag the thumb (improved delta-based version)
   useEffect(() => {
     const thumb = thumbRef.current;
     if (!thumb) return;
 
-    const moveToClientX = (clientX: number) => {
-      const track = trackRef.current;
-      const scroller = scrollerRef.current;
-      if (!track || !scroller) return;
+    let initialClientX = 0;
+    let initialScrollLeft = 0;
 
-      const rect = track.getBoundingClientRect();
-      const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
-      const pct = x / rect.width;
-      scroller.scrollLeft = pct * getMaxScroll();
-      updateProgress();
-    };
-
-    const onDown = (e: PointerEvent) => {
+    const onPointerDown = (e: PointerEvent) => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
+      e.preventDefault();
+
+      initialClientX = e.clientX;
+      initialScrollLeft = scrollerRef.current?.scrollLeft ?? 0;
+
       thumb.setPointerCapture(e.pointerId);
       setIsDragging(true);
-      moveToClientX(e.clientX);
     };
 
-    const onMove = (e: PointerEvent) => {
+    const onPointerMove = (e: PointerEvent) => {
       if (!thumb.hasPointerCapture(e.pointerId)) return;
-      moveToClientX(e.clientX);
-    };
 
-    const onUp = () => {
-      setIsDragging(false);
-    };
+      const deltaX = e.clientX - initialClientX;
+      const trackWidth = trackRef.current?.offsetWidth ?? 1;
+      const maxScroll = getMaxScroll();
 
-    thumb.addEventListener("pointerdown", onDown);
-    thumb.addEventListener("pointermove", onMove);
-    thumb.addEventListener("pointerup", onUp);
-    thumb.addEventListener("pointercancel", onUp);
+      const scrollDelta = (deltaX / trackWidth) * maxScroll;
+      const targetScroll = initialScrollLeft + scrollDelta;
 
-    return () => {
-      thumb.removeEventListener("pointerdown", onDown);
-      thumb.removeEventListener("pointermove", onMove);
-      thumb.removeEventListener("pointerup", onUp);
-      thumb.removeEventListener("pointercancel", onUp);
-    };
-  }, [getMaxScroll, updateProgress]);
-
-  // Click on track to jump
-  useEffect(() => {
-    const track = trackRef.current;
-    if (!track) return;
-
-    const onDown = (e: PointerEvent) => {
-      if (e.target === thumbRef.current) return;
-      const rect = track.getBoundingClientRect();
-      const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-      const pct = x / rect.width;
-      const scroller = scrollerRef.current;
-      if (scroller) {
-        scroller.scrollLeft = pct * getMaxScroll();
+      if (scrollerRef.current) {
+        scrollerRef.current.scrollLeft = Math.max(0, Math.min(maxScroll, targetScroll));
         updateProgress();
       }
     };
 
-    track.addEventListener("pointerdown", onDown);
-    return () => track.removeEventListener("pointerdown", onDown);
+    const onPointerUp = (e: PointerEvent) => {
+      if (thumb.hasPointerCapture(e.pointerId)) {
+        thumb.releasePointerCapture(e.pointerId);
+      }
+      setIsDragging(false);
+    };
+
+    thumb.addEventListener("pointerdown", onPointerDown);
+    thumb.addEventListener("pointermove", onPointerMove);
+    thumb.addEventListener("pointerup", onPointerUp);
+    thumb.addEventListener("pointercancel", onPointerUp);
+
+    return () => {
+      thumb.removeEventListener("pointerdown", onPointerDown);
+      thumb.removeEventListener("pointermove", onPointerMove);
+      thumb.removeEventListener("pointerup", onPointerUp);
+      thumb.removeEventListener("pointercancel", onPointerUp);
+    };
+  }, [getMaxScroll, updateProgress]);
+
+  // Click anywhere on track to jump
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.target === thumbRef.current) return;
+
+      const rect = track.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const pct = clickX / rect.width;
+      const maxScroll = getMaxScroll();
+
+      if (scrollerRef.current) {
+        scrollerRef.current.scrollLeft = pct * maxScroll;
+        updateProgress();
+      }
+    };
+
+    track.addEventListener("pointerdown", onPointerDown);
+    return () => track.removeEventListener("pointerdown", onPointerDown);
   }, [getMaxScroll, updateProgress]);
 
   return (
     <div className="relative">
-      {/* Fade edges */}
       <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
@@ -245,6 +255,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
           hide-scrollbar select-none touch-pan-x
           ${isDragging ? "cursor-grabbing" : "cursor-grab active:cursor-grabbing"}
         `}
+        style={{ touchAction: "pan-y pinch-zoom" }}
         aria-label={ariaLabel}
       >
         {children}
@@ -256,7 +267,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
           <div className="w-full max-w-md">
             <div
               ref={trackRef}
-              className="relative h-3.5 sm:h-4 rounded-full bg-white/10 border border-white/10 cursor-pointer"
+              className="relative h-3.5 sm:h-4 rounded-full bg-white/10 border border-white/10 cursor-pointer select-none touch-none"
               role="slider"
               aria-label={`${ariaLabel} scrollbar`}
               aria-valuemin={0}
@@ -273,11 +284,11 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
                 className={`
                   absolute top-1/2 -translate-y-1/2 h-5 w-10 sm:h-6 sm:w-12 
                   rounded-full bg-[#D4AF37] shadow-md cursor-grab active:cursor-grabbing
-                  transition-transform duration-150
-                  ${isDragging ? "scale-110 shadow-xl" : ""}
+                  transition-all duration-150
+                  ${isDragging ? "scale-115 shadow-xl" : ""}
                 `}
                 style={{
-                  left: `calc(${progress}% - ${progress > 90 ? 48 : 24}px)`,
+                  left: `calc(${progress}% - 20px)`,
                 }}
                 aria-label="Drag to scroll"
               />
