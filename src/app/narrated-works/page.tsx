@@ -26,7 +26,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         group relative rounded-xl overflow-hidden shadow-lg 
         transition-all duration-300 hover:-translate-y-2 
         border border-[#1A2550] bg-[#0B1224] flex-shrink-0 
-        w-64 sm:w-72 snap-start select-none
+        w-[75vw] sm:w-64 md:w-72 snap-start select-none
       "
     >
       {/* Clickable Amazon Link Button */}
@@ -34,7 +34,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         href={book.link}
         target="_blank"
         rel="noopener noreferrer"
-        // STOP PROPAGATION: This prevents the scroller from capturing the pointer
+        // STOP PROPAGATION + manipulation ensures touch doesn't hang
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         className="
@@ -43,6 +43,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
           p-2 rounded-full shadow-lg transition-transform 
           active:scale-90 hover:scale-110 cursor-pointer
         "
+        style={{ touchAction: "manipulation" }}
         aria-label={`View ${book.title} on Amazon`}
       >
         <svg 
@@ -70,7 +71,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
           fill
           draggable={false}
           className="object-cover transition-transform duration-500 group-hover:scale-105"
-          sizes="(max-width: 640px) 70vw, 256px"
+          sizes="(max-width: 640px) 75vw, 288px"
         />
       </div>
 
@@ -145,6 +146,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   }, [checkOverflow, updateProgress]);
 
   const onPointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
+    // If it's a touch, let the browser handle it entirely
     if (e.pointerType === 'touch' && target === 'container') return;
 
     const el = scrollerRef.current;
@@ -163,8 +165,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     if (!isDown.current || !scrollerRef.current || e.pointerType === 'touch') return;
     
     const el = scrollerRef.current;
-    const x = e.pageX;
-    const delta = x - startX.current;
+    const delta = e.pageX - startX.current;
 
     if (target === 'container') {
       el.scrollLeft = scrollLeftStart.current - delta;
@@ -187,9 +188,8 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
   return (
     <div className="relative group/scroller">
-      {/* Visual Gradients */}
-      <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
-      <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
+      <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
       <div
         ref={scrollerRef}
@@ -200,10 +200,15 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
         className="
           flex overflow-x-auto pb-10 
           snap-x snap-mandatory 
-          scroll-smooth gap-6 sm:gap-8 px-10 sm:px-20
-          hide-scrollbar cursor-grab active:cursor-grabbing select-none
+          scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20
+          hide-scrollbar select-none
         "
-        style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
+        // touchAction auto is critical to allow mobile browser to scroll horizontally
+        style={{ 
+          touchAction: "auto", 
+          WebkitOverflowScrolling: "touch",
+          scrollbarWidth: 'none'
+        }}
         aria-label={ariaLabel}
       >
         {children}
@@ -213,13 +218,13 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
       {showBar && (
         <div className="hidden sm:flex mt-6 justify-center px-4">
           <div className="w-full max-w-md">
-            <div ref={trackRef} className="relative h-2 rounded-full bg-white/5 select-none touch-none">
+            <div ref={trackRef} className="relative h-2 rounded-full bg-white/5 select-none">
               <div
                 onPointerDown={(e) => { e.stopPropagation(); onPointerDown(e, 'thumb'); }}
                 onPointerMove={(e) => onPointerMove(e, 'thumb')}
                 onPointerUp={onPointerUp}
                 onPointerCancel={onPointerUp}
-                className="absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing hover:bg-[#E0C15A] transition-colors"
+                className="absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
                 style={{ left: `${progress}%`, transform: `translate(-${progress}%, -50%)` }}
               />
             </div>
@@ -252,23 +257,21 @@ export default function NarratedWorks() {
 
   return (
     <main className="min-h-screen bg-[#050814] text-white overflow-x-hidden">
-      <div className="max-w-7xl mx-auto px-4 py-16 md:py-24">
+      <div className="max-w-7xl mx-auto py-16 md:py-24">
         <header className="mb-20 text-center px-6">
-          <h1 className="text-5xl md:text-6xl font-bold mb-6">Narrated Works</h1>
-          <p className="text-white/60 text-xl max-w-2xl mx-auto font-light tracking-wide">
-            A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.
-          </p>
+          <h1 className="text-4xl md:text-6xl font-bold mb-4">Narrated Works</h1>
+          <p className="text-white/60 text-lg">Portfolio of narrated audiobooks.</p>
         </header>
 
-        <section className="mb-24">
-          <h2 className="text-2xl font-bold mb-10 text-center uppercase tracking-widest text-white/80">Completed Projects</h2>
+        <section className="mb-20">
+          <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">Completed Projects</h2>
           <HorizontalScroller ariaLabel="Completed projects">
             {completed.map((book, index) => <BookCard key={index} book={book} />)}
           </HorizontalScroller>
         </section>
 
-        <section className="mb-24">
-          <h2 className="text-2xl font-bold mb-10 text-center uppercase tracking-widest text-white/80">Currently Narrating</h2>
+        <section className="mb-20">
+          <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">Currently Narrating</h2>
           <HorizontalScroller ariaLabel="Currently narrating">
             {inProgress.map((book, index) => (
               <BookCard key={index} book={book} statusBadge="In Progress" />
@@ -276,8 +279,8 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        <section className="mb-24">
-          <h2 className="text-2xl font-bold mb-10 text-center uppercase tracking-widest text-white/80">Coming Soon</h2>
+        <section className="mb-20">
+          <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">Coming Soon</h2>
           <HorizontalScroller ariaLabel="Coming soon">
             {comingSoon.map((book, index) => (
               <BookCard key={index} book={book} statusBadge="Soon" />
@@ -285,8 +288,8 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        <footer className="mt-32 text-center">
-          <Link href="/#contact" className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-12 py-5 font-bold transition-all hover:scale-105 shadow-[0_0_20px_rgba(212,175,55,0.2)]">
+        <footer className="mt-24 text-center">
+          <Link href="/#contact" className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-10 py-4 font-bold hover:scale-105 transition-all">
             Contact Me
           </Link>
         </footer>
