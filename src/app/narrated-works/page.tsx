@@ -79,7 +79,6 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
 
-  const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showBar, setShowBar] = useState(false);
 
@@ -96,8 +95,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   }, [getMaxScroll]);
 
   const updateLayout = useCallback(() => {
-    const max = getMaxScroll();
-    setShowBar(max > 4);
+    setShowBar(getMaxScroll() > 4);
     updateProgress();
   }, [getMaxScroll, updateProgress]);
 
@@ -120,81 +118,36 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, [updateLayout, updateProgress]);
 
-  // Drag cards
-  useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-
-    let startX = 0;
-    let startScrollLeft = 0;
-
-    const onPointerDown = (e: PointerEvent) => {
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      startX = e.clientX;
-      startScrollLeft = el.scrollLeft;
-      setIsDragging(true);
-      el.setPointerCapture(e.pointerId);
-    };
-
-    const onPointerMove = (e: PointerEvent) => {
-      if (!el.hasPointerCapture(e.pointerId)) return;
-      const dx = e.clientX - startX;
-      el.scrollTo({
-        left: startScrollLeft - dx,
-        behavior: "instant",
-      });
-    };
-
-    const onPointerUp = () => {
-      setIsDragging(false);
-    };
-
-    el.addEventListener("pointerdown", onPointerDown);
-    el.addEventListener("pointermove", onPointerMove);
-    el.addEventListener("pointerup", onPointerUp);
-    el.addEventListener("pointercancel", onPointerUp);
-
-    return () => {
-      el.removeEventListener("pointerdown", onPointerDown);
-      el.removeEventListener("pointermove", onPointerMove);
-      el.removeEventListener("pointerup", onPointerUp);
-      el.removeEventListener("pointercancel", onPointerUp);
-    };
-  }, []);
-
-  // Drag thumb
+  // Thumb drag only (simplified, no card drag to avoid capture conflicts)
   useEffect(() => {
     const thumb = thumbRef.current;
     if (!thumb) return;
 
-    let initialX = 0;
-    let initialScroll = 0;
+    let startX = 0;
+    let startScroll = 0;
 
     const onDown = (e: PointerEvent) => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
       e.preventDefault();
-      initialX = e.clientX;
-      initialScroll = scrollerRef.current?.scrollLeft ?? 0;
+      startX = e.clientX;
+      startScroll = scrollerRef.current?.scrollLeft ?? 0;
       thumb.setPointerCapture(e.pointerId);
-      setIsDragging(true);
     };
 
     const onMove = (e: PointerEvent) => {
       if (!thumb.hasPointerCapture(e.pointerId)) return;
-      const dx = e.clientX - initialX;
-      const trackW = trackRef.current?.offsetWidth || 400;
+      const dx = e.clientX - startX;
+      const trackWidth = trackRef.current?.offsetWidth || 1;
       const max = getMaxScroll();
-      const deltaScroll = (dx / trackW) * max;
-      const target = initialScroll + deltaScroll;
-
+      const newScroll = startScroll + (dx / trackWidth) * max * -1; // invert for natural drag direction
       scrollerRef.current?.scrollTo({
-        left: Math.max(0, Math.min(max, target)),
+        left: Math.max(0, Math.min(max, newScroll)),
         behavior: "instant",
       });
       updateProgress();
     };
 
-    const onUp = () => setIsDragging(false);
+    const onUp = () => {};
 
     thumb.addEventListener("pointerdown", onDown);
     thumb.addEventListener("pointermove", onMove);
@@ -209,7 +162,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, [getMaxScroll, updateProgress]);
 
-  // Track click jump
+  // Track click to jump
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
@@ -234,18 +187,12 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
       <div
         ref={scrollerRef}
-        className={`
+        className="
           flex overflow-x-auto pb-8 sm:pb-10 
-          snap-x snap-mandatory ${isDragging ? "!scroll-auto" : "scroll-smooth"} 
-          gap-5 sm:gap-7 px-4 sm:px-6
-          hide-scrollbar select-none touch-pan-x
-          ${isDragging ? "cursor-grabbing" : "cursor-grab"}
-        `}
-        style={{
-          touchAction: "pan-y pinch-zoom",
-          WebkitOverflowScrolling: "touch",
-          willChange: "scroll-position",
-        }}
+          snap-x snap-mandatory scroll-smooth gap-5 sm:gap-7 px-4 sm:px-6
+          hide-scrollbar
+        "
+        style={{ touchAction: "pan-y pinch-zoom", WebkitOverflowScrolling: "touch" }}
         aria-label={ariaLabel}
       >
         {children}
@@ -275,7 +222,6 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
                   absolute top-1/2 -translate-y-1/2 h-5 w-10 sm:h-6 sm:w-12 
                   rounded-full bg-[#D4AF37] shadow-md cursor-grab active:cursor-grabbing
                   transition-all duration-150
-                  ${isDragging ? "scale-115 shadow-xl" : ""}
                 `}
                 style={{ left: `calc(${progress}% - 20px)` }}
                 aria-label="Drag to scroll"
