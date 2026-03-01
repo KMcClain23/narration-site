@@ -32,9 +32,6 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         w-64 sm:w-72 snap-start select-none
       "
       onDragStart={(e) => e.preventDefault()}
-      onClick={(e) => {
-        if (window.isGlobalDragging) e.preventDefault();
-      }}
     >
       <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
         <Image
@@ -74,12 +71,6 @@ function BookCard({ book, statusBadge }: BookCardProps) {
   );
 }
 
-declare global {
-  interface Window {
-    isGlobalDragging: boolean;
-  }
-}
-
 interface HorizontalScrollerProps {
   children: React.ReactNode;
   ariaLabel: string;
@@ -92,10 +83,10 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   const [progress, setProgress] = useState(0);
   const [showBar, setShowBar] = useState(false);
 
+  // Desktop Mouse Drag State
   const isDown = useRef(false);
   const startX = useRef(0);
   const scrollLeftStart = useRef(0);
-  const moved = useRef(false);
 
   const updateProgress = useCallback(() => {
     const el = scrollerRef.current;
@@ -124,45 +115,34 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, [checkOverflow, updateProgress]);
 
-  // Handle Pointer Down
-  const handlePointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
-    // MOBILE FIX: If user is touching, DO NOT capture pointer or run JS drag.
-    // This allows native browser momentum to work.
-    if (e.pointerType === 'touch' && target === 'container') return;
+  // --- MOUSE ONLY DRAG LOGIC ---
+  const onPointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
+    // IMPORTANT: If this is touch, exit. Let the browser handle native scrolling.
+    if (e.pointerType !== 'mouse') return;
 
     const el = scrollerRef.current;
     if (!el) return;
 
     isDown.current = true;
-    moved.current = false;
-    window.isGlobalDragging = false;
     startX.current = e.pageX;
     scrollLeftStart.current = el.scrollLeft;
 
-    // Desktop/Mouse behavior only
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     el.style.scrollSnapType = "none";
     el.style.scrollBehavior = "auto";
-    el.style.cursor = "grabbing";
   };
 
-  const handlePointerMove = (e: React.PointerEvent, target: 'container' | 'thumb') => {
-    // If it's a touch move, skip JS logic
-    if (!isDown.current || !scrollerRef.current || e.pointerType === 'touch') return;
-    
-    const el = scrollerRef.current;
-    const x = e.pageX;
-    const delta = x - startX.current;
+  const onPointerMove = (e: React.PointerEvent, target: 'container' | 'thumb') => {
+    if (!isDown.current || !scrollerRef.current || e.pointerType !== 'mouse') return;
 
-    if (Math.abs(delta) > 5) {
-      moved.current = true;
-      window.isGlobalDragging = true;
-    }
+    const el = scrollerRef.current;
+    const delta = e.pageX - startX.current;
 
     if (target === 'container') {
+      // Mouse drags cards (inverted movement)
       el.scrollLeft = scrollLeftStart.current - delta;
     } else {
-      // Thumb math
+      // Mouse drags scrollbar thumb (direct movement)
       const maxScroll = el.scrollWidth - el.clientWidth;
       const trackWidth = trackRef.current?.clientWidth || 1;
       const scrollRatio = maxScroll / trackWidth;
@@ -170,43 +150,44 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     }
   };
 
-  const handlePointerUp = (e: React.PointerEvent) => {
-    if (e.pointerType === 'touch') return;
-    
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (e.pointerType !== 'mouse') return;
     isDown.current = false;
-    const el = scrollerRef.current;
-    if (el) {
-      el.style.scrollSnapType = "x mandatory";
-      el.style.scrollBehavior = "smooth";
-      el.style.cursor = "grab";
+    if (scrollerRef.current) {
+      scrollerRef.current.style.scrollSnapType = "x mandatory";
+      scrollerRef.current.style.scrollBehavior = "smooth";
     }
-    setTimeout(() => { window.isGlobalDragging = false; }, 50);
   };
 
   return (
     <div className="relative group/scroller">
-      {/* Visual Gradients */}
+      {/* Gradients */}
       <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
       <div
         ref={scrollerRef}
-        onPointerDown={(e) => handlePointerDown(e, 'container')}
-        onPointerMove={(e) => handlePointerMove(e, 'container')}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        // Attaching listeners but they exit immediately if e.pointerType === 'touch'
+        onPointerDown={(e) => onPointerDown(e, 'container')}
+        onPointerMove={(e) => onPointerMove(e, 'container')}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
         className="
-          flex overflow-x-auto pb-8 sm:pb-10 
+          flex overflow-x-auto pb-10 
           snap-x snap-mandatory 
-          scroll-smooth gap-5 sm:gap-7 px-8 sm:px-20
-          hide-scrollbar select-none
+          scroll-smooth gap-6 sm:gap-8 px-10 sm:px-20
+          hide-scrollbar cursor-grab active:cursor-grabbing
         "
-        // pan-y ensures vertical scrolling (page scroll) isn't blocked on touch devices
-        style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
+        // touchAction: "pan-x" is the secret sauce for mobile scrolling
+        style={{ 
+          touchAction: "pan-x", 
+          WebkitOverflowScrolling: "touch",
+          scrollbarWidth: 'none' 
+        }}
         aria-label={ariaLabel}
       >
         {children}
-        <div className="flex-shrink-0 w-8 sm:w-20" />
+        <div className="flex-shrink-0 w-10 sm:w-20" />
       </div>
 
       {showBar && (
@@ -219,11 +200,11 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
               <div
                 onPointerDown={(e) => {
                   e.stopPropagation();
-                  handlePointerDown(e, 'thumb');
+                  onPointerDown(e, 'thumb');
                 }}
-                onPointerMove={(e) => handlePointerMove(e, 'thumb')}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerUp}
+                onPointerMove={(e) => onPointerMove(e, 'thumb')}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
                 className="
                   absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] 
                   shadow-[0_0_15px_rgba(212,175,55,0.4)] cursor-grab active:cursor-grabbing 
@@ -241,6 +222,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   );
 }
 
+// --- Main Section Component ---
 export default function NarratedWorks() {
   const completed: Book[] = [
     { title: "The Final Guardian", subtitle: "The Citadel of the Mind and the Garden", author: "Alexander Kamenetsky", link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H", cover: "/covers/the-final-guardian.jpg" },
