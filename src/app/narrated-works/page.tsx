@@ -25,12 +25,11 @@ function BookCard({ book, statusBadge }: BookCardProps) {
       href={book.link}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label={`View ${book.title} by ${book.author} on Amazon`}
       className="
         group relative rounded-xl overflow-hidden shadow-lg 
         hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 
         border border-[#1A2550] bg-[#0B1224] flex-shrink-0 
-        w-56 sm:w-64 snap-center sm:snap-start select-none
+        w-64 sm:w-72 snap-start select-none
       "
       onDragStart={(e) => e.preventDefault()}
     >
@@ -116,7 +115,11 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     };
   }, [checkOverflow, updateProgress]);
 
+  // --- DRAG LOGIC (Optimized for Mouse/Desktop) ---
   const handlePointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
+    // Detect if this is a touch event. If so, let the browser handle it natively.
+    if (e.pointerType === 'touch') return;
+
     const el = scrollerRef.current;
     if (!el) return;
 
@@ -127,18 +130,17 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 
-    // Remove snapping completely while dragging to allow "continuous" feel
+    // Disable snapping temporarily for smooth JS dragging
     el.style.scrollSnapType = "none";
     el.style.scrollBehavior = "auto";
-    el.style.cursor = "grabbing";
   };
 
   const handlePointerMove = (e: React.PointerEvent, target: 'container' | 'thumb') => {
-    if (!isDown.current || !scrollerRef.current) return;
+    if (!isDown.current || !scrollerRef.current || e.pointerType === 'touch') return;
     
     const el = scrollerRef.current;
     const x = e.pageX;
-    const walk = x - startX.current;
+    const walk = (x - startX.current) * 1.2; // Sensitivity boost
 
     if (Math.abs(walk) > 5) hasMoved.current = true;
 
@@ -153,13 +155,13 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    
     isDown.current = false;
     if (scrollerRef.current) {
-      // Use snap-proximity on mobile for "soft" snapping, snap-mandatory on desktop
-      const isMobile = window.innerWidth < 640;
-      scrollerRef.current.style.scrollSnapType = isMobile ? "x proximity" : "x mandatory";
+      // Restore snapping after drag ends
+      scrollerRef.current.style.scrollSnapType = "x mandatory";
       scrollerRef.current.style.scrollBehavior = "smooth";
-      scrollerRef.current.style.cursor = "grab";
     }
 
     if (hasMoved.current) {
@@ -173,8 +175,9 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
   return (
     <div className="relative group/scroller">
-      <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
-      <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
+      {/* Visual Gradients */}
+      <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-r from-[#050814] via-[#050814]/40 to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-32 bg-gradient-to-l from-[#050814] via-[#050814]/40 to-transparent z-10 pointer-events-none" />
 
       <div
         ref={scrollerRef}
@@ -183,31 +186,34 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         className="
-          flex overflow-x-auto pb-6 sm:pb-10 
-          snap-x snap-proximity sm:snap-mandatory 
-          scroll-smooth gap-5 sm:gap-7 px-8 sm:px-12
+          flex overflow-x-auto pb-10 
+          snap-x snap-mandatory 
+          scroll-smooth gap-6 sm:gap-8 px-10 sm:px-20
           hide-scrollbar cursor-grab active:cursor-grabbing select-none
         "
+        // touch-action: auto allows the browser to use its native, fluid momentum on mobile
         style={{ 
-            touchAction: "pan-y", 
-            WebkitOverflowScrolling: "touch",
-            scrollbarWidth: 'none'
+          touchAction: "pan-y", 
+          WebkitOverflowScrolling: "touch",
+          scrollbarWidth: 'none'
         }}
         aria-label={ariaLabel}
       >
         {children}
-        <div className="flex-shrink-0 w-8 sm:w-20" />
+        {/* Extra padding at the end */}
+        <div className="flex-shrink-0 w-10 sm:w-20" />
       </div>
 
+      {/* Scrollbar - Desktop Only */}
       {showBar && (
         <div className="hidden sm:flex mt-6 justify-center px-4">
           <div className="w-full max-w-md">
             <div
               ref={trackRef}
-              className="relative h-3 rounded-full bg-white/10 border border-white/5 select-none touch-none"
+              className="relative h-2 rounded-full bg-white/5 border border-white/5 select-none touch-none"
             >
               <div
-                className="absolute inset-y-0 left-0 rounded-full bg-[#D4AF37]/20"
+                className="absolute inset-y-0 left-0 rounded-full bg-[#D4AF37]/10"
                 style={{ width: `${progress}%` }}
               />
               <div
@@ -219,8 +225,9 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
                 onPointerUp={handlePointerUp}
                 onPointerCancel={handlePointerUp}
                 className="
-                  absolute top-1/2 h-5 w-12 rounded-full bg-[#D4AF37] 
-                  shadow-lg cursor-grab active:cursor-grabbing hover:bg-[#E0C15A] transition-colors
+                  absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] 
+                  shadow-[0_0_15px_rgba(212,175,55,0.4)] cursor-grab active:cursor-grabbing 
+                  hover:bg-[#E0C15A] transition-colors
                 "
                 style={{ 
                   left: `${progress}%`, 
@@ -312,16 +319,20 @@ export default function NarratedWorks() {
 
   return (
     <main className="min-h-screen bg-[#050814] text-white overflow-x-hidden">
-      <div className="max-w-7xl mx-auto px-6 py-16 md:py-20">
-        <h1 className="text-4xl md:text-5xl font-bold text-center mb-4">
-          Narrated Works
-        </h1>
-        <p className="text-center text-white/70 text-lg mb-16 max-w-3xl mx-auto">
-          A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.
-        </p>
+      <div className="max-w-7xl mx-auto px-4 py-16 md:py-24">
+        <header className="mb-20">
+          <h1 className="text-5xl md:text-6xl font-bold text-center mb-6 tracking-tight">
+            Narrated Works
+          </h1>
+          <p className="text-center text-white/60 text-xl max-w-2xl mx-auto font-light">
+            A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.
+          </p>
+        </header>
 
-        <section className="mb-20">
-          <h2 className="text-3xl font-bold mb-8 text-center">Completed Projects</h2>
+        <section className="mb-24">
+          <h2 className="text-3xl font-bold mb-10 text-center text-[#D4AF37]/90 uppercase tracking-widest text-sm">
+            Completed Projects
+          </h2>
           <HorizontalScroller ariaLabel="Completed projects">
             {completed.map((book, index) => (
               <BookCard key={index} book={book} />
@@ -329,15 +340,17 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        <section className="mb-20">
-          <h2 className="text-3xl font-bold mb-8 text-center">Currently Narrating</h2>
+        <section className="mb-24">
+          <h2 className="text-3xl font-bold mb-10 text-center text-[#D4AF37]/90 uppercase tracking-widest text-sm">
+            Currently Narrating
+          </h2>
           <HorizontalScroller ariaLabel="Currently narrating">
             {inProgress.map((book, index) => (
               <BookCard
                 key={index}
                 book={book}
                 statusBadge={
-                  <span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded font-bold uppercase tracking-wider text-[10px]">
+                  <span className="bg-[#D4AF37] text-black px-2.5 py-1 rounded font-bold uppercase text-[10px]">
                     In Progress
                   </span>
                 }
@@ -346,15 +359,17 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        <section className="mb-20">
-          <h2 className="text-3xl font-bold mb-8 text-center">Coming Soon</h2>
+        <section className="mb-24">
+          <h2 className="text-3xl font-bold mb-10 text-center text-[#D4AF37]/90 uppercase tracking-widest text-sm">
+            Coming Soon
+          </h2>
           <HorizontalScroller ariaLabel="Coming soon">
             {comingSoon.map((book, index) => (
               <BookCard
                 key={index}
                 book={book}
                 statusBadge={
-                  <span className="bg-white/10 text-white/80 px-2 py-0.5 rounded border border-white/10 text-[10px] uppercase">
+                  <span className="bg-white/5 text-white/60 px-2.5 py-1 rounded border border-white/10 font-bold uppercase text-[10px]">
                     Soon
                   </span>
                 }
@@ -363,14 +378,14 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        <div className="mt-20 text-center">
+        <footer className="mt-32 text-center">
           <Link
             href="/#contact"
-            className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-10 py-4 font-bold hover:bg-[#E0C15A] transition-all transform hover:scale-105 shadow-[0_0_20px_rgba(212,175,55,0.2)]"
+            className="group relative inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-12 py-5 font-bold transition-all hover:bg-[#E0C15A] hover:shadow-[0_0_30px_rgba(212,175,55,0.3)] transform hover:-translate-y-1"
           >
             Contact Me
           </Link>
-        </div>
+        </footer>
       </div>
     </main>
   );
