@@ -25,17 +25,14 @@ function BookCard({ book, statusBadge }: BookCardProps) {
       target="_blank"
       rel="noopener noreferrer"
       aria-label={`View ${book.title} by ${book.author} on Amazon`}
-      // Added select-none and draggable={false} to prevent browser image ghosting
       className="
         group relative rounded-xl overflow-hidden shadow-lg 
         hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 
         border border-[#1A2550] bg-[#0B1224] flex-shrink-0 
         w-56 sm:w-64 snap-start select-none
       "
-      onClick={(e) => {
-        // This is a safety check in case the global intercept fails
-        if (window.isDragging) e.preventDefault();
-      }}
+      // Crucial: prevents the browser from trying to "pick up" the link/image
+      onDragStart={(e) => e.preventDefault()}
     >
       <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
         <Image
@@ -75,13 +72,6 @@ function BookCard({ book, statusBadge }: BookCardProps) {
   );
 }
 
-// Global declaration to help component communication
-declare global {
-  interface Window {
-    isDragging: boolean;
-  }
-}
-
 interface HorizontalScrollerProps {
   children: React.ReactNode;
   ariaLabel: string;
@@ -89,8 +79,15 @@ interface HorizontalScrollerProps {
 
 function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const [showBar, setShowBar] = useState(false);
+
+  // Drag State Refs
+  const isDown = useRef(false);
+  const startX = useRef(0);
+  const scrollLeftStart = useRef(0);
+  const hasMoved = useRef(false);
 
   const updateProgress = useCallback(() => {
     const el = scrollerRef.current;
@@ -102,6 +99,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   const checkOverflow = useCallback(() => {
     const el = scrollerRef.current;
     if (el) {
+      // Show bar only if content is wider than container
       setShowBar(el.scrollWidth > el.clientWidth + 10);
       updateProgress();
     }
@@ -110,116 +108,120 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
-
     const ro = new ResizeObserver(checkOverflow);
     ro.observe(el);
     el.addEventListener("scroll", updateProgress, { passive: true });
-
     return () => {
       ro.disconnect();
       el.removeEventListener("scroll", updateProgress);
     };
   }, [checkOverflow, updateProgress]);
 
-  // Unified Drag Logic
-  useEffect(() => {
+  // Pointer Logic
+  const handlePointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
     const el = scrollerRef.current;
     if (!el) return;
 
-    let isDown = false;
-    let startX: number;
-    let scrollLeft: number;
-    let hasMoved = false;
+    isDown.current = true;
+    hasMoved.current = false;
+    startX.current = e.pageX;
+    scrollLeftStart.current = el.scrollLeft;
 
-    const onMouseDown = (e: PointerEvent) => {
-      isDown = true;
-      hasMoved = false;
-      window.isDragging = false;
-      startX = e.pageX - el.offsetLeft;
-      scrollLeft = el.scrollLeft;
-      
-      // Stop any current smooth scrolling for immediate response
-      el.style.scrollBehavior = 'auto';
-      el.style.cursor = 'grabbing';
-      el.setPointerCapture(e.pointerId);
-    };
+    // Forces the element to "keep" the mouse/touch even if it leaves the bounds
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 
-    const onMouseMove = (e: PointerEvent) => {
-      if (!isDown) return;
-      e.preventDefault();
-      
-      const x = e.pageX - el.offsetLeft;
-      const walk = (x - startX) * 1.5; // Scroll speed multiplier
-      
-      if (Math.abs(walk) > 5) {
-        hasMoved = true;
-        window.isDragging = true;
-      }
-      
-      el.scrollLeft = scrollLeft - walk;
-    };
+    el.style.scrollBehavior = "auto";
+    el.style.cursor = "grabbing";
+  };
 
-    const onMouseUp = (e: PointerEvent) => {
-      if (!isDown) return;
-      isDown = false;
-      el.style.scrollBehavior = 'smooth';
-      el.style.cursor = 'grab';
-      
-      // If we moved, we block the very next click event
-      if (hasMoved) {
-        const preventClick = (e: MouseEvent) => {
-          e.preventDefault();
-          e.stopImmediatePropagation();
-        };
-        document.addEventListener('click', preventClick, { capture: true, once: true });
-        // Cleanup dragging state after a tiny delay
-        setTimeout(() => { window.isDragging = false; }, 50);
-      }
-    };
+  const handlePointerMove = (e: React.PointerEvent, target: 'container' | 'thumb') => {
+    if (!isDown.current || !scrollerRef.current) return;
+    
+    const el = scrollerRef.current;
+    const x = e.pageX;
+    const walk = x - startX.current;
 
-    el.addEventListener('pointerdown', onMouseDown);
-    el.addEventListener('pointermove', onMouseMove);
-    el.addEventListener('pointerup', onMouseUp);
-    el.addEventListener('pointercancel', onMouseUp);
+    if (Math.abs(walk) > 5) hasMoved.current = true;
 
-    return () => {
-      el.removeEventListener('pointerdown', onMouseDown);
-      el.removeEventListener('pointermove', onMouseMove);
-      el.removeEventListener('pointerup', onMouseUp);
-      el.removeEventListener('pointercancel', onMouseUp);
-    };
-  }, []);
+    if (target === 'container') {
+      el.scrollLeft = scrollLeftStart.current - walk;
+    } else {
+      // Scroller thumb math
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      const trackWidth = trackRef.current?.clientWidth || 1;
+      const scrollRatio = maxScroll / trackWidth;
+      el.scrollLeft = scrollLeftStart.current + (walk * scrollRatio);
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    isDown.current = false;
+    if (scrollerRef.current) {
+      scrollerRef.current.style.scrollBehavior = "smooth";
+      scrollerRef.current.style.cursor = "grab";
+    }
+
+    // If user dragged, block the link click from firing
+    if (hasMoved.current) {
+      const preventClick = (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      };
+      document.addEventListener("click", preventClick, { capture: true, once: true });
+    }
+  };
 
   return (
     <div className="relative group/scroller">
       {/* Gradients */}
-      <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-20 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
-      <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-20 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
+      <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
       <div
         ref={scrollerRef}
+        onPointerDown={(e) => handlePointerDown(e, 'container')}
+        onPointerMove={(e) => handlePointerMove(e, 'container')}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         className="
           flex overflow-x-auto pb-8 sm:pb-10 
           snap-x snap-mandatory scroll-smooth gap-5 sm:gap-7 px-8 sm:px-12
-          hide-scrollbar cursor-grab active:cursor-grabbing
+          hide-scrollbar cursor-grab active:cursor-grabbing select-none
         "
-        style={{ touchAction: "pan-y" }}
+        style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
         aria-label={ariaLabel}
       >
         {children}
-        {/* Spacer for the end of scroll */}
-        <div className="flex-shrink-0 w-4 sm:w-8" />
+        <div className="flex-shrink-0 w-12 sm:w-20" />
       </div>
 
       {showBar && (
-        <div className="mt-2 flex justify-center px-4">
-          <div className="w-full max-w-[200px] sm:max-w-md">
-            <div className="relative h-1.5 sm:h-2 rounded-full bg-white/10 overflow-hidden">
+        <div className="mt-5 sm:mt-6 flex justify-center px-4">
+          <div className="w-full max-w-md">
+            <div
+              ref={trackRef}
+              className="relative h-3.5 sm:h-4 rounded-full bg-white/10 border border-white/10 select-none touch-none"
+            >
               <div
-                className="absolute inset-y-0 left-0 rounded-full bg-[#D4AF37] transition-all duration-150 ease-out"
+                className="absolute inset-y-0 left-0 rounded-full bg-[#D4AF37]/30 transition-all"
+                style={{ width: `${progress}%` }}
+              />
+              <div
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  handlePointerDown(e, 'thumb');
+                }}
+                onPointerMove={(e) => handlePointerMove(e, 'thumb')}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+                className="
+                  absolute top-1/2 h-5 w-10 sm:h-6 sm:w-12 
+                  rounded-full bg-[#D4AF37] shadow-md cursor-grab active:cursor-grabbing
+                  transition-colors hover:bg-[#E0C15A]
+                "
                 style={{ 
-                  width: '30%', 
-                  transform: `translateX(${(progress * (100 - 30)) / 30}%)` 
+                  left: `${progress}%`, 
+                  transform: `translate(-${progress}%, -50%)` 
                 }}
               />
             </div>
@@ -231,7 +233,6 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 }
 
 export default function NarratedWorks() {
-  // Data arrays remain the same...
   const completed: Book[] = [
     {
       title: "The Final Guardian",
@@ -307,21 +308,17 @@ export default function NarratedWorks() {
   ];
 
   return (
-    <main className="min-h-screen bg-[#050814] text-white overflow-x-hidden">
+    <main className="min-h-screen bg-[#050814] text-white">
       <div className="max-w-7xl mx-auto px-6 py-16 md:py-20">
-        <header className="mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold text-center mb-4">
-            Narrated Works
-          </h1>
-          <p className="text-center text-white/70 text-lg max-w-3xl mx-auto">
-            A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.
-          </p>
-        </header>
+        <h1 className="text-4xl md:text-5xl font-bold text-center mb-4">
+          Narrated Works
+        </h1>
+        <p className="text-center text-white/70 text-lg mb-16 max-w-3xl mx-auto">
+          A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.
+        </p>
 
-        <section className="mb-24">
-          <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center text-white/90">
-            Completed Projects
-          </h2>
+        <section className="mb-20">
+          <h2 className="text-3xl font-bold mb-8 text-center">Completed Projects</h2>
           <HorizontalScroller ariaLabel="Completed projects carousel">
             {completed.map((book, index) => (
               <BookCard key={index} book={book} />
@@ -329,17 +326,15 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        <section className="mb-24">
-          <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center text-white/90">
-            Currently Narrating
-          </h2>
+        <section className="mb-20">
+          <h2 className="text-3xl font-bold mb-8 text-center">Currently Narrating</h2>
           <HorizontalScroller ariaLabel="Currently narrating carousel">
             {inProgress.map((book, index) => (
               <BookCard
                 key={index}
                 book={book}
                 statusBadge={
-                  <span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded font-bold uppercase tracking-wider text-[10px]">
+                  <span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded font-medium">
                     In Progress
                   </span>
                 }
@@ -348,15 +343,15 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        <section className="mb-24">
-          <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center text-white/90">Coming Soon</h2>
+        <section className="mb-20">
+          <h2 className="text-3xl font-bold mb-8 text-center">Coming Soon</h2>
           <HorizontalScroller ariaLabel="Coming soon carousel">
             {comingSoon.map((book, index) => (
               <BookCard
                 key={index}
                 book={book}
                 statusBadge={
-                  <span className="bg-white/10 text-white/80 px-2 py-0.5 rounded border border-white/10 uppercase tracking-wider text-[10px]">
+                  <span className="bg-white/15 text-white px-2 py-0.5 rounded border border-white/10">
                     Coming Soon
                   </span>
                 }
@@ -365,17 +360,15 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        <footer className="mt-20 text-center">
-          <p className="text-white/60 mb-8 text-lg">
-            Ready to bring your story to life?
-          </p>
+        <div className="mt-16 text-center">
+          <p className="text-white/70 mb-6 text-lg">Ready to bring your story to life?</p>
           <Link
             href="/#contact"
-            className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-10 py-4 font-bold hover:bg-[#E0C15A] transition-all transform hover:scale-105 shadow-[0_0_20px_rgba(212,175,55,0.2)]"
+            className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-8 py-4 font-semibold hover:bg-[#E0C15A] transition text-lg shadow-lg hover:shadow-2xl"
           >
             Contact Me
           </Link>
-        </footer>
+        </div>
       </div>
     </main>
   );
