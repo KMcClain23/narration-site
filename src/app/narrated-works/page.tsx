@@ -25,18 +25,24 @@ function BookCard({ book, statusBadge }: BookCardProps) {
       target="_blank"
       rel="noopener noreferrer"
       aria-label={`View ${book.title} by ${book.author} on Amazon`}
+      // Added select-none and draggable={false} to prevent browser image ghosting
       className="
         group relative rounded-xl overflow-hidden shadow-lg 
         hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 
         border border-[#1A2550] bg-[#0B1224] flex-shrink-0 
-        w-56 sm:w-64 snap-start
+        w-56 sm:w-64 snap-start select-none
       "
+      onClick={(e) => {
+        // This is a safety check in case the global intercept fails
+        if (window.isDragging) e.preventDefault();
+      }}
     >
-      <div className="relative aspect-[3/4.5] w-full bg-gray-900/40">
+      <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
         <Image
           src={book.cover}
           alt={`${book.title} book cover`}
           fill
+          draggable={false}
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 640px) 70vw, 256px"
         />
@@ -54,7 +60,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         </div>
       )}
 
-      <div className="p-4 text-center">
+      <div className="p-4 text-center pointer-events-none">
         <h3 className="font-semibold text-base leading-tight text-white group-hover:text-[#D4AF37] transition-colors">
           {book.title}
         </h3>
@@ -69,6 +75,13 @@ function BookCard({ book, statusBadge }: BookCardProps) {
   );
 }
 
+// Global declaration to help component communication
+declare global {
+  interface Window {
+    isDragging: boolean;
+  }
+}
+
 interface HorizontalScrollerProps {
   children: React.ReactNode;
   ariaLabel: string;
@@ -76,156 +89,138 @@ interface HorizontalScrollerProps {
 
 function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const thumbRef = useRef<HTMLDivElement>(null);
-
   const [progress, setProgress] = useState(0);
   const [showBar, setShowBar] = useState(false);
-
-  const getMaxScroll = useCallback(() => {
-    const el = scrollerRef.current;
-    return el ? Math.max(0, el.scrollWidth - el.clientWidth) : 0;
-  }, []);
 
   const updateProgress = useCallback(() => {
     const el = scrollerRef.current;
     if (!el) return;
-    const max = getMaxScroll();
+    const max = el.scrollWidth - el.clientWidth;
     setProgress(max > 0 ? (el.scrollLeft / max) * 100 : 0);
-  }, [getMaxScroll]);
+  }, []);
 
-  const updateLayout = useCallback(() => {
-    setShowBar(getMaxScroll() > 4);
-    updateProgress();
-  }, [getMaxScroll, updateProgress]);
+  const checkOverflow = useCallback(() => {
+    const el = scrollerRef.current;
+    if (el) {
+      setShowBar(el.scrollWidth > el.clientWidth + 10);
+      updateProgress();
+    }
+  }, [updateProgress]);
 
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
 
-    const ro = new ResizeObserver(updateLayout);
+    const ro = new ResizeObserver(checkOverflow);
     ro.observe(el);
-
     el.addEventListener("scroll", updateProgress, { passive: true });
-    window.addEventListener("resize", updateLayout);
-
-    updateLayout();
 
     return () => {
       ro.disconnect();
       el.removeEventListener("scroll", updateProgress);
-      window.removeEventListener("resize", updateLayout);
     };
-  }, [updateLayout, updateProgress]);
+  }, [checkOverflow, updateProgress]);
 
-  // Thumb drag
+  // Unified Drag Logic
   useEffect(() => {
-    const thumb = thumbRef.current;
-    if (!thumb) return;
+    const el = scrollerRef.current;
+    if (!el) return;
 
-    let startX = 0;
-    let startScroll = 0;
+    let isDown = false;
+    let startX: number;
+    let scrollLeft: number;
+    let hasMoved = false;
 
-    const onDown = (e: PointerEvent) => {
-      if (e.pointerType === "mouse" && e.button !== 0) return;
+    const onMouseDown = (e: PointerEvent) => {
+      isDown = true;
+      hasMoved = false;
+      window.isDragging = false;
+      startX = e.pageX - el.offsetLeft;
+      scrollLeft = el.scrollLeft;
+      
+      // Stop any current smooth scrolling for immediate response
+      el.style.scrollBehavior = 'auto';
+      el.style.cursor = 'grabbing';
+      el.setPointerCapture(e.pointerId);
+    };
+
+    const onMouseMove = (e: PointerEvent) => {
+      if (!isDown) return;
       e.preventDefault();
-      startX = e.clientX;
-      startScroll = scrollerRef.current?.scrollLeft ?? 0;
-      thumb.setPointerCapture(e.pointerId);
+      
+      const x = e.pageX - el.offsetLeft;
+      const walk = (x - startX) * 1.5; // Scroll speed multiplier
+      
+      if (Math.abs(walk) > 5) {
+        hasMoved = true;
+        window.isDragging = true;
+      }
+      
+      el.scrollLeft = scrollLeft - walk;
     };
 
-    const onMove = (e: PointerEvent) => {
-      if (!thumb.hasPointerCapture(e.pointerId)) return;
-      const dx = e.clientX - startX;
-      const trackWidth = trackRef.current?.offsetWidth || 1;
-      const max = getMaxScroll();
-      const newScroll = startScroll - (dx / trackWidth) * max; // invert dx for natural direction
-      scrollerRef.current?.scrollTo({
-        left: Math.max(0, Math.min(max, newScroll)),
-        behavior: "instant",
-      });
-      updateProgress();
+    const onMouseUp = (e: PointerEvent) => {
+      if (!isDown) return;
+      isDown = false;
+      el.style.scrollBehavior = 'smooth';
+      el.style.cursor = 'grab';
+      
+      // If we moved, we block the very next click event
+      if (hasMoved) {
+        const preventClick = (e: MouseEvent) => {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        };
+        document.addEventListener('click', preventClick, { capture: true, once: true });
+        // Cleanup dragging state after a tiny delay
+        setTimeout(() => { window.isDragging = false; }, 50);
+      }
     };
 
-    const onUp = () => {};
-
-    thumb.addEventListener("pointerdown", onDown);
-    thumb.addEventListener("pointermove", onMove);
-    thumb.addEventListener("pointerup", onUp);
-    thumb.addEventListener("pointercancel", onUp);
+    el.addEventListener('pointerdown', onMouseDown);
+    el.addEventListener('pointermove', onMouseMove);
+    el.addEventListener('pointerup', onMouseUp);
+    el.addEventListener('pointercancel', onMouseUp);
 
     return () => {
-      thumb.removeEventListener("pointerdown", onDown);
-      thumb.removeEventListener("pointermove", onMove);
-      thumb.removeEventListener("pointerup", onUp);
-      thumb.removeEventListener("pointercancel", onUp);
+      el.removeEventListener('pointerdown', onMouseDown);
+      el.removeEventListener('pointermove', onMouseMove);
+      el.removeEventListener('pointerup', onMouseUp);
+      el.removeEventListener('pointercancel', onMouseUp);
     };
-  }, [getMaxScroll, updateProgress]);
-
-  // Track click to jump
-  useEffect(() => {
-    const track = trackRef.current;
-    if (!track) return;
-
-    const onDown = (e: PointerEvent) => {
-      if (e.target === thumbRef.current) return;
-      const rect = track.getBoundingClientRect();
-      const pct = (e.clientX - rect.left) / rect.width;
-      const max = getMaxScroll();
-      scrollerRef.current?.scrollTo({ left: pct * max, behavior: "instant" });
-      updateProgress();
-    };
-
-    track.addEventListener("pointerdown", onDown);
-    return () => track.removeEventListener("pointerdown", onDown);
-  }, [getMaxScroll, updateProgress]);
+  }, []);
 
   return (
-    <div className="relative">
-      <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
-      <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
+    <div className="relative group/scroller">
+      {/* Gradients */}
+      <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-20 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-20 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
       <div
         ref={scrollerRef}
-        tabIndex={0}  // Enables keyboard focus & arrow keys
         className="
           flex overflow-x-auto pb-8 sm:pb-10 
-          snap-x snap-mandatory scroll-smooth gap-5 sm:gap-7 px-4 sm:px-6
-          scrollbar-hide select-none touch-pan-x
+          snap-x snap-mandatory scroll-smooth gap-5 sm:gap-7 px-8 sm:px-12
+          hide-scrollbar cursor-grab active:cursor-grabbing
         "
-        style={{ touchAction: "pan-y pinch-zoom", WebkitOverflowScrolling: "touch" }}
+        style={{ touchAction: "pan-y" }}
         aria-label={ariaLabel}
       >
         {children}
-        <div className="flex-shrink-0 w-12 sm:w-20" />
+        {/* Spacer for the end of scroll */}
+        <div className="flex-shrink-0 w-4 sm:w-8" />
       </div>
 
       {showBar && (
-        <div className="mt-5 sm:mt-6 flex justify-center px-4">
-          <div className="w-full max-w-md">
-            <div
-              ref={trackRef}
-              className="relative h-3.5 sm:h-4 rounded-full bg-white/10 border border-white/10 cursor-pointer select-none touch-none"
-              role="slider"
-              aria-label={`${ariaLabel} scrollbar`}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round(progress)}
-              tabIndex={0}
-            >
+        <div className="mt-2 flex justify-center px-4">
+          <div className="w-full max-w-[200px] sm:max-w-md">
+            <div className="relative h-1.5 sm:h-2 rounded-full bg-white/10 overflow-hidden">
               <div
-                className="absolute inset-y-0 left-0 rounded-full bg-[#D4AF37]/30 transition-all"
-                style={{ width: `${progress}%` }}
-              />
-              <div
-                ref={thumbRef}
-                className={`
-                  absolute top-1/2 -translate-y-1/2 h-5 w-10 sm:h-6 sm:w-12 
-                  rounded-full bg-[#D4AF37] shadow-md cursor-grab active:cursor-grabbing
-                  transition-all duration-150
-                `}
-                style={{ left: `calc(${progress}% - 20px)` }}
-                aria-label="Drag to scroll"
+                className="absolute inset-y-0 left-0 rounded-full bg-[#D4AF37] transition-all duration-150 ease-out"
+                style={{ 
+                  width: '30%', 
+                  transform: `translateX(${(progress * (100 - 30)) / 30}%)` 
+                }}
               />
             </div>
           </div>
@@ -236,6 +231,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 }
 
 export default function NarratedWorks() {
+  // Data arrays remain the same...
   const completed: Book[] = [
     {
       title: "The Final Guardian",
@@ -311,18 +307,19 @@ export default function NarratedWorks() {
   ];
 
   return (
-    <main className="min-h-screen bg-[#050814] text-white">
+    <main className="min-h-screen bg-[#050814] text-white overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-6 py-16 md:py-20">
-        <h1 className="text-4xl md:text-5xl font-bold text-center mb-4">
-          Narrated Works
-        </h1>
-        <p className="text-center text-white/70 text-lg mb-16 max-w-3xl mx-auto">
-          A showcase of audiobook projects I&apos;ve completed and those I&apos;m
-          currently narrating.
-        </p>
+        <header className="mb-16">
+          <h1 className="text-4xl md:text-5xl font-bold text-center mb-4">
+            Narrated Works
+          </h1>
+          <p className="text-center text-white/70 text-lg max-w-3xl mx-auto">
+            A showcase of audiobook projects I&apos;ve completed and those I&apos;m currently narrating.
+          </p>
+        </header>
 
-        <section className="mb-20">
-          <h2 className="text-3xl font-bold mb-8 text-center">
+        <section className="mb-24">
+          <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center text-white/90">
             Completed Projects
           </h2>
           <HorizontalScroller ariaLabel="Completed projects carousel">
@@ -332,8 +329,8 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        <section className="mb-20">
-          <h2 className="text-3xl font-bold mb-8 text-center">
+        <section className="mb-24">
+          <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center text-white/90">
             Currently Narrating
           </h2>
           <HorizontalScroller ariaLabel="Currently narrating carousel">
@@ -342,7 +339,7 @@ export default function NarratedWorks() {
                 key={index}
                 book={book}
                 statusBadge={
-                  <span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded font-medium">
+                  <span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded font-bold uppercase tracking-wider text-[10px]">
                     In Progress
                   </span>
                 }
@@ -351,15 +348,15 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        <section className="mb-20">
-          <h2 className="text-3xl font-bold mb-8 text-center">Coming Soon</h2>
+        <section className="mb-24">
+          <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center text-white/90">Coming Soon</h2>
           <HorizontalScroller ariaLabel="Coming soon carousel">
             {comingSoon.map((book, index) => (
               <BookCard
                 key={index}
                 book={book}
                 statusBadge={
-                  <span className="bg-white/15 text-white px-2 py-0.5 rounded border border-white/10">
+                  <span className="bg-white/10 text-white/80 px-2 py-0.5 rounded border border-white/10 uppercase tracking-wider text-[10px]">
                     Coming Soon
                   </span>
                 }
@@ -368,17 +365,17 @@ export default function NarratedWorks() {
           </HorizontalScroller>
         </section>
 
-        <div className="mt-16 text-center">
-          <p className="text-white/70 mb-6 text-lg">
+        <footer className="mt-20 text-center">
+          <p className="text-white/60 mb-8 text-lg">
             Ready to bring your story to life?
           </p>
           <Link
             href="/#contact"
-            className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-8 py-4 font-semibold hover:bg-[#E0C15A] transition text-lg shadow-lg hover:shadow-2xl"
+            className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-10 py-4 font-bold hover:bg-[#E0C15A] transition-all transform hover:scale-105 shadow-[0_0_20px_rgba(212,175,55,0.2)]"
           >
             Contact Me
           </Link>
-        </div>
+        </footer>
       </div>
     </main>
   );
