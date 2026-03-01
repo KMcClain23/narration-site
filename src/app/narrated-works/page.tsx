@@ -137,8 +137,9 @@ export default function NarratedWorks() {
     ariaLabel: string;
   }) {
     const scrollerRef = useRef<HTMLDivElement | null>(null);
+    const barRef = useRef<HTMLDivElement | null>(null);
 
-    // Drag state must be ref-based so pointermove works immediately
+    // drag state for the cards row
     const draggingRef = useRef(false);
     const dragState = useRef({
       startX: 0,
@@ -147,18 +148,41 @@ export default function NarratedWorks() {
       pointerId: -1,
     });
 
+    // drag state for the scrubber bar
+    const scrubbingRef = useRef(false);
+    const scrubState = useRef({
+      pointerId: -1,
+    });
+
     const [cursorDragging, setCursorDragging] = useState(false);
     const [progressPct, setProgressPct] = useState(0);
+
+    const updateProgress = () => {
+      const el = scrollerRef.current;
+      if (!el) return;
+
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      const pct = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
+      setProgressPct(Math.min(100, Math.max(0, pct)));
+    };
+
+    const setScrollFromBarClientX = (clientX: number) => {
+      const el = scrollerRef.current;
+      const bar = barRef.current;
+      if (!el || !bar) return;
+
+      const rect = bar.getBoundingClientRect();
+      const x = Math.min(Math.max(0, clientX - rect.left), rect.width);
+      const ratio = rect.width > 0 ? x / rect.width : 0;
+
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      el.scrollLeft = ratio * maxScroll;
+      updateProgress();
+    };
 
     useEffect(() => {
       const el = scrollerRef.current;
       if (!el) return;
-
-      const updateProgress = () => {
-        const maxScroll = el.scrollWidth - el.clientWidth;
-        const pct = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
-        setProgressPct(Math.min(100, Math.max(0, pct)));
-      };
 
       updateProgress();
       el.addEventListener("scroll", updateProgress, { passive: true });
@@ -194,7 +218,6 @@ export default function NarratedWorks() {
 
         const dx = e.clientX - dragState.current.startX;
 
-        // Threshold so a normal click still opens the link
         if (Math.abs(dx) > 6) dragState.current.moved = true;
 
         el.scrollLeft = dragState.current.startScrollLeft - dx;
@@ -208,7 +231,6 @@ export default function NarratedWorks() {
         dragState.current.pointerId = -1;
       };
 
-      // Block accidental link opens after dragging
       const onClickCapture = (e: MouseEvent) => {
         if (dragState.current.moved) {
           e.preventDefault();
@@ -232,6 +254,47 @@ export default function NarratedWorks() {
       };
     }, []);
 
+    useEffect(() => {
+      const bar = barRef.current;
+      if (!bar) return;
+
+      const onPointerDown = (e: PointerEvent) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+
+        scrubbingRef.current = true;
+        scrubState.current.pointerId = e.pointerId;
+
+        bar.setPointerCapture(e.pointerId);
+        setScrollFromBarClientX(e.clientX);
+      };
+
+      const onPointerMove = (e: PointerEvent) => {
+        if (!scrubbingRef.current) return;
+        if (scrubState.current.pointerId !== e.pointerId) return;
+
+        setScrollFromBarClientX(e.clientX);
+      };
+
+      const endScrub = (e: PointerEvent) => {
+        if (scrubState.current.pointerId !== e.pointerId) return;
+
+        scrubbingRef.current = false;
+        scrubState.current.pointerId = -1;
+      };
+
+      bar.addEventListener("pointerdown", onPointerDown);
+      bar.addEventListener("pointermove", onPointerMove);
+      bar.addEventListener("pointerup", endScrub);
+      bar.addEventListener("pointercancel", endScrub);
+
+      return () => {
+        bar.removeEventListener("pointerdown", onPointerDown);
+        bar.removeEventListener("pointermove", onPointerMove);
+        bar.removeEventListener("pointerup", endScrub);
+        bar.removeEventListener("pointercancel", endScrub);
+      };
+    }, []);
+
     return (
       <div className="relative">
         {/* Gradient Overlays */}
@@ -252,10 +315,23 @@ export default function NarratedWorks() {
           <div className="flex-shrink-0 w-4 sm:w-8" />
         </div>
 
-        {/* Custom scroll indicator: half width, centered, themed */}
-        <div className="mt-3 flex justify-center">
+        {/* Custom scroll indicator: thicker, rounded, draggable scrubber */}
+        <div className="mt-4 flex justify-center">
           <div className="w-1/2 max-w-sm">
-            <div className="h-1.5 rounded-full bg-white/10 border border-white/10 overflow-hidden">
+            <div
+              ref={barRef}
+              className={[
+                "h-2.5 rounded-full overflow-hidden",
+                "bg-white/10 border border-white/10",
+                "cursor-pointer",
+              ].join(" ")}
+              role="slider"
+              aria-label={`${ariaLabel} scroll position`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(progressPct)}
+              tabIndex={0}
+            >
               <div
                 className="h-full rounded-full bg-[#D4AF37] transition-[width] duration-150"
                 style={{ width: `${progressPct}%` }}
