@@ -144,8 +144,8 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   }, [checkOverflow, updateProgress]);
 
   const onPointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
-    // Completely bypass JS for touch scrolling on the container
-    if (e.pointerType === 'touch' && target === 'container') return;
+    // Completely bypass JS for touch scrolling to let mobile native take over
+    if (e.pointerType === 'touch') return;
 
     const el = scrollerRef.current;
     if (!el) return;
@@ -185,8 +185,8 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   };
 
   return (
-    <div className="relative group/scroller">
-      {/* Side Gradients: Narrower on mobile (w-4) */}
+    <div className="relative group/scroller overflow-hidden">
+      {/* Side Gradients: narrow and pointer-events-none to prevent interception */}
       <div className="absolute left-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
@@ -205,7 +205,8 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
         style={{ 
           touchAction: "pan-y", 
           WebkitOverflowScrolling: "touch",
-          scrollbarWidth: 'none'
+          scrollbarWidth: 'none',
+          overscrollBehaviorX: 'contain'
         }}
         aria-label={ariaLabel}
       >
