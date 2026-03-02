@@ -63,12 +63,12 @@ function BookCard({ book, statusBadge }: BookCardProps) {
           sizes="(max-width: 640px) 75vw, 288px"
         />
         
-        {/* Tags Overlay */}
-        <div className="absolute bottom-2 left-2 flex flex-wrap gap-1 z-20 max-w-[90%]">
+        {/* Tags Overlay: Limited to bottom row */}
+        <div className="absolute bottom-2 left-0 right-0 px-2 flex flex-nowrap gap-1 z-20 overflow-hidden h-6 items-center">
           {book.tags.map((tag) => (
             <span 
               key={tag} 
-              className="bg-black/80 backdrop-blur-sm text-[#D4AF37] text-[9px] font-bold px-2 py-0.5 rounded border border-[#D4AF37]/40 uppercase tracking-tight shadow-sm"
+              className="bg-black/80 backdrop-blur-sm text-[#D4AF37] text-[9px] font-bold px-2 py-0.5 rounded border border-[#D4AF37]/40 uppercase tracking-tight shadow-sm whitespace-nowrap flex-shrink-0"
             >
               {tag}
             </span>
@@ -122,12 +122,11 @@ interface HorizontalScrollerProps {
 // --- Horizontal Scroller Component ---
 function HorizontalScroller({ children, ariaLabel, showHint = false }: HorizontalScrollerProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const [showBar, setShowBar] = useState(false);
   const [hintVisible, setHintVisible] = useState(showHint);
 
-  const isDown = useRef(false);
+  const isDragging = useRef(false);
   const startX = useRef(0);
   const scrollLeftStart = useRef(0);
 
@@ -158,28 +157,28 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
     };
   }, [updateProgress]);
 
-  const onPointerDown = (e: React.PointerEvent) => {
+  const handlePointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'touch') return;
     const el = scrollerRef.current;
     if (!el) return;
-    isDown.current = true;
+    isDragging.current = true;
     startX.current = e.pageX;
     scrollLeftStart.current = el.scrollLeft;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    el.setPointerCapture(e.pointerId);
     el.style.scrollSnapType = "none";
     el.style.scrollBehavior = "auto";
   };
 
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!isDown.current || !scrollerRef.current || e.pointerType === 'touch') return;
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging.current || !scrollerRef.current) return;
     const el = scrollerRef.current;
     const delta = e.pageX - startX.current;
+    // Standard grab-to-scroll calculation
     el.scrollLeft = scrollLeftStart.current - delta;
   };
 
-  const onPointerUp = (e: React.PointerEvent) => {
-    if (e.pointerType === 'touch') return;
-    isDown.current = false;
+  const handlePointerUp = () => {
+    isDragging.current = false;
     if (scrollerRef.current) {
       scrollerRef.current.style.scrollSnapType = "x mandatory";
       scrollerRef.current.style.scrollBehavior = "smooth";
@@ -194,17 +193,17 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
 
       <div
         ref={scrollerRef}
-        onPointerDown={(e) => onPointerDown(e)}
-        onPointerMove={(e) => onPointerMove(e)}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         style={{ 
-          touchAction: "auto", 
+          touchAction: "pan-y", // Standard touch behavior
           WebkitOverflowScrolling: "touch",
           scrollbarWidth: 'none'
         }}
         aria-label={ariaLabel}
-        className="flex overflow-x-auto pb-10 snap-x snap-mandatory scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20 hide-scrollbar select-none"
+        className="flex overflow-x-auto pb-10 snap-x snap-mandatory scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20 hide-scrollbar select-none cursor-grab active:cursor-grabbing"
       >
         {children}
         <div className="flex-shrink-0 w-10 sm:w-20" />
@@ -212,17 +211,14 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
 
       {showBar && (
         <div className="hidden sm:flex mt-6 justify-center px-4">
-          <div className="w-full max-w-md">
-            <div ref={trackRef} className="relative h-2 rounded-full bg-white/5 select-none">
-              <div
-                onPointerDown={(e) => { e.stopPropagation(); onPointerDown(e); }}
-                onPointerMove={(e) => onPointerMove(e)}
-                onPointerUp={onPointerUp}
-                onPointerCancel={onPointerUp}
-                className="absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
-                style={{ left: `${progress}%`, transform: `translate(-${progress}%, -50%)` }}
-              />
-            </div>
+          <div className="w-full max-w-md relative h-2 rounded-full bg-white/5 overflow-hidden">
+            <div
+              className="absolute top-0 bottom-0 w-16 rounded-full bg-[#D4AF37] transition-all duration-75"
+              style={{ 
+                left: `${progress}%`, 
+                transform: `translateX(-${progress}%)` // Bar moves with scroll progress
+              }}
+            />
           </div>
         </div>
       )}
