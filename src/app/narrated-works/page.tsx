@@ -51,13 +51,22 @@ function BookCard({ book, statusBadge }: BookCardProps) {
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 640px) 75vw, 288px"
         />
-        {/* Fixed Tag Row: Single line, no wrap, no overflow */}
-        <div className="absolute bottom-2 left-0 right-0 px-2 flex flex-nowrap gap-1 z-20 overflow-hidden h-6 items-center">
-          {book.tags.map((tag) => (
-            <span key={tag} className="bg-black/80 backdrop-blur-sm text-[#D4AF37] text-[9px] font-bold px-2 py-0.5 rounded border border-[#D4AF37]/40 uppercase tracking-tight shadow-sm whitespace-nowrap flex-shrink-0">
-              {tag}
-            </span>
-          ))}
+        
+        {/* --- STRICTLY CONSTRAINED TAG ROW --- */}
+        <div 
+          className="absolute bottom-2 left-0 right-0 px-2 z-20 overflow-hidden" 
+          style={{ height: '24px' }} // Strict fixed height
+        >
+          <div className="flex flex-nowrap gap-1 items-center w-full h-full">
+            {book.tags.map((tag) => (
+              <span 
+                key={tag} 
+                className="bg-black/80 backdrop-blur-sm text-[#D4AF37] text-[9px] font-bold px-2 py-0.5 rounded border border-[#D4AF37]/40 uppercase tracking-tight shadow-sm whitespace-nowrap flex-shrink-0"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -122,7 +131,7 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     if (!isDown.current || !scrollerRef.current) return;
     const el = scrollerRef.current;
     const delta = e.pageX - startX.current;
-    // Standard grab-to-scroll calculation
+    // Standard grab-to-scroll: content moves with the mouse direction
     el.scrollLeft = scrollLeftStart.current - delta;
   };
 
@@ -154,6 +163,7 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
 
       {showBar && (
         <div className="hidden sm:flex mt-6 justify-center px-4">
+          {/* Scroll Track: restored trackRef and capture logic to fix "can't grab bar" */}
           <div className="w-full max-w-md relative h-2 rounded-full bg-white/5 select-none" ref={trackRef}>
             <div
               onPointerDown={(e) => { e.stopPropagation(); onPointerDown(e); }}
@@ -161,7 +171,11 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
               onPointerUp={onPointerUp}
               onPointerCancel={onPointerUp}
               className="absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
-              style={{ left: `${progress}%`, transform: `translate(-${progress}%, -50%)`, touchAction: "none" }}
+              style={{ 
+                left: `${progress}%`, 
+                transform: `translate(-${progress}%, -50%)`, 
+                touchAction: "none" // Ensures browser standard touch behavior
+              }}
             />
           </div>
         </div>
@@ -170,6 +184,7 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
   );
 }
 
+// --- MAIN PAGE COMPONENT ---
 export default function NarratedWorks() {
   const [searchQuery, setSearchQuery] = useState("");
 
