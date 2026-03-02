@@ -19,9 +19,11 @@ interface BookCardProps {
   statusBadge?: React.ReactNode;
 }
 
+// --- Book Card Component ---
 function BookCard({ book, statusBadge }: BookCardProps) {
   return (
     <div className="group relative rounded-xl overflow-hidden shadow-lg transition-all duration-300 hover:-translate-y-2 border border-[#1A2550] bg-[#0B1224] flex-shrink-0 w-[75vw] sm:w-64 md:w-72 snap-start select-none">
+      {/* Amazon Link Button with Tooltip */}
       <div className="absolute top-3 left-3 z-30 group/btn">
         <a
           href={book.link}
@@ -29,7 +31,11 @@ function BookCard({ book, statusBadge }: BookCardProps) {
           rel="noopener noreferrer"
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
-          className="block bg-[#D4AF37] hover:bg-[#E0C15A] text-black p-2 rounded-full shadow-lg transition-transform active:scale-90 hover:scale-110 cursor-pointer"
+          className="
+            block bg-[#D4AF37] hover:bg-[#E0C15A] text-black 
+            p-2 rounded-full shadow-lg transition-transform 
+            active:scale-90 hover:scale-110 cursor-pointer
+          "
           style={{ touchAction: "manipulation" }}
           aria-label={`View ${book.title} on Amazon`}
         >
@@ -39,11 +45,14 @@ function BookCard({ book, statusBadge }: BookCardProps) {
             <line x1="10" y1="14" x2="21" y2="3" />
           </svg>
         </a>
+        
+        {/* Desktop Tooltip */}
         <div className="hidden md:block absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-black/90 border border-[#D4AF37]/50 text-[#D4AF37] text-[10px] font-bold uppercase tracking-wider rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-xl">
           View on Amazon
         </div>
       </div>
 
+      {/* Book Cover Container */}
       <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
         <Image
           src={book.cover}
@@ -53,9 +62,14 @@ function BookCard({ book, statusBadge }: BookCardProps) {
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 640px) 75vw, 288px"
         />
+        
+        {/* Tags Overlay */}
         <div className="absolute bottom-2 left-2 flex flex-wrap gap-1 z-20 max-w-[90%]">
           {book.tags.map((tag) => (
-            <span key={tag} className="bg-black/80 backdrop-blur-sm text-[#D4AF37] text-[9px] font-bold px-2 py-0.5 rounded border border-[#D4AF37]/40 uppercase tracking-tight shadow-sm">
+            <span 
+              key={tag} 
+              className="bg-black/80 backdrop-blur-sm text-[#D4AF37] text-[9px] font-bold px-2 py-0.5 rounded border border-[#D4AF37]/40 uppercase tracking-tight shadow-sm"
+            >
               {tag}
             </span>
           ))}
@@ -75,7 +89,9 @@ function BookCard({ book, statusBadge }: BookCardProps) {
       )}
 
       <div className="p-4 text-center pointer-events-none">
-        <h3 className="font-semibold text-base leading-tight text-white group-hover:text-[#D4AF37] transition-colors line-clamp-1">{book.title}</h3>
+        <h3 className="font-semibold text-base leading-tight text-white group-hover:text-[#D4AF37] transition-colors line-clamp-1">
+          {book.title}
+        </h3>
         {book.subtitle && <p className="text-xs text-white/75 mt-0.5 line-clamp-1">{book.subtitle}</p>}
         <p className="text-sm mt-2 text-[#D4AF37] font-medium">{book.author}</p>
       </div>
@@ -83,6 +99,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
   );
 }
 
+// --- Swipe Hint Component ---
 function SwipeHint() {
   return (
     <div className="sm:hidden absolute right-6 top-1/2 -translate-y-1/2 z-40 pointer-events-none">
@@ -102,13 +119,15 @@ interface HorizontalScrollerProps {
   showHint?: boolean;
 }
 
+// --- Horizontal Scroller Component ---
 function HorizontalScroller({ children, ariaLabel, showHint = false }: HorizontalScrollerProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const [showBar, setShowBar] = useState(false);
   const [hintVisible, setHintVisible] = useState(showHint);
 
-  const isDragging = useRef(false);
+  const isDown = useRef(false);
   const startX = useRef(0);
   const scrollLeftStart = useRef(0);
 
@@ -116,8 +135,12 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
     const el = scrollerRef.current;
     if (!el) return;
     const max = el.scrollWidth - el.clientWidth;
-    setProgress(max > 0 ? (el.scrollLeft / max) * 100 : 0);
-    if (el.scrollLeft > 10 && hintVisible) setHintVisible(false);
+    const currentScroll = el.scrollLeft;
+    setProgress(max > 0 ? (currentScroll / max) * 100 : 0);
+    
+    if (currentScroll > 10 && hintVisible) {
+      setHintVisible(false);
+    }
   }, [hintVisible]);
 
   useEffect(() => {
@@ -135,28 +158,28 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
     };
   }, [updateProgress]);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+  const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'touch') return;
     const el = scrollerRef.current;
     if (!el) return;
-    isDragging.current = true;
+    isDown.current = true;
     startX.current = e.pageX;
     scrollLeftStart.current = el.scrollLeft;
-    el.setPointerCapture(e.pointerId);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     el.style.scrollSnapType = "none";
     el.style.scrollBehavior = "auto";
   };
 
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging.current || !scrollerRef.current) return;
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!isDown.current || !scrollerRef.current || e.pointerType === 'touch') return;
     const el = scrollerRef.current;
     const delta = e.pageX - startX.current;
-    // content moves with mouse standard drag
     el.scrollLeft = scrollLeftStart.current - delta;
   };
 
-  const handlePointerUp = () => {
-    isDragging.current = false;
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    isDown.current = false;
     if (scrollerRef.current) {
       scrollerRef.current.style.scrollSnapType = "x mandatory";
       scrollerRef.current.style.scrollBehavior = "smooth";
@@ -171,13 +194,17 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
 
       <div
         ref={scrollerRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        style={{ touchAction: "pan-y", scrollbarWidth: 'none' }}
+        onPointerDown={(e) => onPointerDown(e)}
+        onPointerMove={(e) => onPointerMove(e)}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{ 
+          touchAction: "auto", 
+          WebkitOverflowScrolling: "touch",
+          scrollbarWidth: 'none'
+        }}
         aria-label={ariaLabel}
-        className="flex overflow-x-auto pb-10 snap-x snap-mandatory scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20 hide-scrollbar select-none cursor-grab active:cursor-grabbing"
+        className="flex overflow-x-auto pb-10 snap-x snap-mandatory scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20 hide-scrollbar select-none"
       >
         {children}
         <div className="flex-shrink-0 w-10 sm:w-20" />
@@ -185,11 +212,17 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
 
       {showBar && (
         <div className="hidden sm:flex mt-6 justify-center px-4">
-          <div className="w-full max-w-md relative h-2 rounded-full bg-white/5 overflow-hidden">
-            <div
-              className="absolute top-0 bottom-0 w-16 rounded-full bg-[#D4AF37] transition-all duration-75"
-              style={{ left: `${progress}%`, transform: `translateX(-${progress}%)` }}
-            />
+          <div className="w-full max-w-md">
+            <div ref={trackRef} className="relative h-2 rounded-full bg-white/5 select-none">
+              <div
+                onPointerDown={(e) => { e.stopPropagation(); onPointerDown(e); }}
+                onPointerMove={(e) => onPointerMove(e)}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
+                className="absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
+                style={{ left: `${progress}%`, transform: `translate(-${progress}%, -50%)` }}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -199,7 +232,9 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
           0%, 100% { transform: translateX(0); opacity: 0.8; }
           50% { transform: translateX(-15px); opacity: 1; }
         }
-        .animate-swipe-hint { animation: swipe-hint 1.5s ease-in-out infinite; }
+        .animate-swipe-hint {
+          animation: swipe-hint 1.5s ease-in-out infinite;
+        }
       `}</style>
     </div>
   );
@@ -232,26 +267,32 @@ export default function NarratedWorks() {
           <h1 className="text-4xl md:text-6xl font-bold mb-4">Narrated Works</h1>
           <p className="text-white/60 text-lg">Portfolio of narrated audiobooks.</p>
         </header>
+
         <section className="mb-20">
           <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">Completed Projects</h2>
           <HorizontalScroller ariaLabel="Completed projects" showHint={true}>
             {completed.map((book) => <BookCard key={book.link} book={book} />)}
           </HorizontalScroller>
         </section>
+
         <section className="mb-20">
           <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">Currently Narrating</h2>
           <HorizontalScroller ariaLabel="Currently narrating">
             {inProgress.map((book) => <BookCard key={book.link} book={book} statusBadge="In Progress" />)}
           </HorizontalScroller>
         </section>
+
         <section className="mb-20">
           <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">Coming Soon</h2>
           <HorizontalScroller ariaLabel="Coming soon">
             {comingSoon.map((book) => <BookCard key={book.link} book={book} statusBadge="Soon" />)}
           </HorizontalScroller>
         </section>
+
         <footer className="mt-24 text-center">
-          <Link href="/#contact" className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-10 py-4 font-bold hover:scale-105 transition-all">Contact Me</Link>
+          <Link href="/#contact" className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-10 py-4 font-bold hover:scale-105 transition-all">
+            Contact Me
+          </Link>
         </footer>
       </div>
     </main>
