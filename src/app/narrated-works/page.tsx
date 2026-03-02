@@ -174,7 +174,7 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
     if (!isDown.current || !scrollerRef.current || e.pointerType === 'touch') return;
     const el = scrollerRef.current;
     const delta = e.pageX - startX.current;
-    // CHANGED: Use addition (+) instead of subtraction (-) to sync mouse direction with scroll movement
+    // FIX: Subtracting delta moves content with the mouse naturally
     el.scrollLeft = scrollLeftStart.current - delta;
   };
 
@@ -200,7 +200,7 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         style={{ 
-          touchAction: "auto", 
+          touchAction: "pan-y", // Ensures vertical page scrolling works
           WebkitOverflowScrolling: "touch",
           scrollbarWidth: 'none'
         }}
@@ -216,12 +216,12 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
           <div className="w-full max-w-md">
             <div ref={trackRef} className="relative h-2 rounded-full bg-white/5 select-none">
               <div
-                onPointerDown={(e) => { e.stopPropagation(); onPointerDown(e); }}
-                onPointerMove={(e) => onPointerMove(e)}
-                onPointerUp={onPointerUp}
-                onPointerCancel={onPointerUp}
                 className="absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
-                style={{ left: `${progress}%`, transform: `translate(-${progress}%, -50%)` }}
+                style={{ 
+                   left: `${progress}%`, 
+                   transform: `translate(-${progress}%, -50%)`,
+                   transition: isDown.current ? 'none' : 'left 0.2s ease-out' 
+                }}
               />
             </div>
           </div>
