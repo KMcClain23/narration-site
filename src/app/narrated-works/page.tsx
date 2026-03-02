@@ -22,12 +22,7 @@ interface BookCardProps {
 function BookCard({ book, statusBadge }: BookCardProps) {
   return (
     <div
-      className="
-        group relative rounded-xl overflow-hidden shadow-lg 
-        transition-all duration-300 hover:-translate-y-2 
-        border border-[#1A2550] bg-[#0B1224] flex-shrink-0 
-        w-[75vw] sm:w-64 md:w-72 snap-start select-none
-      "
+      className="group relative rounded-xl overflow-hidden shadow-lg transition-all duration-300 hover:-translate-y-2 border border-[#1A2550] bg-[#0B1224] flex-shrink-0 w-[75vw] sm:w-64 md:w-72 snap-start select-none"
     >
       {/* Clickable Amazon Link Button */}
       <a
@@ -36,12 +31,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         rel="noopener noreferrer"
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
-        className="
-          absolute top-3 left-3 z-30
-          bg-[#D4AF37] hover:bg-[#E0C15A] text-black 
-          p-2 rounded-full shadow-lg transition-transform 
-          active:scale-90 hover:scale-110 cursor-pointer
-        "
+        className="absolute top-3 left-3 z-30 bg-[#D4AF37] hover:bg-[#E0C15A] text-black p-2 rounded-full shadow-lg transition-transform active:scale-90 hover:scale-110 cursor-pointer"
         style={{ touchAction: "manipulation" }}
         aria-label={`View ${book.title} on Amazon`}
       >
@@ -137,10 +127,8 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
     if (!el) return;
     const max = el.scrollWidth - el.clientWidth;
     const currentScroll = el.scrollLeft;
-    
     setProgress(max > 0 ? (currentScroll / max) * 100 : 0);
     
-    // Hide hint once user scrolls
     if (currentScroll > 10 && hintVisible) {
       setHintVisible(false);
     }
@@ -162,15 +150,12 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
   }, [updateProgress]);
 
   const onPointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
-    if (e.pointerType === 'touch' && target === 'container') return;
-
+    if (e.pointerType === 'touch') return;
     const el = scrollerRef.current;
     if (!el) return;
-
     isDown.current = true;
     startX.current = e.pageX;
     scrollLeftStart.current = el.scrollLeft;
-
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     el.style.scrollSnapType = "none";
     el.style.scrollBehavior = "auto";
@@ -178,10 +163,8 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
 
   const onPointerMove = (e: React.PointerEvent, target: 'container' | 'thumb') => {
     if (!isDown.current || !scrollerRef.current || e.pointerType === 'touch') return;
-    
     const el = scrollerRef.current;
     const delta = e.pageX - startX.current;
-
     if (target === 'container') {
       el.scrollLeft = scrollLeftStart.current - delta;
     } else {
@@ -204,7 +187,6 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
   return (
     <div className="relative group/scroller">
       {hintVisible && <SwipeHint />}
-      
       <div className="absolute left-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
@@ -214,18 +196,13 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
         onPointerMove={(e) => onPointerMove(e, 'container')}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className="
-          flex overflow-x-auto pb-10 
-          snap-x snap-mandatory 
-          scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20
-          hide-scrollbar select-none
-        "
         style={{ 
-          touchAction: "pan-x pan-y", // Allow native horizontal scrolling
+          touchAction: "pan-x", 
           WebkitOverflowScrolling: "touch",
           scrollbarWidth: 'none'
         }}
         aria-label={ariaLabel}
+        className="flex overflow-x-auto pb-10 snap-x snap-mandatory scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20 hide-scrollbar select-none"
       >
         {children}
         <div className="flex-shrink-0 w-10 sm:w-20" />
