@@ -2,29 +2,13 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useRef, useEffect, Suspense, useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRef, useEffect, useState, useTransition } from "react";
+import { sendEmail } from "@/app/actions/sendEmail";
 
 const BOOKINGS_URL =
   "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
 
-/**
- * Isolated component to handle the "sent" success message.
- * This prevents the entire page from failing the static build.
- */
-function SentMessage() {
-  const searchParams = useSearchParams();
-  const sent = searchParams.get("sent") === "1";
-
-  if (!sent) return null;
-
-  return (
-    <div className="mb-4 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-      Thanks, your inquiry was sent. I will reply soon.
-    </div>
-  );
-}
-
+// --- Utility: Format Seconds to M:SS ---
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
   const m = Math.floor(seconds / 60);
@@ -32,6 +16,7 @@ function formatTime(seconds: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// --- Component: Media Lightbox ---
 function MediaLightbox({
   isOpen,
   onClose,
@@ -76,6 +61,7 @@ function MediaLightbox({
   );
 }
 
+// --- Component: Proof Points ---
 function ProofPoints() {
   return (
     <>
@@ -108,6 +94,7 @@ function ProofPoints() {
   );
 }
 
+// --- Component: At A Glance Card ---
 function AtAGlanceCard({
   onOpenLightbox,
 }: {
@@ -145,7 +132,6 @@ function AtAGlanceCard({
 
         <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
           <p className="text-xs uppercase tracking-wide text-[#D4AF37]">Media kit</p>
-
           <p className="mt-2 text-sm text-white/70">Click to enlarge.</p>
 
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
@@ -189,6 +175,7 @@ function AtAGlanceCard({
   );
 }
 
+// --- Component: Demo Player ---
 function DemoPlayer({
   title,
   desc,
@@ -207,7 +194,6 @@ function DemoPlayer({
   audioRefs: React.MutableRefObject<(HTMLAudioElement | null)[]>;
 }) {
   const isActive = activeIndex === index;
-
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -218,21 +204,15 @@ function DemoPlayer({
     e.preventDefault();
     const a = audioRefs.current[index];
     if (!a) return;
-    if (a.paused) {
-      a.play().catch(() => {});
-    } else {
-      a.pause();
-    }
+    a.paused ? a.play().catch(() => {}) : a.pause();
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLButtonElement>) => {
     const a = audioRefs.current[index];
     if (!a || !duration) return;
-
     const rect = e.currentTarget.getBoundingClientRect();
     const x = Math.min(Math.max(0, e.clientX - rect.left), rect.width);
-    const pctLocal = x / rect.width;
-    a.currentTime = pctLocal * duration;
+    a.currentTime = (x / rect.width) * duration;
   };
 
   const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -248,19 +228,11 @@ function DemoPlayer({
 
     const onTimeUpdate = () => setCurrent(a.currentTime);
     const onDurationChange = () => setDuration(a.duration);
-    const onPlay = () => {
-      setPlaying(true);
-      setBuffering(false);
-      setActiveIndex(index);
-    };
+    const onPlay = () => { setPlaying(true); setBuffering(false); setActiveIndex(index); };
     const onPause = () => setPlaying(false);
     const onWaiting = () => setBuffering(true);
     const onPlaying = () => setBuffering(false);
-    const onEnded = () => {
-      setPlaying(false);
-      setCurrent(0);
-      setActiveIndex(null);
-    };
+    const onEnded = () => { setPlaying(false); setCurrent(0); setActiveIndex(null); };
 
     a.addEventListener("timeupdate", onTimeUpdate);
     a.addEventListener("durationchange", onDurationChange);
@@ -290,16 +262,8 @@ function DemoPlayer({
           <p className="font-semibold text-lg text-white leading-tight">{title}</p>
           <p className="mt-1 text-sm text-white/70">{desc}</p>
         </div>
-
         <div className="shrink-0 pt-1">
-          <span
-            className={[
-              "rounded-full border px-3 py-1 text-[10px] uppercase tracking-wider font-bold transition-colors duration-300",
-              isActive
-                ? "border-[#D4AF37]/40 bg-[#D4AF37]/10 text-[#F5DE85]"
-                : "border-white/10 bg-white/5 text-white/40",
-            ].join(" ")}
-          >
+          <span className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-wider font-bold transition-colors duration-300 ${isActive ? "border-[#D4AF37]/40 bg-[#D4AF37]/10 text-[#F5DE85]" : "border-white/10 bg-white/5 text-white/40"}`}>
             {isActive ? "Now playing" : "Demo"}
           </span>
         </div>
@@ -309,37 +273,21 @@ function DemoPlayer({
         <div className="rounded-xl border border-[#1A2550] bg-[#050814] p-4">
           <div className="flex items-center gap-4">
             <button
-              type="button"
               onClick={toggle}
-              className={[
-                "relative h-14 w-14 shrink-0 rounded-full flex items-center justify-center transition active:scale-95",
-                "border-2 border-white/20 bg-white/5 text-white shadow-xl hover:border-[#D4AF37]/70",
-                !src ? "opacity-50 pointer-events-none" : "cursor-pointer",
-              ].join(" ")}
+              type="button"
+              className={`relative h-14 w-14 shrink-0 rounded-full flex items-center justify-center transition active:scale-95 border-2 border-white/20 bg-white/5 text-white shadow-xl hover:border-[#D4AF37]/70 ${!src ? "opacity-50 pointer-events-none" : "cursor-pointer"}`}
             >
               {buffering ? (
                 <div className="h-6 w-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
               ) : playing ? (
-                <svg className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5h3v14H8zM13 5h3v14h-3z" />
-                </svg>
+                <svg className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5h3v14H8zM13 5h3v14h-3z" /></svg>
               ) : (
-                <svg className="h-7 w-7 translate-x-0.5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5.14v13.72l11-6.86L8 5.14z" />
-                </svg>
+                <svg className="h-7 w-7 translate-x-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
               )}
             </button>
-
             <div className="flex-1 min-w-0">
-              <button
-                type="button"
-                onClick={handleSeek}
-                className="relative block w-full h-2 rounded-full overflow-hidden bg-white/10 cursor-pointer z-10"
-              >
-                <div
-                  className="absolute left-0 top-0 h-full bg-[#D4AF37]"
-                  style={{ width: `${pct}%` }}
-                />
+              <button type="button" onClick={handleSeek} className="relative block w-full h-2 rounded-full overflow-hidden bg-white/10 cursor-pointer z-10">
+                <div className="absolute left-0 top-0 h-full bg-[#D4AF37]" style={{ width: `${pct}%` }} />
               </button>
               <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-white/40 tracking-tighter">
                 <span>{formatTime(current)}</span>
@@ -349,55 +297,52 @@ function DemoPlayer({
           </div>
 
           <div className="mt-4 flex items-center gap-3 border-t border-white/5 pt-3">
-            <svg className="h-4 w-4 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-            </svg>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={volume}
-              onChange={handleVolume}
-              className="flex-1 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#D4AF37]"
-            />
+            <svg className="h-4 w-4 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+            <input type="range" min="0" max="1" step="0.01" value={volume} onChange={handleVolume} className="flex-1 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#D4AF37]" />
           </div>
-
-          <audio
-            ref={(el) => {
-              audioRefs.current[index] = el;
-            }}
-            src={src}
-            preload="metadata"
-          />
+          <audio ref={(el) => { audioRefs.current[index] = el; }} src={src} preload="metadata" />
         </div>
       </div>
     </div>
   );
 }
 
+// --- MAIN HOME CLIENT COMPONENT ---
 function HomeContent() {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
+  const formRef = useRef<HTMLFormElement>(null);
+  
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState("");
   const [lightboxTitle, setLightboxTitle] = useState("");
+
+  const [isPending, startTransition] = useTransition();
+  const [formStatus, setFormStatus] = useState<{ success?: boolean; message?: string } | null>(null);
 
   const openLightbox = (src: string, title: string) => {
     setLightboxSrc(src);
     setLightboxTitle(title);
     setLightboxOpen(true);
   };
-
   const closeLightbox = () => setLightboxOpen(false);
+
+  const handleNativeSubmit = async (formData: FormData) => {
+    setFormStatus(null);
+    startTransition(async () => {
+      const result = await sendEmail(formData);
+      if (result.success) {
+        setFormStatus({ success: true, message: "Thanks! Inquiry sent and confirmation email dispatched. Talk soon!" });
+        formRef.current?.reset();
+      } else {
+        setFormStatus({ success: false, message: result.error || "Please check the form and try again." });
+      }
+    });
+  };
 
   useEffect(() => {
     audioRefs.current.forEach((audio, i) => {
-      if (!audio) return;
-      if (activeIndex === null) return;
-      if (i !== activeIndex) {
+      if (audio && activeIndex !== null && i !== activeIndex) {
         audio.pause();
         audio.currentTime = 0;
       }
@@ -405,120 +350,47 @@ function HomeContent() {
   }, [activeIndex]);
 
   const demos = [
-    {
-      title: "LGBTQ+ Romance",
-      desc: "Bright pacing, playful emotional tone",
-      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20LGBTQ%2B%20Romance%20-%20Male%20(BrightPlayful)%2C%20Confident%2C%20Sex-PositiveFlirtatious.mp3",
-    },
-    {
-      title: "Romantasy",
-      desc: "Atmospheric delivery, grounded fantasy emotion",
-      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Romantasy%20-%20Male%20(PossessiveHaunted)%2C%20Harsh%20Control%20to%20Remorse%2C%20Deep%20Loss.mp3",
-    },
-    {
-      title: "Femminine Voice",
-      desc: "Male & Female Dialogue",
-      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Female%20Voice%202.mp3",
-    },
-    {
-      title: "Romance Duet",
-      desc: "British accent, romantic restraint",
-      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/British%20-%20Romance%20Duet.mp3",
-    },
-    {
-      title: "Child POV Drama",
-      desc: "Raw emotion, age-appropriate delivery",
-      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Child%20(5-year-old%20boy)%2C%20Emotional%20TraumaWitness%20-%20Sample.mp3",
-    },
-    {
-      title: "Multi-Character Text Dialogue",
-      desc: "Clear character separation and vocal range",
-      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/4%20Characters.mp3",
-    },
+    { title: "LGBTQ+ Romance", desc: "Bright pacing, playful emotional tone", src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20LGBTQ%2B%20Romance%20-%20Male%20(BrightPlayful)%2C%20Confident%2C%20Sex-PositiveFlirtatious.mp3" },
+    { title: "Romantasy", desc: "Atmospheric delivery, grounded fantasy emotion", src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Romantasy%20-%20Male%20(PossessiveHaunted)%2C%20Harsh%20Control%20to%20Remorse%2C%20Deep%20Loss.mp3" },
+    { title: "Femminine Voice", desc: "Male & Female Dialogue", src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Female%20Voice%202.mp3" },
+    { title: "Romance Duet", desc: "British accent, romantic restraint", src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/British%20-%20Romance%20Duet.mp3" },
+    { title: "Child POV Drama", desc: "Raw emotion, age-appropriate delivery", src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Child%20(5-year-old%20boy)%2C%20Emotional%20TraumaWitness%20-%20Sample.mp3" },
+    { title: "Multi-Character Text Dialogue", desc: "Clear character separation and vocal range", src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/4%20Characters.mp3" },
   ];
 
   return (
     <main className="min-h-screen bg-[#050814] text-white">
       <div id="top" />
 
-      {/* HERO */}
+      {/* HERO SECTION */}
       <section className="relative overflow-hidden -mt-16 pt-16">
         <div className="absolute inset-0">
-          <Image
-            src="/dean-banner.png"
-            alt="Dean Miller Narrator banner"
-            fill
-            priority
-            className="object-cover opacity-35"
-          />
+          <Image src="/dean-banner.png" alt="Dean Miller Narrator banner" fill priority className="object-cover opacity-35" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050814]/85 via-[#050814]/75 to-[#050814]" />
         </div>
 
         <div className="relative max-w-6xl mx-auto px-5 sm:px-6 py-10 sm:py-14 md:py-20">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-10 items-start">
-            {/* LEFT HERO */}
             <div className="md:col-span-7">
-              <p className="text-xs tracking-[0.28em] text-white/70 uppercase">
-                Audiobook narrator for fiction and narrative nonfiction.
-              </p>
-
-              <h1 className="mt-3 sm:mt-4 text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.05]">
-                Dean Miller
-              </h1>
-
-              <p className="mt-4 text-base sm:text-lg md:text-xl text-white/85 max-w-2xl leading-relaxed">
-                Character-driven audiobook narration with clear emotional beats, clean
-                character separation, consistent audio, and fast, reliable communication.
-              </p>
+              <p className="text-xs tracking-[0.28em] text-white/70 uppercase">Audiobook narrator for fiction and narrative nonfiction.</p>
+              <h1 className="mt-3 sm:mt-4 text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.05]">Dean Miller</h1>
+              <p className="mt-4 text-base sm:text-lg md:text-xl text-white/85 max-w-2xl leading-relaxed">Character-driven audiobook narration with clear emotional beats, clean character separation, consistent audio, and fast, reliable communication.</p>
 
               <div className="mt-5 flex flex-wrap gap-2 max-w-2xl">
-                {[
-                  "24 to 48h reply",
-                  "Pickups within 24h",
-                  "ACX-ready delivery",
-                  "Broadcast-ready studio",
-                  "Romance, romantasy, drama, thriller",
-                ].map((item) => (
-                  <span
-                    key={item}
-                    className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 backdrop-blur-sm transition hover:border-[#D4AF37]/40 hover:bg-[#D4AF37]/10"
-                  >
-                    {item}
-                  </span>
+                {["24 to 48h reply", "Pickups within 24h", "ACX-ready delivery", "Broadcast-ready studio", "Romance, romantasy, drama, thriller"].map((item) => (
+                  <span key={item} className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 backdrop-blur-sm transition hover:border-[#D4AF37]/40 hover:bg-[#D4AF37]/10">{item}</span>
                 ))}
               </div>
 
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
-                <a
-                  href="/#demos"
-                  className="w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A]"
-                >
-                  Listen to demos
-                </a>
-
-                <a
-                  href={BOOKINGS_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold transition hover:border-white/60"
-                >
-                  Request availability
-                </a>
+                <a href="/#demos" className="w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A]">Listen to demos</a>
+                <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer" className="w-full inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold transition hover:border-white/60">Request availability</a>
               </div>
-
-              <div className="mt-4">
-                <Link
-                  href="/audiobook-narrator"
-                  className="text-sm text-[#D4AF37] hover:underline"
-                >
-                  Learn about services and rates
-                </Link>
-              </div>
-
+              
+              <div className="mt-4"><Link href="/audiobook-narrator" className="text-sm text-[#D4AF37] hover:underline">Learn about services and rates</Link></div>
               <ProofPoints />
             </div>
 
-            {/* RIGHT HERO CARD */}
             <div className="hidden md:block md:col-span-5">
               <AtAGlanceCard onOpenLightbox={openLightbox} />
             </div>
@@ -526,27 +398,15 @@ function HomeContent() {
         </div>
       </section>
 
-      {/* CONTENT */}
       <div className="max-w-6xl mx-auto px-5 sm:px-6 py-12 sm:py-14">
         {/* DEMOS */}
         <section id="demos" className="mt-2 scroll-mt-24">
           <h2 className="text-3xl font-bold">Featured demos</h2>
-          <p className="mt-2 text-white/70">
-            Short, targeted clips. Click play and you will know fast.
-          </p>
+          <p className="mt-2 text-white/70">Short, targeted clips. Click play and you will know fast.</p>
 
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {demos.map((demo, index) => (
-              <DemoPlayer
-                key={demo.title}
-                title={demo.title}
-                desc={demo.desc}
-                src={demo.src}
-                index={index}
-                activeIndex={activeIndex}
-                setActiveIndex={setActiveIndex}
-                audioRefs={audioRefs}
-              />
+              <DemoPlayer key={demo.title} title={demo.title} desc={demo.desc} src={demo.src} index={index} activeIndex={activeIndex} setActiveIndex={setActiveIndex} audioRefs={audioRefs} />
             ))}
           </div>
         </section>
@@ -556,128 +416,74 @@ function HomeContent() {
           <h2 className="text-3xl font-bold">About</h2>
           <div className="mt-6 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
             <div className="md:col-span-8">
-              <p className="text-white/80 leading-relaxed">
-                I’m Dean Miller, a professional audiobook narrator drawn to character-driven stories with emotional depth, quiet tension, and honest human connection. I aim for narration that feels natural and immersive, where listeners stop noticing the voice and simply live inside the story.
-              </p>
-
+              <p className="text-white/80 leading-relaxed">I’m Dean Miller, a professional audiobook narrator drawn to character-driven stories with emotional depth, quiet tension, and honest human connection. I aim for narration that feels natural and immersive, where listeners stop noticing the voice and simply live inside the story.</p>
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg">
                   <p className="font-semibold text-white">Genres</p>
-                  <p className="mt-1 text-sm text-white/70">
-                    Romance, romantasy, drama, thriller, narrative nonfiction
-                  </p>
+                  <p className="mt-1 text-sm text-white/70">Romance, romantasy, drama, thriller, narrative nonfiction</p>
                 </div>
-
                 <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg">
                   <p className="font-semibold text-white">Studio</p>
-                  <p className="mt-1 text-sm text-white/70">
-                    Shure MV7+, pop filter, treated space
-                  </p>
+                  <p className="mt-1 text-sm text-white/70">Shure MV7+, pop filter, treated space</p>
                 </div>
               </div>
             </div>
-
             <div className="md:col-span-4">
               <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg text-center">
                 <p className="text-sm text-white/70">Preferred contact</p>
-                <a
-                  className="mt-2 inline-block text-lg font-semibold text-[#D4AF37] hover:underline"
-                  href="mailto:Dean@DMNarration.com"
-                >
-                  Dean@DMNarration.com
-                </a>
+                <a className="mt-2 inline-block text-lg font-semibold text-[#D4AF37] hover:underline" href="mailto:Dean@DMNarration.com">Dean@DMNarration.com</a>
               </div>
             </div>
           </div>
         </section>
 
-        {/* CONTACT */}
+        {/* CONTACT SECTION */}
         <section id="contact" className="mt-20 scroll-mt-24">
           <h2 className="text-3xl font-bold">Contact</h2>
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <form
-              action="https://formspree.io/f/mdalkedn"
-              method="POST"
-              className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg"
-            >
-              <Suspense fallback={null}>
-                <SentMessage />
-              </Suspense>
-
-              <label className="block">
-                <span className="text-sm text-white/80">Name</span>
-                <input
-                  name="name"
-                  required
-                  className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70"
-                  placeholder="Your name"
-                />
-              </label>
-
-              <label className="block mt-4">
-                <span className="text-sm text-white/80">Email</span>
-                <input
-                  name="email"
-                  type="email"
-                  required
-                  className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70"
-                  placeholder="you@example.com"
-                />
-              </label>
-
-              <label className="block mt-4">
-                <span className="text-sm text-white/80">Project details</span>
-                <textarea
-                  name="message"
-                  required
-                  rows={6}
-                  className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70"
-                  placeholder="Genre, word count, deadline, etc."
-                />
-              </label>
-
-              <button
-                type="submit"
-                className="mt-5 w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A]"
-              >
-                Send inquiry
-              </button>
+            <form ref={formRef} action={handleNativeSubmit} className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
+              {formStatus && (
+                <div className={`mb-6 p-4 rounded-md text-sm border ${formStatus.success ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-100" : "bg-red-500/10 border-red-500/30 text-red-100"}`}>
+                  {formStatus.message}
+                </div>
+              )}
+              <input type="text" name="_hp_name" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" />
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="text-sm text-white/80 font-medium">Name</span>
+                  <input name="name" required disabled={isPending} className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70 disabled:opacity-50" placeholder="Your name" />
+                </label>
+                <label className="block">
+                  <span className="text-sm text-white/80 font-medium">Email</span>
+                  <input name="email" type="email" required disabled={isPending} className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70 disabled:opacity-50" placeholder="you@example.com" />
+                </label>
+                <label className="block">
+                  <span className="text-sm text-white/80 font-medium">Project details</span>
+                  <textarea name="message" required rows={6} disabled={isPending} className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70 disabled:opacity-50" placeholder="Genre, word count, deadline, accents, etc." />
+                </label>
+                <button type="submit" disabled={isPending} className="mt-5 w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A] active:scale-[0.98] disabled:opacity-50">
+                  {isPending ? "Sending..." : "Send inquiry"}
+                </button>
+              </div>
             </form>
 
-            <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
-              <p className="text-sm text-white/70">Direct email</p>
-              <a
-                className="mt-1 inline-block text-lg font-semibold text-[#D4AF37] hover:underline"
-                href="mailto:Dean@DMNarration.com"
-              >
-                Dean@DMNarration.com
-              </a>
-              <div className="mt-6 border-t border-[#1A2550] pt-5">
+            <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg flex flex-col justify-between">
+              <div>
+                <p className="text-sm text-white/70">Direct email</p>
+                <a className="mt-1 inline-block text-lg font-semibold text-[#D4AF37] hover:underline" href="mailto:Dean@DMNarration.com">Dean@DMNarration.com</a>
+              </div>
+              <div className="mt-8 pt-6 border-t border-white/5">
                 <p className="text-sm text-white/70">Prefer to schedule?</p>
-                <a
-                  href={BOOKINGS_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-2 text-sm font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
-                >
-                  Book a 15-minute call
-                </a>
+                <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-2 text-sm font-semibold text-white/90 hover:border-white/40 hover:text-white transition">Book a 15-minute call</a>
               </div>
             </div>
           </div>
         </section>
 
-        <footer className="mt-20 py-10 text-sm text-white/50 text-center">
-          © {new Date().getFullYear()} Dean Miller. All rights reserved.
-        </footer>
+        <footer className="mt-20 py-10 text-sm text-white/50 text-center">© {new Date().getFullYear()} Dean Miller. All rights reserved.</footer>
       </div>
 
-      <MediaLightbox
-        isOpen={lightboxOpen}
-        onClose={closeLightbox}
-        title={lightboxTitle}
-        src={lightboxSrc}
-      />
+      <MediaLightbox isOpen={lightboxOpen} onClose={closeLightbox} title={lightboxTitle} src={lightboxSrc} />
     </main>
   );
 }

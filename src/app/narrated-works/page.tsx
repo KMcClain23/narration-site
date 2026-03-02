@@ -245,7 +245,7 @@ export default function NarratedWorks() {
     { title: "The Final Guardian", author: "Alexander Kamenetsky", link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H", cover: "/covers/the-final-guardian.jpg", tags: ["Sci-Fi Mystery", "Psych Thriller", "AI Horror", "Dystopian"] },
     { title: "Santa Promised", author: "Laetitia Clark", link: "https://www.amazon.com/Santa-Promised-A-Christmas-Novella/dp/B0G6GLQGHK", cover: "/covers/santa-promised.jpg", tags: ["Duet", "Holiday Romance", "Age Gap", "Single Mom"] },
     { title: "The Circle", subtitle: "Rituals & Ruins", author: "Lillian Minx Monroe", link: "https://www.amazon.com/Audible-The-Circle-Rituals-Ruins/dp/B0GKQY7N27", cover: "/covers/the-circle-rituals-and-ruins.jpg", tags: ["Dark Romance", "Mystery", "Small Town", "Secrets"] },
-    { title: "Sultry Secrets: Tease", author: "Bethanie Loren", link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L", cover: "/covers/sultry-secrets-tease.jpg", note: true, tags: ["LGBTQ+", "Friends to Lovers", "Spicy", "Contemporary"] },
+    { title: "Sultry Secrets: Tease", author: "Bethanie Loren", link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L", cover: "/covers/sultry-secrets-tease.jpg", tags: ["LGBTQ+", "Friends to Lovers", "Spicy", "Contemporary"] },
     { title: "Heir of the Emberscale", author: "Shelby Gardner", link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB", cover: "/covers/heir-of-emberscale.jpg", tags: ["Fantasy Romance", "Epic", "War & Love", "Dragon Lore"] },
   ];
 
