@@ -100,17 +100,33 @@ function BookCard({ book, statusBadge }: BookCardProps) {
   );
 }
 
+// --- Swipe Hint Component ---
+function SwipeHint() {
+  return (
+    <div className="sm:hidden absolute right-6 top-1/2 -translate-y-1/2 z-40 pointer-events-none">
+      <div className="bg-[#D4AF37] p-3 rounded-full shadow-[0_0_20px_rgba(212,175,55,0.6)] border border-white/20 animate-swipe-hint">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8L22 12L18 16" />
+          <path d="M2 12H22" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 interface HorizontalScrollerProps {
   children: React.ReactNode;
   ariaLabel: string;
+  showHint?: boolean;
 }
 
 // --- Horizontal Scroller Component ---
-function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
+function HorizontalScroller({ children, ariaLabel, showHint = false }: HorizontalScrollerProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const [showBar, setShowBar] = useState(false);
+  const [hintVisible, setHintVisible] = useState(showHint);
 
   const isDown = useRef(false);
   const startX = useRef(0);
@@ -120,31 +136,32 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
     const el = scrollerRef.current;
     if (!el) return;
     const max = el.scrollWidth - el.clientWidth;
-    setProgress(max > 0 ? (el.scrollLeft / max) * 100 : 0);
-  }, []);
-
-  const checkOverflow = useCallback(() => {
-    const el = scrollerRef.current;
-    if (el) {
-      setShowBar(el.scrollWidth > el.clientWidth + 10);
-      updateProgress();
+    const currentScroll = el.scrollLeft;
+    
+    setProgress(max > 0 ? (currentScroll / max) * 100 : 0);
+    
+    // Hide hint once user scrolls
+    if (currentScroll > 10 && hintVisible) {
+      setHintVisible(false);
     }
-  }, [updateProgress]);
+  }, [hintVisible]);
 
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(checkOverflow);
+    const ro = new ResizeObserver(() => {
+      setShowBar(el.scrollWidth > el.clientWidth + 10);
+      updateProgress();
+    });
     ro.observe(el);
     el.addEventListener("scroll", updateProgress, { passive: true });
     return () => {
       ro.disconnect();
       el.removeEventListener("scroll", updateProgress);
     };
-  }, [checkOverflow, updateProgress]);
+  }, [updateProgress]);
 
   const onPointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
-    // Completely bypass JS for touch scrolling on the container
     if (e.pointerType === 'touch' && target === 'container') return;
 
     const el = scrollerRef.current;
@@ -186,7 +203,8 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
   return (
     <div className="relative group/scroller">
-      {/* Side Gradients: Narrower on mobile (w-4) */}
+      {hintVisible && <SwipeHint />}
+      
       <div className="absolute left-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
@@ -203,7 +221,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
           hide-scrollbar select-none
         "
         style={{ 
-          touchAction: "pan-y", 
+          touchAction: "pan-x pan-y", // Allow native horizontal scrolling
           WebkitOverflowScrolling: "touch",
           scrollbarWidth: 'none'
         }}
@@ -229,6 +247,16 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
           </div>
         </div>
       )}
+
+      <style jsx global>{`
+        @keyframes swipe-hint {
+          0%, 100% { transform: translateX(0); opacity: 0.8; }
+          50% { transform: translateX(-15px); opacity: 1; }
+        }
+        .animate-swipe-hint {
+          animation: swipe-hint 1.5s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }
@@ -263,7 +291,7 @@ export default function NarratedWorks() {
 
         <section className="mb-20">
           <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">Completed Projects</h2>
-          <HorizontalScroller ariaLabel="Completed projects">
+          <HorizontalScroller ariaLabel="Completed projects" showHint={true}>
             {completed.map((book, index) => <BookCard key={index} book={book} />)}
           </HorizontalScroller>
         </section>
