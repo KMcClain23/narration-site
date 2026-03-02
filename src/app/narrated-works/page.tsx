@@ -23,6 +23,7 @@ interface BookCardProps {
 function BookCard({ book, statusBadge }: BookCardProps) {
   return (
     <div className="group relative rounded-xl overflow-hidden shadow-lg transition-all duration-300 hover:-translate-y-2 border border-[#1A2550] bg-[#0B1224] flex-shrink-0 w-[75vw] sm:w-64 md:w-72 snap-start select-none">
+      {/* Amazon Link */}
       <div className="absolute top-3 left-3 z-30 group/btn">
         <a
           href={book.link}
@@ -42,6 +43,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         </a>
       </div>
 
+      {/* Book Cover */}
       <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
         <Image
           src={book.cover}
@@ -51,23 +53,6 @@ function BookCard({ book, statusBadge }: BookCardProps) {
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 640px) 75vw, 288px"
         />
-        
-        {/* --- STRICTLY CONSTRAINED TAG ROW --- */}
-        <div 
-          className="absolute bottom-2 left-0 right-0 px-2 z-20 overflow-hidden" 
-          style={{ height: '24px' }} // Strict fixed height
-        >
-          <div className="flex flex-nowrap gap-1 items-center w-full h-full">
-            {book.tags.map((tag) => (
-              <span 
-                key={tag} 
-                className="bg-black/80 backdrop-blur-sm text-[#D4AF37] text-[9px] font-bold px-2 py-0.5 rounded border border-[#D4AF37]/40 uppercase tracking-tight shadow-sm whitespace-nowrap flex-shrink-0"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
       </div>
 
       {statusBadge && (
@@ -76,10 +61,25 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         </div>
       )}
 
-      <div className="p-4 text-center pointer-events-none">
-        <h3 className="font-semibold text-base leading-tight text-white group-hover:text-[#D4AF37] transition-colors line-clamp-1">{book.title}</h3>
+      {/* Details Container - Removed bottom padding to eliminate buffer */}
+      <div className="p-4 pb-2 text-center pointer-events-none">
+        <h3 className="font-semibold text-base leading-tight text-white group-hover:text-[#D4AF37] transition-colors line-clamp-1">
+          {book.title}
+        </h3>
         {book.subtitle && <p className="text-xs text-white/75 mt-0.5 line-clamp-1">{book.subtitle}</p>}
-        <p className="text-sm mt-2 text-[#D4AF37] font-medium">{book.author}</p>
+        <p className="text-sm mt-1 text-[#D4AF37] font-medium">{book.author}</p>
+
+        {/* Wrapping Tags - Now part of the flow instead of absolute positioned */}
+        <div className="mt-3 flex flex-wrap justify-center gap-1">
+          {book.tags.map((tag) => (
+            <span 
+              key={tag} 
+              className="bg-black/80 backdrop-blur-sm text-[#D4AF37] text-[9px] font-bold px-2 py-0.5 rounded border border-[#D4AF37]/40 uppercase tracking-tight shadow-sm whitespace-nowrap"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -131,7 +131,6 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     if (!isDown.current || !scrollerRef.current) return;
     const el = scrollerRef.current;
     const delta = e.pageX - startX.current;
-    // Standard grab-to-scroll: content moves with the mouse direction
     el.scrollLeft = scrollLeftStart.current - delta;
   };
 
@@ -163,7 +162,6 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
 
       {showBar && (
         <div className="hidden sm:flex mt-6 justify-center px-4">
-          {/* Scroll Track: restored trackRef and capture logic to fix "can't grab bar" */}
           <div className="w-full max-w-md relative h-2 rounded-full bg-white/5 select-none" ref={trackRef}>
             <div
               onPointerDown={(e) => { e.stopPropagation(); onPointerDown(e); }}
@@ -174,7 +172,7 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
               style={{ 
                 left: `${progress}%`, 
                 transform: `translate(-${progress}%, -50%)`, 
-                touchAction: "none" // Ensures browser standard touch behavior
+                touchAction: "none" 
               }}
             />
           </div>
@@ -184,7 +182,6 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
   );
 }
 
-// --- MAIN PAGE COMPONENT ---
 export default function NarratedWorks() {
   const [searchQuery, setSearchQuery] = useState("");
 
