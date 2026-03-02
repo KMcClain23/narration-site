@@ -11,6 +11,7 @@ type Book = {
   link: string;
   cover: string;
   note?: boolean;
+  tags: string[];
 };
 
 interface BookCardProps {
@@ -21,10 +22,8 @@ interface BookCardProps {
 // --- Book Card Component ---
 function BookCard({ book, statusBadge }: BookCardProps) {
   return (
-    <div
-      className="group relative rounded-xl overflow-hidden shadow-lg transition-all duration-300 hover:-translate-y-2 border border-[#1A2550] bg-[#0B1224] flex-shrink-0 w-[75vw] sm:w-64 md:w-72 snap-start select-none"
-    >
-      {/* Clickable Amazon Link Button */}
+    <div className="group relative rounded-xl overflow-hidden shadow-lg transition-all duration-300 hover:-translate-y-2 border border-[#1A2550] bg-[#0B1224] flex-shrink-0 w-[75vw] sm:w-64 md:w-72 snap-start select-none">
+      {/* Amazon Link Button */}
       <a
         href={book.link}
         target="_blank"
@@ -42,15 +41,28 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         </svg>
       </a>
 
+      {/* Book Cover Container */}
       <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
         <Image
           src={book.cover}
-          alt={`${book.title} book cover`}
+          alt={`${book.title} cover`}
           fill
           draggable={false}
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 640px) 75vw, 288px"
         />
+        
+        {/* Tags Overlay */}
+        <div className="absolute bottom-2 left-2 flex flex-wrap gap-1 z-20">
+          {book.tags.map((tag) => (
+            <span 
+              key={tag} 
+              className="bg-black/60 backdrop-blur-md text-[#D4AF37] text-[9px] font-bold px-1.5 py-0.5 rounded border border-[#D4AF37]/30 uppercase tracking-tighter"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
       </div>
 
       {statusBadge && (
@@ -66,15 +78,11 @@ function BookCard({ book, statusBadge }: BookCardProps) {
       )}
 
       <div className="p-4 text-center pointer-events-none">
-        <h3 className="font-semibold text-base leading-tight text-white group-hover:text-[#D4AF37] transition-colors">
+        <h3 className="font-semibold text-base leading-tight text-white group-hover:text-[#D4AF37] transition-colors line-clamp-1">
           {book.title}
         </h3>
-        {book.subtitle && (
-          <p className="text-sm text-white/75 mt-0.5">{book.subtitle}</p>
-        )}
-        <p className="text-sm mt-2 text-[#D4AF37] font-medium">
-          {book.author}
-        </p>
+        {book.subtitle && <p className="text-xs text-white/75 mt-0.5 line-clamp-1">{book.subtitle}</p>}
+        <p className="text-sm mt-2 text-[#D4AF37] font-medium">{book.author}</p>
       </div>
     </div>
   );
@@ -139,7 +147,7 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
     };
   }, [updateProgress]);
 
-  const onPointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
+  const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'touch') return;
     const el = scrollerRef.current;
     if (!el) return;
@@ -151,18 +159,11 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
     el.style.scrollBehavior = "auto";
   };
 
-  const onPointerMove = (e: React.PointerEvent, target: 'container' | 'thumb') => {
+  const onPointerMove = (e: React.PointerEvent) => {
     if (!isDown.current || !scrollerRef.current || e.pointerType === 'touch') return;
     const el = scrollerRef.current;
     const delta = e.pageX - startX.current;
-    if (target === 'container') {
-      el.scrollLeft = scrollLeftStart.current - delta;
-    } else {
-      const maxScroll = el.scrollWidth - el.clientWidth;
-      const trackWidth = trackRef.current?.clientWidth || 1;
-      const scrollRatio = maxScroll / trackWidth;
-      el.scrollLeft = scrollLeftStart.current + (delta * scrollRatio);
-    }
+    el.scrollLeft = scrollLeftStart.current - delta;
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
@@ -182,8 +183,8 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
 
       <div
         ref={scrollerRef}
-        onPointerDown={(e) => onPointerDown(e, 'container')}
-        onPointerMove={(e) => onPointerMove(e, 'container')}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         style={{ 
@@ -203,8 +204,8 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
           <div className="w-full max-w-md">
             <div ref={trackRef} className="relative h-2 rounded-full bg-white/5 select-none">
               <div
-                onPointerDown={(e) => { e.stopPropagation(); onPointerDown(e, 'thumb'); }}
-                onPointerMove={(e) => onPointerMove(e, 'thumb')}
+                onPointerDown={(e) => { e.stopPropagation(); onPointerDown(e); }}
+                onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
                 onPointerCancel={onPointerUp}
                 className="absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
@@ -230,22 +231,22 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
 
 export default function NarratedWorks() {
   const completed: Book[] = [
-    { title: "The Final Guardian", author: "Alexander Kamenetsky", link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H", cover: "/covers/the-final-guardian.jpg" },
-    { title: "Santa Promised", author: "Laetitia Clark", link: "https://www.amazon.com/Santa-Promised-A-Christmas-Novella/dp/B0G6GLQGHK", cover: "/covers/santa-promised.jpg" },
-    { title: "The Circle", author: "Lillian Minx Monroe", link: "https://www.amazon.com/Audible-The-Circle-Rituals-Ruins/dp/B0GKQY7N27", cover: "/covers/the-circle-rituals-and-ruins.jpg" },
-    { title: "Sultry Secrets: Tease", author: "Bethanie Loren", link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L", cover: "/covers/sultry-secrets-tease.jpg", note: true },
-    { title: "Heir of the Emberscale", author: "Shelby Gardner", link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB", cover: "/covers/heir-of-emberscale.jpg" },
+    { title: "The Final Guardian", author: "Alexander Kamenetsky", link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H", cover: "/covers/the-final-guardian.jpg", tags: ["Sci-Fi Mystery", "Psych Thriller", "AI Horror", "Dystopian"] },
+    { title: "Santa Promised", author: "Laetitia Clark", link: "https://www.amazon.com/Santa-Promised-A-Christmas-Novella/dp/B0G6GLQGHK", cover: "/covers/santa-promised.jpg", tags: ["Duet", "Holiday Romance", "Age Gap", "Single Mom"] },
+    { title: "The Circle", subtitle: "Rituals & Ruins", author: "Lillian Minx Monroe", link: "https://www.amazon.com/Audible-The-Circle-Rituals-Ruins/dp/B0GKQY7N27", cover: "/covers/the-circle-rituals-and-ruins.jpg", tags: ["Dark Romance", "Mystery", "Small Town", "Secrets"] },
+    { title: "Sultry Secrets: Tease", author: "Bethanie Loren", link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L", cover: "/covers/sultry-secrets-tease.jpg", note: true, tags: ["LGBTQ+", "Friends to Lovers", "Spicy", "Contemporary"] },
+    { title: "Heir of the Emberscale", author: "Shelby Gardner", link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB", cover: "/covers/heir-of-emberscale.jpg", tags: ["Fantasy Romance", "Epic", "War & Love", "Dragon Lore"] },
   ];
 
   const inProgress: Book[] = [
-    { title: "No One to Hold Me", author: "Noelle Rahn-Johnson", link: "https://www.amazon.com/No-One-Hold-Noelle-Rahn-Johnson-ebook/dp/B088RMPLYX", cover: "/covers/no-one-to-hold-me.jpg" },
-    { title: "Merciless Punks", author: "Madeline Fay", link: "https://www.amazon.com/Merciless-Punks-Enemies-romance-douchebags-ebook/dp/B09Z9P3C7V", cover: "/covers/merciless-punks.jpg" },
-    { title: "Unmasked Hearts", author: "K.E. Noel", link: "https://www.amazon.com/Unmasked-Hearts-K-Noel-ebook/dp/B0FMKP92Y9", cover: "/covers/unmasked-hearts.jpg" },
+    { title: "No One to Hold Me", author: "Noelle Rahn-Johnson", link: "https://www.amazon.com/No-One-Hold-Noelle-Rahn-Johnson-ebook/dp/B088RMPLYX", cover: "/covers/no-one-to-hold-me.jpg", tags: ["Steamy Romance", "Emotional", "POV Narratives", "Contemporary"] },
+    { title: "Merciless Punks", author: "Madeline Fay", link: "https://www.amazon.com/Merciless-Punks-Enemies-romance-douchebags-ebook/dp/B09Z9P3C7V", cover: "/covers/merciless-punks.jpg", tags: ["Dark Romance", "Bully", "Why Choose", "MC Club"] },
+    { title: "Unmasked Hearts", author: "K.E. Noel", link: "https://www.amazon.com/Unmasked-Hearts-K-Noel-ebook/dp/B0FMKP92Y9", cover: "/covers/unmasked-hearts.jpg", tags: ["Dual POV", "Contemporary", "Emotional", "Small Town"] },
   ];
 
   const comingSoon: Book[] = [
-    { title: "Beating For You", author: "L.L. McAlister", link: "https://www.amazon.com/Beating-You-Body-Nobody-That-ebook/dp/B0FNQ2F6P4", cover: "/covers/beating-for-you.jpg" },
-    { title: "Whiskey & Lies", author: "E.A. Harper", link: "https://www.amazon.com/dp/B0FBT3XW76", cover: "/covers/whiskey-and-lies.jpg" },
+    { title: "Beating For You", author: "L.L. McAlister", link: "https://www.amazon.com/Beating-You-Body-Nobody-That-ebook/dp/B0FNQ2F6P4", cover: "/covers/beating-for-you.jpg", tags: ["New Adult", "Steamy Romance", "Emotional", "Dual POV"] },
+    { title: "Whiskey & Lies", author: "E.A. Harper", link: "https://www.amazon.com/dp/B0FBT3XW76", cover: "/covers/whiskey-and-lies.jpg", tags: ["Dark Romance", "Romantic Suspense", "Billionaire", "Slow Burn"] },
   ];
 
   return (
