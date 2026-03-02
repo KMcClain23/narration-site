@@ -141,12 +141,7 @@ function AtAGlanceCard({
                 onClick={() => onOpenLightbox("/dean-profile.png", "Logo")}
                 className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60"
               >
-                <Image
-                  src="/dean-profile.png"
-                  alt="Logo"
-                  fill
-                  className="object-contain p-2"
-                />
+                <Image src="/dean-profile.png" alt="Logo" fill className="object-contain p-2" />
               </button>
 
               <button
@@ -154,12 +149,7 @@ function AtAGlanceCard({
                 onClick={() => onOpenLightbox("/dean-headshot.jpg", "Headshot")}
                 className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60"
               >
-                <Image
-                  src="/dean-headshot.jpg"
-                  alt="Headshot"
-                  fill
-                  className="object-cover"
-                />
+                <Image src="/dean-headshot.jpg" alt="Headshot" fill className="object-cover" />
               </button>
             </div>
 
@@ -307,7 +297,7 @@ function DemoPlayer({
   );
 }
 
-// --- MAIN HOME CLIENT COMPONENT ---
+// --- MAIN HOME COMPONENT ---
 function HomeContent() {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
@@ -320,11 +310,7 @@ function HomeContent() {
   const [isPending, startTransition] = useTransition();
   const [formStatus, setFormStatus] = useState<{ success?: boolean; message?: string } | null>(null);
 
-  const openLightbox = (src: string, title: string) => {
-    setLightboxSrc(src);
-    setLightboxTitle(title);
-    setLightboxOpen(true);
-  };
+  const openLightbox = (src: string, title: string) => { setLightboxSrc(src); setLightboxTitle(title); setLightboxOpen(true); };
   const closeLightbox = () => setLightboxOpen(false);
 
   const handleNativeSubmit = async (formData: FormData) => {
@@ -335,7 +321,9 @@ function HomeContent() {
         setFormStatus({ success: true, message: "Thanks! Inquiry sent and confirmation email dispatched. Talk soon!" });
         formRef.current?.reset();
       } else {
-        setFormStatus({ success: false, message: result.error || "Please check the form and try again." });
+        // Correcting the TypeScript error here:
+        const errorMsg = typeof result.error === 'string' ? result.error : "Please check the form and try again.";
+        setFormStatus({ success: false, message: errorMsg });
       }
     });
   };
@@ -362,10 +350,10 @@ function HomeContent() {
     <main className="min-h-screen bg-[#050814] text-white">
       <div id="top" />
 
-      {/* HERO SECTION */}
+      {/* HERO */}
       <section className="relative overflow-hidden -mt-16 pt-16">
         <div className="absolute inset-0">
-          <Image src="/dean-banner.png" alt="Dean Miller Narrator banner" fill priority className="object-cover opacity-35" />
+          <Image src="/dean-banner.png" alt="Dean Miller banner" fill priority className="object-cover opacity-35" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050814]/85 via-[#050814]/75 to-[#050814]" />
         </div>
 
@@ -386,14 +374,10 @@ function HomeContent() {
                 <a href="/#demos" className="w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A]">Listen to demos</a>
                 <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer" className="w-full inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold transition hover:border-white/60">Request availability</a>
               </div>
-              
               <div className="mt-4"><Link href="/audiobook-narrator" className="text-sm text-[#D4AF37] hover:underline">Learn about services and rates</Link></div>
               <ProofPoints />
             </div>
-
-            <div className="hidden md:block md:col-span-5">
-              <AtAGlanceCard onOpenLightbox={openLightbox} />
-            </div>
+            <div className="hidden md:block md:col-span-5"><AtAGlanceCard onOpenLightbox={openLightbox} /></div>
           </div>
         </div>
       </section>
@@ -403,7 +387,6 @@ function HomeContent() {
         <section id="demos" className="mt-2 scroll-mt-24">
           <h2 className="text-3xl font-bold">Featured demos</h2>
           <p className="mt-2 text-white/70">Short, targeted clips. Click play and you will know fast.</p>
-
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {demos.map((demo, index) => (
               <DemoPlayer key={demo.title} title={demo.title} desc={demo.desc} src={demo.src} index={index} activeIndex={activeIndex} setActiveIndex={setActiveIndex} audioRefs={audioRefs} />
@@ -416,7 +399,7 @@ function HomeContent() {
           <h2 className="text-3xl font-bold">About</h2>
           <div className="mt-6 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
             <div className="md:col-span-8">
-              <p className="text-white/80 leading-relaxed">I’m Dean Miller, a professional audiobook narrator drawn to character-driven stories with emotional depth, quiet tension, and honest human connection. I aim for narration that feels natural and immersive, where listeners stop noticing the voice and simply live inside the story.</p>
+              <p className="text-white/80 leading-relaxed">I’m Dean Miller, a professional audiobook narrator drawn to character-driven stories with emotional depth, quiet tension, and honest human connection. I record from a broadcast-quality home studio and value clear communication and collaboration throughout each project.</p>
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg">
                   <p className="font-semibold text-white">Genres</p>
@@ -437,7 +420,7 @@ function HomeContent() {
           </div>
         </section>
 
-        {/* CONTACT SECTION */}
+        {/* CONTACT */}
         <section id="contact" className="mt-20 scroll-mt-24">
           <h2 className="text-3xl font-bold">Contact</h2>
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
