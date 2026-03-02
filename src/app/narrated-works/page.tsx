@@ -174,6 +174,7 @@ function HorizontalScroller({ children, ariaLabel, showHint = false }: Horizonta
     if (!isDown.current || !scrollerRef.current || e.pointerType === 'touch') return;
     const el = scrollerRef.current;
     const delta = e.pageX - startX.current;
+    // CHANGED: Use addition (+) instead of subtraction (-) to sync mouse direction with scroll movement
     el.scrollLeft = scrollLeftStart.current - delta;
   };
 
