@@ -61,15 +61,15 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         </div>
       )}
 
-      {/* Details Container - Removed bottom padding to eliminate buffer */}
-      <div className="p-4 pb-2 text-center pointer-events-none">
+      {/* Details Container */}
+      <div className="p-4 pb-2 text-center">
         <h3 className="font-semibold text-base leading-tight text-white group-hover:text-[#D4AF37] transition-colors line-clamp-1">
           {book.title}
         </h3>
         {book.subtitle && <p className="text-xs text-white/75 mt-0.5 line-clamp-1">{book.subtitle}</p>}
         <p className="text-sm mt-1 text-[#D4AF37] font-medium">{book.author}</p>
 
-        {/* Wrapping Tags - Now part of the flow instead of absolute positioned */}
+        {/* Wrapping Tags */}
         <div className="mt-3 flex flex-wrap justify-center gap-1">
           {book.tags.map((tag) => (
             <span 
@@ -88,7 +88,6 @@ function BookCard({ book, statusBadge }: BookCardProps) {
 // --- Horizontal Scroller Component ---
 function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode; ariaLabel: string }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const [showBar, setShowBar] = useState(false);
 
@@ -152,9 +151,13 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        style={{ touchAction: "pan-y", scrollbarWidth: 'none' }}
+        style={{ 
+          touchAction: "auto", 
+          WebkitOverflowScrolling: "touch",
+          scrollbarWidth: 'none'
+        }}
         aria-label={ariaLabel}
-        className="flex overflow-x-auto pb-10 snap-x snap-mandatory scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20 hide-scrollbar select-none cursor-grab active:cursor-grabbing"
+        className="flex overflow-x-auto pb-10 snap-x snap-mandatory scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20 hide-scrollbar select-none md:cursor-grab md:active:cursor-grabbing"
       >
         {children}
         <div className="flex-shrink-0 w-10 sm:w-20" />
@@ -162,17 +165,12 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
 
       {showBar && (
         <div className="hidden sm:flex mt-6 justify-center px-4">
-          <div className="w-full max-w-md relative h-2 rounded-full bg-white/5 select-none" ref={trackRef}>
+          <div className="w-full max-w-md relative h-1.5 rounded-full bg-white/5 overflow-hidden">
             <div
-              onPointerDown={(e) => { e.stopPropagation(); onPointerDown(e); }}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
-              className="absolute top-1/2 h-4 w-16 rounded-full bg-[#D4AF37] shadow-lg cursor-grab active:cursor-grabbing"
+              className="absolute top-0 bottom-0 w-16 rounded-full bg-[#D4AF37] transition-all duration-75"
               style={{ 
                 left: `${progress}%`, 
-                transform: `translate(-${progress}%, -50%)`, 
-                touchAction: "none" 
+                transform: `translateX(-${progress}%)` 
               }}
             />
           </div>
@@ -224,7 +222,7 @@ export default function NarratedWorks() {
           <p className="text-white/60 text-lg">Portfolio of narrated audiobooks.</p>
           <div className="mt-10 max-w-md mx-auto relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-white/30 group-focus-within:text-[#D4AF37] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-5 w-5 text-white/30 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
