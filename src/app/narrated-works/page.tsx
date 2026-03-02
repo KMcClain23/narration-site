@@ -34,7 +34,6 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         href={book.link}
         target="_blank"
         rel="noopener noreferrer"
-        // STOP PROPAGATION + manipulation ensures touch doesn't hang
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         className="
@@ -63,7 +62,6 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         </svg>
       </a>
 
-      {/* Book Cover Container */}
       <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
         <Image
           src={book.cover}
@@ -146,7 +144,7 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
   }, [checkOverflow, updateProgress]);
 
   const onPointerDown = (e: React.PointerEvent, target: 'container' | 'thumb') => {
-    // If it's a touch, let the browser handle it entirely
+    // Completely bypass JS for touch scrolling on the container
     if (e.pointerType === 'touch' && target === 'container') return;
 
     const el = scrollerRef.current;
@@ -188,8 +186,9 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
   return (
     <div className="relative group/scroller">
-      <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
-      <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
+      {/* Side Gradients: Narrower on mobile (w-4) */}
+      <div className="absolute left-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
 
       <div
         ref={scrollerRef}
@@ -203,9 +202,8 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
           scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20
           hide-scrollbar select-none
         "
-        // touchAction auto is critical to allow mobile browser to scroll horizontally
         style={{ 
-          touchAction: "auto", 
+          touchAction: "pan-y", 
           WebkitOverflowScrolling: "touch",
           scrollbarWidth: 'none'
         }}
@@ -237,10 +235,10 @@ function HorizontalScroller({ children, ariaLabel }: HorizontalScrollerProps) {
 
 export default function NarratedWorks() {
   const completed: Book[] = [
-    { title: "The Final Guardian", subtitle: "The Citadel of the Mind and the Garden", author: "Alexander Kamenetsky", link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H", cover: "/covers/the-final-guardian.jpg" },
-    { title: "Santa Promised", subtitle: "A Christmas Novella", author: "Laetitia Clark", link: "https://www.amazon.com/Santa-Promised-A-Christmas-Novella/dp/B0G6GLQGHK", cover: "/covers/santa-promised.jpg" },
-    { title: "The Circle", subtitle: "Rituals & Ruins", author: "Lilian Monroe, Kayla Gerdes", link: "https://www.amazon.com/Audible-The-Circle-Rituals-Ruins/dp/B0GKQY7N27", cover: "/covers/the-circle-rituals-and-ruins.jpg" },
-    { title: "Sultry Secrets: Tease", subtitle: "Sultry Secrets Book 4", author: "Bethanie Loren", link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L", cover: "/covers/sultry-secrets-tease.jpg"},
+    { title: "The Final Guardian", author: "Alexander Kamenetsky", link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H", cover: "/covers/the-final-guardian.jpg" },
+    { title: "Santa Promised", author: "Laetitia Clark", link: "https://www.amazon.com/Santa-Promised-A-Christmas-Novella/dp/B0G6GLQGHK", cover: "/covers/santa-promised.jpg" },
+    { title: "The Circle", author: "Lillian Minx Monroe", link: "https://www.amazon.com/Audible-The-Circle-Rituals-Ruins/dp/B0GKQY7N27", cover: "/covers/the-circle-rituals-and-ruins.jpg" },
+    { title: "Sultry Secrets: Tease", author: "Bethanie Loren", link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L", cover: "/covers/sultry-secrets-tease.jpg", note: true },
     { title: "Heir of the Emberscale", author: "Shelby Gardner", link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB", cover: "/covers/heir-of-emberscale.jpg" },
   ];
 
