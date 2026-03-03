@@ -5,10 +5,12 @@ import { z } from "zod";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Assets from your Cloudflare R2 bucket
+// Assets and Links
 const LOGO_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerLogo.png";
 const HEADSHOT_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile.jpg";
 const BANNER_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerBanner.png";
+const BOOKINGS_URL = "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
+const SITE_URL = "https://dmnarration.com"; // Replace with your actual live domain
 
 const contactSchema = z.object({
   name: z.string().min(2),
@@ -59,8 +61,13 @@ const clientTemplate = (name: string) => `
         
         <h2 style="color: #D4AF37; margin-bottom: 20px; font-size: 22px; letter-spacing: 1px; font-weight: bold;">Inquiry Received</h2>
         
-        <p style="font-size: 16px; line-height: 1.6; color: rgba(255,255,255,0.95); margin-bottom: 15px;">Hi ${name},</p>
-        <p style="font-size: 16px; line-height: 1.6; color: rgba(255,255,255,0.9); margin-bottom: 30px;">Thanks for reaching out! I've received your project details and will review them shortly. You can typically expect a response within 24–48 hours.</p>
+        <p style="font-size: 16px; line-height: 1.6; color: rgba(255,255,255,0.95);">Hi ${name},</p>
+        <p style="font-size: 16px; line-height: 1.6; color: rgba(255,255,255,0.9); margin-bottom: 25px;">Thanks for reaching out! I've received your project details and will review them shortly. You can typically expect a response within 24–48 hours.</p>
+
+        <div style="margin-bottom: 35px;">
+          <a href="${SITE_URL}/#demos" style="display: inline-block; padding: 10px 20px; margin: 5px; border: 1px solid #D4AF37; color: #D4AF37; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Listen to Demos</a>
+          <a href="${BOOKINGS_URL}" style="display: inline-block; padding: 10px 20px; margin: 5px; background-color: #D4AF37; color: #000000; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Book a 15-min Call</a>
+        </div>
         
         <div style="max-width: 250px; margin: 30px auto; border-top: 1px solid #1A2550;"></div>
         
@@ -105,7 +112,6 @@ export async function sendEmail(formData: FormData) {
 
   try {
     await Promise.all([
-      // 1. Primary Inquiry to Dean
       resend.emails.send({
         from: "Dean Miller Narration <Dean@dmnarration.com>",
         to: ["Dean@DMNarration.com"],
@@ -113,7 +119,6 @@ export async function sendEmail(formData: FormData) {
         replyTo: email,
         html: internalTemplate(name, email, message),
       }),
-      // 2. Auto-reply confirmation to the client
       resend.emails.send({
         from: "Dean Miller Narration <Dean@dmnarration.com>",
         to: [email],
