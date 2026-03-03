@@ -321,7 +321,6 @@ function HomeContent() {
         setFormStatus({ success: true, message: "Thanks! Inquiry sent and confirmation email dispatched. Talk soon!" });
         formRef.current?.reset();
       } else {
-        // Correcting the TypeScript error here:
         const errorMsg = typeof result.error === 'string' ? result.error : "Please check the form and try again.";
         setFormStatus({ success: false, message: errorMsg });
       }
@@ -450,14 +449,38 @@ function HomeContent() {
               </div>
             </form>
 
-            <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg flex flex-col justify-between">
-              <div>
-                <p className="text-sm text-white/70">Direct email</p>
-                <a className="mt-1 inline-block text-lg font-semibold text-[#D4AF37] hover:underline" href="mailto:Dean@DMNarration.com">Dean@DMNarration.com</a>
+            <div className="space-y-6 flex flex-col">
+              <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
+                <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-semibold">Direct Email</p>
+                <a className="mt-2 inline-block text-lg font-semibold text-white hover:text-[#D4AF37] transition-colors" href="mailto:Dean@DMNarration.com">
+                  Dean@DMNarration.com
+                </a>
+                <p className="mt-2 text-sm text-white/50">Expect a response within 24-48 hours.</p>
               </div>
-              <div className="mt-8 pt-6 border-t border-white/5">
-                <p className="text-sm text-white/70">Prefer to schedule?</p>
-                <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-2 text-sm font-semibold text-white/90 hover:border-white/40 hover:text-white transition">Book a 15-minute call</a>
+
+              <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg flex-1">
+                <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-semibold">Studio Specs</p>
+                <ul className="mt-4 space-y-4">
+                  <li className="flex items-start gap-3">
+                    <div className="mt-1 h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0" />
+                    <p className="text-sm text-white/80"><span className="text-white font-medium">Hardware:</span> Shure MV7+ with professional pop filtration.</p>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="mt-1 h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0" />
+                    <p className="text-sm text-white/80"><span className="text-white font-medium">Environment:</span> Custom-treated acoustic space.</p>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="mt-1 h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0" />
+                    <p className="text-sm text-white/80"><span className="text-white font-medium">Quality:</span> ACX-ready, broadcast-quality audio delivery.</p>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
+                <p className="text-sm text-white/70">Prefer a face-to-face chat?</p>
+                <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/5 transition">
+                  Book a 15-minute call
+                </a>
               </div>
             </div>
           </div>
