@@ -8,6 +8,11 @@ import { sendEmail } from "@/app/actions/sendEmail";
 const BOOKINGS_URL =
   "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
 
+// Asset URLs from your R2 Bucket
+const BANNER_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerBanner.png";
+const LOGO_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerLogo.png";
+const PROFILE_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile.jpg";
+
 // --- Utility: Format Seconds to M:SS ---
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -138,18 +143,18 @@ function AtAGlanceCard({
             <div className="grid grid-cols-2 gap-4">
               <button
                 type="button"
-                onClick={() => onOpenLightbox("/DeanMillerLogo.png", "Logo")}
+                onClick={() => onOpenLightbox(LOGO_URL, "Logo")}
                 className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60"
               >
-                <Image src="https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerLogo.png" alt="Logo" fill className="object-contain p-2" />
+                <Image src={LOGO_URL} alt="Logo" fill className="object-contain p-2" />
               </button>
 
               <button
                 type="button"
-                onClick={() => onOpenLightbox("/Profile.jpg", "Headshot")}
+                onClick={() => onOpenLightbox(PROFILE_URL, "Headshot")}
                 className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60"
               >
-                <Image src="https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile.jpg" alt="Headshot" fill className="object-cover" />
+                <Image src={PROFILE_URL} alt="Headshot" fill className="object-cover" />
               </button>
             </div>
 
@@ -223,13 +228,12 @@ function DemoPlayer({
       setBuffering(false); 
       setActiveIndex(index);
       
-      // Tracking: Log play events to console or API
       console.log(`Demo Played: ${title}`);
       fetch('/api/track-demo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title }),
-      }).catch(() => {}); // Silent fail to not disrupt user experience
+      }).catch(() => {});
     };
     const onPause = () => setPlaying(false);
     const onWaiting = () => setBuffering(true);
@@ -364,7 +368,7 @@ function HomeContent() {
       {/* HERO */}
       <section className="relative overflow-hidden -mt-16 pt-16">
         <div className="absolute inset-0">
-          <Image src="https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerBanner.png" alt="Dean Miller banner" fill priority className="object-cover opacity-35" />
+          <Image src={BANNER_URL} alt="Dean Miller banner" fill priority className="object-cover opacity-35" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050814]/85 via-[#050814]/75 to-[#050814]" />
         </div>
 
@@ -411,7 +415,7 @@ function HomeContent() {
           <div className="mt-6 flex flex-col gap-8">
             <div className="max-w-4xl">
               <p className="text-white/90 text-lg leading-relaxed">
-                Hello. I’m <span className="text-[#D4AF37] font-semibold">Dean Miller</span>, a professional audiobook narrator and storyteller. For me, narration isn’t just performance—it&apos;s connection. It’s the moment a listener forgets there’s a voice between them and the story, and simply feels.
+                Hello. I’m <span className="text-[#D4AF37] font-semibold">Dean Miller</span>, a professional audiobook narrator and storyteller. For me, narration isn’t just performance. It&apos;s connection. It’s the moment a listener forgets there’s a voice between them and the story, and simply feels.
               </p>
             </div>
             
@@ -419,7 +423,7 @@ function HomeContent() {
               <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-8 shadow-lg transition hover:border-[#D4AF37]/30">
                 <p className="text-[#D4AF37] text-xs uppercase tracking-widest font-bold mb-4">The Musical Ear</p>
                 <p className="text-white/80 leading-relaxed text-sm">
-                  I’ve always had a fascination with voices. As a kid, I mimicked actors and cartoon characters, testing how close I could get to their tone, rhythm, and emotion. That love of sound naturally extended into music and theatre. Performing became a way to translate that emotion into something others could feel—a single note or phrase that stirs the soul.
+                  I’ve always had a fascination with voices. As a kid, I mimicked actors and cartoon characters, testing how close I could get to their tone, rhythm, and emotion. That love of sound naturally extended into music and theatre. Performing became a way to translate that emotion into something others could feel. It could be a single note or phrase that stirs the soul.
                 </p>
               </div>
               
