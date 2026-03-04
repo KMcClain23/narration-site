@@ -19,7 +19,6 @@ interface BookCardProps {
   statusBadge?: React.ReactNode;
 }
 
-// --- Book Card Component ---
 function BookCard({ book, statusBadge }: BookCardProps) {
   return (
     <div className="group relative rounded-xl overflow-hidden shadow-lg transition-all duration-300 hover:-translate-y-2 border border-[#1A2550] bg-[#0B1224] flex-shrink-0 w-[75vw] sm:w-64 md:w-72 snap-start select-none">
@@ -81,7 +80,6 @@ function BookCard({ book, statusBadge }: BookCardProps) {
   );
 }
 
-// --- Horizontal Scroller Component ---
 function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode; ariaLabel: string }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
@@ -123,10 +121,7 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     const el = scrollerRef.current;
     if (!el) return;
     const scrollAmount = el.clientWidth * 0.8;
-    el.scrollBy({ 
-      left: direction === 'left' ? -scrollAmount : scrollAmount, 
-      behavior: 'smooth' 
-    });
+    el.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -159,25 +154,13 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
   return (
     <div className="relative group/scroller">
       {canScrollLeft && (
-        <button
-          onClick={() => scroll('left')}
-          className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-40 bg-black/60 border border-[#D4AF37]/30 text-[#D4AF37] p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/80 hover:border-[#D4AF37] active:scale-95 opacity-0 group-hover/scroller:opacity-100 shadow-2xl"
-          aria-label="Scroll left"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
+        <button onClick={() => scroll('left')} className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-40 bg-black/60 border border-[#D4AF37]/30 text-[#D4AF37] p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/80 hover:border-[#D4AF37] opacity-0 group-hover/scroller:opacity-100 shadow-2xl" aria-label="Scroll left">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
       )}
       {canScrollRight && (
-        <button
-          onClick={() => scroll('right')}
-          className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-40 bg-black/60 border border-[#D4AF37]/30 text-[#D4AF37] p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/80 hover:border-[#D4AF37] active:scale-95 opacity-0 group-hover/scroller:opacity-100 shadow-2xl"
-          aria-label="Scroll right"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
+        <button onClick={() => scroll('right')} className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-40 bg-black/60 border border-[#D4AF37]/30 text-[#D4AF37] p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/80 hover:border-[#D4AF37] opacity-0 group-hover/scroller:opacity-100 shadow-2xl" aria-label="Scroll right">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
         </button>
       )}
       <div className="absolute left-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
@@ -197,10 +180,7 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
       {showBar && (
         <div className="hidden sm:flex mt-6 justify-center px-4">
           <div className="w-full max-w-md relative h-1.5 rounded-full bg-white/5 overflow-hidden">
-            <div
-              className="absolute top-0 bottom-0 w-16 rounded-full bg-[#D4AF37] transition-all duration-75"
-              style={{ left: `${progress}%`, transform: `translateX(-${progress}%)` }}
-            />
+            <div className="absolute top-0 bottom-0 w-16 rounded-full bg-[#D4AF37] transition-all duration-75" style={{ left: `${progress}%`, transform: `translateX(-${progress}%)` }} />
           </div>
         </div>
       )}
@@ -249,17 +229,9 @@ export default function NarratedWorks() {
           <p className="text-white/60 text-lg max-w-2xl mx-auto">Explore my portfolio of professional audiobook narrations specializing in dark romance and character-driven fiction.</p>
           <div className="mt-10 max-w-md mx-auto relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+              <svg className="h-5 w-5 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             </div>
-            <input 
-              type="text" 
-              placeholder="Search by title, author, or genre..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#0B1224] border border-[#1A2550] rounded-full py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/50 transition-all placeholder:text-white/20"
-            />
+            <input type="text" placeholder="Search by title, author, or genre..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#0B1224] border border-[#1A2550] rounded-full py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/50 transition-all placeholder:text-white/20" />
           </div>
         </header>
 
