@@ -15,15 +15,20 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://dmnarration.com"),
-  title:
-    "Hire Dean Miller | Professional Audiobook Narrator | Character Driven Performance",
-  description:
-    "Professional audiobook narrator delivering emotionally grounded, character driven performances across fiction genres. Broadcast quality audio, fast turnaround, and collaborative production.",
+  // Audit Fix: Optimal character length for search engines
+  title: "Dean Miller | Professional Audiobook Narrator", 
+  description: "Professional audiobook narrator delivering character-driven, emotionally grounded performances for fiction. Broadcast quality audio and fast turnaround.",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png", // Audit Fix: Clears "No Apple touch icon specified" warning
+  },
+  alternates: {
+    // Audit Fix: Prevents duplicate content issues
+    canonical: "/", 
+  },
   openGraph: {
-    title:
-      "Hire Dean Miller | Professional Audiobook Narrator | Character Driven Performance",
-    description:
-      "Explore audiobook narration demos and request availability. Emotionally immersive, character driven performance with broadcast quality audio.",
+    title: "Dean Miller | Professional Audiobook Narrator",
+    description: "Explore audiobook narration demos and request availability. Emotionally immersive, character driven performance.",
     url: "https://dmnarration.com/",
     siteName: "Dean Miller Narration",
     images: [
@@ -39,10 +44,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title:
-      "Hire Dean Miller | Professional Audiobook Narrator | Character Driven Performance",
-    description:
-      "Explore audiobook narration demos and request availability. Broadcast quality, emotionally immersive performance.",
+    title: "Dean Miller | Professional Audiobook Narrator",
+    description: "Explore audiobook narration demos. Broadcast quality, emotionally immersive performance.",
     images: ["/opengraph-image.png"],
   },
 };
@@ -53,8 +56,7 @@ const personJsonLd = {
   name: "Dean Miller",
   jobTitle: "Audiobook Narrator",
   url: "https://dmnarration.com/",
-  description:
-    "Professional audiobook narrator delivering character driven, emotionally immersive performances across fiction genres.",
+  description: "Professional audiobook narrator delivering character driven, emotionally immersive performances across fiction genres.",
   knowsAbout: [
     "Audiobook narration",
     "Character driven storytelling",
@@ -67,9 +69,41 @@ const personJsonLd = {
   ],
   sameAs: [
     "https://www.acx.com/narrator?p=A3DYAXR7JFPXPE",
-    "https://www.audible.com/search?searchNarrator=Dean+Miller&ref_pageloadid=not_applicable&pf_rd_p=f6da0b63-439d-48a7-a859-b187b7c50705&pf_rd_r=N83F413HQWM3VFWET5VH&plink=jqnppclGL9EcQpHn&pageLoadId=mT2OfOyyKZ9uncuC&creativeId=16015ba4-2e2d-4ae3-93c5-e937781a25cd&ref=a_pd_Santa-_pin_narrator_2",
+    "https://www.audible.com/search?searchNarrator=Dean+Miller",
     "https://www.tiktok.com/@deanmillernarration",
   ],
+};
+
+const businessJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  name: "Dean Miller Narration",
+  image: "https://dmnarration.com/opengraph-image.png",
+  "@id": "https://dmnarration.com",
+  url: "https://dmnarration.com",
+  address: {
+    "@type": "PostalAddress",
+    "addressLocality": "Cornelius",
+    "addressRegion": "OR",
+    "addressCountry": "US"
+  },
+  geo: {
+    "@type": "GeoCoordinates",
+    "latitude": 45.5187,
+    "longitude": -123.0593
+  },
+  openingHoursSpecification: {
+    "@type": "OpeningHoursSpecification",
+    "dayOfWeek": [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday"
+    ],
+    "opens": "09:00",
+    "closes": "17:00"
+  }
 };
 
 export default function RootLayout({
@@ -89,10 +123,16 @@ export default function RootLayout({
 
         <Header />
 
+        {/* Person Schema */}
         <script
           type="application/ld+json"
-          // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+        />
+        
+        {/* Local Business Schema */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }}
         />
 
         {children}
