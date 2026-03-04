@@ -69,7 +69,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         {book.subtitle && <p className="text-xs text-white/75 mt-0.5 line-clamp-1">{book.subtitle}</p>}
         <p className="text-sm mt-1 text-[#D4AF37] font-medium">{book.author}</p>
 
-        {/* Wrapping Tags */}
+        {/* Tags */}
         <div className="mt-3 flex flex-wrap justify-center gap-1">
           {book.tags.map((tag) => (
             <span 
@@ -85,7 +85,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
   );
 }
 
-// --- Horizontal Scroller Component with Navigation Arrows ---
+// --- Horizontal Scroller Component ---
 function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode; ariaLabel: string }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
@@ -103,7 +103,7 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     const max = el.scrollWidth - el.clientWidth;
     setProgress(max > 0 ? (el.scrollLeft / max) * 100 : 0);
     
-    // Check if we can scroll in either direction to show/hide arrows
+    // Updates arrow visibility based on scroll position
     setCanScrollLeft(el.scrollLeft > 5);
     setCanScrollRight(el.scrollLeft < max - 5);
   }, []);
@@ -117,14 +117,24 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     });
     ro.observe(el);
     el.addEventListener("scroll", updateScrollState, { passive: true });
-    return () => { ro.disconnect(); el.removeEventListener("scroll", updateScrollState); };
+    
+    // Initial check on mount
+    updateScrollState();
+
+    return () => { 
+      ro.disconnect(); 
+      el.removeEventListener("scroll", updateScrollState); 
+    };
   }, [updateScrollState]);
 
   const scroll = (direction: 'left' | 'right') => {
     const el = scrollerRef.current;
     if (!el) return;
     const scrollAmount = el.clientWidth * 0.8;
-    el.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+    el.scrollBy({ 
+      left: direction === 'left' ? -scrollAmount : scrollAmount, 
+      behavior: 'smooth' 
+    });
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -156,28 +166,32 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
 
   return (
     <div className="relative group/scroller">
-      {/* Side Arrows - Hidden on mobile, visible on hover for desktop */}
-      <button
-        onClick={() => scroll('left')}
-        className={`hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-40 bg-black/60 border border-[#D4AF37]/30 text-[#D4AF37] p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/80 hover:border-[#D4AF37] active:scale-95 ${canScrollLeft ? 'opacity-0 group-hover/scroller:opacity-100' : 'opacity-0 pointer-events-none'}`}
-        aria-label="Scroll left"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
-      </button>
+      {/* Dynamic Navigation Arrows */}
+      {canScrollLeft && (
+        <button
+          onClick={() => scroll('left')}
+          className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-40 bg-black/60 border border-[#D4AF37]/30 text-[#D4AF37] p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/80 hover:border-[#D4AF37] active:scale-95 opacity-0 group-hover/scroller:opacity-100 shadow-2xl"
+          aria-label="Scroll left"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+      )}
 
-      <button
-        onClick={() => scroll('right')}
-        className={`hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-40 bg-black/60 border border-[#D4AF37]/30 text-[#D4AF37] p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/80 hover:border-[#D4AF37] active:scale-95 ${canScrollRight ? 'opacity-0 group-hover/scroller:opacity-100' : 'opacity-0 pointer-events-none'}`}
-        aria-label="Scroll right"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
-      </button>
+      {canScrollRight && (
+        <button
+          onClick={() => scroll('right')}
+          className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-40 bg-black/60 border border-[#D4AF37]/30 text-[#D4AF37] p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/80 hover:border-[#D4AF37] active:scale-95 opacity-0 group-hover/scroller:opacity-100 shadow-2xl"
+          aria-label="Scroll right"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      )}
 
-      {/* Gradients */}
+      {/* Visual Gradients */}
       <div className="absolute left-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
       
@@ -192,7 +206,6 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
           WebkitOverflowScrolling: "touch",
           scrollbarWidth: 'none'
         }}
-        aria-label={ariaLabel}
         className="flex overflow-x-auto pb-10 snap-x snap-mandatory scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20 hide-scrollbar select-none md:cursor-grab md:active:cursor-grabbing"
       >
         {children}
