@@ -366,7 +366,10 @@ function HomeContent() {
             </div>
           </div>
         </section>
-        <footer className="mt-20 py-10 text-sm text-white/50 text-center">© {new Date().getFullYear()} Dean Miller. All rights reserved.</footer>
+        <footer className="mt-20 py-10 text-sm text-white/50 text-center">
+  © {new Date().getFullYear()} Dean Miller. All rights reserved.
+  <Link href="/admin/login" className="opacity-0 cursor-default ml-1">.</Link>
+</footer>
       </div>
       <MediaLightbox isOpen={lightboxOpen} onClose={closeLightbox} title={lightboxTitle} src={lightboxSrc} />
     </main>
