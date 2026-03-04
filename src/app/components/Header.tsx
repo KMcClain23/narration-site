@@ -1,11 +1,11 @@
 "use client";
 
-import Image from "next/image"; //
+import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FaTiktok, FaInstagram, FaDiscord } from "react-icons/fa";
 import { HiMenu, HiX } from "react-icons/hi";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const BOOKINGS_URL =
   "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
@@ -14,6 +14,11 @@ export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+
+  // Secret admin trigger: 5 rapid clicks on the brand/profile area
+  const secretClicks = useRef(0);
+  const lastSecretClickAt = useRef(0);
 
   const toggleMenu = () => setIsOpen((v) => !v);
   const closeMenu = () => setIsOpen(false);
@@ -73,20 +78,50 @@ export default function Header() {
     ? "bg-[#050814]/55 backdrop-blur-xl border-b border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
     : "bg-transparent border-b border-white/10";
 
+  const handleSecretAdminTrigger = (e: React.MouseEvent) => {
+    // Let normal navigation still happen
+    // Just count rapid clicks in the background
+    const now = Date.now();
+
+    // If the gap between clicks is too long, reset the sequence
+    if (now - lastSecretClickAt.current > 1500) {
+      secretClicks.current = 0;
+    }
+
+    secretClicks.current += 1;
+    lastSecretClickAt.current = now;
+
+    if (secretClicks.current >= 5) {
+      secretClicks.current = 0;
+
+      // Optional: prevent the last click from navigating home
+      // so you immediately land on admin login.
+      e.preventDefault();
+
+      router.push("/admin/login");
+    }
+  };
+
   return (
     <header className={`sticky top-0 z-50 transition-all duration-200 ${headerClass}`}>
       <div className="max-w-6xl mx-auto px-5 sm:px-6 h-16 flex items-center justify-between">
         {/* Brand */}
-        <Link href="/" className="flex items-center gap-3 group" onClick={closeMenu}>
+        <Link
+          href="/"
+          className="flex items-center gap-3 group"
+          onClick={(e) => {
+            handleSecretAdminTrigger(e);
+            closeMenu();
+          }}
+        >
           <div className="h-9 w-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center overflow-hidden transition group-hover:border-[#D4AF37]/50 group-hover:bg-[#D4AF37]/10">
-            {/* The profile image replaces the text DM */}
-            <Image 
-              src="/dean-profile.png" 
-              alt="Dean Miller" 
-              width={36} 
-              height={36} 
+            <Image
+              src="/dean-profile.png"
+              alt="Dean Miller"
+              width={36}
+              height={36}
               className="object-cover"
-              priority 
+              priority
             />
           </div>
           <div className="leading-tight">
