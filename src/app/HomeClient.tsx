@@ -138,18 +138,18 @@ function AtAGlanceCard({
             <div className="grid grid-cols-2 gap-4">
               <button
                 type="button"
-                onClick={() => onOpenLightbox("/dean-profile.png", "Logo")}
+                onClick={() => onOpenLightbox("/DeanMillerLogo.png", "Logo")}
                 className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60"
               >
-                <Image src="/dean-profile.png" alt="Logo" fill className="object-contain p-2" />
+                <Image src="https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerLogo.png" alt="Logo" fill className="object-contain p-2" />
               </button>
 
               <button
                 type="button"
-                onClick={() => onOpenLightbox("/dean-headshot.jpg", "Headshot")}
+                onClick={() => onOpenLightbox("/Profile.jpg", "Headshot")}
                 className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60"
               >
-                <Image src="/dean-headshot.jpg" alt="Headshot" fill className="object-cover" />
+                <Image src="https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile.jpg" alt="Headshot" fill className="object-cover" />
               </button>
             </div>
 
@@ -218,7 +218,19 @@ function DemoPlayer({
 
     const onTimeUpdate = () => setCurrent(a.currentTime);
     const onDurationChange = () => setDuration(a.duration);
-    const onPlay = () => { setPlaying(true); setBuffering(false); setActiveIndex(index); };
+    const onPlay = () => { 
+      setPlaying(true); 
+      setBuffering(false); 
+      setActiveIndex(index);
+      
+      // Tracking: Log play events to console or API
+      console.log(`Demo Played: ${title}`);
+      fetch('/api/track-demo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      }).catch(() => {}); // Silent fail to not disrupt user experience
+    };
     const onPause = () => setPlaying(false);
     const onWaiting = () => setBuffering(true);
     const onPlaying = () => setBuffering(false);
@@ -241,7 +253,7 @@ function DemoPlayer({
       a.removeEventListener("playing", onPlaying);
       a.removeEventListener("ended", onEnded);
     };
-  }, [index, setActiveIndex, audioRefs]);
+  }, [index, title, setActiveIndex, audioRefs]);
 
   const pct = duration > 0 ? (current / duration) * 100 : 0;
 
@@ -352,7 +364,7 @@ function HomeContent() {
       {/* HERO */}
       <section className="relative overflow-hidden -mt-16 pt-16">
         <div className="absolute inset-0">
-          <Image src="/dean-banner.png" alt="Dean Miller banner" fill priority className="object-cover opacity-35" />
+          <Image src="https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerBanner.png" alt="Dean Miller banner" fill priority className="object-cover opacity-35" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050814]/85 via-[#050814]/75 to-[#050814]" />
         </div>
 
@@ -395,33 +407,32 @@ function HomeContent() {
 
         {/* ABOUT */}
         <section id="about" className="mt-20 scroll-mt-24">
-          <h2 className="text-3xl font-bold">About</h2>
+          <h2 className="text-3xl font-bold">About Your Narrator</h2>
           <div className="mt-6 flex flex-col gap-8">
             <div className="max-w-4xl">
-              <p className="text-white/80 text-lg leading-relaxed">
-                I’m Dean Miller, a professional audiobook narrator drawn to character-driven stories with emotional depth, quiet tension, and honest human connection. I record from a broadcast-quality home studio and value clear communication and collaboration throughout each project.
+              <p className="text-white/90 text-lg leading-relaxed">
+                Hello. I’m <span className="text-[#D4AF37] font-semibold">Dean Miller</span>, a professional audiobook narrator and storyteller. For me, narration isn’t just performance—it&apos;s connection. It’s the moment a listener forgets there’s a voice between them and the story, and simply feels.
               </p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
-                <p className="text-[#D4AF37] text-xs uppercase tracking-widest font-bold mb-3">Expertise & Genres</p>
-                <p className="text-white/90 leading-relaxed">
-                  Specializing in Romance, Romantasy, Drama, Thriller, and Narrative Nonfiction. 
-                  Focusing on authentic emotional beats and distinct character voices.
+              <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-8 shadow-lg transition hover:border-[#D4AF37]/30">
+                <p className="text-[#D4AF37] text-xs uppercase tracking-widest font-bold mb-4">The Musical Ear</p>
+                <p className="text-white/80 leading-relaxed text-sm">
+                  I’ve always had a fascination with voices. As a kid, I mimicked actors and cartoon characters, testing how close I could get to their tone, rhythm, and emotion. That love of sound naturally extended into music and theatre. Performing became a way to translate that emotion into something others could feel—a single note or phrase that stirs the soul.
                 </p>
               </div>
               
-              <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
-                <p className="text-[#D4AF37] text-xs uppercase tracking-widest font-bold mb-3">The Studio</p>
-                <div className="flex items-center gap-4">
-                  <div className="text-sm text-white/90">
-                    <p>• Shure MV7+ Broadcast Microphone</p>
-                    <p>• Custom Acoustically Treated Space</p>
-                    <p>• Professional Grade Pop Filtration</p>
-                  </div>
-                </div>
+              <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-8 shadow-lg transition hover:border-[#D4AF37]/30">
+                <p className="text-[#D4AF37] text-xs uppercase tracking-widest font-bold mb-4">The Path to Narration</p>
+                <p className="text-white/80 leading-relaxed text-sm">
+                  My background weaves together years of performance, leadership, and creative exploration. While I’ve managed teams and built brands, the voice was always there waiting. Narration is the perfect convergence of everything I love: storytelling, precision, and the ability to bring an author’s vision to life through tone and presence.
+                </p>
               </div>
+            </div>
+
+            <div className="max-w-3xl italic text-white/60 text-sm">
+              Every project I take on is approached with the same respect I give the story itself: immersive, authentic, and emotionally true.
             </div>
           </div>
         </section>
@@ -484,7 +495,7 @@ function HomeContent() {
               </div>
 
               <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
-                <p className="text-sm text-white/70">Prefer a face-to-face chat?</p>
+                <p className="text-sm text-white/70">Prefer to schedule?</p>
                 <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/5 transition">
                   Book a 15-minute call
                 </a>
