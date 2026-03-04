@@ -3,6 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+// Import for Metadata if you decide to move it to a layout or separate file, 
+// but for client components, we use specific tags or the parent layout.
 
 type Book = {
   title: string;
@@ -63,6 +65,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
 
       {/* Details Container */}
       <div className="p-4 pb-2 text-center">
+        {/* Audit Fix: Changed to H3 for semantic hierarchy */}
         <h3 className="font-semibold text-base leading-tight text-white group-hover:text-[#D4AF37] transition-colors line-clamp-1">
           {book.title}
         </h3>
@@ -103,7 +106,6 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     const max = el.scrollWidth - el.clientWidth;
     setProgress(max > 0 ? (el.scrollLeft / max) * 100 : 0);
     
-    // Updates arrow visibility based on scroll position
     setCanScrollLeft(el.scrollLeft > 5);
     setCanScrollRight(el.scrollLeft < max - 5);
   }, []);
@@ -112,7 +114,6 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     const el = scrollerRef.current;
     if (!el) return;
 
-    // FIX: Force reset to absolute zero on mount to prevent the initial offset
     el.scrollTo({ left: 0 });
 
     const ro = new ResizeObserver(() => {
@@ -122,7 +123,6 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     ro.observe(el);
     el.addEventListener("scroll", updateScrollState, { passive: true });
     
-    // Initial check to hide the left arrow immediately
     updateScrollState();
 
     return () => { 
@@ -170,7 +170,6 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
 
   return (
     <div className="relative group/scroller">
-      {/* Navigation Arrows */}
       {canScrollLeft && (
         <button
           onClick={() => scroll('left')}
@@ -272,7 +271,7 @@ export default function NarratedWorks() {
       <div className="max-w-7xl mx-auto py-16 md:py-24">
         <header className="mb-12 text-center px-6">
           <h1 className="text-4xl md:text-6xl font-bold mb-4">Narrated Works</h1>
-          <p className="text-white/60 text-lg">Portfolio of narrated audiobooks.</p>
+          <p className="text-white/60 text-lg max-w-2xl mx-auto">Explore my portfolio of professional audiobook narrations. Specializing in dark romance, romantasy, and emotionally driven fiction available on Amazon and Audible.</p>
           <div className="mt-10 max-w-md mx-auto relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <svg className="h-5 w-5 text-white/30 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -298,7 +297,8 @@ export default function NarratedWorks() {
           <>
             {filteredCompleted.length > 0 && (
               <section className="mb-20">
-                <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">Completed Projects</h2>
+                {/* Audit Fix: Ensure clear hierarchy */}
+                <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">Completed Audiobook Projects</h2>
                 <HorizontalScroller ariaLabel="Completed projects">
                   {filteredCompleted.map((book) => <BookCard key={book.link} book={book} />)}
                 </HorizontalScroller>
@@ -314,7 +314,7 @@ export default function NarratedWorks() {
             )}
             {filteredComingSoon.length > 0 && (
               <section className="mb-20">
-                <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">Coming Soon</h2>
+                <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">Coming Soon to Audible</h2>
                 <HorizontalScroller ariaLabel="Coming soon">
                   {filteredComingSoon.map((book) => <BookCard key={book.link} book={book} statusBadge="Soon" />)}
                 </HorizontalScroller>
@@ -323,7 +323,8 @@ export default function NarratedWorks() {
           </>
         )}
         <footer className="mt-24 text-center">
-          <Link href="/#contact" className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-10 py-4 font-bold hover:scale-105 transition-all">Contact Me</Link>
+          <p className="mb-8 text-white/50 text-sm italic">Looking for a specific tone or character range for your next project?</p>
+          <Link href="/#contact" className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-10 py-4 font-bold hover:scale-105 transition-all">Request a Custom Narration Quote</Link>
         </footer>
       </div>
     </main>

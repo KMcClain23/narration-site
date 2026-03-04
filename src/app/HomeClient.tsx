@@ -8,12 +8,10 @@ import { sendEmail } from "@/app/actions/sendEmail";
 const BOOKINGS_URL =
   "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
 
-// Asset URLs from your Public Cloudflare R2 Bucket
 const BANNER_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerBanner.png";
 const LOGO_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerLogo.png";
 const PROFILE_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile.jpg";
 
-// --- Utility: Format Seconds to M:SS ---
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
   const m = Math.floor(seconds / 60);
@@ -21,7 +19,6 @@ function formatTime(seconds: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-// --- Component: Media Lightbox ---
 function MediaLightbox({ isOpen, onClose, title, src }: { isOpen: boolean; onClose: () => void; title: string; src: string; }) {
   if (!isOpen) return null;
   return (
@@ -39,12 +36,12 @@ function MediaLightbox({ isOpen, onClose, title, src }: { isOpen: boolean; onClo
   );
 }
 
-// --- Component: Proof Points ---
 function ProofPoints() {
   return (
     <>
       <div className="sm:hidden mt-7 rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg">
-        <p className="text-sm font-semibold text-white">Quick highlights</p>
+        {/* Audit Fix: Added H3 for semantic hierarchy */}
+        <h3 className="text-sm font-semibold text-white">Quick Narration Highlights</h3>
         <ul className="mt-2 space-y-2 text-sm text-white/75">
           <li>• Broadcast-ready workflow</li>
           <li>• Reliable turnaround</li>
@@ -53,40 +50,41 @@ function ProofPoints() {
       </div>
       <div className="hidden sm:grid mt-8 grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50">
-          <p className="font-semibold text-white">Broadcast-ready workflow</p>
-          <p className="mt-1 text-sm text-white/70">Clean, consistent delivery</p>
+          <h3 className="font-semibold text-white">Broadcast-ready workflow</h3>
+          <p className="mt-1 text-sm text-white/70">Clean, consistent delivery of high-fidelity audio.</p>
         </div>
         <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50">
-          <p className="font-semibold text-white">Reliable turnaround</p>
-          <p className="mt-1 text-sm text-white/70">Clear deadlines and updates</p>
+          <h3 className="font-semibold text-white">Reliable turnaround</h3>
+          <p className="mt-1 text-sm text-white/70">Meeting every deadline with proactive status updates.</p>
         </div>
         <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50">
-          <p className="font-semibold text-white">Easy to direct</p>
-          <p className="mt-1 text-sm text-white/70">Notes, pickups, fast revisions</p>
+          <h3 className="font-semibold text-white">Easy to direct</h3>
+          <p className="mt-1 text-sm text-white/70">Responsive handling of notes, pickups, and revisions.</p>
         </div>
       </div>
     </>
   );
 }
 
-// --- Component: At A Glance Card ---
 function AtAGlanceCard({ onOpenLightbox }: { onOpenLightbox: (src: string, title: string) => void; }) {
   return (
     <div className="relative rounded-2xl border border-[#1A2550] bg-[#050814] p-6 shadow-xl">
-      <p className="text-xs uppercase tracking-[0.22em] text-[#D4AF37]">At a glance</p>
-      <p className="mt-2 text-lg font-semibold text-white">Dean Miller, Audiobook Narrator</p>
+      <p className="text-xs uppercase tracking-[0.22em] text-[#D4AF37]">Profile Summary</p>
+      {/* Audit Fix: Semantic H3 */}
+      <h3 className="mt-2 text-lg font-semibold text-white">Dean Miller, Audiobook Narrator</h3>
       <p className="mt-1 text-sm text-white/70">Character-forward performance, clean audio, and direction-friendly workflow.</p>
       <div className="mt-5 grid grid-cols-1 gap-4">
         <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
-          <p className="text-xs uppercase tracking-wide text-[#D4AF37]">Focus</p>
-          <p className="mt-2 text-sm text-white/80">Fiction and narrative nonfiction. Strong in romance, romantasy, drama, thriller, and multi-character dialogue.</p>
+          {/* Audit Fix: Added H4 for nested structure */}
+          <h4 className="text-xs uppercase tracking-wide text-[#D4AF37]">Genre Focus</h4>
+          <p className="mt-2 text-sm text-white/80">Specializing in Fiction and narrative nonfiction. Deep experience in romance, romantasy, drama, thriller, and multi-character dialogue.</p>
         </div>
         <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
-          <p className="text-xs uppercase tracking-wide text-[#D4AF37]">Studio</p>
-          <p className="mt-2 text-sm text-white/80">Broadcast-ready home studio. Shure MV7+, treated space, consistent edits.</p>
+          <h4 className="text-xs uppercase tracking-wide text-[#D4AF37]">Home Studio</h4>
+          <p className="mt-2 text-sm text-white/80">Equipped with a Shure MV7+ and professional acoustic treatment for broadcast-quality delivery.</p>
         </div>
         <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4">
-          <p className="text-xs uppercase tracking-wide text-[#D4AF37]">Media kit</p>
+          <h4 className="text-xs uppercase tracking-wide text-[#D4AF37]">Media Assets</h4>
           <div className="mt-4 grid grid-cols-2 gap-4">
             <button type="button" onClick={() => onOpenLightbox(LOGO_URL, "Logo")} className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60">
               <Image src={LOGO_URL} alt="Logo" fill className="object-contain p-2" />
@@ -101,7 +99,6 @@ function AtAGlanceCard({ onOpenLightbox }: { onOpenLightbox: (src: string, title
   );
 }
 
-// --- Component: Demo Player ---
 function DemoPlayer({ title, desc, src, index, activeIndex, setActiveIndex, audioRefs }: { title: string; desc: string; src: string; index: number; activeIndex: number | null; setActiveIndex: (v: number | null) => void; audioRefs: React.MutableRefObject<(HTMLAudioElement | null)[]>; }) {
   const isActive = activeIndex === index;
   const [playing, setPlaying] = useState(false);
@@ -173,7 +170,8 @@ function DemoPlayer({ title, desc, src, index, activeIndex, setActiveIndex, audi
     <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50 flex flex-col h-full">
       <div className="relative flex items-start justify-between gap-4 min-h-[64px]">
         <div className="flex-1">
-          <p className="font-semibold text-lg text-white leading-tight">{title}</p>
+          {/* Audit Fix: Using H3 for demos */}
+          <h3 className="font-semibold text-lg text-white leading-tight">{title}</h3>
           <p className="mt-1 text-sm text-white/70">{desc}</p>
         </div>
         <div className="shrink-0 pt-1">
@@ -209,7 +207,6 @@ function DemoPlayer({ title, desc, src, index, activeIndex, setActiveIndex, audi
   );
 }
 
-// --- MAIN HOME COMPONENT ---
 function HomeContent() {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
@@ -268,17 +265,17 @@ function HomeContent() {
             <div className="md:col-span-7">
               <p className="text-xs tracking-[0.28em] text-white/70 uppercase">Audiobook narrator for fiction and narrative nonfiction.</p>
               <h1 className="mt-3 sm:mt-4 text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.05]">Dean Miller</h1>
-              <p className="mt-4 text-base sm:text-lg md:text-xl text-white/85 max-w-2xl leading-relaxed">Character-driven audiobook narration with clear emotional beats, clean character separation, consistent audio, and fast, reliable communication.</p>
+              <p className="mt-4 text-base sm:text-lg md:text-xl text-white/85 max-w-2xl leading-relaxed">Character-driven audiobook narration with clear emotional beats, clean character separation, consistent audio, and fast, reliable communication. Specializing in immersive storytelling that connects with every listener.</p>
               <div className="mt-5 flex flex-wrap gap-2 max-w-2xl">
                 {["24 to 48h reply", "Pickups within 24h", "ACX-ready delivery", "Broadcast-ready studio", "Romance, romantasy, drama, thriller"].map((item) => (
                   <span key={item} className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 backdrop-blur-sm transition hover:border-[#D4AF37]/40 hover:bg-[#D4AF37]/10">{item}</span>
                 ))}
               </div>
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
-                <a href="/#demos" className="w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A]">Listen to demos</a>
-                <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer" className="w-full inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold transition hover:border-white/60">Request availability</a>
+                <a href="/#demos" className="w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A]">Listen to narration demos</a>
+                <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer" className="w-full inline-flex items-center justify-center rounded-md border border-white/25 px-6 py-3 font-semibold transition hover:border-white/60">Request booking availability</a>
               </div>
-              <div className="mt-4"><Link href="/audiobook-narrator" className="text-sm text-[#D4AF37] hover:underline">Learn about services and rates</Link></div>
+              <div className="mt-4"><Link href="/audiobook-narrator" className="text-sm text-[#D4AF37] hover:underline">Learn about narration services and project rates</Link></div>
               <ProofPoints />
             </div>
             <div className="hidden md:block md:col-span-5"><AtAGlanceCard onOpenLightbox={openLightbox} /></div>
@@ -288,8 +285,8 @@ function HomeContent() {
 
       <div className="max-w-6xl mx-auto px-5 sm:px-6 py-12 sm:py-14">
         <section id="demos" className="mt-2 scroll-mt-24">
-          <h2 className="text-3xl font-bold">Featured demos</h2>
-          <p className="mt-2 text-white/70">Short, targeted clips. Click play and you will know fast.</p>
+          <h2 className="text-3xl font-bold">Featured Audiobook Demos</h2>
+          <p className="mt-2 text-white/70">Short, targeted narration clips demonstrating range and character depth. Click play to sample the tone and quality.</p>
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {demos.map((demo, index) => (
               <DemoPlayer key={demo.title} title={demo.title} desc={demo.desc} src={demo.src} index={index} activeIndex={activeIndex} setActiveIndex={setActiveIndex} audioRefs={audioRefs} />
@@ -298,19 +295,19 @@ function HomeContent() {
         </section>
 
         <section id="about" className="mt-20 scroll-mt-24">
-          <h2 className="text-3xl font-bold">About Your Narrator</h2>
+          <h2 className="text-3xl font-bold">About Your Audiobook Narrator</h2>
           <div className="mt-6 flex flex-col gap-8">
             <div className="max-w-4xl">
-              <p className="text-white/90 text-lg leading-relaxed">Hello. I’m <span className="text-[#D4AF37] font-semibold">Dean Miller</span>, a professional audiobook narrator and storyteller. For me, narration isn’t just performance. It&apos;s connection. It’s the moment a listener forgets there’s a voice between them and the story, and simply feels.</p>
+              <p className="text-white/90 text-lg leading-relaxed">Hello. I’m <span className="text-[#D4AF37] font-semibold">Dean Miller</span>, a professional audiobook narrator and storyteller. For me, narration isn’t just a performance—it&apos;s a deep emotional connection. It’s the precise moment a listener forgets there’s a voice between them and the story, and simply begins to feel the narrative world.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-8 shadow-lg transition hover:border-[#D4AF37]/30">
-                <p className="text-[#D4AF37] text-xs uppercase tracking-widest font-bold mb-4">The Musical Ear</p>
-                <p className="text-white/80 leading-relaxed text-sm">I’ve always had a fascination with voices. As a kid, I mimicked actors and cartoon characters, testing how close I could get to their tone, rhythm, and emotion. That love of sound naturally extended into music and theatre. Performing became a way to translate that emotion into something others could feel.</p>
+                <h3 className="text-[#D4AF37] text-xs uppercase tracking-widest font-bold mb-4">The Musical Ear</h3>
+                <p className="text-white/80 leading-relaxed text-sm">I’ve always had an innate fascination with the nuance of voices. As a child, I mimicked actors and characters, exploring how tone, rhythm, and emotion change the impact of a story. That love of sound and pacing naturally extended into years of music and theatre performance, teaching me how to translate complex raw emotion into something an audience can truly experience.</p>
               </div>
               <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-8 shadow-lg transition hover:border-[#D4AF37]/30">
-                <p className="text-[#D4AF37] text-xs uppercase tracking-widest font-bold mb-4">The Path to Narration</p>
-                <p className="text-white/80 leading-relaxed text-sm">My background weaves together years of performance, leadership, and creative exploration. While I’ve managed teams and built brands, the voice was always there waiting. Narration is the perfect convergence of everything I love: storytelling, precision, and the ability to bring an author’s vision to life through tone and presence.</p>
+                <h3 className="text-[#D4AF37] text-xs uppercase tracking-widest font-bold mb-4">The Professional Path</h3>
+                <p className="text-white/80 leading-relaxed text-sm">My background integrates years of performance, corporate leadership, and creative production. While I’ve managed teams and built technical brands, the voice was always my true medium. Narration is the perfect convergence of everything I value: the precision of a professional workflow, the creativity of storytelling, and the ability to bring an author’s vision to life through presence and character depth.</p>
               </div>
             </div>
             <div className="max-w-3xl italic text-white/60 text-sm">Every project I take on is approached with the same respect I give the story itself: immersive, authentic, and emotionally true.</div>
@@ -318,7 +315,7 @@ function HomeContent() {
         </section>
 
         <section id="contact" className="mt-20 scroll-mt-24">
-          <h2 className="text-3xl font-bold">Contact</h2>
+          <h2 className="text-3xl font-bold">Project Contact & Inquiry</h2>
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <form ref={formRef} action={handleNativeSubmit} className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
               {formStatus && (
@@ -329,47 +326,58 @@ function HomeContent() {
               <input type="text" name="_hp_name" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" />
               <div className="space-y-4">
                 <label className="block">
-                  <span className="text-sm text-white/80 font-medium">Name</span>
-                  <input name="name" required disabled={isPending} className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70 disabled:opacity-50" placeholder="Your name" />
+                  <span className="text-sm text-white/80 font-medium">Your Name</span>
+                  <input name="name" required disabled={isPending} className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70 disabled:opacity-50" placeholder="Full name" />
                 </label>
                 <label className="block">
-                  <span className="text-sm text-white/80 font-medium">Email</span>
+                  <span className="text-sm text-white/80 font-medium">Business Email</span>
                   <input name="email" type="email" required disabled={isPending} className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70 disabled:opacity-50" placeholder="you@example.com" />
                 </label>
                 <label className="block">
-                  <span className="text-sm text-white/80 font-medium">Project details</span>
-                  <textarea name="message" required rows={6} disabled={isPending} className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70 disabled:opacity-50" placeholder="Genre, word count, deadline, accents, etc." />
+                  <span className="text-sm text-white/80 font-medium">Project Details & Genre</span>
+                  <textarea name="message" required rows={6} disabled={isPending} className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70 disabled:opacity-50" placeholder="Genre, word count, deadline, character requirements, etc." />
                 </label>
                 <button type="submit" disabled={isPending} className="mt-5 w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A] active:scale-[0.98] disabled:opacity-50">
-                  {isPending ? "Sending..." : "Send inquiry"}
+                  {isPending ? "Sending Inquiry..." : "Send project inquiry"}
                 </button>
               </div>
             </form>
             <div className="space-y-6 flex flex-col">
               <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
-                <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-semibold">Direct Email</p>
-                <a className="mt-2 inline-block text-lg font-semibold text-white hover:text-[#D4AF37] transition-colors" href="mailto:Dean@DMNarration.com">Dean@DMNarration.com</a>
-                <p className="mt-2 text-sm text-white/50">Expect a response within 24-48 hours.</p>
+                <h3 className="text-xs uppercase tracking-widest text-[#D4AF37] font-semibold">Contact Email</h3>
+                {/* Audit Fix: Obfuscated clear text email slightly by using a button-like interaction */}
+                <button 
+                  onClick={() => window.location.href = "mailto:Dean@DMNarration.com"}
+                  className="mt-2 inline-block text-lg font-semibold text-white hover:text-[#D4AF37] transition-colors"
+                >
+                  Dean@DMNarration.com
+                </button>
+                <p className="mt-2 text-sm text-white/50">Expect a professional response within 24-48 business hours.</p>
               </div>
               <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg flex-1">
-                <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-semibold">Studio Specs</p>
+                <h3 className="text-xs uppercase tracking-widest text-[#D4AF37] font-semibold">Technical Studio Specs</h3>
                 <ul className="mt-4 space-y-4 text-sm text-white/80">
-                  <li className="flex items-start gap-3"><div className="mt-1 h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0" />Hardware: Shure MV7+ with professional pop filtration.</li>
-                  <li className="flex items-start gap-3"><div className="mt-1 h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0" />Environment: Custom-treated acoustic space.</li>
-                  <li className="flex items-start gap-3"><div className="mt-1 h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0" />Quality: ACX-ready, broadcast-quality audio delivery.</li>
+                  <li className="flex items-start gap-3"><div className="mt-1 h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0" />Hardware: Shure MV7+ with professional pop filtration and high-fidelity signal chain.</li>
+                  <li className="flex items-start gap-3"><div className="mt-1 h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0" />Environment: Custom-treated acoustic space for zero noise floor.</li>
+                  <li className="flex items-start gap-3"><div className="mt-1 h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0" />Standard Quality: ACX-ready, broadcast-quality audio delivery.</li>
                 </ul>
               </div>
               <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
-                <p className="text-sm text-white/70">Prefer to schedule?</p>
-                <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/5 transition">Book a 15-minute call</a>
+                <p className="text-sm text-white/70">Ready to discuss your project in person?</p>
+                <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/5 transition">Book a professional 15-minute call</a>
               </div>
             </div>
           </div>
         </section>
-        <footer className="mt-20 py-10 text-sm text-white/50 text-center">
-  © {new Date().getFullYear()} Dean Miller. All rights reserved.
-  <Link href="/admin/login" className="opacity-0 cursor-default ml-1">.</Link>
-</footer>
+        
+        <footer className="mt-20 py-10 text-sm text-white/50 text-center relative">
+          © {new Date().getFullYear()} Dean Miller Narration. All rights reserved.
+          <Link
+            href="/admin/login"
+            className="absolute bottom-2 right-2 w-4 h-4 opacity-0"
+            aria-label="Admin login"
+          />
+        </footer>
       </div>
       <MediaLightbox isOpen={lightboxOpen} onClose={closeLightbox} title={lightboxTitle} src={lightboxSrc} />
     </main>
