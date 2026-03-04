@@ -24,11 +24,12 @@ export default async function AdminStatsPage({
   /**
    * Verify admin key
    */
-  const providedKey = searchParams?.key;
+const providedKey = (searchParams?.key ?? "").trim();
+const secret = (process.env.ADMIN_SECRET_KEY ?? "").trim();
 
-  if (!process.env.ADMIN_SECRET_KEY) {
-    throw new Error("ADMIN_SECRET_KEY environment variable is not set.");
-  }
+if (!providedKey || providedKey !== secret) {
+  return notFound();
+}
 
   if (providedKey !== process.env.ADMIN_SECRET_KEY) {
     return notFound();
