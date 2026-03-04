@@ -359,7 +359,6 @@ function HomeContent() {
             <div>
               <h4 className="text-white font-semibold mb-4 uppercase tracking-wider text-xs">Professional Links</h4>
               <ul className="space-y-2">
-                <li><a href="https://www.linkedin.com/in/kevinandrewmcclain" target="_blank" rel="noopener" className="hover:text-[#D4AF37]">LinkedIn Profile</a></li>
                 <li><a href="https://www.acx.com/narrator?p=A3DYAXR7JFPXPE" target="_blank" rel="noopener" className="hover:text-[#D4AF37]">ACX Narrator Profile</a></li>
               </ul>
             </div>
@@ -367,6 +366,7 @@ function HomeContent() {
               <h4 className="text-white font-semibold mb-4 uppercase tracking-wider text-xs">Social</h4>
               <ul className="space-y-2">
                 <li><a href="https://www.tiktok.com/@deanmillernarration" target="_blank" rel="noopener" className="hover:text-[#D4AF37]">TikTok Portfolio</a></li>
+                <li><a href="https://www.instagram.com/deanmillernarrator" target="_blank" rel="noopener" className="hover:text-[#D4AF37]">Instagram Reels</a></li>
               </ul>
             </div>
           </div>
