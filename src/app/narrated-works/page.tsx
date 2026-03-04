@@ -103,7 +103,6 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     const max = el.scrollWidth - el.clientWidth;
     setProgress(max > 0 ? (el.scrollLeft / max) * 100 : 0);
     
-    // Updates arrow visibility based on scroll position
     setCanScrollLeft(el.scrollLeft > 5);
     setCanScrollRight(el.scrollLeft < max - 5);
   }, []);
@@ -111,6 +110,10 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
+
+    // Force absolute start on mount to fix initial offset issue
+    el.scrollTo({ left: 0 });
+
     const ro = new ResizeObserver(() => {
       setShowBar(el.scrollWidth > el.clientWidth + 10);
       updateScrollState();
@@ -118,7 +121,6 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     ro.observe(el);
     el.addEventListener("scroll", updateScrollState, { passive: true });
     
-    // Initial check on mount
     updateScrollState();
 
     return () => { 
@@ -166,7 +168,6 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
 
   return (
     <div className="relative group/scroller">
-      {/* Dynamic Navigation Arrows */}
       {canScrollLeft && (
         <button
           onClick={() => scroll('left')}
@@ -191,7 +192,6 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
         </button>
       )}
 
-      {/* Visual Gradients */}
       <div className="absolute left-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
       
