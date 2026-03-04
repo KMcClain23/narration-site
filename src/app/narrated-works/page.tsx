@@ -23,7 +23,6 @@ interface BookCardProps {
 function BookCard({ book, statusBadge }: BookCardProps) {
   return (
     <div className="group relative rounded-xl overflow-hidden shadow-lg transition-all duration-300 hover:-translate-y-2 border border-[#1A2550] bg-[#0B1224] flex-shrink-0 w-[75vw] sm:w-64 md:w-72 snap-start select-none">
-      {/* Amazon Link */}
       <div className="absolute top-3 left-3 z-30 group/btn">
         <a
           href={book.link}
@@ -43,7 +42,6 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         </a>
       </div>
 
-      {/* Book Cover */}
       <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
         <Image
           src={book.cover}
@@ -61,16 +59,13 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         </div>
       )}
 
-      {/* Details Container */}
       <div className="p-4 pb-2 text-center">
-        {/* Audit Fix: Changed to H3 for semantic hierarchy */}
         <h3 className="font-semibold text-base leading-tight text-white group-hover:text-[#D4AF37] transition-colors line-clamp-1">
           {book.title}
         </h3>
         {book.subtitle && <p className="text-xs text-white/75 mt-0.5 line-clamp-1">{book.subtitle}</p>}
         <p className="text-sm mt-1 text-[#D4AF37] font-medium">{book.author}</p>
 
-        {/* Tags */}
         <div className="mt-3 flex flex-wrap justify-center gap-1">
           {book.tags.map((tag) => (
             <span 
@@ -103,7 +98,6 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     if (!el) return;
     const max = el.scrollWidth - el.clientWidth;
     setProgress(max > 0 ? (el.scrollLeft / max) * 100 : 0);
-    
     setCanScrollLeft(el.scrollLeft > 5);
     setCanScrollRight(el.scrollLeft < max - 5);
   }, []);
@@ -111,18 +105,14 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
-
     el.scrollTo({ left: 0 });
-
     const ro = new ResizeObserver(() => {
       setShowBar(el.scrollWidth > el.clientWidth + 10);
       updateScrollState();
     });
     ro.observe(el);
     el.addEventListener("scroll", updateScrollState, { passive: true });
-    
     updateScrollState();
-
     return () => { 
       ro.disconnect(); 
       el.removeEventListener("scroll", updateScrollState); 
@@ -179,7 +169,6 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
           </svg>
         </button>
       )}
-
       {canScrollRight && (
         <button
           onClick={() => scroll('right')}
@@ -191,37 +180,26 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
           </svg>
         </button>
       )}
-
       <div className="absolute left-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
-      
       <div
         ref={scrollerRef}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        style={{ 
-          touchAction: "auto", 
-          WebkitOverflowScrolling: "touch",
-          scrollbarWidth: 'none'
-        }}
-        aria-label={ariaLabel}
+        style={{ touchAction: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: 'none' }}
         className="flex overflow-x-auto pb-10 snap-x snap-mandatory scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20 hide-scrollbar select-none md:cursor-grab md:active:cursor-grabbing justify-start"
       >
         {children}
         <div className="flex-shrink-0 w-10 sm:w-20" />
       </div>
-
       {showBar && (
         <div className="hidden sm:flex mt-6 justify-center px-4">
           <div className="w-full max-w-md relative h-1.5 rounded-full bg-white/5 overflow-hidden">
             <div
               className="absolute top-0 bottom-0 w-16 rounded-full bg-[#D4AF37] transition-all duration-75"
-              style={{ 
-                left: `${progress}%`, 
-                transform: `translateX(-${progress}%)` 
-              }}
+              style={{ left: `${progress}%`, transform: `translateX(-${progress}%)` }}
             />
           </div>
         </div>
@@ -261,7 +239,6 @@ export default function NarratedWorks() {
   const filteredCompleted = useMemo(() => filterBooks(completed), [searchQuery]);
   const filteredInProgress = useMemo(() => filterBooks(inProgress), [searchQuery]);
   const filteredComingSoon = useMemo(() => filterBooks(comingSoon), [searchQuery]);
-
   const hasResults = filteredCompleted.length > 0 || filteredInProgress.length > 0 || filteredComingSoon.length > 0;
 
   return (
@@ -269,10 +246,10 @@ export default function NarratedWorks() {
       <div className="max-w-7xl mx-auto py-16 md:py-24">
         <header className="mb-12 text-center px-6">
           <h1 className="text-4xl md:text-6xl font-bold mb-4">Narrated Works</h1>
-          <p className="text-white/60 text-lg max-w-2xl mx-auto">Explore my portfolio of professional audiobook narrations. Specializing in dark romance, romantasy, and emotionally driven fiction available on Amazon and Audible.</p>
+          <p className="text-white/60 text-lg max-w-2xl mx-auto">Explore my portfolio of professional audiobook narrations specializing in dark romance and character-driven fiction.</p>
           <div className="mt-10 max-w-md mx-auto relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-white/30 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-5 w-5 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
@@ -320,7 +297,6 @@ export default function NarratedWorks() {
           </>
         )}
         <footer className="mt-24 text-center">
-          <p className="mb-8 text-white/50 text-sm italic">Looking for a specific tone or character range for your next project?</p>
           <Link href="/#contact" className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-10 py-4 font-bold hover:scale-105 transition-all">Request a Custom Narration Quote</Link>
         </footer>
       </div>
