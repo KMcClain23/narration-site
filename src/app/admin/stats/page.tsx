@@ -1,6 +1,5 @@
 import { Redis } from '@upstash/redis';
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { revalidatePath } from 'next/cache';
 
 const redis = new Redis({
@@ -15,13 +14,15 @@ export default async function AdminStatsPage({
 }: {
   searchParams: { key?: string };
 }) {
+  // Access the key from the query string
   const secretKey = searchParams.key;
 
-  // Verify access via the ADMIN_SECRET_KEY variable
+  // Verify access against the environment variable
   if (secretKey !== process.env.ADMIN_SECRET_KEY) {
     return notFound(); 
   }
 
+  // Fetch metrics from Upstash Redis
   const totalPlays = await redis.get<number>('total_demo_plays') || 0;
   const keys = await redis.keys('demo_play_count:*');
   const stats = await Promise.all(
@@ -35,6 +36,9 @@ export default async function AdminStatsPage({
   );
   const sortedStats = stats.sort((a, b) => b.count - a.count);
 
+  /**
+   * Server action to clear counters
+   */
   async function resetStatsAction() {
     "use server";
     const keysToDelete = await redis.keys('demo_play_count:*');
@@ -49,20 +53,20 @@ export default async function AdminStatsPage({
     <main className="min-h-screen bg-[#050814] text-white p-6 md:p-12">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between border-b border-[#1A2550] pb-8">
-          <h1 className="text-4xl font-bold tracking-tight text-[#D4AF37]">Stats Dashboard</h1>
+          <h1 className="text-4xl font-bold tracking-tight text-[#D4AF37]">Analytics</h1>
           <form action={resetStatsAction}>
             <button type="submit" className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-bold text-red-400 transition hover:bg-red-500/20">
-              Reset Counts
+              Clear All Data
             </button>
           </form>
         </div>
         
-        <div className="mt-12">
-          <p className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-bold">Total Plays</p>
+        <div className="mt-12 bg-[#0B1224] border border-[#1A2550] rounded-2xl p-8 inline-block shadow-xl">
+          <p className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-bold">Lifetime Plays</p>
           <p className="mt-2 text-6xl font-mono text-white">{totalPlays.toLocaleString()}</p>
         </div>
 
-        <div className="mt-12 overflow-hidden rounded-2xl border border-[#1A2550] bg-[#0B1224]">
+        <div className="mt-12 overflow-hidden rounded-2xl border border-[#1A2550] bg-[#0B1224] shadow-xl">
           <table className="w-full text-left">
             <thead className="bg-[#050814]/50 text-[#D4AF37] text-[10px] uppercase tracking-[0.2em]">
               <tr>
@@ -72,7 +76,7 @@ export default async function AdminStatsPage({
             </thead>
             <tbody className="divide-y divide-[#1A2550]">
               {sortedStats.map((item) => (
-                <tr key={item.genre} className="hover:bg-white/[0.02]">
+                <tr key={item.genre} className="hover:bg-white/[0.02] transition-colors">
                   <td className="px-8 py-6 font-semibold">{item.genre}</td>
                   <td className="px-8 py-6 text-right font-mono text-xl">{item.count.toLocaleString()}</td>
                 </tr>
