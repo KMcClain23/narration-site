@@ -103,6 +103,7 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     const max = el.scrollWidth - el.clientWidth;
     setProgress(max > 0 ? (el.scrollLeft / max) * 100 : 0);
     
+    // Updates arrow visibility based on scroll position
     setCanScrollLeft(el.scrollLeft > 5);
     setCanScrollRight(el.scrollLeft < max - 5);
   }, []);
@@ -111,7 +112,7 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     const el = scrollerRef.current;
     if (!el) return;
 
-    // Force absolute start on mount to fix initial offset issue
+    // FIX: Force reset to absolute zero on mount to prevent the initial offset
     el.scrollTo({ left: 0 });
 
     const ro = new ResizeObserver(() => {
@@ -121,6 +122,7 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     ro.observe(el);
     el.addEventListener("scroll", updateScrollState, { passive: true });
     
+    // Initial check to hide the left arrow immediately
     updateScrollState();
 
     return () => { 
@@ -168,6 +170,7 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
 
   return (
     <div className="relative group/scroller">
+      {/* Navigation Arrows */}
       {canScrollLeft && (
         <button
           onClick={() => scroll('left')}
@@ -206,7 +209,8 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
           WebkitOverflowScrolling: "touch",
           scrollbarWidth: 'none'
         }}
-        className="flex overflow-x-auto pb-10 snap-x snap-mandatory scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20 hide-scrollbar select-none md:cursor-grab md:active:cursor-grabbing"
+        aria-label={ariaLabel}
+        className="flex overflow-x-auto pb-10 snap-x snap-mandatory scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20 hide-scrollbar select-none md:cursor-grab md:active:cursor-grabbing justify-start"
       >
         {children}
         <div className="flex-shrink-0 w-10 sm:w-20" />
