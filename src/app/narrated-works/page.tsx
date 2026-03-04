@@ -85,21 +85,27 @@ function BookCard({ book, statusBadge }: BookCardProps) {
   );
 }
 
-// --- Horizontal Scroller Component ---
+// --- Horizontal Scroller Component with Navigation Arrows ---
 function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode; ariaLabel: string }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const [showBar, setShowBar] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const isDown = useRef(false);
   const startX = useRef(0);
   const scrollLeftStart = useRef(0);
 
-  const updateProgress = useCallback(() => {
+  const updateScrollState = useCallback(() => {
     const el = scrollerRef.current;
     if (!el) return;
     const max = el.scrollWidth - el.clientWidth;
     setProgress(max > 0 ? (el.scrollLeft / max) * 100 : 0);
+    
+    // Check if we can scroll in either direction to show/hide arrows
+    setCanScrollLeft(el.scrollLeft > 5);
+    setCanScrollRight(el.scrollLeft < max - 5);
   }, []);
 
   useEffect(() => {
@@ -107,12 +113,19 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
     if (!el) return;
     const ro = new ResizeObserver(() => {
       setShowBar(el.scrollWidth > el.clientWidth + 10);
-      updateProgress();
+      updateScrollState();
     });
     ro.observe(el);
-    el.addEventListener("scroll", updateProgress, { passive: true });
-    return () => { ro.disconnect(); el.removeEventListener("scroll", updateProgress); };
-  }, [updateProgress]);
+    el.addEventListener("scroll", updateScrollState, { passive: true });
+    return () => { ro.disconnect(); el.removeEventListener("scroll", updateScrollState); };
+  }, [updateScrollState]);
+
+  const scroll = (direction: 'left' | 'right') => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const scrollAmount = el.clientWidth * 0.8;
+    el.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+  };
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'touch') return;
@@ -143,8 +156,31 @@ function HorizontalScroller({ children, ariaLabel }: { children: React.ReactNode
 
   return (
     <div className="relative group/scroller">
+      {/* Side Arrows - Hidden on mobile, visible on hover for desktop */}
+      <button
+        onClick={() => scroll('left')}
+        className={`hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-40 bg-black/60 border border-[#D4AF37]/30 text-[#D4AF37] p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/80 hover:border-[#D4AF37] active:scale-95 ${canScrollLeft ? 'opacity-0 group-hover/scroller:opacity-100' : 'opacity-0 pointer-events-none'}`}
+        aria-label="Scroll left"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+      </button>
+
+      <button
+        onClick={() => scroll('right')}
+        className={`hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-40 bg-black/60 border border-[#D4AF37]/30 text-[#D4AF37] p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/80 hover:border-[#D4AF37] active:scale-95 ${canScrollRight ? 'opacity-0 group-hover/scroller:opacity-100' : 'opacity-0 pointer-events-none'}`}
+        aria-label="Scroll right"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+
+      {/* Gradients */}
       <div className="absolute left-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
+      
       <div
         ref={scrollerRef}
         onPointerDown={onPointerDown}
