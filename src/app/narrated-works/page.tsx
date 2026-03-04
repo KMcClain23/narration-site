@@ -3,8 +3,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-// Import for Metadata if you decide to move it to a layout or separate file, 
-// but for client components, we use specific tags or the parent layout.
 
 type Book = {
   title: string;
@@ -297,7 +295,6 @@ export default function NarratedWorks() {
           <>
             {filteredCompleted.length > 0 && (
               <section className="mb-20">
-                {/* Audit Fix: Ensure clear hierarchy */}
                 <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">Completed Audiobook Projects</h2>
                 <HorizontalScroller ariaLabel="Completed projects">
                   {filteredCompleted.map((book) => <BookCard key={book.link} book={book} />)}
