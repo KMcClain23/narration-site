@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import LogoutButton from "./LogoutButton";
+import QuickLinks from "./QuickLinks";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,33 @@ const redis = new Redis({
   url: process.env.KV_REST_API_URL ?? "",
   token: process.env.KV_REST_API_TOKEN ?? "",
 });
+
+const QUICK_LINKS = [
+  {
+    label: "Wave Apps (Dashboard)",
+    href: "https://next.waveapps.com/9c9842e4-3e7b-4c9b-a276-189d8f312e01/dashboard",
+  },
+  {
+    label: "Microsoft 365 Admin",
+    href: "https://admin.cloud.microsoft/?#/homepage",
+  },
+  {
+    label: "Cloudflare R2 (Narration Demos)",
+    href: "https://dash.cloudflare.com/1ac8744006bf0a438cba3989adcc230b/r2/default/buckets/narration-demos",
+  },
+  {
+    label: "Resend (Domains)",
+    href: "https://resend.com/domains/5f094384-505c-4d62-bc89-8f5677750153",
+  },
+  {
+    label: "Porkbun (Domains)",
+    href: "https://porkbun.com/account/domainsSpeedy?fo=1&oid=9471711",
+  },
+  {
+    label: "Vercel (Login)",
+    href: "https://vercel.com/login?next=%2Fkevins-projects-818a808d",
+  },
+] as const;
 
 export default async function AdminStatsPage() {
   const secret = String(process.env.ADMIN_SECRET_KEY ?? "").trim();
@@ -81,6 +109,9 @@ export default async function AdminStatsPage() {
             <LogoutButton />
           </div>
         </div>
+
+        {/* Collapsible Quick Links */}
+        <QuickLinks links={[...QUICK_LINKS]} defaultOpen={true} />
 
         <div className="mt-12 bg-[#0B1224] border border-[#1A2550] rounded-2xl p-8 inline-block shadow-xl">
           <p className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-bold">
