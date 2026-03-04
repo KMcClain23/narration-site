@@ -1,7 +1,7 @@
 import { Redis } from '@upstash/redis';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { resetStats } from '@/app/actions/resetStats';
+import { resetStats } from '@/app/actions/resetStats'; // Verify this path
 
 const redis = new Redis({
   url: process.env.KV_REST_API_URL!,
@@ -15,8 +15,10 @@ export default async function AdminStatsPage({
 }: {
   searchParams: { key?: string };
 }) {
+  // Access key from the URL query string
   const secretKey = searchParams.key;
 
+  // Hidden Access Check
   if (secretKey !== process.env.ADMIN_SECRET_KEY) {
     return notFound(); 
   }
@@ -47,7 +49,7 @@ export default async function AdminStatsPage({
             </p>
           </div>
           
-          {/* Reset Action */}
+          {/* Inline Reset Form */}
           <form action={async () => {
             "use server";
             await resetStats(secretKey!);
@@ -55,17 +57,13 @@ export default async function AdminStatsPage({
             <button 
               type="submit"
               className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-bold text-red-400 transition hover:bg-red-500/20 hover:text-red-300"
-              onClick={(e) => {
-                if (!confirm("Are you sure you want to wipe all play stats? This cannot be undone.")) {
-                  e.preventDefault();
-                }
-              }}
             >
               Reset All Counts
             </button>
           </form>
         </div>
         
+        {/* Metric Card */}
         <div className="mt-12">
           <div className="inline-block rounded-2xl border border-[#1A2550] bg-[#0B1224] p-8 shadow-2xl">
             <p className="text-white/50 text-xs uppercase tracking-widest font-bold">Total Lifetime Plays</p>
@@ -73,6 +71,7 @@ export default async function AdminStatsPage({
           </div>
         </div>
 
+        {/* Stats Table */}
         <h2 className="mt-16 text-2xl font-bold">Demo Performance</h2>
         <div className="mt-6 overflow-hidden rounded-2xl border border-[#1A2550] bg-[#0B1224]">
           <table className="w-full text-left">
@@ -85,12 +84,16 @@ export default async function AdminStatsPage({
             <tbody className="divide-y divide-[#1A2550]">
               {sortedStats.length > 0 ? sortedStats.map((item) => (
                 <tr key={item.genre} className="hover:bg-white/[0.02] transition-colors group">
-                  <td className="px-8 py-6 font-semibold group-hover:text-[#D4AF37] transition-colors">{item.genre}</td>
-                  <td className="px-8 py-6 text-right font-mono text-xl text-white/90">{item.count.toLocaleString()}</td>
+                  <td className="px-8 py-6 font-semibold group-hover:text-[#D4AF37] transition-colors">
+                    {item.genre}
+                  </td>
+                  <td className="px-8 py-6 text-right font-mono text-xl text-white/90">
+                    {item.count.toLocaleString()}
+                  </td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={2} className="px-8 py-12 text-center text-white/30 italic">No data collected yet.</td>
+                  <td colSpan={2} className="px-8 py-12 text-center text-white/30 italic">No data points yet.</td>
                 </tr>
               )}
             </tbody>
