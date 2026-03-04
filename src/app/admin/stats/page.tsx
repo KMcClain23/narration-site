@@ -1,8 +1,7 @@
 import { Redis } from '@upstash/redis';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-// Try using a relative path if the @ alias is causing issues
-import { resetStats } from '../../actions/resetStats'; 
+import { revalidatePath } from 'next/cache';
 
 const redis = new Redis({
   url: process.env.KV_REST_API_URL!,
@@ -18,14 +17,14 @@ export default async function AdminStatsPage({
 }) {
   const secretKey = searchParams.key;
 
-  // HIDDEN ACCESS CHECK
+  // 1. Hidden Access Check
   if (secretKey !== process.env.ADMIN_SECRET_KEY) {
     return notFound(); 
   }
 
+  // 2. Fetch Data
   const totalPlays = await redis.get<number>('total_demo_plays') || 0;
   const keys = await redis.keys('demo_play_count:*');
-  
   const stats = await Promise.all(
     keys.map(async (key) => {
       const count = await redis.get<number>(key);
@@ -35,35 +34,38 @@ export default async function AdminStatsPage({
       };
     })
   );
-
   const sortedStats = stats.sort((a, b) => b.count - a.count);
+
+  // 3. Inline Server Action (Fixes the "Export not found" error)
+  async function resetStatsAction() {
+    "use server";
+    const keysToDelete = await redis.keys('demo_play_count:*');
+    if (keysToDelete.length > 0) {
+      await redis.del(...keysToDelete);
+    }
+    await redis.del("total_demo_plays");
+    revalidatePath('/admin/stats');
+  }
 
   return (
     <main className="min-h-screen bg-[#050814] text-white p-6 md:p-12">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between border-b border-[#1A2550] pb-8">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight text-[#D4AF37]">Dean Miller Narration</h1>
-            <p className="mt-2 text-white/40 text-xs uppercase tracking-widest font-bold">
-              Private Analytics Dashboard
-            </p>
+            <h1 className="text-4xl font-bold tracking-tight text-[#D4AF37]">Dean Miller Stats</h1>
+            <p className="mt-2 text-white/40 text-xs uppercase tracking-widest font-bold">Private Dashboard</p>
           </div>
           
-          {/* RESET BUTTON */}
-          <form action={async () => {
-            "use server";
-            await resetStats(secretKey!);
-          }}>
+          <form action={resetStatsAction}>
             <button 
               type="submit"
               className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-bold text-red-400 transition hover:bg-red-500/20"
             >
-              Wipe All Stats
+              Reset All Counts
             </button>
           </form>
         </div>
         
-        {/* BIG NUMBERS */}
         <div className="mt-12">
           <div className="inline-block rounded-2xl border border-[#1A2550] bg-[#0B1224] p-8 shadow-2xl">
             <p className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-bold">Total Lifetime Plays</p>
@@ -71,8 +73,7 @@ export default async function AdminStatsPage({
           </div>
         </div>
 
-        {/* GENRE TABLE */}
-        <h2 className="mt-20 text-2xl font-bold">Demo Performance</h2>
+        <h2 className="mt-16 text-2xl font-bold">Performance by Genre</h2>
         <div className="mt-6 overflow-hidden rounded-2xl border border-[#1A2550] bg-[#0B1224]">
           <table className="w-full text-left">
             <thead className="bg-[#050814]/50 text-[#D4AF37] text-[10px] uppercase tracking-[0.2em]">
@@ -89,7 +90,7 @@ export default async function AdminStatsPage({
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={2} className="px-8 py-16 text-center text-white/20 italic font-mono text-xs">NO_DATA_COLLECTED</td>
+                  <td colSpan={2} className="px-8 py-16 text-center text-white/20 italic">No data yet.</td>
                 </tr>
               )}
             </tbody>
