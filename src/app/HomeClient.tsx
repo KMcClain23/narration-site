@@ -396,24 +396,31 @@ function HomeContent() {
         {/* ABOUT */}
         <section id="about" className="mt-20 scroll-mt-24">
           <h2 className="text-3xl font-bold">About</h2>
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-            <div className="md:col-span-8">
-              <p className="text-white/80 leading-relaxed">I’m Dean Miller, a professional audiobook narrator drawn to character-driven stories with emotional depth, quiet tension, and honest human connection. I record from a broadcast-quality home studio and value clear communication and collaboration throughout each project.</p>
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg">
-                  <p className="font-semibold text-white">Genres</p>
-                  <p className="mt-1 text-sm text-white/70">Romance, romantasy, drama, thriller, narrative nonfiction</p>
-                </div>
-                <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-4 shadow-lg">
-                  <p className="font-semibold text-white">Studio</p>
-                  <p className="mt-1 text-sm text-white/70">Shure MV7+, pop filter, treated space</p>
-                </div>
-              </div>
+          <div className="mt-6 flex flex-col gap-8">
+            <div className="max-w-4xl">
+              <p className="text-white/80 text-lg leading-relaxed">
+                I’m Dean Miller, a professional audiobook narrator drawn to character-driven stories with emotional depth, quiet tension, and honest human connection. I record from a broadcast-quality home studio and value clear communication and collaboration throughout each project.
+              </p>
             </div>
-            <div className="md:col-span-4">
-              <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg text-center">
-                <p className="text-sm text-white/70">Preferred contact</p>
-                <a className="mt-2 inline-block text-lg font-semibold text-[#D4AF37] hover:underline" href="mailto:Dean@DMNarration.com">Dean@DMNarration.com</a>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
+                <p className="text-[#D4AF37] text-xs uppercase tracking-widest font-bold mb-3">Expertise & Genres</p>
+                <p className="text-white/90 leading-relaxed">
+                  Specializing in Romance, Romantasy, Drama, Thriller, and Narrative Nonfiction. 
+                  Focusing on authentic emotional beats and distinct character voices.
+                </p>
+              </div>
+              
+              <div className="rounded-xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
+                <p className="text-[#D4AF37] text-xs uppercase tracking-widest font-bold mb-3">The Studio</p>
+                <div className="flex items-center gap-4">
+                  <div className="text-sm text-white/90">
+                    <p>• Shure MV7+ Broadcast Microphone</p>
+                    <p>• Custom Acoustically Treated Space</p>
+                    <p>• Professional Grade Pop Filtration</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -423,7 +430,7 @@ function HomeContent() {
         <section id="contact" className="mt-20 scroll-mt-24">
           <h2 className="text-3xl font-bold">Contact</h2>
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <form ref={formRef} action={handleNativeSubmit} className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
+            <form ref={formRef} action={handleNativeSubmit} className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-8 shadow-lg">
               {formStatus && (
                 <div className={`mb-6 p-4 rounded-md text-sm border ${formStatus.success ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-100" : "bg-red-500/10 border-red-500/30 text-red-100"}`}>
                   {formStatus.message}
@@ -449,38 +456,45 @@ function HomeContent() {
               </div>
             </form>
 
-            <div className="space-y-6 flex flex-col">
-              <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
-                <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-semibold">Direct Email</p>
-                <a className="mt-2 inline-block text-lg font-semibold text-white hover:text-[#D4AF37] transition-colors" href="mailto:Dean@DMNarration.com">
-                  Dean@DMNarration.com
-                </a>
-                <p className="mt-2 text-sm text-white/50">Expect a response within 24-48 hours.</p>
-              </div>
-
-              <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg flex-1">
-                <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-semibold">Studio Specs</p>
-                <ul className="mt-4 space-y-4">
-                  <li className="flex items-start gap-3">
-                    <div className="mt-1 h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0" />
-                    <p className="text-sm text-white/80"><span className="text-white font-medium">Hardware:</span> Shure MV7+ with professional pop filtration.</p>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <div className="mt-1 h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0" />
-                    <p className="text-sm text-white/80"><span className="text-white font-medium">Environment:</span> Custom-treated acoustic space.</p>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <div className="mt-1 h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0" />
-                    <p className="text-sm text-white/80"><span className="text-white font-medium">Quality:</span> ACX-ready, broadcast-quality audio delivery.</p>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
-                <p className="text-sm text-white/70">Prefer a face-to-face chat?</p>
-                <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/5 transition">
-                  Book a 15-minute call
-                </a>
+            <div className="flex flex-col gap-6">
+              {/* Visual Production Brief Sidebar */}
+              <div className="relative overflow-hidden rounded-2xl border border-[#1A2550] bg-[#0B1224] flex-1 shadow-lg">
+                <div className="absolute top-0 left-0 w-full h-32 opacity-40">
+                  <Image 
+                    src="https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerBanner.png" 
+                    alt="Banner" 
+                    fill 
+                    className="object-cover"
+                  />
+                </div>
+                
+                <div className="relative pt-36 p-8">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="relative h-16 w-16 overflow-hidden rounded-full border-2 border-[#D4AF37]">
+                      <Image 
+                        src="https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile.jpg" 
+                        alt="Dean Miller" 
+                        fill 
+                        className="object-cover"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-white leading-tight">Dean Miller</p>
+                      <p className="text-xs text-[#D4AF37] uppercase tracking-widest">Narrator & Producer</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-lg bg-[#050814] border border-[#1A2550]">
+                      <p className="text-xs text-white/50 uppercase mb-1">Direct Inquiries</p>
+                      <a href="mailto:Dean@DMNarration.com" className="text-white hover:text-[#D4AF37] transition">Dean@DMNarration.com</a>
+                    </div>
+                    
+                    <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer" className="inline-flex w-full items-center justify-center rounded-md border border-[#D4AF37]/30 bg-[#D4AF37]/5 px-4 py-3 text-sm font-semibold text-white hover:bg-[#D4AF37]/10 transition">
+                      Book a 15-minute call
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
