@@ -1,7 +1,8 @@
 import { Redis } from '@upstash/redis';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { resetStats } from '@/app/actions/resetStats'; // Verify this path
+// Try using a relative path if the @ alias is causing issues
+import { resetStats } from '../../actions/resetStats'; 
 
 const redis = new Redis({
   url: process.env.KV_REST_API_URL!,
@@ -15,10 +16,9 @@ export default async function AdminStatsPage({
 }: {
   searchParams: { key?: string };
 }) {
-  // Access key from the URL query string
   const secretKey = searchParams.key;
 
-  // Hidden Access Check
+  // HIDDEN ACCESS CHECK
   if (secretKey !== process.env.ADMIN_SECRET_KEY) {
     return notFound(); 
   }
@@ -43,36 +43,36 @@ export default async function AdminStatsPage({
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between border-b border-[#1A2550] pb-8">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight">Private Analytics</h1>
-            <p className="mt-2 text-[#D4AF37] text-sm uppercase tracking-widest font-bold">
-              Authenticated Access Only
+            <h1 className="text-4xl font-bold tracking-tight text-[#D4AF37]">Dean Miller Narration</h1>
+            <p className="mt-2 text-white/40 text-xs uppercase tracking-widest font-bold">
+              Private Analytics Dashboard
             </p>
           </div>
           
-          {/* Inline Reset Form */}
+          {/* RESET BUTTON */}
           <form action={async () => {
             "use server";
             await resetStats(secretKey!);
           }}>
             <button 
               type="submit"
-              className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-bold text-red-400 transition hover:bg-red-500/20 hover:text-red-300"
+              className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-bold text-red-400 transition hover:bg-red-500/20"
             >
-              Reset All Counts
+              Wipe All Stats
             </button>
           </form>
         </div>
         
-        {/* Metric Card */}
+        {/* BIG NUMBERS */}
         <div className="mt-12">
           <div className="inline-block rounded-2xl border border-[#1A2550] bg-[#0B1224] p-8 shadow-2xl">
-            <p className="text-white/50 text-xs uppercase tracking-widest font-bold">Total Lifetime Plays</p>
-            <p className="mt-4 text-5xl font-mono text-[#D4AF37]">{totalPlays.toLocaleString()}</p>
+            <p className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-bold">Total Lifetime Plays</p>
+            <p className="mt-4 text-6xl font-mono text-white">{totalPlays.toLocaleString()}</p>
           </div>
         </div>
 
-        {/* Stats Table */}
-        <h2 className="mt-16 text-2xl font-bold">Demo Performance</h2>
+        {/* GENRE TABLE */}
+        <h2 className="mt-20 text-2xl font-bold">Demo Performance</h2>
         <div className="mt-6 overflow-hidden rounded-2xl border border-[#1A2550] bg-[#0B1224]">
           <table className="w-full text-left">
             <thead className="bg-[#050814]/50 text-[#D4AF37] text-[10px] uppercase tracking-[0.2em]">
@@ -84,16 +84,12 @@ export default async function AdminStatsPage({
             <tbody className="divide-y divide-[#1A2550]">
               {sortedStats.length > 0 ? sortedStats.map((item) => (
                 <tr key={item.genre} className="hover:bg-white/[0.02] transition-colors group">
-                  <td className="px-8 py-6 font-semibold group-hover:text-[#D4AF37] transition-colors">
-                    {item.genre}
-                  </td>
-                  <td className="px-8 py-6 text-right font-mono text-xl text-white/90">
-                    {item.count.toLocaleString()}
-                  </td>
+                  <td className="px-8 py-6 font-semibold group-hover:text-[#D4AF37] transition-colors">{item.genre}</td>
+                  <td className="px-8 py-6 text-right font-mono text-xl text-white/90">{item.count.toLocaleString()}</td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={2} className="px-8 py-12 text-center text-white/30 italic">No data points yet.</td>
+                  <td colSpan={2} className="px-8 py-16 text-center text-white/20 italic font-mono text-xs">NO_DATA_COLLECTED</td>
                 </tr>
               )}
             </tbody>
@@ -101,7 +97,7 @@ export default async function AdminStatsPage({
         </div>
 
         <div className="mt-12 flex justify-center">
-          <Link href="/" className="text-xs text-white/20 hover:text-white transition">Exit to Public Site</Link>
+          <Link href="/" className="text-[10px] uppercase tracking-widest text-white/20 hover:text-white transition">Exit Dashboard</Link>
         </div>
       </div>
     </main>
