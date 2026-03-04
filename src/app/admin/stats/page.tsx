@@ -17,12 +17,11 @@ export default async function AdminStatsPage({
 }) {
   const secretKey = searchParams.key;
 
-  // 1. Hidden Access Check
+  // Verify access via the ADMIN_SECRET_KEY variable
   if (secretKey !== process.env.ADMIN_SECRET_KEY) {
     return notFound(); 
   }
 
-  // 2. Fetch Data
   const totalPlays = await redis.get<number>('total_demo_plays') || 0;
   const keys = await redis.keys('demo_play_count:*');
   const stats = await Promise.all(
@@ -36,7 +35,6 @@ export default async function AdminStatsPage({
   );
   const sortedStats = stats.sort((a, b) => b.count - a.count);
 
-  // 3. Inline Server Action (Fixes the "Export not found" error)
   async function resetStatsAction() {
     "use server";
     const keysToDelete = await redis.keys('demo_play_count:*');
@@ -51,30 +49,20 @@ export default async function AdminStatsPage({
     <main className="min-h-screen bg-[#050814] text-white p-6 md:p-12">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between border-b border-[#1A2550] pb-8">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight text-[#D4AF37]">Dean Miller Stats</h1>
-            <p className="mt-2 text-white/40 text-xs uppercase tracking-widest font-bold">Private Dashboard</p>
-          </div>
-          
+          <h1 className="text-4xl font-bold tracking-tight text-[#D4AF37]">Stats Dashboard</h1>
           <form action={resetStatsAction}>
-            <button 
-              type="submit"
-              className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-bold text-red-400 transition hover:bg-red-500/20"
-            >
-              Reset All Counts
+            <button type="submit" className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-bold text-red-400 transition hover:bg-red-500/20">
+              Reset Counts
             </button>
           </form>
         </div>
         
         <div className="mt-12">
-          <div className="inline-block rounded-2xl border border-[#1A2550] bg-[#0B1224] p-8 shadow-2xl">
-            <p className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-bold">Total Lifetime Plays</p>
-            <p className="mt-4 text-6xl font-mono text-white">{totalPlays.toLocaleString()}</p>
-          </div>
+          <p className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-bold">Total Plays</p>
+          <p className="mt-2 text-6xl font-mono text-white">{totalPlays.toLocaleString()}</p>
         </div>
 
-        <h2 className="mt-16 text-2xl font-bold">Performance by Genre</h2>
-        <div className="mt-6 overflow-hidden rounded-2xl border border-[#1A2550] bg-[#0B1224]">
+        <div className="mt-12 overflow-hidden rounded-2xl border border-[#1A2550] bg-[#0B1224]">
           <table className="w-full text-left">
             <thead className="bg-[#050814]/50 text-[#D4AF37] text-[10px] uppercase tracking-[0.2em]">
               <tr>
@@ -83,22 +71,14 @@ export default async function AdminStatsPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1A2550]">
-              {sortedStats.length > 0 ? sortedStats.map((item) => (
-                <tr key={item.genre} className="hover:bg-white/[0.02] transition-colors group">
-                  <td className="px-8 py-6 font-semibold group-hover:text-[#D4AF37] transition-colors">{item.genre}</td>
-                  <td className="px-8 py-6 text-right font-mono text-xl text-white/90">{item.count.toLocaleString()}</td>
+              {sortedStats.map((item) => (
+                <tr key={item.genre} className="hover:bg-white/[0.02]">
+                  <td className="px-8 py-6 font-semibold">{item.genre}</td>
+                  <td className="px-8 py-6 text-right font-mono text-xl">{item.count.toLocaleString()}</td>
                 </tr>
-              )) : (
-                <tr>
-                  <td colSpan={2} className="px-8 py-16 text-center text-white/20 italic">No data yet.</td>
-                </tr>
-              )}
+              ))}
             </tbody>
           </table>
-        </div>
-
-        <div className="mt-12 flex justify-center">
-          <Link href="/" className="text-[10px] uppercase tracking-widest text-white/20 hover:text-white transition">Exit Dashboard</Link>
         </div>
       </div>
     </main>
