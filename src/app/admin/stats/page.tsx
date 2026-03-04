@@ -18,30 +18,19 @@ const redis = new Redis({
 
 export default async function AdminStatsPage() {
   const secret = String(process.env.ADMIN_SECRET_KEY ?? "").trim();
-
-  const cookieStore = await cookies();
-  const cookieKey = String(cookieStore.get(COOKIE_NAME)?.value ?? "").trim();
-
-  /**
-   * Verify login cookie
-   */
   if (!secret) {
     throw new Error("ADMIN_SECRET_KEY environment variable is not set.");
   }
+
+  const cookieStore = await cookies();
+  const cookieKey = String(cookieStore.get(COOKIE_NAME)?.value ?? "").trim();
 
   if (!cookieKey || cookieKey !== secret) {
     return notFound();
   }
 
-  /**
-   * Get total demo plays
-   */
-  const totalPlays =
-    (await redis.get<number>("total_demo_plays")) ?? 0;
+  const totalPlays = (await redis.get<number>("total_demo_plays")) ?? 0;
 
-  /**
-   * Get individual demo counts
-   */
   const keys = await redis.keys("demo_play_count:*");
 
   const stats = await Promise.all(
@@ -57,9 +46,6 @@ export default async function AdminStatsPage() {
 
   const sortedStats = stats.sort((a, b) => b.count - a.count);
 
-  /**
-   * Server Action to reset all counters
-   */
   async function resetStatsAction() {
     "use server";
 
@@ -77,16 +63,12 @@ export default async function AdminStatsPage() {
   return (
     <main className="min-h-screen bg-[#050814] text-white p-6 md:p-12">
       <div className="max-w-5xl mx-auto">
-
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1A2550] pb-8">
-
           <h1 className="text-4xl font-bold tracking-tight text-[#D4AF37]">
             Analytics
           </h1>
 
-          <div className="flex items-center gap-4">
-
+          <div className="flex items-center gap-3">
             <form action={resetStatsAction}>
               <button
                 type="submit"
@@ -97,11 +79,9 @@ export default async function AdminStatsPage() {
             </form>
 
             <LogoutButton />
-
           </div>
         </div>
 
-        {/* Lifetime Plays */}
         <div className="mt-12 bg-[#0B1224] border border-[#1A2550] rounded-2xl p-8 inline-block shadow-xl">
           <p className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-bold">
             Lifetime Plays
@@ -112,7 +92,6 @@ export default async function AdminStatsPage() {
           </p>
         </div>
 
-        {/* Stats Table */}
         <div className="mt-12 overflow-hidden rounded-2xl border border-[#1A2550] bg-[#0B1224] shadow-xl">
           <table className="w-full text-left">
             <thead className="bg-[#050814]/50 text-[#D4AF37] text-[10px] uppercase tracking-[0.2em]">
@@ -128,10 +107,7 @@ export default async function AdminStatsPage() {
                   key={item.genre}
                   className="hover:bg-white/[0.02] transition-colors"
                 >
-                  <td className="px-8 py-6 font-semibold">
-                    {item.genre}
-                  </td>
-
+                  <td className="px-8 py-6 font-semibold">{item.genre}</td>
                   <td className="px-8 py-6 text-right font-mono text-xl">
                     {item.count.toLocaleString()}
                   </td>
@@ -140,7 +116,6 @@ export default async function AdminStatsPage() {
             </tbody>
           </table>
         </div>
-
       </div>
     </main>
   );
