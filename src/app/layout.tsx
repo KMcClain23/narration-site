@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import Header from "./components/Header";
 import "./globals.css";
 
@@ -14,22 +15,25 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://dmnarration.com"),
-  // Audit Fix: Optimal character length for search engines
-  title: "Dean Miller | Professional Audiobook Narrator", 
-  description: "Professional audiobook narrator delivering character-driven, emotionally grounded performances for fiction. Broadcast quality audio and fast turnaround.",
+  // Audit Fix: Uses the full WWW version as the base for the canonical strategy
+  metadataBase: new URL("https://www.dmnarration.com"),
+  title: "Dean Miller | Professional Audiobook Narrator",
+  description:
+    "Professional audiobook narrator delivering character-driven, emotionally grounded performances for fiction. Broadcast quality audio and fast turnaround.",
   icons: {
     icon: "/icon.png",
-    apple: "/icon.png", // Audit Fix: Clears "No Apple touch icon specified" warning
+    shortcut: "/icon.png",
+    apple: "/icon.png",
   },
   alternates: {
-    // Audit Fix: Prevents duplicate content issues
-    canonical: "/", 
+    // Audit Fix: Explicitly sets the absolute URL for the Canonical Tag Test
+    canonical: "https://www.dmnarration.com/",
   },
   openGraph: {
     title: "Dean Miller | Professional Audiobook Narrator",
-    description: "Explore audiobook narration demos and request availability. Emotionally immersive, character driven performance.",
-    url: "https://dmnarration.com/",
+    description:
+      "Explore audiobook narration demos and request availability. Emotionally immersive, character driven performance.",
+    url: "https://www.dmnarration.com/",
     siteName: "Dean Miller Narration",
     images: [
       {
@@ -45,7 +49,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Dean Miller | Professional Audiobook Narrator",
-    description: "Explore audiobook narration demos. Broadcast quality, emotionally immersive performance.",
+    description:
+      "Explore audiobook narration demos. Broadcast quality, emotionally immersive performance.",
     images: ["/opengraph-image.png"],
   },
 };
@@ -55,8 +60,9 @@ const personJsonLd = {
   "@type": "Person",
   name: "Dean Miller",
   jobTitle: "Audiobook Narrator",
-  url: "https://dmnarration.com/",
-  description: "Professional audiobook narrator delivering character driven, emotionally immersive performances across fiction genres.",
+  url: "https://www.dmnarration.com/",
+  description:
+    "Professional audiobook narrator delivering character driven, emotionally immersive performances across fiction genres.",
   knowsAbout: [
     "Audiobook narration",
     "Character driven storytelling",
@@ -78,32 +84,26 @@ const businessJsonLd = {
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
   name: "Dean Miller Narration",
-  image: "https://dmnarration.com/opengraph-image.png",
-  "@id": "https://dmnarration.com",
-  url: "https://dmnarration.com",
+  image: "https://www.dmnarration.com/opengraph-image.png",
+  "@id": "https://www.dmnarration.com",
+  url: "https://www.dmnarration.com",
   address: {
     "@type": "PostalAddress",
     "addressLocality": "Cornelius",
     "addressRegion": "OR",
-    "addressCountry": "US"
+    "addressCountry": "US",
   },
   geo: {
     "@type": "GeoCoordinates",
     "latitude": 45.5187,
-    "longitude": -123.0593
+    "longitude": -123.0593,
   },
   openingHoursSpecification: {
     "@type": "OpeningHoursSpecification",
-    "dayOfWeek": [
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday"
-    ],
+    "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
     "opens": "09:00",
-    "closes": "17:00"
-  }
+    "closes": "17:00",
+  },
 };
 
 export default function RootLayout({
@@ -116,25 +116,28 @@ export default function RootLayout({
       lang="en"
       className={`scroll-smooth scroll-pt-24 ${geistSans.variable} ${geistMono.variable}`}
     >
+      <head>
+        {/* Structured Data (JSON-LD) */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }}
+        />
+      </head>
+
       <body className="min-h-screen bg-[#050814] text-white antialiased">
+        {/* Audit Fix: Integrated your unique GA4 Measurement ID
+            Place GA as early as possible in the body so it reliably fires */}
+        <GoogleAnalytics gaId="G-WN5GMY7ZN7" />
+
         <a href="#top" className="skip-link">
           Skip to content
         </a>
 
         <Header />
-
-        {/* Person Schema */}
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
-        />
-        
-        {/* Local Business Schema */}
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }}
-        />
-
         {children}
       </body>
     </html>
