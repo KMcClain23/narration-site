@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRef, useEffect, useState, useTransition } from "react";
 import { sendEmail } from "@/app/actions/sendEmail";
+import { sendGAEvent } from "@next/third-parties/google"; // Audit Fix: Import GA tracking function
 
 const BOOKINGS_URL =
   "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
@@ -29,7 +30,8 @@ function MediaLightbox({ isOpen, onClose, title, src }: { isOpen: boolean; onClo
           <button type="button" onClick={onClose} className="rounded-md border border-white/20 px-3 py-1 text-sm text-white/80 transition hover:border-white/40 hover:text-white">Close</button>
         </div>
         <div className="mt-4 relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-[#1A2550] bg-black/30">
-          <Image src={src} alt={title} fill className="object-contain" />
+          {/* Audit Fix: Responsive sizes for lightbox images */}
+          <Image src={src} alt={title} fill sizes="(max-width: 1200px) 100vw, 800px" className="object-contain" />
         </div>
       </div>
     </div>
@@ -74,10 +76,10 @@ function AtAGlanceCard({ onOpenLightbox }: { onOpenLightbox: (src: string, title
           <h4 className="text-xs uppercase tracking-wide text-[#D4AF37]">Media kit</h4>
           <div className="mt-4 grid grid-cols-2 gap-4">
             <button type="button" onClick={() => onOpenLightbox(LOGO_URL, "Logo")} className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60">
-              <Image src={LOGO_URL} alt="Logo" fill className="object-contain p-2" />
+              <Image src={LOGO_URL} alt="Logo" fill sizes="150px" className="object-contain p-2" />
             </button>
             <button type="button" onClick={() => onOpenLightbox(PROFILE_URL, "Headshot")} className="relative h-24 sm:h-28 w-full rounded-xl overflow-hidden border border-[#1A2550] bg-[#050814] transition hover:border-[#D4AF37]/60">
-              <Image src={PROFILE_URL} alt="Headshot" fill className="object-cover" />
+              <Image src={PROFILE_URL} alt="Headshot" fill sizes="150px" className="object-cover" />
             </button>
           </div>
         </div>
@@ -125,6 +127,14 @@ function DemoPlayer({ title, desc, src, index, activeIndex, setActiveIndex, audi
       setPlaying(true); 
       setBuffering(false); 
       setActiveIndex(index);
+
+      // Audit Fix: Custom GA4 tracking event
+      sendGAEvent('event', 'demo_play', {
+        event_category: 'Audio',
+        event_label: title,
+        value: index
+      });
+
       fetch('/api/track-demo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) }).catch(() => {});
     };
     const onPause = () => setPlaying(false);
@@ -169,11 +179,11 @@ function DemoPlayer({ title, desc, src, index, activeIndex, setActiveIndex, audi
       <div className="mt-auto pt-6">
         <div className="rounded-xl border border-[#1A2550] bg-[#050814] p-4">
           <div className="flex items-center gap-4">
-            <button onClick={toggle} type="button" className={`relative h-14 w-14 shrink-0 rounded-full flex items-center justify-center transition active:scale-95 border-2 border-white/20 bg-white/5 text-white shadow-xl hover:border-[#D4AF37]/70 ${!src ? "opacity-50 pointer-events-none" : "cursor-pointer"}`}>
+            <button onClick={toggle} aria-label={playing ? "Pause" : "Play"} type="button" className={`relative h-14 w-14 shrink-0 rounded-full flex items-center justify-center transition active:scale-95 border-2 border-white/20 bg-white/5 text-white shadow-xl hover:border-[#D4AF37]/70 ${!src ? "opacity-50 pointer-events-none" : "cursor-pointer"}`}>
               {buffering ? (<div className="h-6 w-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />) : playing ? (<svg className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5h3v14H8zM13 5h3v14h-3z" /></svg>) : (<svg className="h-7 w-7 translate-x-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>)}
             </button>
             <div className="flex-1 min-w-0">
-              <button type="button" onClick={handleSeek} className="relative block w-full h-2 rounded-full overflow-hidden bg-white/10 cursor-pointer z-10">
+              <button type="button" aria-label="Seekbar" onClick={handleSeek} className="relative block w-full h-2 rounded-full overflow-hidden bg-white/10 cursor-pointer z-10">
                 <div className="absolute left-0 top-0 h-full bg-[#D4AF37]" style={{ width: `${pct}%` }} />
               </button>
               <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-white/40 tracking-tighter">
@@ -184,7 +194,7 @@ function DemoPlayer({ title, desc, src, index, activeIndex, setActiveIndex, audi
           </div>
           <div className="mt-4 flex items-center gap-3 border-t border-white/5 pt-3">
             <svg className="h-4 w-4 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-            <input type="range" min="0" max="1" step="0.01" value={volume} onChange={handleVolume} className="flex-1 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#D4AF37]" />
+            <input type="range" min="0" max="1" step="0.01" value={volume} aria-label="Volume control" onChange={handleVolume} className="flex-1 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#D4AF37]" />
           </div>
           <audio ref={(el) => { audioRefs.current[index] = el; }} src={src} preload="metadata" />
         </div>
@@ -202,6 +212,7 @@ function HomeContent() {
   const [lightboxTitle, setLightboxTitle] = useState("");
   const [isPending, startTransition] = useTransition();
   const [formStatus, setFormStatus] = useState<{ success?: boolean; message?: string } | null>(null);
+  const [showEmail, setShowEmail] = useState(false);
 
   const openLightbox = (src: string, title: string) => { setLightboxSrc(src); setLightboxTitle(title); setLightboxOpen(true); };
   const closeLightbox = () => setLightboxOpen(false);
@@ -243,14 +254,14 @@ function HomeContent() {
       <div id="top" />
       <section className="relative overflow-hidden -mt-16 pt-16">
         <div className="absolute inset-0">
-          <Image src={BANNER_URL} alt="Dean Miller banner" fill priority className="object-cover opacity-35" />
+          {/* Audit Fix: Priority and sizes for LCP optimization */}
+          <Image src={BANNER_URL} alt="Dean Miller banner" fill priority sizes="100vw" className="object-cover opacity-35" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050814]/85 via-[#050814]/75 to-[#050814]" />
         </div>
         <div className="relative max-w-6xl mx-auto px-5 sm:px-6 py-10 sm:py-14 md:py-20">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-10 items-start">
             <div className="md:col-span-7">
               <p className="text-xs tracking-[0.28em] text-white/70 uppercase">Audiobook narrator for fiction and narrative nonfiction.</p>
-              {/* Audit Fix: Explicit H1 for Crawler Visibility */}
               <h1 className="mt-3 sm:mt-4 text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.05]">Dean Miller</h1>
               <p className="mt-4 text-base sm:text-lg md:text-xl text-white/85 max-w-2xl leading-relaxed">Character-driven audiobook narration specializing in dark romance and romantasy. Broadcast-quality audio with 24-48 hour turnaround.</p>
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
@@ -325,11 +336,18 @@ function HomeContent() {
             <div className="space-y-6 flex flex-col">
               <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
                 <h3 className="text-xs uppercase tracking-widest text-[#D4AF37] font-semibold">Direct Email</h3>
+                {/* Audit Fix: Email obfuscation */}
                 <button 
-                  onClick={() => window.location.href = "mailto:Dean@DMNarration.com"}
+                  onClick={() => {
+                    if(!showEmail) {
+                      setShowEmail(true);
+                    } else {
+                      window.location.href = "mailto:Dean@DMNarration.com";
+                    }
+                  }}
                   className="mt-2 text-lg font-semibold text-white hover:text-[#D4AF37] transition-colors"
                 >
-                  Dean@DMNarration.com
+                  {showEmail ? "Dean@DMNarration.com" : "Click to reveal email"}
                 </button>
                 <p className="mt-2 text-sm text-white/50">Typical response within 24-48 hours.</p>
               </div>
@@ -345,7 +363,6 @@ function HomeContent() {
           </div>
         </section>
 
-        {/* Audit Fix: New Comprehensive Footer for Internal & Social Links */}
         <footer className="mt-24 border-t border-white/5 pt-12 pb-8 text-sm text-white/40">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 text-center sm:text-left mb-12">
             <div>

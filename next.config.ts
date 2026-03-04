@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Audit Fix: Compress assets to reduce total page size
+  compress: true,
+  
   images: {
     remotePatterns: [
       {
@@ -9,6 +12,8 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
+    // Audit Fix: Long-term caching for R2 assets
+    minimumCacheTTL: 31536000, 
   },
 };
 
