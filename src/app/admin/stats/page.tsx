@@ -1,8 +1,12 @@
 import { Redis } from "@upstash/redis";
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import LogoutButton from "./LogoutButton";
 
 export const dynamic = "force-dynamic";
+
+const COOKIE_NAME = "dmn_admin_key";
 
 /**
  * Initialize Upstash Redis connection
@@ -12,26 +16,20 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN ?? "",
 });
 
-type SearchParams = {
-  key?: string;
-};
+export default async function AdminStatsPage() {
+  const secret = String(process.env.ADMIN_SECRET_KEY ?? "").trim();
 
-export default async function AdminStatsPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+  const cookieStore = await cookies();
+  const cookieKey = String(cookieStore.get(COOKIE_NAME)?.value ?? "").trim();
+
   /**
-   * Verify admin key
+   * Verify login cookie
    */
-const providedKey = (searchParams?.key ?? "").trim();
-const secret = (process.env.ADMIN_SECRET_KEY ?? "").trim();
+  if (!secret) {
+    throw new Error("ADMIN_SECRET_KEY environment variable is not set.");
+  }
 
-if (!providedKey || providedKey !== secret) {
-  return notFound();
-}
-
-  if (providedKey !== process.env.ADMIN_SECRET_KEY) {
+  if (!cookieKey || cookieKey !== secret) {
     return notFound();
   }
 
@@ -82,18 +80,25 @@ if (!providedKey || providedKey !== secret) {
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1A2550] pb-8">
+
           <h1 className="text-4xl font-bold tracking-tight text-[#D4AF37]">
             Analytics
           </h1>
 
-          <form action={resetStatsAction}>
-            <button
-              type="submit"
-              className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-bold text-red-400 transition hover:bg-red-500/20"
-            >
-              Clear All Data
-            </button>
-          </form>
+          <div className="flex items-center gap-4">
+
+            <form action={resetStatsAction}>
+              <button
+                type="submit"
+                className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-bold text-red-400 transition hover:bg-red-500/20"
+              >
+                Clear All Data
+              </button>
+            </form>
+
+            <LogoutButton />
+
+          </div>
         </div>
 
         {/* Lifetime Plays */}
