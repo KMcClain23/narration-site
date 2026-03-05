@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import LogoutButton from "./LogoutButton";
 import QuickLinks from "./QuickLinks";
+import FileUpload from "./FileUpload";
 
 export const dynamic = "force-dynamic";
 
@@ -112,6 +113,21 @@ export default async function AdminStatsPage() {
 
         {/* Collapsible Quick Links */}
         <QuickLinks links={[...QUICK_LINKS]} defaultOpen={true} />
+
+        {/* Upload Section */}
+        <section className="mt-12 overflow-hidden rounded-2xl border border-[#1A2550] bg-[#0B1224] p-8 shadow-xl">
+          <p className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-bold">
+            Media Upload
+          </p>
+
+          <h2 className="mt-2 text-xl font-semibold text-[#D4AF37]">
+            Upload files to R2
+          </h2>
+
+          <div className="mt-6">
+            <FileUpload />
+          </div>
+        </section>
 
         <div className="mt-12 bg-[#0B1224] border border-[#1A2550] rounded-2xl p-8 inline-block shadow-xl">
           <p className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-bold">
