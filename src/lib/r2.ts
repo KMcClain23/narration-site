@@ -1,18 +1,24 @@
 import { S3Client } from "@aws-sdk/client-s3";
 
-function requireEnv(name: string): string {
-  const v = process.env[name];
-  if (!v || !String(v).trim()) {
-    throw new Error(`${name} environment variable is not set.`);
-  }
-  return String(v).trim();
-}
 
-export const r2 = new S3Client({
+const globalForR2 = globalThis as unknown as {
+  r2: S3Client | undefined;
+};
+
+// Helper to safely get environment variables without crashing the build
+const getEnv = (name: string) => process.env[name]?.trim() || "";
+
+const r2ClientConfig = {
   region: "auto",
-  endpoint: requireEnv("R2_ENDPOINT"),
+  endpoint: getEnv("R2_ENDPOINT"),
   credentials: {
-    accessKeyId: requireEnv("R2_ACCESS_KEY_ID"),
-    secretAccessKey: requireEnv("R2_SECRET_ACCESS_KEY"),
+    accessKeyId: getEnv("R2_ACCESS_KEY_ID"),
+    secretAccessKey: getEnv("R2_SECRET_ACCESS_KEY"),
   },
-});
+};
+
+// Export the singleton instance
+export const r2 =
+  globalForR2.r2 ?? new S3Client(r2ClientConfig);
+
+if (process.env.NODE_ENV !== "production") globalForR2.r2 = r2;

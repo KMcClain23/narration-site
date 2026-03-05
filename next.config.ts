@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Audit Fix: Compress assets to reduce total page size
+  // Audit Fix: Compresses assets to reduce the total content size
   compress: true,
-  
   images: {
     remotePatterns: [
       {
@@ -12,7 +11,7 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
-    // Audit Fix: Long-term caching for R2 assets
+    // Audit Fix: Optimizes caching for assets hosted on Cloudflare R2
     minimumCacheTTL: 31536000, 
   },
 };

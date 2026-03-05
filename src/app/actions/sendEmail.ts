@@ -2,15 +2,26 @@
 
 import { Resend } from "resend";
 import { z } from "zod";
+import { Redis } from "@upstash/redis";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+/**
+ * Initialize Upstash Redis connection for the CMS Lead Management
+ */
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL ?? "",
+  token: process.env.KV_REST_API_TOKEN ?? "",
+});
+
+const INQUIRY_KEY = "dmn_inquiries";
 
 // Assets and Links
 const LOGO_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerLogo.png";
 const HEADSHOT_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile.jpg";
 const BANNER_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerBanner.png";
 const BOOKINGS_URL = "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
-const SITE_URL = "https://dmnarration.com"; // Replace with your actual live domain
+const SITE_URL = "https://dmnarration.com";
 
 const contactSchema = z.object({
   name: z.string().min(2),
@@ -111,6 +122,19 @@ export async function sendEmail(formData: FormData) {
   const { name, email, message } = validatedFields.data;
 
   try {
+    // 1. SAVE TO CMS DATABASE (Upstash Redis)
+    const newInquiry = {
+      id: crypto.randomUUID(),
+      name,
+      email,
+      message,
+      createdAt: new Date().toISOString(),
+      status: "unread"
+    };
+
+    await redis.lpush(INQUIRY_KEY, JSON.stringify(newInquiry));
+
+    // 2. SEND EMAILS (Internal and Client Auto-reply)
     await Promise.all([
       resend.emails.send({
         from: "Dean Miller Narration <Dean@dmnarration.com>",
@@ -129,10 +153,10 @@ export async function sendEmail(formData: FormData) {
 
     return { success: true };
   } catch (err) {
-    console.error("Email service error:", err);
+    console.error("Email/CMS service error:", err);
     return { 
       success: false, 
-      error: "The email service is temporarily unavailable. Please try again later or email me directly." 
+      error: "The service is temporarily unavailable. Please try again later or email me directly." 
     };
   }
 }

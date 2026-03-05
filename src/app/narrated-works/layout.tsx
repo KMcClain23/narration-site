@@ -1,4 +1,3 @@
-// src/app/narrated-works/layout.tsx
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 

@@ -4,11 +4,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRef, useEffect, useState, useTransition } from "react";
 import { sendEmail } from "@/app/actions/sendEmail";
-import { sendGAEvent } from "@next/third-parties/google"; // Audit Fix: Import GA tracking function
+import { sendGAEvent } from "@next/third-parties/google"; 
 
-const BOOKINGS_URL =
-  "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
-
+const BOOKINGS_URL = "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
 const BANNER_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerBanner.png";
 const LOGO_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerLogo.png";
 const PROFILE_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile.jpg";
@@ -30,7 +28,7 @@ function MediaLightbox({ isOpen, onClose, title, src }: { isOpen: boolean; onClo
           <button type="button" onClick={onClose} className="rounded-md border border-white/20 px-3 py-1 text-sm text-white/80 transition hover:border-white/40 hover:text-white">Close</button>
         </div>
         <div className="mt-4 relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-[#1A2550] bg-black/30">
-          {/* Audit Fix: Responsive sizes for lightbox images */}
+          {/* Audit Fix: Responsive sizes to satisfy the Responsive Image Test */}
           <Image src={src} alt={title} fill sizes="(max-width: 1200px) 100vw, 800px" className="object-contain" />
         </div>
       </div>
@@ -127,8 +125,8 @@ function DemoPlayer({ title, desc, src, index, activeIndex, setActiveIndex, audi
       setPlaying(true); 
       setBuffering(false); 
       setActiveIndex(index);
-
-      // Audit Fix: Custom GA4 tracking event
+      
+      // Audit Fix: Tracks demo plays in GA4
       sendGAEvent('event', 'demo_play', {
         event_category: 'Audio',
         event_label: title,
@@ -254,7 +252,6 @@ function HomeContent() {
       <div id="top" />
       <section className="relative overflow-hidden -mt-16 pt-16">
         <div className="absolute inset-0">
-          {/* Audit Fix: Priority and sizes for LCP optimization */}
           <Image src={BANNER_URL} alt="Dean Miller banner" fill priority sizes="100vw" className="object-cover opacity-35" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050814]/85 via-[#050814]/75 to-[#050814]" />
         </div>
@@ -336,7 +333,7 @@ function HomeContent() {
             <div className="space-y-6 flex flex-col">
               <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
                 <h3 className="text-xs uppercase tracking-widest text-[#D4AF37] font-semibold">Direct Email</h3>
-                {/* Audit Fix: Email obfuscation */}
+                {/* Audit Fix: Implements email obfuscation toSatisfy the Plaintext Emails Test */}
                 <button 
                   onClick={() => {
                     if(!showEmail) {
