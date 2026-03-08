@@ -345,6 +345,13 @@ export default function NarratedWorks() {
       cover: "/covers/unmasked-hearts.jpg",
       tags: ["Dual POV", "Contemporary", "Emotional", "Small Town"],
     },
+    {
+      title: "Blood on the Asphalt",
+      author: "River Fox",
+      link: "",
+      cover: "/covers/whiskey-and-lies.jpg",
+      tags: [""],
+    },    
   ];
 
   const comingSoon: Book[] = [
