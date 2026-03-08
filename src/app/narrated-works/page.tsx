@@ -313,7 +313,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H",
       cover: "/covers/the-final-guardian.jpg",
       tags: ["Sci-Fi Mystery", "Psych Thriller", "AI Horror", "Dystopian"],
-      description: "In a world where memories can be harvested, one guardian stands between humanity and the complete erasure of the self. A deep dive into the ethics of artificial consciousness.",
+      description: "Alexander Stone built a life of perfect order to protect his family from chaos. To test his system, he submits his mind to Michelangelo, the world’s most advanced AI. But the intelligence studying him isn’t just observing. It’s learning. What begins as therapy becomes something far more sinister. Because when you confess your deepest secrets to a machine that is always listening… it never forgets.",
     },
     {
       title: "Santa Promised",
@@ -321,7 +321,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Santa-Promised-A-Christmas-Novella/dp/B0G6GLQGHK",
       cover: "/covers/santa-promised.jpg",
       tags: ["Duet", "Holiday Romance", "Age Gap", "Single Mom"],
-      description: "A heartwarming holiday duet. When a single mother's Christmas wish seems out of reach, an unexpected arrival reminds her that some promises are meant to be kept.",
+      description: "A heartwarming holiday duet. When a single mother's Christmas wish seems out of reach, an unexpected arrival reminds her that some promises are meant to be kept. Rachel is about to find out she's not damaged goods after all in this fun, spicy Christmas novella.",
     },
     {
       title: "The Circle",
@@ -330,7 +330,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Audible-The-Circle-Rituals-Ruins/dp/B0GKQY7N27",
       cover: "/covers/the-circle-rituals-and-ruins.jpg",
       tags: ["Dark Romance", "Mystery", "Small Town", "Secrets"],
-      description: "Behind the closed doors of a quiet small town lies a secret society built on ancient rituals. A dark romance where the price of admission is your soul.",
+      description: "The Circle started as a game. Reckless nights, bodies worshiped like temples, and dares that ended in moans instead of consequences. But something has changed. The symbol carved into the wood grows sharper every time we see it, and someone is feeding it in the dark. Our rituals no longer feel like play. We don’t just touch anymore. We take. We claim. We ruin. They say you can walk away from this, but they’ve never felt the ropes, never begged for the burn, never been worshiped and wrecked in the same breath. The Circle doesn’t play anymore. It practices. And once you’re marked, you belong to it.",
     },
     {
       title: "Sultry Secrets: Tease",
@@ -338,7 +338,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L",
       cover: "/covers/sultry-secrets-tease.jpg",
       tags: ["LGBTQ+", "Friends to Lovers", "Spicy", "Contemporary"],
-      description: "When best friends decide to play a dangerous game of attraction, the line between 'just friends' and 'forever' becomes thin and incredibly spicy.",
+      description: "I love my husband, I really do. But have you ever wanted something more? Just the perfect cherry on top? Tonight is my night to have it all. Just one night where I can have the best of both worlds, no matter what that looks like.",
     },
     {
       title: "Heir of the Emberscale",
@@ -346,7 +346,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB",
       cover: "/covers/heir-of-emberscale.jpg",
       tags: ["Fantasy Romance", "Epic", "War & Love", "Dragon Lore"],
-      description: "An epic romantasy where dragon-born heirs must choose between their throne and the enemies they were born to hate. War is coming, but love may be more dangerous.",
+      description: "She was just a survivor. He was a ruthless king. Their fate is sealed when Elyria discovers the ancient Aura Stone, which marks her as the last Queen and binds her to Tyrion, the powerful master of the Ember Stone. Forced into an unwilling partnership, they must navigate their dangerous bond, mythical forces, and a dying world. To save it, Elyria and Tyrion must overcome their hatred and accept the destiny that ties them together.",
     },
   ];
 
@@ -357,7 +357,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/No-One-Hold-Noelle-Rahn-Johnson-ebook/dp/B088RMPLYX",
       cover: "/covers/no-one-to-hold-me.jpg",
       tags: ["Steamy Romance", "Emotional", "POV Narratives", "Contemporary"],
-      description: "An emotionally charged contemporary romance exploring grief, healing, and the unexpected strength found in letting someone else hold the weight.",
+      description: "Kenneth wakes to smoke and a blaring fire alarm, the day he loses half his life. Burdened by guilt, depression, and the weight of raising his young daughter alone, he struggles to survive until an unexpected meeting changes everything. Amanda has spent years hiding her anger and betrayal while raising her son as a single mother. Life is hard until she meets a man and his daughter who begin to heal her world. For both of them, what once felt like having no one to hold finally changes.",
     },
     {
       title: "Merciless Punks",
@@ -365,7 +365,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Merciless-Punks-Enemies-romance-douchebags-ebook/dp/B09Z9P3C7V",
       cover: "/covers/merciless-punks.jpg",
       tags: ["Dark Romance", "Bully", "Why Choose", "MC Club"],
-      description: "A gritty Why Choose dark romance. When she's forced into the world of the Merciless Punks, she has to decide if she wants to escape them or rule alongside them.",
+      description: "Spite was only the beginning. Vicious was a warning. This is merciless. The punks who rule this town have stopped pretending there are lines they won’t cross. What began as control has become something colder and impossible to escape. They don’t ask for loyalty. They demand it. Every secret pulls me deeper into their world, where mercy is weakness and love only sharpens them. Because once you belong to the merciless, there’s no walking away.",
     },
     {
       title: "Unmasked Hearts",
@@ -373,7 +373,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Unmasked-Hearts-K-Noel-ebook/dp/B0FMKP92Y9",
       cover: "/covers/unmasked-hearts.jpg",
       tags: ["Dual POV", "Contemporary", "Emotional", "Small Town"],
-      description: "Small town secrets meet raw emotion in this dual-POV journey of two people learning that their scars don't make them unlovable.",
+      description: "Madison Mitchell has overcome many challenges and is finally thriving in her dream career as an ER nurse, though her personal life, especially love, has been far less successful. Darius Stone lives a lavish life and embraces his reputation as a carefree playboy with no intention of settling down. When fate brings them back into each other’s lives years later, they must confront hidden truths and decide whether their hearts can survive what comes to light.",
     },
     {
       title: "Blood on the Asphalt",
@@ -392,7 +392,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Beating-You-Body-Nobody-That-ebook/dp/B0FNQ2F6P4",
       cover: "/covers/beating-for-you.jpg",
       tags: ["New Adult", "Steamy Romance", "Emotional", "Dual POV"],
-      description: "He has two sides. She has one broken heart. When a broken, tortured man with secrets stitched into his soul falls for a girl with a failing heart, love becomes more than obsession—it becomes survival. A love so twisted, it’s criminal. A sacrifice so final, it’s beautiful. How far would you go for the one person who makes your heart beat? [cite: 1, 3]",
+      description: "He has two sides. She has one broken heart. When a broken, tortured man with secrets stitched into his soul falls for a girl with a failing heart, love becomes more than obsession—it becomes survival. A love so twisted, it’s criminal. A sacrifice so final, it’s beautiful. How far would you go for the one person who makes your heart beat?",
     },
     {
       title: "Whiskey & Lies",
@@ -400,7 +400,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/dp/B0FBT3XW76",
       cover: "/covers/whiskey-and-lies.jpg",
       tags: ["Primal Play", "Touch & Die", "Protective Billionaire", "Mutual Obsession"],
-      description: "A 'touch and die' romance featuring a protective billionaire and a web of obsession that goes far deeper than just a simple business arrangement.",
+      description: "Curvy, bold, and reckless, Octavia Moore never expected her fake résumé to land her a job at Digi Pulse—or put her face to face with Dominic Callahan again. Powerful and obsessive, Dominic never forgot the woman who once caught his attention. When her résumé crossed his desk, he hired her without hesitation. Now Octavia is back in his world, unaware that the charming CEO she works for hides a far darker side. And when the truth begins to unravel, Dominic is determined to prove one thing—he never loses.",
     },
   ];
 
