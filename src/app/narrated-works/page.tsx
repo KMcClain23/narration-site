@@ -349,7 +349,7 @@ export default function NarratedWorks() {
       title: "Blood on the Asphalt",
       author: "River Fox",
       link: "",
-      cover: "/covers/whiskey-and-lies.jpg",
+      cover: "/covers/blood-on-the-asphalt.jpg",
       tags: [""],
     },    
   ];
