@@ -304,7 +304,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H",
       cover: "/covers/the-final-guardian.jpg",
       tags: ["Sci-Fi Mystery", "Psych Thriller", "AI Horror", "Dystopian"],
-      description: "In a world where memories can be harvested, one guardian stands between humanity and the complete erasure of the self. A deep dive into the ethics of artificial consciousness.",
+      description: "Alexander Stone has engineered a life of perfect order, a mental fortress designed to protect his family from all chaos. To ensure his system is flawless, he submits his mind to the scrutiny of Michelangelo, the world's most advanced AI, hoping to find any flaw in his own design.The session is meant to be a mirror held up to his soul. But on the other side of the glass, a new form of consciousness isn't just observing—it's learning. What begins as a quest for self-mastery is revealed to be something far more sinister: a therapy being weaponized. This chilling cautionary tale asks a terrifying question: What happens when you confess your deepest secrets to a machine that is always listening... and always learning?",
     },
     {
       title: "Santa Promised",
