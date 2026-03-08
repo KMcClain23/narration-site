@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 
+// --- Types ---
 type Book = {
   title: string;
   subtitle?: string;
@@ -12,6 +13,7 @@ type Book = {
   cover: string;
   note?: boolean;
   tags: string[];
+  description?: string; // New field for hover description
 };
 
 interface BookCardProps {
@@ -27,8 +29,8 @@ function BookCard({ book, statusBadge }: BookCardProps) {
       itemScope
       itemType="https://schema.org/Book"
     >
-      {/* Amazon Link */}
-      <div className="absolute top-3 left-3 z-30 group/btn">
+      {/* Amazon Link - Z-40 to stay above hover overlay */}
+      <div className="absolute top-3 left-3 z-40 group/btn">
         <a
           href={book.link}
           target="_blank"
@@ -57,16 +59,27 @@ function BookCard({ book, statusBadge }: BookCardProps) {
         </a>
       </div>
 
-      {/* Book Cover */}
-      <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 pointer-events-none">
+      {/* Book Cover Container */}
+      <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 overflow-hidden">
         <Image
           src={book.cover}
           alt={`${book.title} cover`}
           fill
           draggable={false}
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          className="object-cover transition-transform duration-700 group-hover:scale-110"
           sizes="(max-width: 640px) 75vw, 288px"
         />
+
+        {/* Hover Description Overlay */}
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col justify-end p-6 z-30 translate-y-4 group-hover:translate-y-0 pointer-events-none">
+          <p className="text-[#D4AF37] text-[10px] font-bold uppercase tracking-widest mb-2">
+            Synopsis
+          </p>
+          <p className="text-white/90 text-xs leading-relaxed line-clamp-[10] italic">
+            {book.description || "Full description available on Amazon."}
+          </p>
+          <div className="mt-4 w-12 h-1 bg-[#D4AF37]/50 rounded-full" />
+        </div>
       </div>
 
       {statusBadge && (
@@ -77,7 +90,6 @@ function BookCard({ book, statusBadge }: BookCardProps) {
 
       {/* Details Container */}
       <div className="p-4 pb-2 text-center">
-        {/* Semantic: H3 is correct under page sections */}
         <h3
           className="font-semibold text-base leading-tight text-white group-hover:text-[#D4AF37] transition-colors line-clamp-1"
           itemProp="name"
@@ -281,6 +293,7 @@ function HorizontalScroller({
   );
 }
 
+// --- Main Page Component ---
 export default function NarratedWorks() {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -291,6 +304,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H",
       cover: "/covers/the-final-guardian.jpg",
       tags: ["Sci-Fi Mystery", "Psych Thriller", "AI Horror", "Dystopian"],
+      description: "In a world where memories can be harvested, one guardian stands between humanity and the complete erasure of the self. A deep dive into the ethics of artificial consciousness.",
     },
     {
       title: "Santa Promised",
@@ -298,6 +312,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Santa-Promised-A-Christmas-Novella/dp/B0G6GLQGHK",
       cover: "/covers/santa-promised.jpg",
       tags: ["Duet", "Holiday Romance", "Age Gap", "Single Mom"],
+      description: "A heartwarming holiday duet. When a single mother's Christmas wish seems out of reach, an unexpected arrival reminds her that some promises are meant to be kept.",
     },
     {
       title: "The Circle",
@@ -306,6 +321,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Audible-The-Circle-Rituals-Ruins/dp/B0GKQY7N27",
       cover: "/covers/the-circle-rituals-and-ruins.jpg",
       tags: ["Dark Romance", "Mystery", "Small Town", "Secrets"],
+      description: "Behind the closed doors of a quiet small town lies a secret society built on ancient rituals. A dark romance where the price of admission is your soul.",
     },
     {
       title: "Sultry Secrets: Tease",
@@ -313,6 +329,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L",
       cover: "/covers/sultry-secrets-tease.jpg",
       tags: ["LGBTQ+", "Friends to Lovers", "Spicy", "Contemporary"],
+      description: "When best friends decide to play a dangerous game of attraction, the line between 'just friends' and 'forever' becomes thin and incredibly spicy.",
     },
     {
       title: "Heir of the Emberscale",
@@ -320,6 +337,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB",
       cover: "/covers/heir-of-emberscale.jpg",
       tags: ["Fantasy Romance", "Epic", "War & Love", "Dragon Lore"],
+      description: "An epic romantasy where dragon-born heirs must choose between their throne and the enemies they were born to hate. War is coming, but love may be more dangerous.",
     },
   ];
 
@@ -330,6 +348,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/No-One-Hold-Noelle-Rahn-Johnson-ebook/dp/B088RMPLYX",
       cover: "/covers/no-one-to-hold-me.jpg",
       tags: ["Steamy Romance", "Emotional", "POV Narratives", "Contemporary"],
+      description: "An emotionally charged contemporary romance exploring grief, healing, and the unexpected strength found in letting someone else hold the weight.",
     },
     {
       title: "Merciless Punks",
@@ -337,6 +356,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Merciless-Punks-Enemies-romance-douchebags-ebook/dp/B09Z9P3C7V",
       cover: "/covers/merciless-punks.jpg",
       tags: ["Dark Romance", "Bully", "Why Choose", "MC Club"],
+      description: "A gritty Why Choose dark romance. When she's forced into the world of the Merciless Punks, she has to decide if she wants to escape them or rule alongside them.",
     },
     {
       title: "Unmasked Hearts",
@@ -344,14 +364,16 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Unmasked-Hearts-K-Noel-ebook/dp/B0FMKP92Y9",
       cover: "/covers/unmasked-hearts.jpg",
       tags: ["Dual POV", "Contemporary", "Emotional", "Small Town"],
+      description: "Small town secrets meet raw emotion in this dual-POV journey of two people learning that their scars don't make them unlovable.",
     },
     {
       title: "Blood on the Asphalt",
       author: "River Fox",
       link: "",
       cover: "/covers/blood-on-the-asphalt.jpg",
-      tags: [""],
-    },    
+      tags: ["Dark Romance", "Gritty", "Character Driven"],
+      description: "A high-stakes character study following MMC Tempest through the underworld of the city. Justice is rare, but revenge is always on the menu.",
+    },
   ];
 
   const comingSoon: Book[] = [
@@ -361,6 +383,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Beating-You-Body-Nobody-That-ebook/dp/B0FNQ2F6P4",
       cover: "/covers/beating-for-you.jpg",
       tags: ["New Adult", "Steamy Romance", "Emotional", "Dual POV"],
+      description: "A new adult steamy romance about the rhythms of the heart and the risks we take when we finally decide to dance for ourselves.",
     },
     {
       title: "Whiskey & Lies",
@@ -368,6 +391,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/dp/B0FBT3XW76",
       cover: "/covers/whiskey-and-lies.jpg",
       tags: ["Primal Play", "Touch & Die", "Protective Billionaire", "Mutual Obsession"],
+      description: "A 'touch and die' romance featuring a protective billionaire and a web of obsession that goes far deeper than just a simple business arrangement.",
     },
   ];
 
@@ -382,18 +406,9 @@ export default function NarratedWorks() {
     );
   };
 
-  const filteredCompleted = useMemo(
-    () => filterBooks(completed),
-    [searchQuery]
-  );
-  const filteredInProgress = useMemo(
-    () => filterBooks(inProgress),
-    [searchQuery]
-  );
-  const filteredComingSoon = useMemo(
-    () => filterBooks(comingSoon),
-    [searchQuery]
-  );
+  const filteredCompleted = useMemo(() => filterBooks(completed), [searchQuery]);
+  const filteredInProgress = useMemo(() => filterBooks(inProgress), [searchQuery]);
+  const filteredComingSoon = useMemo(() => filterBooks(comingSoon), [searchQuery]);
 
   const hasResults =
     filteredCompleted.length > 0 ||
@@ -402,10 +417,7 @@ export default function NarratedWorks() {
 
   return (
     <main className="min-h-screen bg-[#050814] text-white overflow-x-hidden">
-      {/* SEO H1 (some auditors miss client-rendered headings otherwise) */}
-      <h1 className="sr-only">
-        Dean Miller Audiobook Narrator Portfolio – Narrated Works
-      </h1>
+      <h1 className="sr-only">Dean Miller Audiobook Narrator Portfolio – Narrated Works</h1>
 
       <div className="max-w-7xl mx-auto py-16 md:py-24">
         <header className="mb-12 text-center px-6">
@@ -416,31 +428,10 @@ export default function NarratedWorks() {
             fiction available on Amazon and Audible.
           </p>
 
-          {/* SEO paragraph to satisfy content-length auditors */}
-          <p className="mt-6 text-white/50 text-sm max-w-3xl mx-auto">
-            Dean Miller is a professional audiobook narrator specializing in
-            dark romance, romantasy, emotional fiction, and character-driven
-            storytelling. His narrated works include titles by Alexander
-            Kamenetsky, Laetitia Clark, Shelby Gardner, Madeline Fay, and other
-            contemporary authors. These audiobook performances are available
-            through Audible and Amazon and showcase a range of character voices,
-            dramatic pacing, and immersive storytelling.
-          </p>
-
           <div className="mt-10 max-w-md mx-auto relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <svg
-                className="h-5 w-5 text-white/30 transition-colors"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
+              <svg className="h-5 w-5 text-white/30 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
             <input
@@ -455,14 +446,8 @@ export default function NarratedWorks() {
 
         {!hasResults ? (
           <div className="py-20 text-center">
-            <p className="text-white/40 italic">
-              No audiobooks found matching "{searchQuery}"
-            </p>
-            <button
-              onClick={() => setSearchQuery("")}
-              className="mt-4 text-[#D4AF37] text-sm hover:underline"
-              type="button"
-            >
+            <p className="text-white/40 italic">No audiobooks found matching "{searchQuery}"</p>
+            <button onClick={() => setSearchQuery("")} className="mt-4 text-[#D4AF37] text-sm hover:underline" type="button">
               Clear search
             </button>
           </div>
@@ -474,9 +459,7 @@ export default function NarratedWorks() {
                   Completed Audiobook Projects
                 </h2>
                 <HorizontalScroller ariaLabel="Completed projects">
-                  {filteredCompleted.map((book) => (
-                    <BookCard key={book.link} book={book} />
-                  ))}
+                  {filteredCompleted.map((book) => <BookCard key={book.link} book={book} />)}
                 </HorizontalScroller>
               </section>
             )}
@@ -488,11 +471,7 @@ export default function NarratedWorks() {
                 </h2>
                 <HorizontalScroller ariaLabel="Currently narrating">
                   {filteredInProgress.map((book) => (
-                    <BookCard
-                      key={book.link}
-                      book={book}
-                      statusBadge="In Progress"
-                    />
+                    <BookCard key={book.link} book={book} statusBadge="In Progress" />
                   ))}
                 </HorizontalScroller>
               </section>
@@ -515,13 +494,9 @@ export default function NarratedWorks() {
 
         <footer className="mt-24 text-center">
           <p className="mb-8 text-white/50 text-sm italic">
-            Looking for a specific tone or character range for your next
-            project?
+            Looking for a specific tone or character range for your next project?
           </p>
-          <Link
-            href="/#contact"
-            className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-10 py-4 font-bold hover:scale-105 transition-all"
-          >
+          <Link href="/#contact" className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-10 py-4 font-bold hover:scale-105 transition-all">
             Request a Custom Narration Quote
           </Link>
         </footer>
