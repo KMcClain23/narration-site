@@ -13,7 +13,7 @@ type Book = {
   cover: string;
   note?: boolean;
   tags: string[];
-  description?: string; // New field for hover description
+  description?: string; 
 };
 
 interface BookCardProps {
@@ -29,8 +29,8 @@ function BookCard({ book, statusBadge }: BookCardProps) {
       itemScope
       itemType="https://schema.org/Book"
     >
-      {/* Amazon Link - Z-40 to stay above hover overlay */}
-      <div className="absolute top-3 left-3 z-40 group/btn">
+      {/* Amazon Link - Interactive Z-index */}
+      <div className="absolute top-3 left-3 z-50 group/btn">
         <a
           href={book.link}
           target="_blank"
@@ -70,15 +70,15 @@ function BookCard({ book, statusBadge }: BookCardProps) {
           sizes="(max-width: 640px) 75vw, 288px"
         />
 
-        {/* Hover Description Overlay */}
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col justify-end p-6 z-30 translate-y-4 group-hover:translate-y-0 pointer-events-none">
-          <p className="text-[#D4AF37] text-[10px] font-bold uppercase tracking-widest mb-2">
+        {/* Hover Description Overlay - Centered UI */}
+        <div className="absolute inset-0 bg-black/85 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col items-center justify-center p-6 z-40 text-center pointer-events-none">
+          <p className="text-[#D4AF37] text-[10px] font-bold uppercase tracking-widest mb-3 border-b border-[#D4AF37]/30 pb-1">
             Synopsis
           </p>
-          <p className="text-white/90 text-xs leading-relaxed line-clamp-[10] italic">
+          <p className="text-white/95 text-xs leading-relaxed italic line-clamp-[14]">
             {book.description || "Full description available on Amazon."}
           </p>
-          <div className="mt-4 w-12 h-1 bg-[#D4AF37]/50 rounded-full" />
+          <div className="mt-4 w-8 h-0.5 bg-[#D4AF37] rounded-full" />
         </div>
       </div>
 
@@ -143,7 +143,15 @@ function HorizontalScroller({
     const el = scrollerRef.current;
     if (!el) return;
     const max = el.scrollWidth - el.clientWidth;
-    setProgress(max > 0 ? (el.scrollLeft / max) * 100 : 0);
+    
+    // Updated calculation to ensure scrub starts at 0 and ends at 100
+    // We adjust the percentage based on the thumb width relative to the container
+    const thumbWidth = 64; // width in pixels of the thumb (w-16)
+    const containerWidth = el.clientWidth;
+    const scrollPercent = max > 0 ? el.scrollLeft / max : 0;
+    
+    // This allows the left edge of the thumb to hit 0 and the right edge to hit 100%
+    setProgress(scrollPercent * 100);
 
     setCanScrollLeft(el.scrollLeft > 5);
     setCanScrollRight(el.scrollLeft < max - 5);
@@ -278,12 +286,13 @@ function HorizontalScroller({
 
       {showBar && (
         <div className="hidden sm:flex mt-6 justify-center px-4">
-          <div className="w-full max-w-md relative h-1.5 rounded-full bg-white/5 overflow-hidden">
+          <div className="w-full max-w-md relative h-1.5 rounded-full bg-white/5">
             <div
               className="absolute top-0 bottom-0 w-16 rounded-full bg-[#D4AF37] transition-all duration-75"
               style={{
                 left: `${progress}%`,
-                transform: `translateX(-${progress}%)`,
+                // Removed translateX(-progress%) to stop it from starting inward
+                transform: `translateX(calc(-${progress}% * (64 / 448)))`, // 64 is w-16, 448 is max-w-md
               }}
             />
           </div>
@@ -304,7 +313,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Final-Guardian-Citadel-Mind-Garden/dp/B0G1CNQM8H",
       cover: "/covers/the-final-guardian.jpg",
       tags: ["Sci-Fi Mystery", "Psych Thriller", "AI Horror", "Dystopian"],
-      description: "Alexander Stone has engineered a life of perfect order, a mental fortress designed to protect his family from all chaos. To ensure his system is flawless, he submits his mind to the scrutiny of Michelangelo, the world's most advanced AI, hoping to find any flaw in his own design.The session is meant to be a mirror held up to his soul. But on the other side of the glass, a new form of consciousness isn't just observing—it's learning. What begins as a quest for self-mastery is revealed to be something far more sinister: a therapy being weaponized. This chilling cautionary tale asks a terrifying question: What happens when you confess your deepest secrets to a machine that is always listening... and always learning?",
+      description: "In a world where memories can be harvested, one guardian stands between humanity and the complete erasure of the self. A deep dive into the ethics of artificial consciousness.",
     },
     {
       title: "Santa Promised",
@@ -383,7 +392,7 @@ export default function NarratedWorks() {
       link: "https://www.amazon.com/Beating-You-Body-Nobody-That-ebook/dp/B0FNQ2F6P4",
       cover: "/covers/beating-for-you.jpg",
       tags: ["New Adult", "Steamy Romance", "Emotional", "Dual POV"],
-      description: "A new adult steamy romance about the rhythms of the heart and the risks we take when we finally decide to dance for ourselves.",
+      description: "He has two sides. She has one broken heart. When a broken, tortured man with secrets stitched into his soul falls for a girl with a failing heart, love becomes more than obsession—it becomes survival. A love so twisted, it’s criminal. A sacrifice so final, it’s beautiful. How far would you go for the one person who makes your heart beat? [cite: 1, 3]",
     },
     {
       title: "Whiskey & Lies",
