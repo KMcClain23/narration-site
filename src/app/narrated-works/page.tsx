@@ -333,14 +333,6 @@ export default function NarratedWorks() {
       description: "The Circle started as a game. Reckless nights, bodies worshiped like temples, and dares that ended in moans instead of consequences. But something has changed. The symbol carved into the wood grows sharper every time we see it, and someone is feeding it in the dark. Our rituals no longer feel like play. We don’t just touch anymore. We take. We claim. We ruin. They say you can walk away from this, but they’ve never felt the ropes, never begged for the burn, never been worshiped and wrecked in the same breath. The Circle doesn’t play anymore. It practices. And once you’re marked, you belong to it.",
     },
     {
-      title: "Sultry Secrets: Tease",
-      author: "Bethanie Loren",
-      link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L",
-      cover: "/covers/sultry-secrets-tease.jpg",
-      tags: ["LGBTQ+", "Friends to Lovers", "Spicy", "Contemporary"],
-      description: "I love my husband, I really do. But have you ever wanted something more? Just the perfect cherry on top? Tonight is my night to have it all. Just one night where I can have the best of both worlds, no matter what that looks like.",
-    },
-    {
       title: "Heir of the Emberscale",
       author: "Shelby Gardner",
       link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB",
@@ -348,6 +340,15 @@ export default function NarratedWorks() {
       tags: ["Fantasy Romance", "Epic", "War & Love", "Dragon Lore"],
       description: "She was just a survivor. He was a ruthless king. Their fate is sealed when Elyria discovers the ancient Aura Stone, which marks her as the last Queen and binds her to Tyrion, the powerful master of the Ember Stone. Forced into an unwilling partnership, they must navigate their dangerous bond, mythical forces, and a dying world. To save it, Elyria and Tyrion must overcome their hatred and accept the destiny that ties them together.",
     },
+    {
+      title: "Sultry Secrets: Tease",
+      author: "Bethanie Loren",
+      link: "https://www.amazon.com/-/es/Bethanie-Loren-ebook/dp/B0G6VDHL9L",
+      cover: "/covers/sultry-secrets-tease.jpg",
+      tags: ["LGBTQ+", "Friends to Lovers", "Spicy", "Contemporary"],
+      description: "I love my husband, I really do. But have you ever wanted something more? Just the perfect cherry on top? Tonight is my night to have it all. Just one night where I can have the best of both worlds, no matter what that looks like.",
+    },
+
   ];
 
   const inProgress: Book[] = [
