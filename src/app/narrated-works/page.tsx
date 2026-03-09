@@ -380,7 +380,7 @@ export default function NarratedWorks() {
       author: "River Fox",
       link: "",
       cover: "/covers/blood-on-the-asphalt.jpg",
-      tags: ["Dark Romance", "Gritty", "Character Driven"],
+      tags: ["MC Romance", "Wolf-shifter", "Fated Mates", "Reverse Harem"],
       description: "A high-stakes character study following MMC Tempest through the underworld of the city. Justice is rare, but revenge is always on the menu.",
     },
   ];
@@ -391,7 +391,7 @@ export default function NarratedWorks() {
       author: "L.L. McAlister",
       link: "https://www.amazon.com/Beating-You-Body-Nobody-That-ebook/dp/B0FNQ2F6P4",
       cover: "/covers/beating-for-you.jpg",
-      tags: ["New Adult", "Steamy Romance", "Emotional", "Dual POV"],
+      tags: ["Dark Romance", "Obsession", "Sacrifice", "Morally Grey"],
       description: "He has two sides. She has one broken heart. When a broken, tortured man with secrets stitched into his soul falls for a girl with a failing heart, love becomes more than obsession—it becomes survival. A love so twisted, it’s criminal. A sacrifice so final, it’s beautiful. How far would you go for the one person who makes your heart beat?",
     },
     {
