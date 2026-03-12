@@ -335,7 +335,7 @@ export default function NarratedWorks() {
     {
       title: "Heir of the Emberscale",
       author: "Shelby Gardner",
-      link: "https://www.amazon.com/Heir-Emberscale-Shelby-Gardner-ebook/dp/B0FXR4Y9JB",
+      link: "https://www.amazon.com/Audible-Heir-of-the-Emberscale/dp/B0GS785G6X/ref=tmm_aud_swatch_0",
       cover: "/covers/heir-of-emberscale.jpg",
       tags: ["Fantasy Romance", "Epic", "War & Love", "Dragon Lore"],
       description: "She was just a survivor. He was a ruthless king. Their fate is sealed when Elyria discovers the ancient Aura Stone, which marks her as the last Queen and binds her to Tyrion, the powerful master of the Ember Stone. Forced into an unwilling partnership, they must navigate their dangerous bond, mythical forces, and a dying world. To save it, Elyria and Tyrion must overcome their hatred and accept the destiny that ties them together.",
