@@ -1,5 +1,10 @@
-﻿import { redirect } from "next/navigation";
+﻿import { Suspense } from "react";
+import HomeClient from "./HomeClient";
 
 export default function Page() {
-  redirect("/narrated-works");
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#050814]" />}>
+      <HomeClient />
+    </Suspense>
+  );
 }
