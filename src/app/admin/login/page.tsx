@@ -13,6 +13,11 @@ type FormState = {
   category: BookCategory;
 };
 
+type DragPayload = {
+  title: string;
+  author: string;
+};
+
 const initialForm: FormState = {
   title: "",
   subtitle: "",
@@ -29,17 +34,28 @@ const categoryLabels: Record<BookCategory, string> = {
   "coming-soon": "Coming Soon to Audible",
 };
 
-type DragPayload = {
-  title: string;
-  author: string;
-};
+function formStateFromBook(book: Book): FormState {
+  return {
+    title: book.title,
+    subtitle: book.subtitle || "",
+    author: book.author,
+    link: book.link,
+    description: book.description || "",
+    tags: book.tags.join(", "),
+    category: book.category,
+  };
+}
 
 function AdminBookCard({
   book,
   onDragStart,
+  onEdit,
+  onDelete,
 }: {
   book: Book;
   onDragStart: (book: Book) => void;
+  onEdit: (book: Book) => void;
+  onDelete: (book: Book) => void;
 }) {
   return (
     <div
@@ -51,10 +67,10 @@ function AdminBookCard({
         <img
           src={book.cover}
           alt={`${book.title} cover`}
-          className="h-20 w-14 rounded object-cover border border-[#1A2550]"
+          className="h-20 w-14 rounded object-cover border border-[#1A2550] flex-shrink-0"
         />
 
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold text-white leading-tight">
             {book.title}
           </h3>
@@ -75,6 +91,30 @@ function AdminBookCard({
               </span>
             ))}
           </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(book);
+              }}
+              className="rounded-full border border-[#D4AF37]/40 px-3 py-1.5 text-xs font-semibold text-[#D4AF37] hover:bg-[#D4AF37]/10"
+            >
+              Edit
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(book);
+              }}
+              className="rounded-full border border-red-400/40 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-400/10"
+            >
+              Delete
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -87,12 +127,16 @@ function CategoryColumn({
   onDropBook,
   draggedBook,
   setDraggedBook,
+  onEdit,
+  onDelete,
 }: {
   category: BookCategory;
   books: Book[];
   onDropBook: (category: BookCategory) => void;
   draggedBook: DragPayload | null;
   setDraggedBook: (value: DragPayload | null) => void;
+  onEdit: (book: Book) => void;
+  onDelete: (book: Book) => void;
 }) {
   const [isOver, setIsOver] = useState(false);
 
@@ -127,9 +171,7 @@ function CategoryColumn({
       <div className="space-y-3">
         {books.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[#1A2550] p-6 text-center text-sm text-white/40">
-            {draggedBook
-              ? "Drop book here"
-              : "No books in this category"}
+            {draggedBook ? "Drop book here" : "No books in this category"}
           </div>
         ) : (
           books.map((book) => (
@@ -142,6 +184,8 @@ function CategoryColumn({
                   author: dragged.author,
                 })
               }
+              onEdit={onEdit}
+              onDelete={onDelete}
             />
           ))
         )}
@@ -158,6 +202,12 @@ export default function AdminPage() {
   const [books, setBooks] = useState<Book[]>([]);
   const [isLoadingBooks, setIsLoadingBooks] = useState(true);
   const [draggedBook, setDraggedBook] = useState<DragPayload | null>(null);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingOriginalKey, setEditingOriginalKey] = useState<{
+    title: string;
+    author: string;
+  } | null>(null);
 
   useEffect(() => {
     const loadBooks = async () => {
@@ -210,14 +260,19 @@ export default function AdminPage() {
     }));
   };
 
-  const resetForm = () => {
-    setForm(initialForm);
-    setCoverFile(null);
-
+  const clearFileInput = () => {
     const fileInput = document.getElementById("cover-upload") as HTMLInputElement | null;
     if (fileInput) {
       fileInput.value = "";
     }
+  };
+
+  const resetForm = () => {
+    setForm(initialForm);
+    setCoverFile(null);
+    setIsEditing(false);
+    setEditingOriginalKey(null);
+    clearFileInput();
   };
 
   const refreshBooks = async () => {
@@ -229,32 +284,104 @@ export default function AdminPage() {
     }
   };
 
+  const uploadCoverIfNeeded = async (existingCover?: string) => {
+    if (!coverFile) {
+      return existingCover || "";
+    }
+
+    const imageFormData = new FormData();
+    imageFormData.append("file", coverFile);
+
+    const uploadResponse = await fetch("/api/upload-cover", {
+      method: "POST",
+      body: imageFormData,
+    });
+
+    const uploadResult = await uploadResponse.json();
+
+    if (!uploadResponse.ok) {
+      throw new Error(uploadResult.error || "Failed to upload cover.");
+    }
+
+    return uploadResult.coverPath as string;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!coverFile) {
-      setStatus("Please select a cover image.");
-      return;
-    }
-
     try {
       setIsSubmitting(true);
-      setStatus("Uploading cover...");
 
-      const imageFormData = new FormData();
-      imageFormData.append("file", coverFile);
-
-      const uploadResponse = await fetch("/api/upload-cover", {
-        method: "POST",
-        body: imageFormData,
-      });
-
-      const uploadResult = await uploadResponse.json();
-
-      if (!uploadResponse.ok) {
-        setStatus(uploadResult.error || "Failed to upload cover.");
+      if (!isEditing && !coverFile) {
+        setStatus("Please select a cover image.");
         return;
       }
+
+      if (isEditing && !editingOriginalKey) {
+        setStatus("Missing original book reference for edit.");
+        return;
+      }
+
+      const originalKey = editingOriginalKey;
+
+      if (isEditing) {
+        const existingBook = books.find(
+          (book) =>
+            book.title === editingOriginalKey?.title &&
+            book.author === editingOriginalKey?.author
+        );
+
+        if (!existingBook) {
+          setStatus("Could not find the original book to edit.");
+          return;
+        }
+
+        setStatus(coverFile ? "Uploading new cover..." : "Saving changes...");
+
+        const finalCover = await uploadCoverIfNeeded(existingBook.cover);
+
+        const updatedBook: Book = {
+          title: form.title,
+          subtitle: form.subtitle || undefined,
+          author: form.author,
+          link: form.link,
+          cover: finalCover,
+          description: form.description,
+          tags: form.tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+          category: form.category,
+        };
+
+        const response = await fetch("/api/books", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            originalTitle: editingOriginalKey!.title,
+            originalAuthor: editingOriginalKey!.author,
+            updatedBook,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          setStatus(result.error || "Failed to update book.");
+          return;
+        }
+
+        setStatus("Book updated successfully.");
+        resetForm();
+        await refreshBooks();
+        return;
+      }
+
+      setStatus("Uploading cover...");
+
+      const finalCover = await uploadCoverIfNeeded();
 
       setStatus("Saving book...");
 
@@ -268,7 +395,7 @@ export default function AdminPage() {
           subtitle: form.subtitle,
           author: form.author,
           link: form.link,
-          cover: uploadResult.coverPath,
+          cover: finalCover,
           description: form.description,
           tags: form.tags
             .split(",")
@@ -290,7 +417,11 @@ export default function AdminPage() {
       await refreshBooks();
     } catch (error) {
       console.error(error);
-      setStatus("Something went wrong while adding the book.");
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while saving the book."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -348,18 +479,96 @@ export default function AdminPage() {
     }
   };
 
+  const handleEdit = (book: Book) => {
+    setIsEditing(true);
+    setEditingOriginalKey({
+      title: book.title,
+      author: book.author,
+    });
+    setForm(formStateFromBook(book));
+    setCoverFile(null);
+    clearFileInput();
+    setStatus(`Editing "${book.title}"`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleDelete = async (book: Book) => {
+    const confirmed = window.confirm(
+      `Delete "${book.title}" by ${book.author}? This cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    const previousBooks = books;
+    setBooks((prev) =>
+      prev.filter(
+        (item) => !(item.title === book.title && item.author === book.author)
+      )
+    );
+    setStatus(`Deleting "${book.title}"...`);
+
+    try {
+      const response = await fetch("/api/books", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: book.title,
+          author: book.author,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setBooks(previousBooks);
+        setStatus(result.error || "Failed to delete book.");
+        return;
+      }
+
+      if (
+        editingOriginalKey &&
+        editingOriginalKey.title === book.title &&
+        editingOriginalKey.author === book.author
+      ) {
+        resetForm();
+      }
+
+      setStatus(`Deleted "${book.title}".`);
+    } catch (error) {
+      console.error(error);
+      setBooks(previousBooks);
+      setStatus("Something went wrong while deleting the book.");
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[#050814] text-white px-6 py-12">
       <div className="max-w-7xl mx-auto">
         <header className="mb-10">
           <h1 className="text-3xl md:text-4xl font-bold">Admin: Manage Books</h1>
           <p className="text-white/60 mt-3">
-            Add new books and drag them between categories as they move through production.
+            Add new books, edit existing ones, delete old entries, and drag books between categories as they move through production.
           </p>
         </header>
 
         <section className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 md:p-8 shadow-xl mb-10">
-          <h2 className="text-xl font-bold mb-6">Add a Book</h2>
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xl font-bold">
+              {isEditing ? "Edit Book" : "Add a Book"}
+            </h2>
+
+            {isEditing && (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="rounded-full border border-white/20 px-4 py-2 text-sm text-white/80 hover:bg-white/5"
+              >
+                Cancel Edit
+              </button>
+            )}
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
@@ -456,7 +665,7 @@ export default function AdminPage() {
 
             <div>
               <label htmlFor="category" className="block text-sm font-medium mb-2">
-                Starting Category
+                Category
               </label>
               <select
                 id="category"
@@ -473,35 +682,56 @@ export default function AdminPage() {
 
             <div>
               <label htmlFor="cover-upload" className="block text-sm font-medium mb-2">
-                Book Cover
+                {isEditing ? "Replace Book Cover (optional)" : "Book Cover"}
               </label>
               <input
                 id="cover-upload"
                 type="file"
                 accept="image/*"
                 onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
-                required
+                required={!isEditing}
                 className="w-full rounded-lg bg-[#050814] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
               />
+              {isEditing && (
+                <p className="text-xs text-white/45 mt-2">
+                  Leave blank to keep the current cover.
+                </p>
+              )}
             </div>
 
-            <div className="pt-2">
+            <div className="pt-2 flex flex-wrap gap-3">
               <button
                 type="submit"
                 disabled={isSubmitting}
                 className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-6 py-3 font-bold hover:scale-105 transition-all disabled:opacity-60 disabled:hover:scale-100"
               >
-                {isSubmitting ? "Submitting..." : "Add Book"}
+                {isSubmitting
+                  ? isEditing
+                    ? "Saving..."
+                    : "Submitting..."
+                  : isEditing
+                  ? "Save Changes"
+                  : "Add Book"}
               </button>
+
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="inline-flex items-center justify-center rounded-full border border-white/20 text-white px-6 py-3 font-bold hover:bg-white/5 transition-all"
+                >
+                  Cancel
+                </button>
+              )}
             </div>
           </form>
         </section>
 
         <section>
           <div className="mb-5">
-            <h2 className="text-xl font-bold">Move Books Between Categories</h2>
+            <h2 className="text-xl font-bold">Move, Edit, or Delete Books</h2>
             <p className="text-white/55 text-sm mt-2">
-              Drag a book card from one column to another to update its status.
+              Drag a book card to another column to change its status, or use the edit and delete buttons on each card.
             </p>
           </div>
 
@@ -517,6 +747,8 @@ export default function AdminPage() {
                 onDropBook={handleDropBook}
                 draggedBook={draggedBook}
                 setDraggedBook={setDraggedBook}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
               />
               <CategoryColumn
                 category="in-progress"
@@ -524,6 +756,8 @@ export default function AdminPage() {
                 onDropBook={handleDropBook}
                 draggedBook={draggedBook}
                 setDraggedBook={setDraggedBook}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
               />
               <CategoryColumn
                 category="completed"
@@ -531,6 +765,8 @@ export default function AdminPage() {
                 onDropBook={handleDropBook}
                 draggedBook={draggedBook}
                 setDraggedBook={setDraggedBook}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
               />
             </div>
           )}
