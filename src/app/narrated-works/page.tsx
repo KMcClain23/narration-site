@@ -342,11 +342,12 @@ export default function NarratedWorks() {
       const q = searchQuery.toLowerCase();
 
       return items.filter(
-        (b) =>
-          b.title.toLowerCase().includes(q) ||
-          b.author.toLowerCase().includes(q) ||
-          b.tags.some((t) => t.toLowerCase().includes(q))
-      );
+      (b) =>
+        b.title.toLowerCase().includes(q) ||
+        (b.subtitle?.toLowerCase().includes(q) ?? false) ||
+        b.author.toLowerCase().includes(q) ||
+        b.tags.some((t) => t.toLowerCase().includes(q))
+    );
     },
     [searchQuery]
   );
@@ -391,7 +392,7 @@ export default function NarratedWorks() {
 
             <input
               type="text"
-              placeholder="Search by title, author, or genre..."
+              placeholder="Search by title, subtitle, author, or genre..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#0B1224] border border-[#1A2550] rounded-full py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/50 transition-all placeholder:text-white/20"
