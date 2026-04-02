@@ -3,16 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import booksData from "@/data/books.json";
 import type { Book } from "@/types/book";
 
-// --- Book Card Types ---
 interface BookCardProps {
   book: Book;
   statusBadge?: React.ReactNode;
 }
 
-// --- Book Card Component ---
 function BookCard({ book, statusBadge }: BookCardProps) {
   const hasLink = Boolean(book.link?.trim());
 
@@ -55,7 +52,7 @@ function BookCard({ book, statusBadge }: BookCardProps) {
 
       <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 overflow-hidden">
         <Image
-          src={book.cover}
+          src={book.cover_url}
           alt={`${book.title} cover`}
           fill
           draggable={false}
@@ -113,7 +110,6 @@ function BookCard({ book, statusBadge }: BookCardProps) {
   );
 }
 
-// --- Horizontal Scroller Component ---
 function HorizontalScroller({
   children,
   ariaLabel,
@@ -295,39 +291,65 @@ function HorizontalScroller({
   );
 }
 
-// --- Main Page Component ---
 export default function NarratedWorks() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [books, setBooks] = useState<Book[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const allBooks = booksData as Book[];
+  useEffect(() => {
+    const loadBooks = async () => {
+      try {
+        setIsLoading(true);
+
+        const response = await fetch("/api/books");
+        const result = await response.json();
+
+        if (!response.ok) {
+          console.error(result.error || "Failed to load books.");
+          return;
+        }
+
+        setBooks(result.books || []);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadBooks();
+  }, []);
 
   const completed = useMemo(
-    () => allBooks.filter((book) => book.category === "completed"),
-    [allBooks]
+    () => books.filter((book) => book.category === "completed"),
+    [books]
   );
 
   const inProgress = useMemo(
-    () => allBooks.filter((book) => book.category === "in-progress"),
-    [allBooks]
+    () => books.filter((book) => book.category === "in-progress"),
+    [books]
   );
 
   const comingSoon = useMemo(
-    () => allBooks.filter((book) => book.category === "coming-soon"),
-    [allBooks]
+    () => books.filter((book) => book.category === "coming-soon"),
+    [books]
   );
 
-  const filterBooks = useCallback((books: Book[]) => {
-    if (!searchQuery.trim()) return books;
+  const filterBooks = useCallback(
+    (items: Book[]) => {
+      if (!searchQuery.trim()) return items;
 
-    const q = searchQuery.toLowerCase();
+      const q = searchQuery.toLowerCase();
 
-    return books.filter(
-      (b) =>
-        b.title.toLowerCase().includes(q) ||
-        b.author.toLowerCase().includes(q) ||
-        b.tags.some((t) => t.toLowerCase().includes(q))
-    );
-  }, [searchQuery]);
+      return items.filter(
+        (b) =>
+          b.title.toLowerCase().includes(q) ||
+          b.author.toLowerCase().includes(q) ||
+          b.tags.some((t) => t.toLowerCase().includes(q))
+      );
+    },
+    [searchQuery]
+  );
 
   const filteredCompleted = useMemo(() => filterBooks(completed), [completed, filterBooks]);
   const filteredInProgress = useMemo(() => filterBooks(inProgress), [inProgress, filterBooks]);
@@ -347,8 +369,7 @@ export default function NarratedWorks() {
           <h2 className="text-4xl md:text-6xl font-bold mb-4">Narrated Works</h2>
           <p className="text-white/60 text-lg max-w-2xl mx-auto">
             Explore my portfolio of professional audiobook narrations.
-            Specializing in dark romance, romantasy, and emotionally driven
-            fiction available on Amazon and Audible.
+            Specializing in dark romance, romantasy, and emotionally driven fiction available on Amazon and Audible.
           </p>
 
           <div className="mt-10 max-w-md mx-auto relative group">
@@ -378,7 +399,11 @@ export default function NarratedWorks() {
           </div>
         </header>
 
-        {!hasResults ? (
+        {isLoading ? (
+          <div className="py-20 text-center">
+            <p className="text-white/40 italic">Loading audiobooks...</p>
+          </div>
+        ) : !hasResults ? (
           <div className="py-20 text-center">
             <p className="text-white/40 italic">
               No audiobooks found matching "{searchQuery}"
@@ -400,10 +425,7 @@ export default function NarratedWorks() {
                 </h2>
                 <HorizontalScroller ariaLabel="Completed projects">
                   {filteredCompleted.map((book) => (
-                    <BookCard
-                      key={`${book.title}-${book.author}`}
-                      book={book}
-                    />
+                    <BookCard key={book.id} book={book} />
                   ))}
                 </HorizontalScroller>
               </section>
@@ -416,11 +438,7 @@ export default function NarratedWorks() {
                 </h2>
                 <HorizontalScroller ariaLabel="Currently narrating">
                   {filteredInProgress.map((book) => (
-                    <BookCard
-                      key={`${book.title}-${book.author}`}
-                      book={book}
-                      statusBadge="In Progress"
-                    />
+                    <BookCard key={book.id} book={book} statusBadge="In Progress" />
                   ))}
                 </HorizontalScroller>
               </section>
@@ -433,11 +451,7 @@ export default function NarratedWorks() {
                 </h2>
                 <HorizontalScroller ariaLabel="Coming soon">
                   {filteredComingSoon.map((book) => (
-                    <BookCard
-                      key={`${book.title}-${book.author}`}
-                      book={book}
-                      statusBadge="Soon"
-                    />
+                    <BookCard key={book.id} book={book} statusBadge="Soon" />
                   ))}
                 </HorizontalScroller>
               </section>

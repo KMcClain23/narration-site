@@ -14,8 +14,7 @@ type FormState = {
 };
 
 type DragPayload = {
-  title: string;
-  author: string;
+  id: string;
 };
 
 const initialForm: FormState = {
@@ -65,7 +64,7 @@ function AdminBookCard({
     >
       <div className="flex items-start gap-3">
         <img
-          src={book.cover}
+          src={book.cover_url}
           alt={`${book.title} cover`}
           className="h-20 w-14 rounded object-cover border border-[#1A2550] flex-shrink-0"
         />
@@ -176,12 +175,11 @@ function CategoryColumn({
         ) : (
           books.map((book) => (
             <AdminBookCard
-              key={`${book.title}-${book.author}`}
+              key={book.id}
               book={book}
               onDragStart={(dragged) =>
                 setDraggedBook({
-                  title: dragged.title,
-                  author: dragged.author,
+                  id: dragged.id,
                 })
               }
               onEdit={onEdit}
@@ -204,10 +202,7 @@ export default function AdminPage() {
   const [draggedBook, setDraggedBook] = useState<DragPayload | null>(null);
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editingOriginalKey, setEditingOriginalKey] = useState<{
-    title: string;
-    author: string;
-  } | null>(null);
+  const [editingBookId, setEditingBookId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadBooks = async () => {
@@ -271,7 +266,7 @@ export default function AdminPage() {
     setForm(initialForm);
     setCoverFile(null);
     setIsEditing(false);
-    setEditingOriginalKey(null);
+    setEditingBookId(null);
     clearFileInput();
   };
 
@@ -284,9 +279,9 @@ export default function AdminPage() {
     }
   };
 
-  const uploadCoverIfNeeded = async (existingCover?: string) => {
+  const uploadCoverIfNeeded = async (existingCoverUrl?: string) => {
     if (!coverFile) {
-      return existingCover || "";
+      return existingCoverUrl || "";
     }
 
     const imageFormData = new FormData();
@@ -303,7 +298,7 @@ export default function AdminPage() {
       throw new Error(uploadResult.error || "Failed to upload cover.");
     }
 
-    return uploadResult.coverPath as string;
+    return uploadResult.coverUrl as string;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -317,19 +312,13 @@ export default function AdminPage() {
         return;
       }
 
-      if (isEditing && !editingOriginalKey) {
-        setStatus("Missing original book reference for edit.");
+      if (isEditing && !editingBookId) {
+        setStatus("Missing book ID for edit.");
         return;
       }
 
-      const originalKey = editingOriginalKey;
-
       if (isEditing) {
-        const existingBook = books.find(
-          (book) =>
-            book.title === editingOriginalKey?.title &&
-            book.author === editingOriginalKey?.author
-        );
+        const existingBook = books.find((book) => book.id === editingBookId);
 
         if (!existingBook) {
           setStatus("Could not find the original book to edit.");
@@ -338,20 +327,21 @@ export default function AdminPage() {
 
         setStatus(coverFile ? "Uploading new cover..." : "Saving changes...");
 
-        const finalCover = await uploadCoverIfNeeded(existingBook.cover);
+        const finalCoverUrl = await uploadCoverIfNeeded(existingBook.cover_url);
 
-        const updatedBook: Book = {
+        const updatedBook: Partial<Book> = {
           title: form.title,
           subtitle: form.subtitle || undefined,
           author: form.author,
           link: form.link,
-          cover: finalCover,
+          cover_url: finalCoverUrl,
           description: form.description,
           tags: form.tags
             .split(",")
             .map((tag) => tag.trim())
             .filter(Boolean),
           category: form.category,
+          sort_order: existingBook.sort_order ?? 0,
         };
 
         const response = await fetch("/api/books", {
@@ -360,8 +350,7 @@ export default function AdminPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            originalTitle: editingOriginalKey!.title,
-            originalAuthor: editingOriginalKey!.author,
+            id: editingBookId,
             updatedBook,
           }),
         });
@@ -381,7 +370,7 @@ export default function AdminPage() {
 
       setStatus("Uploading cover...");
 
-      const finalCover = await uploadCoverIfNeeded();
+      const finalCoverUrl = await uploadCoverIfNeeded();
 
       setStatus("Saving book...");
 
@@ -395,13 +384,14 @@ export default function AdminPage() {
           subtitle: form.subtitle,
           author: form.author,
           link: form.link,
-          cover: finalCover,
+          cover_url: finalCoverUrl,
           description: form.description,
           tags: form.tags
             .split(",")
             .map((tag) => tag.trim())
             .filter(Boolean),
           category: form.category,
+          sort_order: 0,
         }),
       });
 
@@ -430,11 +420,7 @@ export default function AdminPage() {
   const handleDropBook = async (targetCategory: BookCategory) => {
     if (!draggedBook) return;
 
-    const currentBook = books.find(
-      (book) =>
-        book.title === draggedBook.title &&
-        book.author === draggedBook.author
-    );
+    const currentBook = books.find((book) => book.id === draggedBook.id);
 
     if (!currentBook) return;
     if (currentBook.category === targetCategory) return;
@@ -442,13 +428,13 @@ export default function AdminPage() {
     const previousBooks = books;
 
     const updatedBooks = books.map((book) =>
-      book.title === draggedBook.title && book.author === draggedBook.author
+      book.id === draggedBook.id
         ? { ...book, category: targetCategory }
         : book
     );
 
     setBooks(updatedBooks);
-    setStatus(`Moving "${draggedBook.title}"...`);
+    setStatus(`Moving "${currentBook.title}"...`);
 
     try {
       const response = await fetch("/api/books", {
@@ -457,8 +443,7 @@ export default function AdminPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          title: draggedBook.title,
-          author: draggedBook.author,
+          id: draggedBook.id,
           newCategory: targetCategory,
         }),
       });
@@ -471,7 +456,7 @@ export default function AdminPage() {
         return;
       }
 
-      setStatus(`Moved "${draggedBook.title}" to ${categoryLabels[targetCategory]}.`);
+      setStatus(`Moved "${currentBook.title}" to ${categoryLabels[targetCategory]}.`);
     } catch (error) {
       console.error(error);
       setBooks(previousBooks);
@@ -481,10 +466,7 @@ export default function AdminPage() {
 
   const handleEdit = (book: Book) => {
     setIsEditing(true);
-    setEditingOriginalKey({
-      title: book.title,
-      author: book.author,
-    });
+    setEditingBookId(book.id);
     setForm(formStateFromBook(book));
     setCoverFile(null);
     clearFileInput();
@@ -500,11 +482,8 @@ export default function AdminPage() {
     if (!confirmed) return;
 
     const previousBooks = books;
-    setBooks((prev) =>
-      prev.filter(
-        (item) => !(item.title === book.title && item.author === book.author)
-      )
-    );
+
+    setBooks((prev) => prev.filter((item) => item.id !== book.id));
     setStatus(`Deleting "${book.title}"...`);
 
     try {
@@ -514,8 +493,7 @@ export default function AdminPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          title: book.title,
-          author: book.author,
+          id: book.id,
         }),
       });
 
@@ -527,11 +505,7 @@ export default function AdminPage() {
         return;
       }
 
-      if (
-        editingOriginalKey &&
-        editingOriginalKey.title === book.title &&
-        editingOriginalKey.author === book.author
-      ) {
+      if (editingBookId === book.id) {
         resetForm();
       }
 

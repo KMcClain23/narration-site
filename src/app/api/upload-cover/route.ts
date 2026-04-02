@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import fs from "fs/promises";
-import path from "path";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { buildR2PublicUrl, r2, R2_BUCKETS, R2_PREFIXES } from "@/lib/r2";
 
 function slugify(value: string) {
   return value
@@ -27,25 +27,38 @@ export async function POST(req: Request) {
     const buffer = Buffer.from(bytes);
 
     const originalName = file.name;
-    const extension = originalName.split(".").pop()?.toLowerCase() || "png";
-    const safeBaseName = slugify(originalName);
-    const fileName = `${safeBaseName}.${extension}`;
+    const extension = originalName.split(".").pop()?.toLowerCase() || "jpg";
+    const baseName = slugify(originalName);
+    const fileName = `${baseName}-${Date.now()}.${extension}`;
+    const objectKey = `${R2_PREFIXES.bookCovers}${fileName}`;
 
-    const coversDir = path.join(process.cwd(), "public", "covers");
-    const savePath = path.join(coversDir, fileName);
+    await r2.send(
+      new PutObjectCommand({
+        Bucket: R2_BUCKETS.media.name,
+        Key: objectKey,
+        Body: buffer,
+        ContentType: file.type || "image/jpeg",
+      })
+    );
 
-    await fs.mkdir(coversDir, { recursive: true });
-    await fs.writeFile(savePath, buffer);
+    const coverUrl = buildR2PublicUrl(
+      R2_BUCKETS.media.publicBaseUrl,
+      objectKey
+    );
 
     return NextResponse.json({
       success: true,
-      coverPath: `/covers/${fileName}`,
+      coverUrl,
+      objectKey,
     });
   } catch (error) {
     console.error("POST /api/upload-cover failed:", error);
 
     return NextResponse.json(
-      { error: "Failed to upload image." },
+      {
+        error: "Failed to upload cover.",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

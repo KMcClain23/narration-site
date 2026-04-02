@@ -1,44 +1,57 @@
 import { NextResponse } from "next/server";
-import fs from "fs/promises";
-import path from "path";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Book, BookCategory } from "@/types/book";
 
-const filePath = path.join(process.cwd(), "src", "data", "books.json");
+type CreateBookBody = {
+  title?: string;
+  subtitle?: string;
+  author?: string;
+  link?: string;
+  cover_url?: string;
+  tags?: string[];
+  description?: string;
+  category?: BookCategory;
+  sort_order?: number;
+};
 
-async function readBooks(): Promise<Book[]> {
-  const fileContents = await fs.readFile(filePath, "utf-8");
-  return JSON.parse(fileContents) as Book[];
-}
+type UpdateBookBody = {
+  id?: string;
+  updatedBook?: Partial<Book>;
+};
 
-async function writeBooks(books: Book[]) {
-  await fs.writeFile(filePath, JSON.stringify(books, null, 2), "utf-8");
-}
+type MoveBookBody = {
+  id?: string;
+  newCategory?: BookCategory;
+};
 
-function normalize(value: string) {
-  return value.trim().toLowerCase();
-}
-
-function findBookIndex(books: Book[], title: string, author: string) {
-  return books.findIndex(
-    (book) =>
-      normalize(book.title) === normalize(title) &&
-      normalize(book.author) === normalize(author)
-  );
-}
+type DeleteBookBody = {
+  id?: string;
+};
 
 export async function GET() {
   try {
-    const books = await readBooks();
+    const { data, error } = await supabaseAdmin
+      .from("books")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json({
       success: true,
-      books,
+      books: data,
     });
   } catch (error) {
     console.error("GET /api/books failed:", error);
 
     return NextResponse.json(
-      { error: "Failed to load books." },
+      {
+        error: "Failed to load books.",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
@@ -46,123 +59,61 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = (await req.json()) as CreateBookBody;
 
     const {
       title,
       subtitle = "",
       author,
       link = "",
-      cover,
+      cover_url,
       tags = [],
       description = "",
       category,
-    } = body as {
-      title?: string;
-      subtitle?: string;
-      author?: string;
-      link?: string;
-      cover?: string;
-      tags?: string[];
-      description?: string;
-      category?: BookCategory;
-    };
+      sort_order = 0,
+    } = body;
 
-    if (!title || !author || !cover || !category) {
+    if (!title || !author || !cover_url || !category) {
       return NextResponse.json(
         { error: "Missing required fields." },
         { status: 400 }
       );
     }
 
-    const books = await readBooks();
+    const { data, error } = await supabaseAdmin
+      .from("books")
+      .insert({
+        title: title.trim(),
+        subtitle: subtitle.trim() || null,
+        author: author.trim(),
+        link: link.trim(),
+        cover_url: cover_url.trim(),
+        tags: Array.isArray(tags)
+          ? tags.map((tag) => tag.trim()).filter(Boolean)
+          : [],
+        description: description.trim(),
+        category,
+        sort_order,
+      })
+      .select()
+      .single();
 
-    const alreadyExists = books.some(
-      (book) =>
-        normalize(book.title) === normalize(title) &&
-        normalize(book.author) === normalize(author)
-    );
-
-    if (alreadyExists) {
-      return NextResponse.json(
-        { error: "That book already exists." },
-        { status: 409 }
-      );
+    if (error) {
+      throw error;
     }
-
-    const newBook: Book = {
-      title: title.trim(),
-      subtitle: subtitle?.trim() || undefined,
-      author: author.trim(),
-      link: link.trim(),
-      cover: cover.trim(),
-      tags: Array.isArray(tags) ? tags : [],
-      description: description.trim(),
-      category,
-    };
-
-    books.push(newBook);
-    await writeBooks(books);
 
     return NextResponse.json({
       success: true,
-      message: "Book added successfully.",
-      book: newBook,
+      book: data,
     });
   } catch (error) {
     console.error("POST /api/books failed:", error);
 
     return NextResponse.json(
-      { error: "Failed to save book." },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PATCH(req: Request) {
-  try {
-    const body = await req.json();
-
-    const {
-      title,
-      author,
-      newCategory,
-    }: {
-      title?: string;
-      author?: string;
-      newCategory?: BookCategory;
-    } = body;
-
-    if (!title || !author || !newCategory) {
-      return NextResponse.json(
-        { error: "Missing required fields for category update." },
-        { status: 400 }
-      );
-    }
-
-    const books = await readBooks();
-    const bookIndex = findBookIndex(books, title, author);
-
-    if (bookIndex === -1) {
-      return NextResponse.json(
-        { error: "Book not found." },
-        { status: 404 }
-      );
-    }
-
-    books[bookIndex].category = newCategory;
-    await writeBooks(books);
-
-    return NextResponse.json({
-      success: true,
-      message: "Book category updated successfully.",
-      book: books[bookIndex],
-    });
-  } catch (error) {
-    console.error("PATCH /api/books failed:", error);
-
-    return NextResponse.json(
-      { error: "Failed to update book category." },
+      {
+        error: "Failed to save book.",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
@@ -170,82 +121,93 @@ export async function PATCH(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const body = await req.json();
+    const body = (await req.json()) as UpdateBookBody;
+    const { id, updatedBook } = body;
 
-    const {
-      originalTitle,
-      originalAuthor,
-      updatedBook,
-    }: {
-      originalTitle?: string;
-      originalAuthor?: string;
-      updatedBook?: Book;
-    } = body;
-
-    if (!originalTitle || !originalAuthor || !updatedBook) {
+    if (!id || !updatedBook) {
       return NextResponse.json(
         { error: "Missing required fields for edit." },
         { status: 400 }
       );
     }
 
-    if (!updatedBook.title || !updatedBook.author || !updatedBook.cover || !updatedBook.category) {
-      return NextResponse.json(
-        { error: "Updated book is missing required fields." },
-        { status: 400 }
-      );
-    }
-
-    const books = await readBooks();
-    const bookIndex = findBookIndex(books, originalTitle, originalAuthor);
-
-    if (bookIndex === -1) {
-      return NextResponse.json(
-        { error: "Original book not found." },
-        { status: 404 }
-      );
-    }
-
-    const duplicateIndex = books.findIndex(
-      (book, index) =>
-        index !== bookIndex &&
-        normalize(book.title) === normalize(updatedBook.title) &&
-        normalize(book.author) === normalize(updatedBook.author)
-    );
-
-    if (duplicateIndex !== -1) {
-      return NextResponse.json(
-        { error: "Another book already uses that title and author." },
-        { status: 409 }
-      );
-    }
-
-    const sanitizedBook: Book = {
-      title: updatedBook.title.trim(),
-      subtitle: updatedBook.subtitle?.trim() || undefined,
-      author: updatedBook.author.trim(),
+    const payload = {
+      title: updatedBook.title?.trim(),
+      subtitle: updatedBook.subtitle?.trim() || null,
+      author: updatedBook.author?.trim(),
       link: updatedBook.link?.trim() || "",
-      cover: updatedBook.cover.trim(),
+      cover_url: updatedBook.cover_url?.trim(),
       tags: Array.isArray(updatedBook.tags)
         ? updatedBook.tags.map((tag) => tag.trim()).filter(Boolean)
-        : [],
+        : undefined,
       description: updatedBook.description?.trim() || "",
       category: updatedBook.category,
+      sort_order: updatedBook.sort_order ?? 0,
     };
 
-    books[bookIndex] = sanitizedBook;
-    await writeBooks(books);
+    const { data, error } = await supabaseAdmin
+      .from("books")
+      .update(payload)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json({
       success: true,
-      message: "Book updated successfully.",
-      book: sanitizedBook,
+      book: data,
     });
   } catch (error) {
     console.error("PUT /api/books failed:", error);
 
     return NextResponse.json(
-      { error: "Failed to update book." },
+      {
+        error: "Failed to update book.",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(req: Request) {
+  try {
+    const body = (await req.json()) as MoveBookBody;
+    const { id, newCategory } = body;
+
+    if (!id || !newCategory) {
+      return NextResponse.json(
+        { error: "Missing required fields for category update." },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("books")
+      .update({ category: newCategory })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json({
+      success: true,
+      book: data,
+    });
+  } catch (error) {
+    console.error("PATCH /api/books failed:", error);
+
+    return NextResponse.json(
+      {
+        error: "Failed to update book category.",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
@@ -253,46 +215,36 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const body = await req.json();
+    const body = (await req.json()) as DeleteBookBody;
+    const { id } = body;
 
-    const {
-      title,
-      author,
-    }: {
-      title?: string;
-      author?: string;
-    } = body;
-
-    if (!title || !author) {
+    if (!id) {
       return NextResponse.json(
-        { error: "Missing required fields for delete." },
+        { error: "Missing required id for delete." },
         { status: 400 }
       );
     }
 
-    const books = await readBooks();
-    const bookIndex = findBookIndex(books, title, author);
+    const { error } = await supabaseAdmin
+      .from("books")
+      .delete()
+      .eq("id", id);
 
-    if (bookIndex === -1) {
-      return NextResponse.json(
-        { error: "Book not found." },
-        { status: 404 }
-      );
+    if (error) {
+      throw error;
     }
-
-    const [deletedBook] = books.splice(bookIndex, 1);
-    await writeBooks(books);
 
     return NextResponse.json({
       success: true,
-      message: "Book deleted successfully.",
-      book: deletedBook,
     });
   } catch (error) {
     console.error("DELETE /api/books failed:", error);
 
     return NextResponse.json(
-      { error: "Failed to delete book." },
+      {
+        error: "Failed to delete book.",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
