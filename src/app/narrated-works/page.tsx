@@ -342,12 +342,12 @@ export default function NarratedWorks() {
       const q = searchQuery.toLowerCase();
 
       return items.filter(
-      (b) =>
-        b.title.toLowerCase().includes(q) ||
-        (b.subtitle?.toLowerCase().includes(q) ?? false) ||
-        b.author.toLowerCase().includes(q) ||
-        b.tags.some((t) => t.toLowerCase().includes(q))
-    );
+        (b) =>
+          b.title.toLowerCase().includes(q) ||
+          (b.subtitle?.toLowerCase().includes(q) ?? false) ||
+          b.author.toLowerCase().includes(q) ||
+          b.tags.some((t) => t.toLowerCase().includes(q))
+      );
     },
     [searchQuery]
   );
@@ -365,8 +365,8 @@ export default function NarratedWorks() {
     <main className="min-h-screen bg-[#050814] text-white overflow-x-hidden">
       <h1 className="sr-only">Dean Miller Audiobook Narrator Portfolio – Narrated Works</h1>
 
-      <div className="max-w-7xl mx-auto py-16 md:py-24">
-        <header className="mb-12 text-center px-6">
+      <div className="w-full max-w-[1600px] mx-auto py-16 md:py-24">
+        <header className="mb-12 text-center px-6 max-w-4xl mx-auto">
           <h2 className="text-4xl md:text-6xl font-bold mb-4">Narrated Works</h2>
           <p className="text-white/60 text-lg max-w-2xl mx-auto">
             Explore my portfolio of professional audiobook narrations.
@@ -421,7 +421,7 @@ export default function NarratedWorks() {
           <>
             {filteredCompleted.length > 0 && (
               <section className="mb-20">
-                <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">
+                <h2 className="text-2xl font-bold mb-6 px-6 sm:px-20 text-left uppercase tracking-widest text-white/90">
                   Completed Audiobook Projects
                 </h2>
                 <HorizontalScroller ariaLabel="Completed projects">
@@ -434,7 +434,7 @@ export default function NarratedWorks() {
 
             {filteredInProgress.length > 0 && (
               <section className="mb-20">
-                <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">
+                <h2 className="text-2xl font-bold mb-6 px-6 sm:px-20 text-left uppercase tracking-widest text-white/90">
                   Currently Narrating
                 </h2>
                 <HorizontalScroller ariaLabel="Currently narrating">
@@ -447,7 +447,7 @@ export default function NarratedWorks() {
 
             {filteredComingSoon.length > 0 && (
               <section className="mb-20">
-                <h2 className="text-2xl font-bold mb-8 text-center uppercase tracking-widest text-white/90">
+                <h2 className="text-2xl font-bold mb-6 px-6 sm:px-20 text-left uppercase tracking-widest text-white/90">
                   Coming Soon to Audible
                 </h2>
                 <HorizontalScroller ariaLabel="Coming soon">
@@ -460,7 +460,7 @@ export default function NarratedWorks() {
           </>
         )}
 
-        <footer className="mt-24 text-center">
+        <footer className="mt-24 text-center max-w-4xl mx-auto px-6">
           <p className="mb-8 text-white/50 text-sm italic">
             Looking for a specific tone or character range for your next project?
           </p>
