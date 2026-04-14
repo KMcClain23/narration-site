@@ -19,28 +19,47 @@ export function useActiveWelcomeSection() {
 
       if (sections.length === 0) return;
 
-      // Keep this aligned with your sticky header and scroll-mt-24.
       const offset = 120;
+      const scrollY = window.scrollY;
+      const viewportHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
 
-      // Find all sections that have crossed the offset line.
-      const pastSections = sections.filter(
-        (section) => section.getBoundingClientRect().top <= offset
-      );
-
-      if (pastSections.length > 0) {
-        // Pick the closest one to the offset line from above.
-        const current = pastSections.reduce((closest, section) => {
-          return section.getBoundingClientRect().top >
-            closest.getBoundingClientRect().top
-            ? section
-            : closest;
-        });
-
-        setActiveId(current.id);
+      // If the user is near the very bottom, force the last section active.
+      // This prevents short final sections from never taking over.
+      if (scrollY + viewportHeight >= documentHeight - 40) {
+        setActiveId(sections[sections.length - 1].id);
         return;
       }
 
-      setActiveId(sections[0].id);
+      const sectionsWithDistance = sections.map((section) => {
+        const rect = section.getBoundingClientRect();
+        return {
+          id: section.id,
+          top: rect.top,
+          distance: Math.abs(rect.top - offset),
+        };
+      });
+
+      // Prefer sections that have reached or passed the offset line.
+      const passedSections = sectionsWithDistance.filter(
+        (section) => section.top <= offset
+      );
+
+      if (passedSections.length > 0) {
+        const closestPassed = passedSections.reduce((closest, section) =>
+          section.top > closest.top ? section : closest
+        );
+
+        setActiveId(closestPassed.id);
+        return;
+      }
+
+      // Fallback for top-of-page behavior
+      const closestOverall = sectionsWithDistance.reduce((closest, section) =>
+        section.distance < closest.distance ? section : closest
+      );
+
+      setActiveId(closestOverall.id);
     };
 
     updateActiveSection();
