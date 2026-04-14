@@ -27,7 +27,7 @@ export default function Header() {
     () => [
       { name: "Demos", href: "/#demos" },
       { name: "Narrated Works", href: "/narrated-works" },
-      { name: "Marketing Guide", href: "/audiobook-marketing" },
+      { name: "Welcome", href: "/welcome" },
       { name: "About", href: "/#about" },
       { name: "Contact", href: "/#contact" },
     ],
