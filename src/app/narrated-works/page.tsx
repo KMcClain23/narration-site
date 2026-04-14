@@ -1,477 +1,678 @@
-"use client";
-
-import Image from "next/image";
+import type { Metadata } from "next";
 import Link from "next/link";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Book } from "@/types/book";
+import WelcomeSectionNav from "../components/WelcomeSectionNav";
+import BackToTopButton from "../components/BackToTopButton";
 
-interface BookCardProps {
-  book: Book;
-  statusBadge?: React.ReactNode;
-}
+export const metadata: Metadata = {
+  title: "Welcome Packet | Dean Miller Narration",
+  description:
+    "Learn what it is like to work with Dean Miller Narration, from manuscript prep through final audiobook delivery.",
+  alternates: {
+    canonical: "https://dmnarration.com/welcome",
+  },
+  openGraph: {
+    title: "Welcome Packet | Dean Miller Narration",
+    description:
+      "A complete guide to Dean Miller's audiobook narration process, expectations, and delivery workflow.",
+    url: "https://dmnarration.com/welcome",
+    type: "website",
+  },
+};
 
-function BookCard({ book, statusBadge }: BookCardProps) {
-  const hasLink = Boolean(book.link?.trim());
+const processSteps = [
+  { label: "Manuscript & notes received", href: "#manuscript-notes" },
+  { label: "Manuscript prep", href: "#manuscript-notes" },
+  { label: 'Production sample ("First 15")', href: "#production-sample" },
+  { label: "Full narration and recording", href: "#recording-process" },
+  { label: "Proofing, editing, mastering", href: "#delivery-review" },
+  { label: "Delivery and review", href: "#delivery-review" },
+  { label: "Final corrections", href: "#delivery-review" },
+  { label: "Payment and release", href: "#payment" },
+];
 
-  return (
-    <div
-      className="group relative rounded-xl overflow-hidden shadow-lg transition-all duration-300 hover:-translate-y-2 border border-[#1A2550] bg-[#0B1224] flex-shrink-0 w-[75vw] sm:w-64 md:w-72 snap-start select-none"
-      itemScope
-      itemType="https://schema.org/Book"
-    >
-      {hasLink && (
-        <div className="absolute top-3 left-3 z-50 group/btn">
-          <a
-            href={book.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            onPointerDown={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="block bg-[#D4AF37] hover:bg-[#E0C15A] text-black p-2 rounded-full shadow-lg transition-transform active:scale-90 hover:scale-110 cursor-pointer"
-            style={{ touchAction: "manipulation" }}
-            aria-label={`View ${book.title} on Amazon`}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-              <polyline points="15 3 21 3 21 9" />
-              <line x1="10" y1="14" x2="21" y2="3" />
-            </svg>
-          </a>
-        </div>
-      )}
+const handledItems = [
+  "Full narration performance",
+  "Character voice development and consistency",
+  "Editing and mastering to platform standards (ACX and others)",
+  "Proofing and error correction",
+  "Final delivery of retail-ready audio files",
+];
 
-      <div className="relative aspect-[3/4.5] w-full bg-gray-900/40 overflow-hidden">
-        <Image
-          src={book.cover_url}
-          alt={`${book.title} cover`}
-          fill
-          draggable={false}
-          className="object-cover transition-transform duration-700 group-hover:scale-110"
-          sizes="(max-width: 640px) 75vw, 288px"
-        />
+const characterNotes = [
+  "Age",
+  "Background or location",
+  "Accent (if applicable)",
+  "Personality traits",
+  "Any defining vocal qualities",
+];
 
-        <div className="absolute inset-0 bg-black/85 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col items-center justify-center p-6 z-40 text-center pointer-events-none">
-          <p className="text-[#D4AF37] text-[10px] font-bold uppercase tracking-widest mb-3 border-b border-[#D4AF37]/30 pb-1">
-            Synopsis
-          </p>
-          <p className="text-white/95 text-xs leading-relaxed italic line-clamp-[14]">
-            {book.description || "Full description available on Amazon."}
-          </p>
-          <div className="mt-4 w-8 h-0.5 bg-[#D4AF37] rounded-full" />
-        </div>
-      </div>
+const pronunciationNotes = [
+  "Names",
+  "Unique terms",
+  "Fantasy or invented language",
+];
 
-      {statusBadge && (
-        <div className="absolute top-3 right-3 bg-[#D4AF37] text-black text-[10px] font-bold px-2 py-0.5 rounded uppercase z-20">
-          {statusBadge}
-        </div>
-      )}
+const characterApprovalSteps = [
+  "I will compile a character list",
+  "Add notes based on your input and my interpretation",
+  "Send it to you for confirmation",
+];
 
-      <div className="p-4 pb-2 text-center">
-        <h3
-          className="font-semibold text-base leading-tight text-white group-hover:text-[#D4AF37] transition-colors line-clamp-1"
-          itemProp="name"
-        >
-          {book.title}
-        </h3>
+const first15Focus = [
+  "Main character voices",
+  "Tone and pacing",
+  "Emotional range",
+];
 
-        {book.subtitle && (
-          <p className="text-xs text-white/75 mt-0.5 line-clamp-1">
-            {book.subtitle}
-          </p>
-        )}
+const recordingPhaseItems = [
+  "I focus on consistent, high-quality recording",
+  "Updates are provided at key milestones",
+  "I work toward our agreed timeline",
+];
 
-        <p className="text-sm mt-1 text-[#D4AF37] font-medium" itemProp="author">
-          {book.author}
-        </p>
+const liveStreamingBenefits = [
+  "Build audience interest",
+  "Create promotional content",
+  "Generate early engagement",
+];
 
-        <div className="mt-3 flex flex-wrap justify-center gap-1">
-          {book.tags.map((tag) => (
-            <span
-              key={tag}
-              className="bg-black/80 backdrop-blur-sm text-[#D4AF37] text-[9px] font-bold px-2 py-0.5 rounded border border-[#D4AF37]/40 uppercase tracking-tight shadow-sm whitespace-nowrap"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+const technicalIssues = [
+  "Audio glitches",
+  "Background noise",
+  "Editing inconsistencies",
+];
 
-function HorizontalScroller({
+const narrationErrors = [
+  "Misreads",
+  "Mispronunciations",
+];
+
+const correctionSteps = [
+  "Review all notes",
+  "Complete final corrections",
+  "Prepare files for submission",
+];
+
+const timelineItems = [
+  "Timeline is agreed upon before recording begins",
+  "I provide updates at key stages",
+  "I prioritize quality, consistency, and reliability",
+];
+
+const paymentMethods = [
+  "Check",
+  "Venmo",
+  "PayPal",
+  "Credit Card",
+  "Direct Deposit",
+];
+
+const promoSupport = [
+  "Short promotional audio clips",
+  "Behind-the-scenes content",
+  "Social media collaboration",
+  "Optional podcast appearances",
+];
+
+const helpfulLinks = [
+  {
+    title: "ACX: Dual and Duet Narration Overview",
+    href: "https://www.acx.com/mp/blog/it-takes-two-dual-and-duet-narrations-are-spicing-up-romance",
+    description:
+      "ACX’s explanation of dual and duet production, including how multi-narrator projects are commonly structured on the platform.",
+  },
+  {
+    title: "ACX: Independent Contractor Agreements",
+    href: "https://www.acx.com/mp/blog/the-four-agreements",
+    description:
+      "Helpful when additional narrators, editors, or engineers need separate off-platform agreements.",
+  },
+  {
+    title: "ACX: How It Works for Authors",
+    href: "https://www.acx.com/help/authors-as-narrators/200626860",
+    description:
+      "Overview of ACX workflow, approvals, and the production process from the rights holder side.",
+  },
+  {
+    title: "ACX: How It Works for Narrators & Studios",
+    href: "https://www.acx.com/mp/how-it-works/narrators-and-studios",
+    description:
+      "Helpful for understanding producer responsibilities and what retail-ready delivery includes.",
+  },
+];
+
+function Section({
+  id,
+  title,
   children,
-  ariaLabel,
 }: {
+  id?: string;
+  title: string;
   children: React.ReactNode;
-  ariaLabel: string;
 }) {
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const [progress, setProgress] = useState(0);
-  const [showBar, setShowBar] = useState(false);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
-  const isDown = useRef(false);
-  const startX = useRef(0);
-  const scrollLeftStart = useRef(0);
-
-  const updateScrollState = useCallback(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-
-    const max = el.scrollWidth - el.clientWidth;
-    const scrollPercent = max > 0 ? el.scrollLeft / max : 0;
-
-    setProgress(scrollPercent * 100);
-    setCanScrollLeft(el.scrollLeft > 5);
-    setCanScrollRight(el.scrollLeft < max - 5);
-  }, []);
-
-  useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-
-    el.scrollTo({ left: 0 });
-
-    const ro = new ResizeObserver(() => {
-      setShowBar(el.scrollWidth > el.clientWidth + 10);
-      updateScrollState();
-    });
-
-    ro.observe(el);
-    el.addEventListener("scroll", updateScrollState, { passive: true });
-
-    updateScrollState();
-
-    return () => {
-      ro.disconnect();
-      el.removeEventListener("scroll", updateScrollState);
-    };
-  }, [updateScrollState]);
-
-  const scroll = (direction: "left" | "right") => {
-    const el = scrollerRef.current;
-    if (!el) return;
-
-    const scrollAmount = el.clientWidth * 0.8;
-
-    el.scrollBy({
-      left: direction === "left" ? -scrollAmount : scrollAmount,
-      behavior: "smooth",
-    });
-  };
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (e.pointerType === "touch") return;
-
-    const el = scrollerRef.current;
-    if (!el) return;
-
-    isDown.current = true;
-    startX.current = e.pageX;
-    scrollLeftStart.current = el.scrollLeft;
-
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    el.style.scrollSnapType = "none";
-    el.style.scrollBehavior = "auto";
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!isDown.current || !scrollerRef.current) return;
-
-    const el = scrollerRef.current;
-    const delta = e.pageX - startX.current;
-    el.scrollLeft = scrollLeftStart.current - delta;
-  };
-
-  const onPointerUp = () => {
-    isDown.current = false;
-
-    if (scrollerRef.current) {
-      scrollerRef.current.style.scrollSnapType = "x mandatory";
-      scrollerRef.current.style.scrollBehavior = "smooth";
-    }
-  };
-
   return (
-    <div className="relative group/scroller">
-      {canScrollLeft && (
-        <button
-          onClick={() => scroll("left")}
-          className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-40 bg-black/60 border border-[#D4AF37]/30 text-[#D4AF37] p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/80 hover:border-[#D4AF37] active:scale-95 opacity-0 group-hover/scroller:opacity-100 shadow-2xl"
-          aria-label="Scroll left"
-          type="button"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
-      )}
-
-      {canScrollRight && (
-        <button
-          onClick={() => scroll("right")}
-          className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-40 bg-black/60 border border-[#D4AF37]/30 text-[#D4AF37] p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/80 hover:border-[#D4AF37] active:scale-95 opacity-0 group-hover/scroller:opacity-100 shadow-2xl"
-          aria-label="Scroll right"
-          type="button"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
-      )}
-
-      <div className="absolute left-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-r from-[#050814] to-transparent z-10 pointer-events-none" />
-      <div className="absolute right-0 top-0 bottom-0 w-4 sm:w-32 bg-gradient-to-l from-[#050814] to-transparent z-10 pointer-events-none" />
-
-      <div
-        ref={scrollerRef}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        style={{
-          touchAction: "auto",
-          WebkitOverflowScrolling: "touch",
-          scrollbarWidth: "none",
-        }}
-        aria-label={ariaLabel}
-        className="flex overflow-x-auto pb-10 snap-x snap-mandatory scroll-smooth gap-4 sm:gap-8 px-6 sm:px-20 hide-scrollbar select-none md:cursor-grab md:active:cursor-grabbing justify-start"
-      >
-        {children}
-        <div className="flex-shrink-0 w-10 sm:w-20" />
-      </div>
-
-      {showBar && (
-        <div className="hidden sm:flex mt-6 justify-center px-4">
-          <div className="w-full max-w-md relative h-1.5 rounded-full bg-white/5">
-            <div
-              className="absolute top-0 bottom-0 w-16 rounded-full bg-[#D4AF37] transition-all duration-75"
-              style={{
-                left: `${progress}%`,
-                transform: `translateX(calc(-${progress}% * (64 / 448)))`,
-              }}
-            />
-          </div>
-        </div>
-      )}
-    </div>
+    <section
+      id={id}
+      className="scroll-mt-24 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.05] to-white/[0.02] p-6 shadow-[0_10px_30px_rgba(0,0,0,0.18)] sm:p-8"
+    >
+      <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+        {title}
+      </h2>
+      <div className="mt-5 space-y-5 leading-7 text-white/80">{children}</div>
+    </section>
   );
 }
 
-export default function NarratedWorks() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [books, setBooks] = useState<Book[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+function BulletList({
+  items,
+}: {
+  items: Array<string | { label: string; href: string }>;
+}) {
+  const hasLinkItems = items.some((item) => typeof item !== "string");
 
-  useEffect(() => {
-    const loadBooks = async () => {
-      try {
-        setIsLoading(true);
+  if (hasLinkItems) {
+    return (
+      <ul className="flex flex-wrap gap-2">
+        {items.map((item) => {
+          if (typeof item === "string") {
+            return (
+              <li key={item}>
+                <span className="inline-flex items-center text-white/85">
+                  {item}
+                </span>
+              </li>
+            );
+          }
 
-        const response = await fetch("/api/books");
-        const result = await response.json();
-
-        if (!response.ok) {
-          console.error(result.error || "Failed to load books.");
-          return;
-        }
-
-        setBooks(result.books || []);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadBooks();
-  }, []);
-
-  const completed = useMemo(
-    () => books.filter((book) => book.category === "completed"),
-    [books]
-  );
-
-  const inProgress = useMemo(
-    () => books.filter((book) => book.category === "in-progress"),
-    [books]
-  );
-
-  const comingSoon = useMemo(
-    () => books.filter((book) => book.category === "coming-soon"),
-    [books]
-  );
-
-  const filterBooks = useCallback(
-    (items: Book[]) => {
-      if (!searchQuery.trim()) return items;
-
-      const q = searchQuery.toLowerCase();
-
-      return items.filter(
-        (b) =>
-          b.title.toLowerCase().includes(q) ||
-          (b.subtitle?.toLowerCase().includes(q) ?? false) ||
-          b.author.toLowerCase().includes(q) ||
-          b.tags.some((t) => t.toLowerCase().includes(q))
-      );
-    },
-    [searchQuery]
-  );
-
-  const filteredCompleted = useMemo(() => filterBooks(completed), [completed, filterBooks]);
-  const filteredInProgress = useMemo(() => filterBooks(inProgress), [inProgress, filterBooks]);
-  const filteredComingSoon = useMemo(() => filterBooks(comingSoon), [comingSoon, filterBooks]);
-
-  const hasResults =
-    filteredCompleted.length > 0 ||
-    filteredInProgress.length > 0 ||
-    filteredComingSoon.length > 0;
+          return (
+            <li key={`${item.href}-${item.label}`}>
+              <a
+                href={item.href}
+                className={[
+                  "inline-flex items-center",
+                  "rounded-md border border-white/15",
+                  "bg-white/[0.03]",
+                  "px-3 py-1.5 text-sm font-medium",
+                  "text-white/85",
+                  "transition-all duration-200",
+                  "hover:border-[#D4AF37]/50",
+                  "hover:bg-[#D4AF37]/10",
+                  "hover:text-white",
+                  "focus-visible:outline-none",
+                  "focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60",
+                  "focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814]",
+                ].join(" ")}
+              >
+                {item.label}
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-[#050814] text-white overflow-x-hidden">
-      <h1 className="sr-only">Dean Miller Audiobook Narrator Portfolio – Narrated Works</h1>
+    <ul className="space-y-2">
+      {items.map((item) => (
+        <li key={item as string} className="flex gap-3">
+          <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#D4AF37]" />
+          <span>{item as string}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
-      <div className="w-full max-w-[1600px] mx-auto py-16 md:py-24">
-        <header className="mb-12 text-center px-6 max-w-4xl mx-auto">
-          <h2 className="text-4xl md:text-6xl font-bold mb-4">Narrated Works</h2>
-          <p className="text-white/60 text-lg max-w-2xl mx-auto">
-            Explore my portfolio of professional audiobook narrations.
-            Specializing in dark romance, romantasy, and emotionally driven fiction available on Amazon and Audible.
+export default function WelcomePage() {
+  return (
+    <main className="min-h-screen bg-[#050814] text-white">
+      <section className="bg-[radial-gradient(circle_at_top,rgba(212,175,55,0.18),transparent_35%),radial-gradient(circle_at_top_right,rgba(122,92,255,0.10),transparent_30%)]">
+        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-20">
+          <p className="text-sm uppercase tracking-[0.24em] text-[#D4AF37]">
+            Dean Miller Narration
           </p>
 
-          <div className="mt-10 max-w-md mx-auto relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <svg
-                className="h-5 w-5 text-white/30 transition-colors"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
+          <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">
+            Welcome Packet
+          </h1>
+
+          <p className="mt-6 max-w-3xl text-lg leading-8 text-white/75">
+            A clear guide to what it is like to work together, what I will need
+            from you, and how your audiobook moves from manuscript to finished
+            delivery.
+          </p>
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <a
+              href="mailto:Dean@DMNarration.com"
+              className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#E0C15A]"
+            >
+              Email Dean
+            </a>
+
+            <Link
+              href="/#contact"
+              className="inline-flex items-center justify-center rounded-md border border-white/15 bg-white/[0.03] px-5 py-3 text-sm font-semibold text-white/90 transition hover:border-[#D4AF37]/60 hover:text-white"
+            >
+              Contact Page
+            </Link>
+          </div>
+
+          <div className="mt-10 grid gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-5 sm:grid-cols-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-white/45">
+                Email
+              </p>
+              <p className="mt-2 text-sm text-white/90">Dean@DMNarration.com</p>
             </div>
 
-            <input
-              type="text"
-              placeholder="Search by title, subtitle, author, or genre..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#0B1224] border border-[#1A2550] rounded-full py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/50 transition-all placeholder:text-white/20"
-            />
-          </div>
-        </header>
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-white/45">
+                TikTok
+              </p>
+              <p className="mt-2 text-sm text-white/90">@deanmillernarration</p>
+            </div>
 
-        {isLoading ? (
-          <div className="py-20 text-center">
-            <p className="text-white/40 italic">Loading audiobooks...</p>
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-white/45">
+                Instagram
+              </p>
+              <p className="mt-2 text-sm text-white/90">@deanmillernarrator</p>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-white/45">
+                Phone / Text
+              </p>
+              <p className="mt-2 text-sm text-white/90">(503) 862-8856</p>
+            </div>
           </div>
-        ) : !hasResults ? (
-          <div className="py-20 text-center">
-            <p className="text-white/40 italic">
-              No audiobooks found matching "{searchQuery}"
-            </p>
-            <button
-              onClick={() => setSearchQuery("")}
-              className="mt-4 text-[#D4AF37] text-sm hover:underline"
-              type="button"
+
+          <p className="mt-4 text-sm text-white/50">Time Zone: Pacific Time</p>
+        </div>
+      </section>
+
+      <div className="mx-auto max-w-6xl px-5 py-10 sm:px-6 sm:py-14">
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="grid gap-6">
+            <Section id="welcome" title="Welcome">
+              <p>
+                I’m glad you’re here. This page gives you a clear picture of what
+                it is like to work with me and how I approach audiobook production
+                from start to finish.
+              </p>
+
+              <p>
+                You’ll find an overview of my process, what I’ll need from you,
+                how reviews and approvals work, and a few helpful resources for
+                navigating production decisions.
+              </p>
+
+              <p>
+                If you have questions at any point, you can always reach out
+                directly.
+              </p>
+            </Section>
+
+            <Section id="process-overview" title="Process Overview">
+              <p>
+                Every audiobook follows a structured process to ensure quality,
+                consistency, and a smooth experience.
+              </p>
+
+              <p>Here’s how I run my projects:</p>
+
+              <BulletList items={processSteps} />
+            </Section>
+
+            <Section id="what-i-handle" title="What I Handle For You">
+              <p>
+                My role is to take your story and deliver a finished,
+                professional audiobook ready for distribution.
+              </p>
+
+              <p>I handle:</p>
+
+              <BulletList items={handledItems} />
+
+              <p>
+                My goal is simple. You focus on the story. I handle the
+                production.
+              </p>
+            </Section>
+
+            <Section id="manuscript-notes" title="Manuscript & Notes">
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-white">
+                  Manuscript Format
+                </h3>
+
+                <p>Please provide the final version of your manuscript in:</p>
+
+                <BulletList items={["PDF (preferred)", "Word document"]} />
+
+                <p>
+                  This must be the locked version of the book. Changes after
+                  recording begins can create delays and additional work.
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <h3 className="text-lg font-semibold text-white">
+                  Character & Pronunciation Notes
+                </h3>
+
+                <p>
+                  To deliver the performance you envision, I need upfront clarity
+                  on:
+                </p>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="rounded-xl border border-[#D4AF37]/15 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-4">
+                    <p className="font-medium text-white">
+                      Character notes for main or important characters
+                    </p>
+                    <div className="mt-3">
+                      <BulletList items={characterNotes} />
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[#8B5CF6]/20 bg-gradient-to-br from-[#8B5CF6]/10 to-transparent p-4">
+                    <p className="font-medium text-white">Pronunciations</p>
+                    <div className="mt-3">
+                      <BulletList items={pronunciationNotes} />
+                    </div>
+                  </div>
+                </div>
+
+                <p>
+                  If notes are not provided, I will make performance decisions
+                  based on the text.
+                </p>
+
+                <p>
+                  If pronunciations are unclear, I will send you a recorded list
+                  for approval before proceeding.
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <h3 className="text-lg font-semibold text-white">
+                  Character Approval Process
+                </h3>
+
+                <p>After reviewing the manuscript:</p>
+
+                <BulletList items={characterApprovalSteps} />
+
+                <p>
+                  You can adjust or expand anything before recording begins.
+                </p>
+              </div>
+            </Section>
+
+            <Section
+              id="production-sample"
+              title='Production Sample: "The First 15"'
             >
-              Clear search
-            </button>
+              <p>Before full production, I record a performance sample.</p>
+
+              <p>
+                This is typically 15 minutes or more and is selected to capture:
+              </p>
+
+              <BulletList items={first15Focus} />
+
+              <p>This is the stage where we lock in the performance.</p>
+
+              <p>
+                You are encouraged to be detailed and specific with feedback here.
+                I will make adjustments until everything feels right.
+              </p>
+
+              <p>
+                Once approved, performance direction is considered final so we can
+                maintain consistency across the entire audiobook.
+              </p>
+            </Section>
+
+            <Section id="recording-process" title="Recording Process">
+              <p>Once the sample is approved, I move into full production.</p>
+
+              <p>During this phase:</p>
+
+              <BulletList items={recordingPhaseItems} />
+
+              <p>
+                You may not hear from me daily, but progress is always moving
+                forward.
+              </p>
+            </Section>
+
+            <Section id="live-streaming" title="Optional: Live Streaming">
+              <p>
+                I occasionally stream portions of my recording sessions on TikTok
+                or Twitch.
+              </p>
+
+              <p>This can:</p>
+
+              <BulletList items={liveStreamingBenefits} />
+
+              <p>
+                You will have full control over whether your project is included
+                in this.
+              </p>
+            </Section>
+
+            <Section id="delivery-review" title="Delivery & Review">
+              <p>
+                Once production is complete, you will receive all audiobook files
+                for review.
+              </p>
+
+              <p>
+                You will need to listen through the full audiobook and note:
+              </p>
+
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="rounded-xl border border-[#D4AF37]/15 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-4">
+                  <p className="font-medium text-white">Technical issues</p>
+                  <div className="mt-3">
+                    <BulletList items={technicalIssues} />
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-[#8B5CF6]/20 bg-gradient-to-br from-[#8B5CF6]/10 to-transparent p-4">
+                  <p className="font-medium text-white">Narration errors</p>
+                  <div className="mt-3">
+                    <BulletList items={narrationErrors} />
+                  </div>
+                </div>
+              </div>
+
+              <p>
+                At this stage, corrections are focused on accuracy and technical
+                quality.
+              </p>
+
+              <p>
+                Performance direction is finalized during the production sample
+                phase.
+              </p>
+
+              <div className="space-y-3 pt-2">
+                <h3 className="text-lg font-semibold text-white">Corrections</h3>
+
+                <p>
+                  You will submit your notes using a shared document or
+                  spreadsheet.
+                </p>
+
+                <p>I will:</p>
+
+                <BulletList items={correctionSteps} />
+              </div>
+            </Section>
+
+            <Section id="timeline-communication" title="Timeline & Communication">
+              <BulletList items={timelineItems} />
+
+              <p>
+                If anything affects timeline or delivery, I will communicate
+                immediately.
+              </p>
+            </Section>
+
+            <Section id="payment" title="Payment">
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-white">ACX Projects</h3>
+
+                <p>
+                  All payments and agreements are handled directly through ACX.
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <h3 className="text-lg font-semibold text-white">
+                  PFH Projects (Off Platform or Duet)
+                </h3>
+
+                <BulletList
+                  items={[
+                    "A project estimate is provided based on final word count",
+                  ]}
+                />
+
+                <p>Payment methods accepted:</p>
+
+                <BulletList items={paymentMethods} />
+
+                <p>
+                  For duet projects, one contract is typically managed through
+                  ACX, with additional agreements handled separately as needed.
+                </p>
+              </div>
+            </Section>
+
+            <Section id="helpful-links" title="Helpful Links">
+              <p>
+                If you are considering duet, dual, or multi-narrator production
+                on ACX, these are a few useful places to start.
+              </p>
+
+              <div className="rounded-xl border border-[#D4AF37]/15 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-5">
+                <p className="font-medium text-white">
+                  A quick note on duet and dual projects on ACX
+                </p>
+
+                <p className="mt-3 text-white/80">
+                  ACX currently supports one rights holder and one producer
+                  directly on-platform. For duet or dual projects, the most common
+                  setup is to contract with one primary narrator or producer
+                  through ACX and handle the additional narrator arrangement
+                  separately. ACX also offers independent contractor agreements
+                  that can help with those off-platform relationships.
+                </p>
+              </div>
+
+              <div className="grid gap-4 pt-2">
+                {helpfulLinks.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group rounded-xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-[#D4AF37]/35 hover:bg-white/[0.05]"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-white transition group-hover:text-[#F1D57A]">
+                          {link.title}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-white/70">
+                          {link.description}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-[#D4AF37]">↗</span>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </Section>
+
+            <Section id="promotion-support" title="Promotion Support">
+              <p>I’m happy to support promotion of your audiobook.</p>
+
+              <p>This can include:</p>
+
+              <BulletList items={promoSupport} />
+
+              <p>
+                If you prefer limited or no promotion during production, just let
+                me know.
+              </p>
+            </Section>
+
+            <Section id="about" title="About Your Narrator">
+              <p>
+                I’m Dean Miller, a professional audiobook narrator focused on
+                immersive, character-driven storytelling.
+              </p>
+
+              <p>
+                My background combines performance, voice work, and years of
+                experience communicating emotion through sound. From early work in
+                theater and music to professional narration, everything I do is
+                centered on one goal:
+              </p>
+
+              <p className="text-lg font-medium text-white">
+                Making the listener forget there’s a narrator at all.
+              </p>
+
+              <p>
+                I record from a professional home studio using a Shure MV7+
+                microphone and a punch-and-roll workflow for clean, efficient
+                production.
+              </p>
+
+              <p>
+                Every project is approached with intention, precision, and respect
+                for the story.
+              </p>
+
+              <p className="text-lg font-medium text-white">
+                Because at the end of the day, narration isn’t just performance.
+                It’s connection.
+              </p>
+            </Section>
+
+            <Section id="final-note" title="Final Note">
+              <p>
+                I know this process can feel like a lot, especially if this is
+                your first audiobook.
+              </p>
+
+              <p className="font-medium text-white">You’re not doing it alone.</p>
+
+              <p>
+                I’ll guide you through each step and make sure the process stays
+                clear, smooth, and collaborative from start to finish.
+              </p>
+
+              <p>I’m looking forward to working with you.</p>
+
+              <p className="pt-2 text-white">Dean Miller</p>
+            </Section>
           </div>
-        ) : (
-          <>
-            {filteredCompleted.length > 0 && (
-              <section className="mb-20">
-                <h2 className="text-2xl font-bold mb-6 px-6 sm:px-20 text-left uppercase tracking-widest text-white/90">
-                  Completed Audiobook Projects
-                </h2>
-                <HorizontalScroller ariaLabel="Completed projects">
-                  {filteredCompleted.map((book) => (
-                    <BookCard key={book.id} book={book} />
-                  ))}
-                </HorizontalScroller>
-              </section>
-            )}
 
-            {filteredInProgress.length > 0 && (
-              <section className="mb-20">
-                <h2 className="text-2xl font-bold mb-6 px-6 sm:px-20 text-left uppercase tracking-widest text-white/90">
-                  Currently Narrating
-                </h2>
-                <HorizontalScroller ariaLabel="Currently narrating">
-                  {filteredInProgress.map((book) => (
-                    <BookCard key={book.id} book={book} statusBadge="In Progress" />
-                  ))}
-                </HorizontalScroller>
-              </section>
-            )}
-
-            {filteredComingSoon.length > 0 && (
-              <section className="mb-20">
-                <h2 className="text-2xl font-bold mb-6 px-6 sm:px-20 text-left uppercase tracking-widest text-white/90">
-                  Coming Soon to Audible
-                </h2>
-                <HorizontalScroller ariaLabel="Coming soon">
-                  {filteredComingSoon.map((book) => (
-                    <BookCard key={book.id} book={book} statusBadge="Soon" />
-                  ))}
-                </HorizontalScroller>
-              </section>
-            )}
-          </>
-        )}
-
-        <footer className="mt-24 text-center max-w-4xl mx-auto px-6">
-          <p className="mb-8 text-white/50 text-sm italic">
-            Looking for a specific tone or character range for your next project?
-          </p>
-          <Link
-            href="/#contact"
-            className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-10 py-4 font-bold hover:scale-105 transition-all"
-          >
-            Request a Custom Narration Quote
-          </Link>
-        </footer>
+          <WelcomeSectionNav />
+        </div>
       </div>
+
+      <BackToTopButton />
     </main>
   );
 }
