@@ -1,76 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import BackToTopButton from "./BackToTopButton";
-
-type NavItem = {
-  id: string;
-  label: string;
-};
-
-const navItems: NavItem[] = [
-  { id: "welcome", label: "Welcome" },
-  { id: "process-overview", label: "Process Overview" },
-  { id: "what-i-handle", label: "What I Handle" },
-  { id: "manuscript-notes", label: "Manuscript & Notes" },
-  { id: "production-sample", label: "The First 15" },
-  { id: "recording-process", label: "Recording Process" },
-  { id: "live-streaming", label: "Live Streaming" },
-  { id: "delivery-review", label: "Delivery & Review" },
-  { id: "timeline-communication", label: "Timeline" },
-  { id: "payment", label: "Payment" },
-  { id: "helpful-links", label: "Helpful Links" },
-  { id: "promotion-support", label: "Promotion Support" },
-  { id: "about", label: "About Dean" },
-  { id: "final-note", label: "Final Note" },
-];
+import { useActiveWelcomeSection } from "./useActiveWelcomeSection";
+import { welcomeNavItems } from "./welcomeNavItems";
 
 export default function WelcomeSectionNav() {
-  const [activeId, setActiveId] = useState<string>("welcome");
-
-  const sectionIds = useMemo(() => navItems.map((item) => item.id), []);
-
-  useEffect(() => {
-    const updateActiveSection = () => {
-      const sections = sectionIds
-        .map((id) => document.getElementById(id))
-        .filter((el): el is HTMLElement => Boolean(el));
-
-      if (sections.length === 0) return;
-
-      const offset = 120;
-
-      const pastSections = sections.filter(
-        (section) => section.getBoundingClientRect().top <= offset
-      );
-
-      if (pastSections.length > 0) {
-        const current = pastSections.reduce((closest, section) => {
-          return section.getBoundingClientRect().top >
-            closest.getBoundingClientRect().top
-            ? section
-            : closest;
-        });
-
-        setActiveId(current.id);
-        return;
-      }
-
-      setActiveId(sections[0].id);
-    };
-
-    updateActiveSection();
-
-    window.addEventListener("scroll", updateActiveSection, { passive: true });
-    window.addEventListener("resize", updateActiveSection);
-    window.addEventListener("hashchange", updateActiveSection);
-
-    return () => {
-      window.removeEventListener("scroll", updateActiveSection);
-      window.removeEventListener("resize", updateActiveSection);
-      window.removeEventListener("hashchange", updateActiveSection);
-    };
-  }, [sectionIds]);
+  const activeId = useActiveWelcomeSection();
 
   return (
     <aside className="hidden lg:block">
@@ -83,7 +18,7 @@ export default function WelcomeSectionNav() {
 
             <nav className="mt-4">
               <ul className="space-y-1.5">
-                {navItems.map((item) => {
+                {welcomeNavItems.map((item) => {
                   const active = item.id === activeId;
 
                   return (

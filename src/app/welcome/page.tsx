@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import WelcomeSectionNav from "../components/WelcomeSectionNav";
+import ProcessOverviewNav from "../components/ProcessOverviewNav";
 
 export const metadata: Metadata = {
   title: "Welcome Packet | Dean Miller Narration",
@@ -17,17 +18,6 @@ export const metadata: Metadata = {
     type: "website",
   },
 };
-
-const processSteps = [
-  { label: "Manuscript & notes received", href: "#manuscript-notes" },
-  { label: "Manuscript prep", href: "#manuscript-notes" },
-  { label: 'Production sample ("First 15")', href: "#production-sample" },
-  { label: "Full narration and recording", href: "#recording-process" },
-  { label: "Proofing, editing, mastering", href: "#delivery-review" },
-  { label: "Delivery and review", href: "#delivery-review" },
-  { label: "Final corrections", href: "#delivery-review" },
-  { label: "Payment and release", href: "#payment" },
-];
 
 const handledItems = [
   "Full narration performance",
@@ -162,61 +152,13 @@ function Section({
   );
 }
 
-function BulletList({
-  items,
-}: {
-  items: Array<string | { label: string; href: string }>;
-}) {
-  const hasLinkItems = items.some((item) => typeof item !== "string");
-
-  if (hasLinkItems) {
-    return (
-      <ul className="flex flex-wrap gap-2">
-        {items.map((item) => {
-          if (typeof item === "string") {
-            return (
-              <li key={item}>
-                <span className="inline-flex items-center text-white/85">
-                  {item}
-                </span>
-              </li>
-            );
-          }
-
-          return (
-            <li key={`${item.href}-${item.label}`}>
-              <a
-                href={item.href}
-                className={[
-                  "inline-flex items-center",
-                  "rounded-md border border-white/15",
-                  "bg-white/[0.03]",
-                  "px-3 py-1.5 text-sm font-medium",
-                  "text-white/85",
-                  "transition-all duration-200",
-                  "hover:border-[#D4AF37]/50",
-                  "hover:bg-[#D4AF37]/10",
-                  "hover:text-white",
-                  "focus-visible:outline-none",
-                  "focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60",
-                  "focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814]",
-                ].join(" ")}
-              >
-                {item.label}
-              </a>
-            </li>
-          );
-        })}
-      </ul>
-    );
-  }
-
+function BulletList({ items }: { items: string[] }) {
   return (
     <ul className="space-y-2">
       {items.map((item) => (
-        <li key={item as string} className="flex gap-3">
+        <li key={item} className="flex gap-3">
           <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#D4AF37]" />
-          <span>{item as string}</span>
+          <span>{item}</span>
         </li>
       ))}
     </ul>
@@ -330,7 +272,7 @@ export default function WelcomePage() {
 
               <p>Here’s how I run my projects:</p>
 
-              <BulletList items={processSteps} />
+              <ProcessOverviewNav />
             </Section>
 
             <Section id="what-i-handle" title="What I Handle For You">
@@ -354,11 +296,8 @@ export default function WelcomePage() {
                 <h3 className="text-lg font-semibold text-white">
                   Manuscript Format
                 </h3>
-
                 <p>Please provide the final version of your manuscript in:</p>
-
                 <BulletList items={["PDF (preferred)", "Word document"]} />
-
                 <p>
                   This must be the locked version of the book. Changes after
                   recording begins can create delays and additional work.
@@ -369,7 +308,6 @@ export default function WelcomePage() {
                 <h3 className="text-lg font-semibold text-white">
                   Character & Pronunciation Notes
                 </h3>
-
                 <p>
                   To deliver the performance you envision, I need upfront clarity
                   on:
@@ -408,36 +346,25 @@ export default function WelcomePage() {
                 <h3 className="text-lg font-semibold text-white">
                   Character Approval Process
                 </h3>
-
                 <p>After reviewing the manuscript:</p>
-
                 <BulletList items={characterApprovalSteps} />
-
                 <p>
                   You can adjust or expand anything before recording begins.
                 </p>
               </div>
             </Section>
 
-            <Section
-              id="production-sample"
-              title='Production Sample: "The First 15"'
-            >
+            <Section id="production-sample" title='Production Sample: "The First 15"'>
               <p>Before full production, I record a performance sample.</p>
-
               <p>
                 This is typically 15 minutes or more and is selected to capture:
               </p>
-
               <BulletList items={first15Focus} />
-
               <p>This is the stage where we lock in the performance.</p>
-
               <p>
                 You are encouraged to be detailed and specific with feedback here.
                 I will make adjustments until everything feels right.
               </p>
-
               <p>
                 Once approved, performance direction is considered final so we can
                 maintain consistency across the entire audiobook.
@@ -446,11 +373,8 @@ export default function WelcomePage() {
 
             <Section id="recording-process" title="Recording Process">
               <p>Once the sample is approved, I move into full production.</p>
-
               <p>During this phase:</p>
-
               <BulletList items={recordingPhaseItems} />
-
               <p>
                 You may not hear from me daily, but progress is always moving
                 forward.
@@ -462,11 +386,8 @@ export default function WelcomePage() {
                 I occasionally stream portions of my recording sessions on TikTok
                 or Twitch.
               </p>
-
               <p>This can:</p>
-
               <BulletList items={liveStreamingBenefits} />
-
               <p>
                 You will have full control over whether your project is included
                 in this.
@@ -478,7 +399,6 @@ export default function WelcomePage() {
                 Once production is complete, you will receive all audiobook files
                 for review.
               </p>
-
               <p>
                 You will need to listen through the full audiobook and note:
               </p>
@@ -511,21 +431,17 @@ export default function WelcomePage() {
 
               <div className="space-y-3 pt-2">
                 <h3 className="text-lg font-semibold text-white">Corrections</h3>
-
                 <p>
                   You will submit your notes using a shared document or
                   spreadsheet.
                 </p>
-
                 <p>I will:</p>
-
                 <BulletList items={correctionSteps} />
               </div>
             </Section>
 
             <Section id="timeline-communication" title="Timeline & Communication">
               <BulletList items={timelineItems} />
-
               <p>
                 If anything affects timeline or delivery, I will communicate
                 immediately.
@@ -535,7 +451,6 @@ export default function WelcomePage() {
             <Section id="payment" title="Payment">
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold text-white">ACX Projects</h3>
-
                 <p>
                   All payments and agreements are handled directly through ACX.
                 </p>
@@ -545,17 +460,11 @@ export default function WelcomePage() {
                 <h3 className="text-lg font-semibold text-white">
                   PFH Projects (Off Platform or Duet)
                 </h3>
-
                 <BulletList
-                  items={[
-                    "A project estimate is provided based on final word count",
-                  ]}
+                  items={["A project estimate is provided based on final word count"]}
                 />
-
                 <p>Payment methods accepted:</p>
-
                 <BulletList items={paymentMethods} />
-
                 <p>
                   For duet projects, one contract is typically managed through
                   ACX, with additional agreements handled separately as needed.
@@ -573,7 +482,6 @@ export default function WelcomePage() {
                 <p className="font-medium text-white">
                   A quick note on duet and dual projects on ACX
                 </p>
-
                 <p className="mt-3 text-white/80">
                   ACX currently supports one rights holder and one producer
                   directly on-platform. For duet or dual projects, the most common
@@ -611,11 +519,8 @@ export default function WelcomePage() {
 
             <Section id="promotion-support" title="Promotion Support">
               <p>I’m happy to support promotion of your audiobook.</p>
-
               <p>This can include:</p>
-
               <BulletList items={promoSupport} />
-
               <p>
                 If you prefer limited or no promotion during production, just let
                 me know.
@@ -627,29 +532,24 @@ export default function WelcomePage() {
                 I’m Dean Miller, a professional audiobook narrator focused on
                 immersive, character-driven storytelling.
               </p>
-
               <p>
                 My background combines performance, voice work, and years of
                 experience communicating emotion through sound. From early work in
                 theater and music to professional narration, everything I do is
                 centered on one goal:
               </p>
-
               <p className="text-lg font-medium text-white">
                 Making the listener forget there’s a narrator at all.
               </p>
-
               <p>
                 I record from a professional home studio using a Shure MV7+
                 microphone and a punch-and-roll workflow for clean, efficient
                 production.
               </p>
-
               <p>
                 Every project is approached with intention, precision, and respect
                 for the story.
               </p>
-
               <p className="text-lg font-medium text-white">
                 Because at the end of the day, narration isn’t just performance.
                 It’s connection.
@@ -661,16 +561,12 @@ export default function WelcomePage() {
                 I know this process can feel like a lot, especially if this is
                 your first audiobook.
               </p>
-
               <p className="font-medium text-white">You’re not doing it alone.</p>
-
               <p>
                 I’ll guide you through each step and make sure the process stays
                 clear, smooth, and collaborative from start to finish.
               </p>
-
               <p>I’m looking forward to working with you.</p>
-
               <p className="pt-2 text-white">Dean Miller</p>
             </Section>
           </div>
