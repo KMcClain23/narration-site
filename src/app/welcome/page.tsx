@@ -518,35 +518,6 @@ export default function WelcomePage() {
             </p>
           </Section>
 
-          <Section id="about" title="About Your Narrator">
-            <p>
-              I’m Dean Miller, a professional audiobook narrator focused on
-              immersive, character-driven storytelling.
-            </p>
-            <p>
-              My background combines performance, voice work, and years of
-              experience communicating emotion through sound. From early work in
-              theater and music to professional narration, everything I do is
-              centered on one goal:
-            </p>
-            <p className="text-white text-lg font-medium">
-              Making the listener forget there’s a narrator at all.
-            </p>
-            <p>
-              I record from a professional home studio using a Shure MV7+
-              microphone and a punch-and-roll workflow for clean, efficient
-              production.
-            </p>
-            <p>
-              Every project is approached with intention, precision, and respect
-              for the story.
-            </p>
-            <p className="text-white text-lg font-medium">
-              Because at the end of the day, narration isn’t just performance.
-              It’s connection.
-            </p>
-          </Section>
-
           <Section id="final-note" title="Final Note">
             <p>
               I know this process can feel like a lot, especially if this is
