@@ -30,32 +30,47 @@ export default function WelcomeSectionNav() {
   const sectionIds = useMemo(() => navItems.map((item) => item.id), []);
 
   useEffect(() => {
-    const handleScroll = () => {
+    const updateActiveSection = () => {
       const sections = sectionIds
         .map((id) => document.getElementById(id))
         .filter((el): el is HTMLElement => Boolean(el));
 
       if (sections.length === 0) return;
 
-      const scrollPosition = window.scrollY + 140;
-      let currentId = sectionIds[0];
+      // This line should roughly match your sticky header + scroll margin.
+      // top-24 and scroll-mt-24 are both ~96px, so 110 is a good active line.
+      const activeLine = 110;
+
+      let currentSection = sections[0];
 
       for (const section of sections) {
-        if (section.offsetTop <= scrollPosition) {
-          currentId = section.id;
+        const rect = section.getBoundingClientRect();
+
+        // If the section crosses the active line, it is the active one.
+        if (rect.top <= activeLine && rect.bottom > activeLine) {
+          currentSection = section;
+          break;
+        }
+
+        // If we've scrolled past it, keep it as the latest valid section.
+        if (rect.top <= activeLine) {
+          currentSection = section;
         }
       }
 
-      setActiveId(currentId);
+      setActiveId(currentSection.id);
     };
 
-    handleScroll();
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("resize", handleScroll);
+    updateActiveSection();
+
+    window.addEventListener("scroll", updateActiveSection, { passive: true });
+    window.addEventListener("resize", updateActiveSection);
+    window.addEventListener("hashchange", updateActiveSection);
 
     return () => {
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleScroll);
+      window.removeEventListener("scroll", updateActiveSection);
+      window.removeEventListener("resize", updateActiveSection);
+      window.removeEventListener("hashchange", updateActiveSection);
     };
   }, [sectionIds]);
 
