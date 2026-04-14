@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import BackToTopButton from "../components/BackToTopButton";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -665,6 +666,7 @@ export default function WelcomePage() {
           </Section>
         </div>
       </div>
+      <BackToTopButton />
     </main>
   );
 }
