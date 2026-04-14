@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import WelcomeSectionNav from "../components/WelcomeSectionNav";
-import BackToTopButton from "../components/BackToTopButton";
 
 export const metadata: Metadata = {
   title: "Welcome Packet | Dean Miller Narration",
@@ -679,8 +678,6 @@ export default function WelcomePage() {
           <WelcomeSectionNav />
         </div>
       </div>
-
-      <BackToTopButton />
     </main>
   );
 }

@@ -16,7 +16,7 @@ export default function BackToTopButton() {
       const scrolled = docHeight > 0 ? scrollTop / docHeight : 0;
 
       setProgress(scrolled);
-      setVisible(scrollTop > 300);
+      setVisible(scrollTop > 250);
     };
 
     onScroll();
@@ -36,25 +36,23 @@ export default function BackToTopButton() {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - progress * circumference;
 
+  if (!visible) return null;
+
   return (
     <button
       type="button"
       onClick={scrollToTop}
       aria-label="Back to top"
       className={[
-        "fixed bottom-28 right-8 sm:right-10 lg:right-16 xl:right-24 z-50",
-        "h-14 w-14 rounded-full",
+        "relative h-14 w-14 rounded-full",
         "flex items-center justify-center",
         "border border-white/10",
         "bg-[#0B1020]/85 backdrop-blur-md",
-        "shadow-[0_10px_30px_rgba(0,0,0,0.4)]",
+        "shadow-[0_10px_30px_rgba(0,0,0,0.35)]",
         "transition-all duration-300",
         "hover:-translate-y-1 hover:border-[#D4AF37]/50 hover:shadow-[0_14px_35px_rgba(0,0,0,0.45)]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60",
         "focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814]",
-        visible
-          ? "translate-y-0 opacity-100"
-          : "pointer-events-none translate-y-4 opacity-0",
       ].join(" ")}
     >
       <svg
