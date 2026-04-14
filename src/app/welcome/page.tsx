@@ -257,6 +257,14 @@ export default function WelcomePage() {
             >
               Contact Page
             </Link>
+
+            <a
+              href="/dean-miller-welcome-packet.pdf"
+              download
+              className="inline-flex items-center justify-center rounded-md border border-white/15 bg-white/[0.03] px-5 py-3 text-sm font-semibold text-white/90 transition hover:border-[#D4AF37]/60 hover:bg-white/[0.06] hover:text-white"
+            >
+              Download PDF
+            </a>
           </div>
 
           <div className="mt-10 grid gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-5 sm:grid-cols-4">
