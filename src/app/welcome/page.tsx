@@ -208,7 +208,7 @@ export default function WelcomePage() {
             </a>
           </div>
 
-          <div className="mt-10 grid gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-5 sm:grid-cols-4">
+          <div className="mt-10 grid gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-5 sm:grid-cols-3">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-white/45">
                 Email
@@ -228,13 +228,6 @@ export default function WelcomePage() {
                 Instagram
               </p>
               <p className="mt-2 text-sm text-white/90">@deanmillernarrator</p>
-            </div>
-
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-                Phone / Text
-              </p>
-              <p className="mt-2 text-sm text-white/90">(503) 862-8856</p>
             </div>
           </div>
 
@@ -270,7 +263,7 @@ export default function WelcomePage() {
                 consistency, and a smooth experience.
               </p>
 
-              <p>Here’s how I run my projects:</p>
+              <p>Jump to any stage of the process:</p>
 
               <ProcessOverviewNav />
             </Section>
