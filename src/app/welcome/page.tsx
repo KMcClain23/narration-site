@@ -166,29 +166,58 @@ function BulletList({
 }: {
   items: Array<string | { label: string; href: string }>;
 }) {
-  return (
-    <ul className="space-y-2">
-      {items.map((item) => {
-        const isLinkItem = typeof item !== "string";
-        const key = typeof item === "string" ? item : `${item.href}-${item.label}`;
+  const hasLinkItems = items.some((item) => typeof item !== "string");
 
-        return (
-          <li key={key} className="flex gap-3">
-            <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#D4AF37]" />
+  if (hasLinkItems) {
+    return (
+      <ul className="flex flex-wrap gap-2">
+        {items.map((item) => {
+          if (typeof item === "string") {
+            return (
+              <li key={item}>
+                <span className="inline-flex items-center text-white/85">
+                  {item}
+                </span>
+              </li>
+            );
+          }
 
-            {isLinkItem ? (
+          return (
+            <li key={`${item.href}-${item.label}`}>
               <a
                 href={item.href}
-                className="text-white/85 underline-offset-4 transition hover:text-[#F1D57A] hover:underline"
+                className={[
+                  "inline-flex items-center",
+                  "rounded-md border border-white/15",
+                  "bg-white/[0.03]",
+                  "px-3 py-1.5 text-sm font-medium",
+                  "text-white/85",
+                  "transition-all duration-200",
+                  "hover:border-[#D4AF37]/50",
+                  "hover:bg-[#D4AF37]/10",
+                  "hover:text-white",
+                  "focus-visible:outline-none",
+                  "focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60",
+                  "focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814]",
+                ].join(" ")}
               >
                 {item.label}
               </a>
-            ) : (
-              <span>{item}</span>
-            )}
-          </li>
-        );
-      })}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <ul className="space-y-2">
+      {items.map((item) => (
+        <li key={item as string} className="flex gap-3">
+          <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#D4AF37]" />
+          <span>{item as string}</span>
+        </li>
+      ))}
     </ul>
   );
 }
