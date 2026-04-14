@@ -30,40 +30,37 @@ export default function WelcomeSectionNav() {
   const sectionIds = useMemo(() => navItems.map((item) => item.id), []);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visibleSections = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort(
-            (a, b) =>
-              Math.abs(a.boundingClientRect.top) - Math.abs(b.boundingClientRect.top)
-          );
+    const handleScroll = () => {
+      const sections = sectionIds
+        .map((id) => document.getElementById(id))
+        .filter((el): el is HTMLElement => Boolean(el));
 
-        if (visibleSections.length > 0) {
-          setActiveId(visibleSections[0].target.id);
+      if (sections.length === 0) return;
+
+      const scrollPosition = window.scrollY + 140;
+      let currentId = sectionIds[0];
+
+      for (const section of sections) {
+        if (section.offsetTop <= scrollPosition) {
+          currentId = section.id;
         }
-      },
-      {
-        root: null,
-        rootMargin: "-20% 0px -60% 0px",
-        threshold: [0.1, 0.25, 0.5],
       }
-    );
 
-    const elements = sectionIds
-      .map((id) => document.getElementById(id))
-      .filter((el): el is HTMLElement => Boolean(el));
+      setActiveId(currentId);
+    };
 
-    elements.forEach((el) => observer.observe(el));
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll);
 
     return () => {
-      elements.forEach((el) => observer.unobserve(el));
-      observer.disconnect();
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
     };
   }, [sectionIds]);
 
   return (
-    <aside className="hidden xl:block">
+    <aside className="hidden lg:block">
       <div className="sticky top-24">
         <div className="rounded-2xl border border-white/10 bg-[#0B1020]/70 p-4 backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
           <p className="text-xs uppercase tracking-[0.22em] text-[#D4AF37]">
@@ -85,7 +82,7 @@ export default function WelcomeSectionNav() {
                           ? "bg-[#D4AF37]/12 text-white"
                           : "text-white/65 hover:bg-white/[0.04] hover:text-white",
                       ].join(" ")}
-                      aria-current={active ? "true" : undefined}
+                      aria-current={active ? "location" : undefined}
                     >
                       <span
                         className={[
