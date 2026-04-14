@@ -112,6 +112,33 @@ const promoSupport = [
   "Optional podcast appearances",
 ];
 
+const helpfulLinks = [
+  {
+    title: "ACX: Dual and Duet Narration Overview",
+    href: "https://www.acx.com/mp/blog/it-takes-two-dual-and-duet-narrations-are-spicing-up-romance",
+    description:
+      "ACX’s own explanation of dual and duet production, including how authors commonly structure multi-narrator projects on the platform.",
+  },
+  {
+    title: "ACX: Independent Contractor Agreements",
+    href: "https://www.acx.com/mp/blog/the-four-agreements",
+    description:
+      "Useful for off-platform agreements involving additional narrators, editors, or engineers.",
+  },
+  {
+    title: "ACX: How It Works for Authors",
+    href: "https://www.acx.com/help/authors-as-narrators/200626860",
+    description:
+      "Overview of the standard ACX production workflow, approvals, and checkpoints.",
+  },
+  {
+    title: "ACX: How It Works for Narrators & Studios",
+    href: "https://www.acx.com/mp/how-it-works/narrators-and-studios",
+    description:
+      "Helpful for understanding producer responsibilities and what retail-ready delivery includes.",
+  },
+];
+
 function Section({
   id,
   title,
@@ -124,7 +151,7 @@ function Section({
   return (
     <section
       id={id}
-      className="scroll-mt-24 rounded-2xl border border-white/10 bg-white/[0.03] p-6 sm:p-8 shadow-[0_10px_30px_rgba(0,0,0,0.18)]"
+      className="scroll-mt-24 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.05] to-white/[0.02] p-6 sm:p-8 shadow-[0_10px_30px_rgba(0,0,0,0.18)]"
     >
       <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
         {title}
@@ -150,7 +177,7 @@ function BulletList({ items }: { items: string[] }) {
 export default function WelcomePage() {
   return (
     <main className="min-h-screen bg-[#050814] text-white">
-      <section className="border-b border-white/10 bg-[radial-gradient(circle_at_top,rgba(212,175,55,0.12),transparent_38%)]">
+      <section className="bg-[radial-gradient(circle_at_top,rgba(212,175,55,0.18),transparent_35%),radial-gradient(circle_at_top_right,rgba(122,92,255,0.10),transparent_30%)]">
         <div className="mx-auto max-w-5xl px-5 sm:px-6 py-16 sm:py-20">
           <p className="text-sm uppercase tracking-[0.24em] text-[#D4AF37]">
             Dean Miller Narration
@@ -175,13 +202,13 @@ export default function WelcomePage() {
             </a>
             <Link
               href="/#contact"
-              className="inline-flex items-center justify-center rounded-md border border-white/15 px-5 py-3 text-sm font-semibold text-white/90 transition hover:border-[#D4AF37]/60 hover:text-white"
+              className="inline-flex items-center justify-center rounded-md border border-white/15 bg-white/[0.03] px-5 py-3 text-sm font-semibold text-white/90 transition hover:border-[#D4AF37]/60 hover:text-white"
             >
               Contact Page
             </Link>
           </div>
 
-          <div className="mt-10 grid gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-5 sm:grid-cols-3">
+          <div className="mt-10 grid gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-5 sm:grid-cols-4">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-white/45">
                 Email
@@ -193,6 +220,12 @@ export default function WelcomePage() {
                 TikTok
               </p>
               <p className="mt-2 text-sm text-white/90">@deanmillernarration</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-white/45">
+                Instagram
+              </p>
+              <p className="mt-2 text-sm text-white/90">@deanmillernarrator</p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-white/45">
@@ -210,16 +243,18 @@ export default function WelcomePage() {
         <div className="grid gap-6">
           <Section id="welcome" title="Welcome">
             <p>
-              If you’re receiving this, it means we’re moving forward together
-              and I’m excited to bring your story to life.
+              I’m glad you’re here. This page gives you a clear picture of what
+              it is like to work with me and how I approach audiobook production
+              from start to finish.
             </p>
             <p>
-              This guide walks you through exactly what to expect from me, what
-              I’ll need from you, and how we’ll create a polished, professional
-              audiobook from start to finish.
+              You’ll find an overview of my process, what I’ll need from you,
+              how reviews and approvals work, and a few helpful resources for
+              navigating production decisions.
             </p>
             <p>
-              If you have questions at any point, you can reach me directly.
+              If you have questions at any point, you can always reach out
+              directly.
             </p>
           </Section>
 
@@ -270,7 +305,7 @@ export default function WelcomePage() {
               </p>
 
               <div className="grid gap-6 md:grid-cols-2">
-                <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="rounded-xl border border-[#D4AF37]/15 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-4">
                   <p className="font-medium text-white">
                     Character notes for main or important characters
                   </p>
@@ -279,7 +314,7 @@ export default function WelcomePage() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="rounded-xl border border-[#8B5CF6]/20 bg-gradient-to-br from-[#8B5CF6]/10 to-transparent p-4">
                   <p className="font-medium text-white">Pronunciations</p>
                   <div className="mt-3">
                     <BulletList items={pronunciationNotes} />
@@ -359,14 +394,14 @@ export default function WelcomePage() {
             </p>
 
             <div className="grid gap-6 md:grid-cols-2">
-              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div className="rounded-xl border border-[#D4AF37]/15 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-4">
                 <p className="font-medium text-white">Technical issues</p>
                 <div className="mt-3">
                   <BulletList items={technicalIssues} />
                 </div>
               </div>
 
-              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div className="rounded-xl border border-[#8B5CF6]/20 bg-gradient-to-br from-[#8B5CF6]/10 to-transparent p-4">
                 <p className="font-medium text-white">Narration errors</p>
                 <div className="mt-3">
                   <BulletList items={narrationErrors} />
@@ -425,6 +460,51 @@ export default function WelcomePage() {
                 For duet projects, one contract is typically managed through
                 ACX, with additional agreements handled separately as needed.
               </p>
+            </div>
+          </Section>
+
+          <Section id="helpful-links" title="Helpful Links">
+            <p>
+              If you are considering duet, dual, or multi-narrator production
+              on ACX, these are a few useful places to start.
+            </p>
+
+            <div className="rounded-xl border border-[#D4AF37]/15 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-5">
+              <p className="font-medium text-white">
+                A quick note on duet and dual projects on ACX
+              </p>
+              <p className="mt-3 text-white/80">
+                ACX currently supports one rights holder and one producer
+                directly on-platform. For duet or dual projects, the most common
+                setup is to contract with one primary narrator or producer
+                through ACX and handle the additional narrator arrangement
+                separately. ACX also offers independent contractor agreements
+                that can help with those off-platform relationships.
+              </p>
+            </div>
+
+            <div className="grid gap-4 pt-2">
+              {helpfulLinks.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group rounded-xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-[#D4AF37]/35 hover:bg-white/[0.05]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-medium text-white group-hover:text-[#F1D57A] transition">
+                        {link.title}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-white/70">
+                        {link.description}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-[#D4AF37]">↗</span>
+                  </div>
+                </a>
+              ))}
             </div>
           </Section>
 
