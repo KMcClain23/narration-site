@@ -39,7 +39,7 @@ export default function WelcomeSectionNav() {
 
       // This line should roughly match your sticky header + scroll margin.
       // top-24 and scroll-mt-24 are both ~96px, so 110 is a good active line.
-      const activeLine = 110;
+      const activeLine = 96;
 
       let currentSection = sections[0];
 
