@@ -25,7 +25,6 @@ export default function Header() {
 
   const navLinks = useMemo(
     () => [
-      { name: "Welcome", href: "/welcome" },
       { name: "Narrated Works", href: "/narrated-works" },
       { name: "Demos", href: "/#demos" },
       { name: "About", href: "/#about" },
