@@ -47,37 +47,30 @@ function AuthorPopup({
   onClose: () => void;
 }) {
   const popupRef = useRef<HTMLDivElement>(null);
-  const [style, setStyle] = useState<React.CSSProperties>({});
+  const [style, setStyle] = useState<React.CSSProperties>({ opacity: 0, pointerEvents: "none" });
 
-  // Position popup relative to anchor button
+  // Position using fixed coords — anchored to click point, always in viewport
   useEffect(() => {
     const anchor = anchorRef.current;
-    const popup = popupRef.current;
-    if (!anchor || !popup) return;
+    if (!anchor) return;
 
-    const anchorRect = anchor.getBoundingClientRect();
-    const popupWidth = 280;
-    const margin = 8;
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    const rect = anchor.getBoundingClientRect();
+    const popupWidth = 272;
+    const margin = 10;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const estimatedHeight = 300;
 
-    let left = anchorRect.left;
-    let top = anchorRect.bottom + margin + window.scrollY;
+    let left = rect.left;
+    let top = rect.bottom + 6;
 
-    // Flip left if it would overflow right
-    if (left + popupWidth > viewportWidth - margin) {
-      left = anchorRect.right - popupWidth;
-    }
-    // Clamp to viewport left
+    if (left + popupWidth > vw - margin) left = rect.right - popupWidth;
     left = Math.max(margin, left);
 
-    // Flip above if it would overflow bottom
-    const popupHeight = popup.offsetHeight || 300;
-    if (anchorRect.bottom + margin + popupHeight > viewportHeight) {
-      top = anchorRect.top - margin - popupHeight + window.scrollY;
-    }
+    if (top + estimatedHeight > vh - margin) top = rect.top - estimatedHeight - 6;
+    top = Math.max(margin, top);
 
-    setStyle({ position: "absolute", top, left, width: popupWidth, zIndex: 50 });
+    setStyle({ position: "fixed", top, left, width: popupWidth, zIndex: 9999, opacity: 1, pointerEvents: "auto" });
   }, [anchorRef]);
 
   // Close on outside click or Escape
@@ -106,10 +99,10 @@ function AuthorPopup({
   return (
     <div
       ref={popupRef}
-      style={style}
       role="dialog"
       aria-label={`${author.name} author info`}
       className="rounded-2xl border border-[#1A2550] bg-[#0B1224] shadow-2xl overflow-hidden"
+      style={{ ...style, animation: style.opacity === 1 ? "popupIn 0.15s ease forwards" : undefined }}
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3 border-b border-white/8">
