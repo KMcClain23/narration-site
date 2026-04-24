@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   // Audit Fix: Uses the full WWW version as the base for the canonical strategy
   metadataBase: new URL("https://www.dmnarration.com"),
-  title: "Dean Miller | Professional Audiobook Narrator",
+  title: "Dean Miller | Audiobook Narrator — Dark Romance & Romantasy",
   description:
     "Professional audiobook narrator delivering character-driven, emotionally grounded performances for fiction. Broadcast quality audio and fast turnaround.",
   icons: {
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     canonical: "https://www.dmnarration.com/",
   },
   openGraph: {
-    title: "Dean Miller | Professional Audiobook Narrator",
+    title: "Dean Miller | Audiobook Narrator — Dark Romance & Romantasy",
     description:
       "Explore audiobook narration demos and request availability. Emotionally immersive, character driven performance.",
     url: "https://www.dmnarration.com/",
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Dean Miller | Professional Audiobook Narrator",
+    title: "Dean Miller | Audiobook Narrator — Dark Romance & Romantasy",
     description:
       "Explore audiobook narration demos. Broadcast quality, emotionally immersive performance.",
     images: ["/opengraph-image.png"],

@@ -1,114 +1,29 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import WelcomeSectionNav from "../components/WelcomeSectionNav";
-import ProcessOverviewNav from "../components/ProcessOverviewNav";
 
 export const metadata: Metadata = {
-  title: "Welcome Packet | Dean Miller Narration",
+  title: "Working Together | Dean Miller Narration",
   description:
-    "Learn what it is like to work with Dean Miller Narration, from manuscript prep through final audiobook delivery.",
+    "Everything you need to know about working with Dean Miller: manuscript prep, character approvals, the First 15 review, delivery, and payment — from inquiry to ACX-ready master.",
   alternates: {
-    canonical: "https://dmnarration.com/welcome",
+    canonical: "https://www.dmnarration.com/welcome",
   },
   openGraph: {
-    title: "Welcome Packet | Dean Miller Narration",
+    title: "Working Together | Dean Miller Narration",
     description:
-      "A complete guide to Dean Miller's audiobook narration process, expectations, and delivery workflow.",
-    url: "https://dmnarration.com/welcome",
+      "A clear guide to Dean Miller's audiobook narration process — from manuscript handoff through final delivery.",
+    url: "https://www.dmnarration.com/welcome",
     type: "website",
   },
 };
-
-const handledItems = [
-  "Full narration performance",
-  "Character voice development and consistency",
-  "Editing and mastering to platform standards (ACX and others)",
-  "Proofing and error correction",
-  "Final delivery of retail-ready audio files",
-];
-
-const characterNotes = [
-  "Age",
-  "Background or location",
-  "Accent (if applicable)",
-  "Personality traits",
-  "Any defining vocal qualities",
-];
-
-const pronunciationNotes = [
-  "Names",
-  "Unique terms",
-  "Fantasy or invented language",
-];
-
-const characterApprovalSteps = [
-  "I will compile a character list",
-  "Add notes based on your input and my interpretation",
-  "Send it to you for confirmation",
-];
-
-const first15Focus = [
-  "Main character voices",
-  "Tone and pacing",
-  "Emotional range",
-];
-
-const recordingPhaseItems = [
-  "I focus on consistent, high-quality recording",
-  "Updates are provided at key milestones",
-  "I work toward our agreed timeline",
-];
-
-const liveStreamingBenefits = [
-  "Build audience interest",
-  "Create promotional content",
-  "Generate early engagement",
-];
-
-const technicalIssues = [
-  "Audio glitches",
-  "Background noise",
-  "Editing inconsistencies",
-];
-
-const narrationErrors = [
-  "Misreads",
-  "Mispronunciations",
-];
-
-const correctionSteps = [
-  "Review all notes",
-  "Complete final corrections",
-  "Prepare files for submission",
-];
-
-const timelineItems = [
-  "Timeline is agreed upon before recording begins",
-  "I provide updates at key stages",
-  "I prioritize quality, consistency, and reliability",
-];
-
-const paymentMethods = [
-  "Check",
-  "Venmo",
-  "PayPal",
-  "Credit Card",
-  "Direct Deposit",
-];
-
-const promoSupport = [
-  "Short promotional audio clips",
-  "Behind-the-scenes content",
-  "Social media collaboration",
-  "Optional podcast appearances",
-];
 
 const helpfulLinks = [
   {
     title: "ACX: Dual and Duet Narration Overview",
     href: "https://www.acx.com/mp/blog/it-takes-two-dual-and-duet-narrations-are-spicing-up-romance",
     description:
-      "ACX’s explanation of dual and duet production, including how multi-narrator projects are commonly structured on the platform.",
+      "ACX's explanation of dual and duet production, including how multi-narrator projects are commonly structured on the platform.",
   },
   {
     title: "ACX: Independent Contractor Agreements",
@@ -165,316 +80,227 @@ function BulletList({ items }: { items: string[] }) {
   );
 }
 
+function StepBadge({ n }: { n: number }) {
+  return (
+    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 text-xs font-bold text-[#D4AF37]">
+      {n}
+    </span>
+  );
+}
+
 export default function WelcomePage() {
   return (
     <main className="min-h-screen bg-[#050814] text-white">
-      <section className="bg-[radial-gradient(circle_at_top,rgba(212,175,55,0.18),transparent_35%),radial-gradient(circle_at_top_right,rgba(122,92,255,0.10),transparent_30%)]">
-        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-20">
-          <p className="text-sm uppercase tracking-[0.24em] text-[#D4AF37]">
+
+      {/* Hero */}
+      <section className="bg-[radial-gradient(circle_at_top,rgba(212,175,55,0.15),transparent_35%)]">
+        <div className="mx-auto max-w-5xl px-5 py-16 sm:px-6 sm:py-20">
+          <p className="text-xs uppercase tracking-[0.24em] text-[#D4AF37]">
             Dean Miller Narration
           </p>
-
           <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">
-            Welcome Packet
+            Working together
           </h1>
-
-          <p className="mt-6 max-w-3xl text-lg leading-8 text-white/75">
-            A clear guide to what it is like to work together, what I will need
-            from you, and how your audiobook moves from manuscript to finished
-            delivery.
+          <p className="mt-5 max-w-2xl text-lg leading-8 text-white/70">
+            What to expect, what you'll need to provide, and how your manuscript
+            becomes a finished audiobook — step by step.
           </p>
-
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-7 flex flex-wrap gap-3">
             <a
               href="mailto:Dean@DMNarration.com"
               className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#E0C15A]"
             >
               Email Dean
             </a>
-
             <Link
               href="/#contact"
-              className="inline-flex items-center justify-center rounded-md border border-white/15 bg-white/[0.03] px-5 py-3 text-sm font-semibold text-white/90 transition hover:border-[#D4AF37]/60 hover:text-white"
+              className="inline-flex items-center justify-center rounded-md border border-white/15 px-5 py-3 text-sm font-semibold text-white/90 transition hover:border-[#D4AF37]/60 hover:text-white"
             >
-              Contact Page
+              Contact & booking
             </Link>
-
           </div>
 
-          <div className="mt-10 grid gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-5 sm:grid-cols-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-                Email
-              </p>
-              <p className="mt-2 text-sm text-white/90">Dean@DMNarration.com</p>
-            </div>
-
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-                TikTok
-              </p>
-              <p className="mt-2 text-sm text-white/90">@deanmillernarration</p>
-            </div>
-
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-                Instagram
-              </p>
-              <p className="mt-2 text-sm text-white/90">@deanmillernarrator</p>
-            </div>
+          {/* Quick-reference strip */}
+          <div className="mt-10 grid gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-5 sm:grid-cols-4 text-sm">
+            {[
+              { label: "Email", value: "Dean@DMNarration.com" },
+              { label: "Response time", value: "24–48 hours" },
+              { label: "Time zone", value: "Pacific Time" },
+              { label: "Platform", value: "ACX · Off-platform" },
+            ].map((item) => (
+              <div key={item.label}>
+                <p className="text-xs uppercase tracking-[0.2em] text-white/45">
+                  {item.label}
+                </p>
+                <p className="mt-2 text-white/90">{item.value}</p>
+              </div>
+            ))}
           </div>
-
-          <p className="mt-4 text-sm text-white/50">Time Zone: Pacific Time</p>
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl px-5 py-10 sm:px-6 sm:py-14">
+      {/* Body */}
+      <div className="mx-auto max-w-5xl px-5 py-10 sm:px-6 sm:py-14">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_250px] xl:grid-cols-[minmax(0,1fr)_270px]">
           <div className="grid gap-6">
-            <Section id="welcome" title="Welcome">
-              <p>
-                I’m glad you’re here. This page gives you a clear picture of what
-                it is like to work with me and how I approach audiobook production
-                from start to finish.
-              </p>
 
+            {/* What I handle */}
+            <Section id="what-i-handle" title="What I handle for you">
               <p>
-                You’ll find an overview of my process, what I’ll need from you,
-                how reviews and approvals work, and a few helpful resources for
-                navigating production decisions.
+                You focus on the story. I take care of the production end to end:
               </p>
-
-              <p>
-                If you have questions at any point, you can always reach out
-                directly.
-              </p>
+              <BulletList
+                items={[
+                  "Full narration performance",
+                  "Character voice development and consistency",
+                  "Editing and mastering to ACX and platform standards",
+                  "Proofing and error correction",
+                  "Final delivery of retail-ready audio files",
+                ]}
+              />
             </Section>
 
-            <Section id="process-overview" title="Process Overview">
+            {/* Process */}
+            <Section id="process" title="The process, start to finish">
               <p>
-                Every audiobook follows a structured process to ensure quality,
-                consistency, and a smooth experience.
+                Every project follows the same structure so you always know where
+                things stand.
               </p>
 
-              <p>Jump to any stage of the process:</p>
-
-              <ProcessOverviewNav />
-            </Section>
-
-            <Section id="what-i-handle" title="What I Handle For You">
-              <p>
-                My role is to take your story and deliver a finished,
-                professional audiobook ready for distribution.
-              </p>
-
-              <p>I handle:</p>
-
-              <BulletList items={handledItems} />
-
-              <p>
-                My goal is simple. You focus on the story. I handle the
-                production.
-              </p>
-            </Section>
-
-            <Section id="manuscript-notes" title="Manuscript & Notes">
-              <div className="space-y-3">
-                <h3 className="text-lg font-semibold text-white">
-                  Manuscript Format
-                </h3>
-                <p>Please provide the final version of your manuscript in:</p>
-                <BulletList items={["PDF (preferred)", "Word document"]} />
-                <p>
-                  This must be the locked version of the book. Changes after
-                  recording begins can create delays and additional work.
-                </p>
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <h3 className="text-lg font-semibold text-white">
-                  Character & Pronunciation Notes
-                </h3>
-                <p>
-                  To deliver the performance you envision, I need upfront clarity
-                  on:
-                </p>
-
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="rounded-xl border border-[#D4AF37]/15 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-4">
-                    <p className="font-medium text-white">
-                      Character notes for main or important characters
-                    </p>
-                    <div className="mt-3">
-                      <BulletList items={characterNotes} />
+              <div className="space-y-5 pt-1">
+                {[
+                  {
+                    n: 1,
+                    title: "Manuscript & notes",
+                    body: "You send the final, locked manuscript (PDF or Word) along with character notes and any pronunciation guide. Changes after recording begins cause delays — the locked version matters.",
+                  },
+                  {
+                    n: 2,
+                    title: "Character voice list",
+                    body: "I compile a character list with notes on age, background, accent, personality, and vocal qualities — based on your input and my read of the text. You review and confirm before recording starts.",
+                  },
+                  {
+                    n: 3,
+                    title: 'Production sample — "The First 15"',
+                    body: "I record 15+ minutes chosen to showcase main character voices, tone, pacing, and emotional range. This is the stage to be detailed with feedback. Once approved, performance direction is locked for consistency across the full book.",
+                  },
+                  {
+                    n: 4,
+                    title: "Full recording",
+                    body: "I move into production, providing milestone updates along the way. You may not hear from me daily — that means recording is moving forward.",
+                  },
+                  {
+                    n: 5,
+                    title: "Delivery & review",
+                    body: "You receive all files and listen through for technical issues (glitches, noise, editing inconsistencies) and narration errors (misreads, mispronunciations). Submit notes via a shared document. I complete all corrections and prepare final files.",
+                  },
+                  {
+                    n: 6,
+                    title: "Payment & release",
+                    body: "ACX projects: handled through ACX. Off-platform or duet: I provide a project estimate based on final word count. Payment via Check, Venmo, PayPal, Credit Card, or Direct Deposit.",
+                  },
+                ].map((step) => (
+                  <div key={step.n} className="flex gap-4">
+                    <StepBadge n={step.n} />
+                    <div>
+                      <p className="font-semibold text-white">{step.title}</p>
+                      <p className="mt-1 text-sm text-white/75 leading-relaxed">
+                        {step.body}
+                      </p>
                     </div>
                   </div>
-
-                  <div className="rounded-xl border border-[#8B5CF6]/20 bg-gradient-to-br from-[#8B5CF6]/10 to-transparent p-4">
-                    <p className="font-medium text-white">Pronunciations</p>
-                    <div className="mt-3">
-                      <BulletList items={pronunciationNotes} />
-                    </div>
-                  </div>
-                </div>
-
-                <p>
-                  If notes are not provided, I will make performance decisions
-                  based on the text.
-                </p>
-
-                <p>
-                  If pronunciations are unclear, I will send you a recorded list
-                  for approval before proceeding.
-                </p>
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <h3 className="text-lg font-semibold text-white">
-                  Character Approval Process
-                </h3>
-                <p>After reviewing the manuscript:</p>
-                <BulletList items={characterApprovalSteps} />
-                <p>
-                  You can adjust or expand anything before recording begins.
-                </p>
+                ))}
               </div>
             </Section>
 
-            <Section id="production-sample" title='Production Sample: "The First 15"'>
-              <p>Before full production, I record a performance sample.</p>
-              <p>
-                This is typically 15 minutes or more and is selected to capture:
-              </p>
-              <BulletList items={first15Focus} />
-              <p>This is the stage where we lock in the performance.</p>
-              <p>
-                You are encouraged to be detailed and specific with feedback here.
-                I will make adjustments until everything feels right.
-              </p>
-              <p>
-                Once approved, performance direction is considered final so we can
-                maintain consistency across the entire audiobook.
-              </p>
-            </Section>
-
-            <Section id="recording-process" title="Recording Process">
-              <p>Once the sample is approved, I move into full production.</p>
-              <p>During this phase:</p>
-              <BulletList items={recordingPhaseItems} />
-              <p>
-                You may not hear from me daily, but progress is always moving
-                forward.
-              </p>
-            </Section>
-
-            <Section id="live-streaming" title="Optional: Live Streaming">
-              <p>
-                I occasionally stream portions of my recording sessions on TikTok
-                or Twitch.
-              </p>
-              <p>This can:</p>
-              <BulletList items={liveStreamingBenefits} />
-              <p>
-                You will have full control over whether your project is included
-                in this.
-              </p>
-            </Section>
-
-            <Section id="delivery-review" title="Delivery & Review">
-              <p>
-                Once production is complete, you will receive all audiobook files
-                for review.
-              </p>
-              <p>
-                You will need to listen through the full audiobook and note:
-              </p>
-
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="rounded-xl border border-[#D4AF37]/15 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-4">
-                  <p className="font-medium text-white">Technical issues</p>
-                  <div className="mt-3">
-                    <BulletList items={technicalIssues} />
-                  </div>
+            {/* What you need to provide */}
+            <Section id="manuscript-notes" title="What to prepare">
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="rounded-xl border border-[#D4AF37]/15 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-5">
+                  <p className="font-semibold text-white">Character notes</p>
+                  <p className="mt-1 text-sm text-white/65">
+                    For main and important characters:
+                  </p>
+                  <BulletList
+                    items={[
+                      "Age",
+                      "Background or location",
+                      "Accent (if applicable)",
+                      "Personality traits",
+                      "Any defining vocal qualities",
+                    ]}
+                  />
                 </div>
-
-                <div className="rounded-xl border border-[#8B5CF6]/20 bg-gradient-to-br from-[#8B5CF6]/10 to-transparent p-4">
-                  <p className="font-medium text-white">Narration errors</p>
-                  <div className="mt-3">
-                    <BulletList items={narrationErrors} />
-                  </div>
+                <div className="rounded-xl border border-[#8B5CF6]/20 bg-gradient-to-br from-[#8B5CF6]/10 to-transparent p-5">
+                  <p className="font-semibold text-white">Pronunciation guide</p>
+                  <p className="mt-1 text-sm text-white/65">Cover anything non-obvious:</p>
+                  <BulletList
+                    items={[
+                      "Character and place names",
+                      "Unique or invented terms",
+                      "Fantasy or constructed language",
+                    ]}
+                  />
+                  <p className="mt-3 text-sm text-white/65">
+                    If notes aren't provided, I make performance decisions from
+                    the text — and send a recorded pronunciation list for
+                    approval if anything is unclear.
+                  </p>
                 </div>
               </div>
-
-              <p>
-                At this stage, corrections are focused on accuracy and technical
-                quality.
-              </p>
-
-              <p>
-                Performance direction is finalized during the production sample
-                phase.
-              </p>
-
-              <div className="space-y-3 pt-2">
-                <h3 className="text-lg font-semibold text-white">Corrections</h3>
-                <p>
-                  You will submit your notes using a shared document or
-                  spreadsheet.
-                </p>
-                <p>I will:</p>
-                <BulletList items={correctionSteps} />
-              </div>
             </Section>
 
-            <Section id="timeline-communication" title="Timeline & Communication">
-              <BulletList items={timelineItems} />
+            {/* Timeline */}
+            <Section id="timeline-communication" title="Timeline & communication">
+              <BulletList
+                items={[
+                  "Timeline is agreed upon before recording begins",
+                  "I provide milestone updates throughout production",
+                  "If anything affects the timeline, I communicate immediately",
+                  "I prioritize quality, consistency, and reliability",
+                ]}
+              />
+            </Section>
+
+            {/* Live streaming — optional */}
+            <Section id="live-streaming" title="Optional: live streaming">
               <p>
-                If anything affects timeline or delivery, I will communicate
-                immediately.
+                I occasionally stream recording sessions on TikTok or Twitch.
+                This can build audience interest, create promotional content, and
+                generate early engagement around your release.
+              </p>
+              <p>
+                You have full control over whether your project is included. Just
+                let me know your preference.
               </p>
             </Section>
 
-            <Section id="payment" title="Payment">
-              <div className="space-y-3">
-                <h3 className="text-lg font-semibold text-white">ACX Projects</h3>
-                <p>
-                  All payments and agreements are handled directly through ACX.
-                </p>
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <h3 className="text-lg font-semibold text-white">
-                  PFH Projects (Off Platform or Duet)
-                </h3>
-                <BulletList
-                  items={["A project estimate is provided based on final word count"]}
-                />
-                <p>Payment methods accepted:</p>
-                <BulletList items={paymentMethods} />
-                <p>
-                  For duet projects, one contract is typically managed through
-                  ACX, with additional agreements handled separately as needed.
-                </p>
-              </div>
+            {/* Promotion */}
+            <Section id="promotion-support" title="Promotion support">
+              <p>
+                I'm happy to support the release of your audiobook with short
+                promotional clips, behind-the-scenes content, social media
+                collaboration, or optional podcast appearances.
+              </p>
+              <p>
+                If you prefer limited or no promotion during production, that's
+                completely fine — just say so upfront.
+              </p>
             </Section>
 
-            <Section id="helpful-links" title="Helpful Links">
-              <p>
-                If you are considering duet, dual, or multi-narrator production
-                on ACX, these are a few useful places to start.
-              </p>
-
+            {/* Duet / helpful links */}
+            <Section id="helpful-links" title="Duet & dual narration on ACX">
               <div className="rounded-xl border border-[#D4AF37]/15 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-5">
-                <p className="font-medium text-white">
-                  A quick note on duet and dual projects on ACX
+                <p className="font-semibold text-white">
+                  A note on multi-narrator projects
                 </p>
-                <p className="mt-3 text-white/80">
+                <p className="mt-3 text-sm text-white/80">
                   ACX currently supports one rights holder and one producer
-                  directly on-platform. For duet or dual projects, the most common
-                  setup is to contract with one primary narrator or producer
-                  through ACX and handle the additional narrator arrangement
-                  separately. ACX also offers independent contractor agreements
-                  that can help with those off-platform relationships.
+                  directly on-platform. For duet or dual projects, the standard
+                  setup is to contract with one primary narrator through ACX and
+                  handle the additional narrator arrangement separately. ACX
+                  independent contractor agreements can help with those
+                  off-platform relationships.
                 </p>
               </div>
 
@@ -503,60 +329,32 @@ export default function WelcomePage() {
               </div>
             </Section>
 
-            <Section id="promotion-support" title="Promotion Support">
-              <p>I’m happy to support promotion of your audiobook.</p>
-              <p>This can include:</p>
-              <BulletList items={promoSupport} />
-              <p>
-                If you prefer limited or no promotion during production, just let
-                me know.
+            {/* Ready to start */}
+            <div className="rounded-2xl border border-[#D4AF37]/20 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-6 sm:p-8">
+              <h2 className="text-xl font-semibold text-white">
+                Ready to get started?
+              </h2>
+              <p className="mt-3 text-white/75 leading-relaxed">
+                Send an inquiry with your genre, word count, and target release
+                date and I'll get back to you within 24–48 hours.
               </p>
-            </Section>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <a
+                  href="mailto:Dean@DMNarration.com"
+                  className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#E0C15A]"
+                >
+                  Email Dean
+                </a>
+                <Link
+                  href="/#contact"
+                  className="inline-flex items-center justify-center rounded-md border border-white/20 px-5 py-3 text-sm font-semibold text-white/90 transition hover:border-[#D4AF37]/60 hover:text-white"
+                >
+                  Use the contact form
+                </Link>
+              </div>
+            </div>
 
-            <Section id="about" title="About Your Narrator">
-              <p>
-                I’m Dean Miller, a professional audiobook narrator focused on
-                immersive, character-driven storytelling.
-              </p>
-              <p>
-                My background combines performance, voice work, and years of
-                experience communicating emotion through sound. From early work in
-                theater and music to professional narration, everything I do is
-                centered on one goal:
-              </p>
-              <p className="text-lg font-medium text-white">
-                Making the listener forget there’s a narrator at all.
-              </p>
-              <p>
-                I record from a professional home studio using a Shure MV7+
-                microphone and a punch-and-roll workflow for clean, efficient
-                production.
-              </p>
-              <p>
-                Every project is approached with intention, precision, and respect
-                for the story.
-              </p>
-              <p className="text-lg font-medium text-white">
-                Because at the end of the day, narration isn’t just performance.
-                It’s connection.
-              </p>
-            </Section>
-
-            <Section id="final-note" title="Final Note">
-              <p>
-                I know this process can feel like a lot, especially if this is
-                your first audiobook.
-              </p>
-              <p className="font-medium text-white">You’re not doing it alone.</p>
-              <p>
-                I’ll guide you through each step and make sure the process stays
-                clear, smooth, and collaborative from start to finish.
-              </p>
-              <p>I’m looking forward to working with you.</p>
-              <p className="pt-2 text-white">Dean Miller</p>
-            </Section>
           </div>
-
           <WelcomeSectionNav />
         </div>
       </div>
