@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import LogoutButton from "./LogoutButton";
 import QuickLinks from "./QuickLinks";
+import AuthorManager from "./AuthorManager";
 
 export const dynamic = "force-dynamic";
 
@@ -97,7 +98,10 @@ export default async function AdminStatsPage() {
           </div>
         </section>
 
-        {/* 2. QUICK ANALYTICS */}
+        {/* 2. AUTHOR PROFILES */}
+        <AuthorManager />
+
+        {/* 3. QUICK ANALYTICS */}
         <section className="mt-12 pt-12 border-t border-[#1A2550]">
           <div className="bg-[#0B1224] border border-[#1A2550] rounded-2xl p-8 inline-block">
             <p className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-bold">Total Demo Plays</p>

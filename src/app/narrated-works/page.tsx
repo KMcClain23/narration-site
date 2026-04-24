@@ -2,83 +2,270 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Book } from "@/types/book";
 
-function BookCard({ book, statusBadge }: { book: Book; statusBadge?: React.ReactNode }) {
-  const hasLink = Boolean(book.link?.trim());
+interface Author {
+  id: string;
+  name: string;
+  bio: string;
+  website: string;
+  amazon: string;
+  instagram: string;
+  tiktok: string;
+  facebook: string;
+  goodreads: string;
+}
+
+function AuthorLink({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/8 transition-colors group"
+    >
+      <span className="text-[#D4AF37] w-4 h-4 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+        {icon}
+      </span>
+      <span>{label}</span>
+      <svg className="ml-auto h-3 w-3 text-white/20 group-hover:text-white/50 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+      </svg>
+    </a>
+  );
+}
+
+function AuthorPopup({
+  author,
+  anchorRef,
+  onClose,
+}: {
+  author: Author;
+  anchorRef: React.RefObject<HTMLButtonElement | null>;
+  onClose: () => void;
+}) {
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<React.CSSProperties>({});
+
+  // Position popup relative to anchor button
+  useEffect(() => {
+    const anchor = anchorRef.current;
+    const popup = popupRef.current;
+    if (!anchor || !popup) return;
+
+    const anchorRect = anchor.getBoundingClientRect();
+    const popupWidth = 280;
+    const margin = 8;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let left = anchorRect.left;
+    let top = anchorRect.bottom + margin + window.scrollY;
+
+    // Flip left if it would overflow right
+    if (left + popupWidth > viewportWidth - margin) {
+      left = anchorRect.right - popupWidth;
+    }
+    // Clamp to viewport left
+    left = Math.max(margin, left);
+
+    // Flip above if it would overflow bottom
+    const popupHeight = popup.offsetHeight || 300;
+    if (anchorRect.bottom + margin + popupHeight > viewportHeight) {
+      top = anchorRect.top - margin - popupHeight + window.scrollY;
+    }
+
+    setStyle({ position: "absolute", top, left, width: popupWidth, zIndex: 50 });
+  }, [anchorRef]);
+
+  // Close on outside click or Escape
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (
+        popupRef.current &&
+        !popupRef.current.contains(e.target as Node) &&
+        anchorRef.current &&
+        !anchorRef.current.contains(e.target as Node)
+      ) {
+        onClose();
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [onClose, anchorRef]);
+
+  const hasAnyLink = author.website || author.amazon || author.instagram || author.tiktok || author.facebook || author.goodreads;
 
   return (
     <div
-      className="group relative rounded-2xl overflow-hidden cursor-default"
+      ref={popupRef}
+      style={style}
+      role="dialog"
+      aria-label={`${author.name} author info`}
+      className="rounded-2xl border border-[#1A2550] bg-[#0B1224] shadow-2xl overflow-hidden"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3 border-b border-white/8">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37] font-semibold">Author</p>
+          <p className="mt-0.5 font-semibold text-white text-sm leading-tight">{author.name}</p>
+        </div>
+        <button
+          onClick={onClose}
+          className="rounded-md p-1.5 text-white/30 hover:text-white hover:bg-white/8 transition-colors"
+          aria-label="Close"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Bio */}
+      {author.bio && (
+        <p className="px-4 pt-3 pb-1 text-xs text-white/60 leading-relaxed">{author.bio}</p>
+      )}
+
+      {/* Links */}
+      {hasAnyLink ? (
+        <div className="px-2 py-2">
+          <AuthorLink href={author.website} label="Website" icon={
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          } />
+          <AuthorLink href={author.amazon} label="Amazon author page" icon={
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M13.958 10.09c0 1.232.029 2.256-.591 3.351-.502.891-1.301 1.438-2.186 1.438-1.214 0-1.922-.924-1.922-2.292 0-2.692 2.415-3.182 4.699-3.182v.685zm3.186 7.705c-.209.189-.512.201-.745.074-1.047-.872-1.236-1.276-1.814-2.106-1.734 1.767-2.962 2.297-5.209 2.297-2.66 0-4.731-1.641-4.731-4.925 0-2.565 1.391-4.309 3.37-5.164 1.715-.754 4.11-.891 5.942-1.095v-.41c0-.753.06-1.642-.383-2.294-.385-.579-1.124-.818-1.775-.818-1.205 0-2.277.618-2.54 1.898-.054.285-.261.567-.549.582l-3.061-.333c-.259-.056-.548-.266-.472-.66C5.57 2.857 8.393 2 10.936 2c1.302 0 3.003.346 4.029 1.33C16.261 4.567 16.15 6.2 16.15 7.986v4.807c0 1.446.6 2.08 1.164 2.862.2.279.243.615-.01.824l-2.16 1.316zm3.617 1.66C18.573 21.34 15.953 22 14.498 22c-1.894 0-4.044-.765-5.496-2.01-.214-.18-.024-.428.233-.287 1.565.912 3.503 1.462 5.502 1.462 1.35 0 2.836-.28 4.2-.859.207-.087.38.135.224.33z"/></svg>
+          } />
+          <AuthorLink href={author.goodreads} label="Goodreads" icon={
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M11.43 23.995c-3.608-.208-6.274-2.077-6.448-5.078.695.007 1.375-.013 2.07-.006.224 1.342 1.065 2.43 2.515 3.002 1.905.756 4.217.496 5.567-.98.955-1.03 1.36-2.716 1.29-4.436l-.002-1.97h-.064c-1.023 1.77-2.845 2.495-4.8 2.356-4.146-.32-6.268-3.988-6.268-7.632 0-3.783 2.396-7.602 6.833-7.602 1.575 0 3.145.45 4.315 1.97h.064V1.49h2.067v16.452c0 5.704-2.735 6.262-6.505 6.053zm.22-21.03c-2.948 0-4.718 2.268-4.718 5.42 0 2.99 1.608 5.55 4.73 5.55 1.403 0 2.67-.452 3.56-1.658.89-1.207 1.118-2.787 1.118-4.244 0-1.36-.23-2.796-1.09-3.915-.87-1.12-2.14-1.153-3.6-1.153z"/></svg>
+          } />
+          <AuthorLink href={author.instagram} label="Instagram" icon={
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+          } />
+          <AuthorLink href={author.tiktok} label="TikTok" icon={
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.16 8.16 0 004.77 1.52V6.76a4.85 4.85 0 01-1-.07z"/></svg>
+          } />
+          <AuthorLink href={author.facebook} label="Facebook" icon={
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+          } />
+        </div>
+      ) : (
+        <p className="px-4 py-4 text-xs text-white/35 italic">No links available yet.</p>
+      )}
+    </div>
+  );
+}
+
+function BookCard({ book, statusBadge, author }: { book: Book; statusBadge?: React.ReactNode; author?: Author }) {
+  const hasLink = Boolean(book.link?.trim());
+  const [showAuthorPopup, setShowAuthorPopup] = useState(false);
+  const authorBtnRef = useRef<HTMLButtonElement>(null);
+
+  return (
+    <div
+      className="group relative rounded-2xl overflow-visible cursor-default"
       itemScope
       itemType="https://schema.org/Book"
       style={{ aspectRatio: "2/3" }}
     >
-      {/* Cover image */}
-      <Image
-        src={book.cover_url}
-        alt={`${book.title} audiobook narrated by Dean Miller`}
-        fill
-        className="object-cover transition-transform duration-700 group-hover:scale-110"
-        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 220px"
-        itemProp="image"
-      />
+      {/* Cover wrapper — clip to card shape */}
+      <div className="absolute inset-0 rounded-2xl overflow-hidden">
+        <Image
+          src={book.cover_url}
+          alt={`${book.title} audiobook narrated by Dean Miller`}
+          fill
+          className="object-cover transition-transform duration-700 group-hover:scale-110"
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 220px"
+          itemProp="image"
+        />
 
-      {/* Ambient glow — bleeds the dominant cover color into the dark bg */}
-      <div className="absolute -inset-2 opacity-0 group-hover:opacity-30 transition-opacity duration-700 blur-2xl bg-[#D4AF37] pointer-events-none z-0" />
+        {/* Ambient glow */}
+        <div className="absolute -inset-2 opacity-0 group-hover:opacity-30 transition-opacity duration-700 blur-2xl bg-[#D4AF37] pointer-events-none z-0" />
 
-      {/* Bottom gradient — always present, grows on hover */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-transparent transition-opacity duration-500 z-10" />
+        {/* Bottom gradient */}
+        <div
+          className="absolute inset-0 z-10"
+          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.7) 35%, rgba(0,0,0,0.1) 65%, transparent 100%)" }}
+        />
 
-      {/* Hover content reveal */}
-      <div className="absolute inset-0 z-20 flex flex-col justify-end p-4 translate-y-2 group-hover:translate-y-0 transition-transform duration-400">
-        {/* Title + author — always visible */}
-        <div>
-          <h3 className="font-semibold text-sm leading-snug text-white line-clamp-2" itemProp="name">
-            {book.title}
-          </h3>
-          {book.subtitle && (
-            <p className="text-[10px] text-white/50 mt-0.5 line-clamp-1">{book.subtitle}</p>
-          )}
-          <p className="text-xs mt-0.5 text-[#D4AF37] font-medium" itemProp="author">
-            {book.author}
-          </p>
-        </div>
-
-        {/* Tags + link — slide in on hover */}
-        <div className="mt-3 opacity-0 group-hover:opacity-100 transition-all duration-300 delay-75">
-          <div className="flex flex-wrap gap-1 mb-3">
-            {book.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="text-[8px] font-bold uppercase tracking-wide text-white/60 bg-white/10 border border-white/15 px-1.5 py-0.5 rounded"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-          {hasLink && (
-            <a
-              href={book.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-3 py-1.5 rounded-md transition-colors"
-              aria-label={`Listen to ${book.title} on Audible`}
+        {/* Text content */}
+        <div className="absolute inset-0 z-20 flex flex-col justify-end p-4 translate-y-2 group-hover:translate-y-0 transition-transform duration-400">
+          <div>
+            <h3
+              className="font-semibold text-sm leading-snug text-white line-clamp-2"
+              itemProp="name"
+              style={{ textShadow: "0 1px 4px rgba(0,0,0,0.9), 0 0 12px rgba(0,0,0,0.7)" }}
             >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z"/></svg>
-              Listen on Audible
-            </a>
-          )}
+              {book.title}
+            </h3>
+            {book.subtitle && (
+              <p className="text-[10px] text-white/60 mt-0.5 line-clamp-1" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>
+                {book.subtitle}
+              </p>
+            )}
+            {/* Author button */}
+            <button
+              ref={authorBtnRef}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
+              className="mt-0.5 text-xs text-[#D4AF37] font-semibold hover:text-[#E0C15A] transition-colors text-left underline-offset-2 hover:underline"
+              itemProp="author"
+              style={{ textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}
+              aria-label={`View ${book.author} author info`}
+            >
+              {book.author}
+            </button>
+          </div>
+
+          {/* Tags + listen link */}
+          <div className="mt-3 opacity-0 group-hover:opacity-100 transition-all duration-300 delay-75">
+            <div className="flex flex-wrap gap-1 mb-3">
+              {book.tags.slice(0, 3).map((tag) => (
+                <span
+                  key={tag}
+                  className="text-[8px] font-bold uppercase tracking-wide text-white/60 bg-white/10 border border-white/15 px-1.5 py-0.5 rounded"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+            {hasLink && (
+              <a
+                href={book.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-3 py-1.5 rounded-md transition-colors"
+                aria-label={`Listen to ${book.title} on Audible`}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
+                Listen on Audible
+              </a>
+            )}
+          </div>
         </div>
+
+        {/* Status badge */}
+        {statusBadge && (
+          <div className="absolute top-3 right-3 z-30 bg-[#D4AF37] text-black text-[8px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">
+            {statusBadge}
+          </div>
+        )}
       </div>
 
-      {/* Status badge */}
-      {statusBadge && (
-        <div className="absolute top-3 right-3 z-30 bg-[#D4AF37] text-black text-[8px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">
-          {statusBadge}
-        </div>
+      {/* Author popup — outside the overflow:hidden wrapper */}
+      {showAuthorPopup && author && (
+        <AuthorPopup
+          author={author}
+          anchorRef={authorBtnRef}
+          onClose={() => setShowAuthorPopup(false)}
+        />
       )}
     </div>
   );
@@ -88,10 +275,12 @@ function SectionGrid({
   title,
   books,
   statusBadge,
+  authors,
 }: {
   title: string;
   books: Book[];
   statusBadge?: React.ReactNode;
+  authors: Record<string, Author>;
 }) {
   if (books.length === 0) return null;
   return (
@@ -103,7 +292,7 @@ function SectionGrid({
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5 sm:gap-6">
         {books.map((book) => (
-          <BookCard key={book.id} book={book} statusBadge={statusBadge} />
+          <BookCard key={book.id} book={book} statusBadge={statusBadge} author={authors[book.author]} />
         ))}
       </div>
     </section>
@@ -113,23 +302,32 @@ function SectionGrid({
 export default function NarratedWorks() {
   const [searchQuery, setSearchQuery] = useState("");
   const [books, setBooks] = useState<Book[]>([]);
+  const [authors, setAuthors] = useState<Record<string, Author>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadBooks = async () => {
+    const loadData = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch("/api/books");
-        const result = await response.json();
-        if (!response.ok) { console.error(result.error || "Failed to load books."); return; }
-        setBooks(result.books || []);
+        const [booksRes, authorsRes] = await Promise.all([
+          fetch("/api/books"),
+          fetch("/api/authors"),
+        ]);
+        const booksData = await booksRes.json();
+        const authorsData = await authorsRes.json();
+        if (booksRes.ok) setBooks(booksData.books || []);
+        if (authorsRes.ok) {
+          const map: Record<string, Author> = {};
+          for (const a of authorsData.authors || []) map[a.name] = a;
+          setAuthors(map);
+        }
       } catch (error) {
         console.error(error);
       } finally {
         setIsLoading(false);
       }
     };
-    loadBooks();
+    loadData();
   }, []);
 
   const completed = useMemo(() => books.filter((b) => b.category === "completed"), [books]);
@@ -154,10 +352,7 @@ export default function NarratedWorks() {
   const filteredCompleted = useMemo(() => filterBooks(completed), [completed, filterBooks]);
   const filteredInProgress = useMemo(() => filterBooks(inProgress), [inProgress, filterBooks]);
   const filteredComingSoon = useMemo(() => filterBooks(comingSoon), [comingSoon, filterBooks]);
-  const hasResults =
-    filteredCompleted.length > 0 ||
-    filteredInProgress.length > 0 ||
-    filteredComingSoon.length > 0;
+  const hasResults = filteredCompleted.length > 0 || filteredInProgress.length > 0 || filteredComingSoon.length > 0;
   const totalBooks = completed.length + inProgress.length + comingSoon.length;
 
   return (
@@ -173,7 +368,6 @@ export default function NarratedWorks() {
               <p className="mt-1 text-sm text-white/35">{totalBooks} titles across dark romance, romantasy, thriller & more</p>
             )}
           </div>
-          {/* Search */}
           <div className="relative sm:w-64">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg className="h-3.5 w-3.5 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -188,15 +382,8 @@ export default function NarratedWorks() {
               className="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 pl-9 pr-9 text-sm focus:outline-none focus:border-[#D4AF37]/40 focus:bg-white/8 transition-all placeholder:text-white/20 text-white/80"
             />
             {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-white/25 hover:text-white/60 transition"
-                type="button"
-                aria-label="Clear search"
-              >
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button onClick={() => setSearchQuery("")} className="absolute inset-y-0 right-0 pr-3 flex items-center text-white/25 hover:text-white/60 transition" type="button" aria-label="Clear search">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             )}
           </div>
@@ -209,28 +396,21 @@ export default function NarratedWorks() {
         ) : !hasResults ? (
           <div className="py-32 text-center">
             <p className="text-white/30">No results for &ldquo;{searchQuery}&rdquo;</p>
-            <button onClick={() => setSearchQuery("")} className="mt-3 text-[#D4AF37] text-sm hover:underline" type="button">
-              Clear search
-            </button>
+            <button onClick={() => setSearchQuery("")} className="mt-3 text-[#D4AF37] text-sm hover:underline" type="button">Clear search</button>
           </div>
         ) : (
           <>
-            <SectionGrid title="Completed" books={filteredCompleted} />
-            <SectionGrid title="Currently narrating" books={filteredInProgress} statusBadge="In Progress" />
-            <SectionGrid title="Coming soon" books={filteredComingSoon} statusBadge="Soon" />
+            <SectionGrid title="Completed" books={filteredCompleted} authors={authors} />
+            <SectionGrid title="Currently narrating" books={filteredInProgress} statusBadge="In Progress" authors={authors} />
+            <SectionGrid title="Coming soon" books={filteredComingSoon} statusBadge="Soon" authors={authors} />
           </>
         )}
 
-        {/* Footer */}
         <div className="border-t border-white/5 pt-10 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-white/35 text-sm">Working on your next audiobook?</p>
           <div className="flex gap-3">
-            <Link href="/#contact" className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-2.5 text-sm font-semibold hover:bg-[#E0C15A] transition">
-              Get in touch
-            </Link>
-            <Link href="/#demos" className="inline-flex items-center justify-center rounded-md border border-white/15 px-6 py-2.5 text-sm font-semibold text-white/70 hover:border-white/40 hover:text-white transition">
-              Listen to demos
-            </Link>
+            <Link href="/#contact" className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-2.5 text-sm font-semibold hover:bg-[#E0C15A] transition">Get in touch</Link>
+            <Link href="/#demos" className="inline-flex items-center justify-center rounded-md border border-white/15 px-6 py-2.5 text-sm font-semibold text-white/70 hover:border-white/40 hover:text-white transition">Listen to demos</Link>
           </div>
         </div>
       </div>
