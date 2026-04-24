@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Book } from "@/types/book";
 
 interface Author {
@@ -61,16 +62,37 @@ function AuthorPopup({
     const vh = window.innerHeight;
     const estimatedHeight = 300;
 
+    // Anchor origin: centre of the button
+    const anchorCX = rect.left + rect.width / 2;
+    const anchorCY = rect.top + rect.height / 2;
+
     let left = rect.left;
     let top = rect.bottom + 6;
+    let flipY = false;
 
     if (left + popupWidth > vw - margin) left = rect.right - popupWidth;
     left = Math.max(margin, left);
 
-    if (top + estimatedHeight > vh - margin) top = rect.top - estimatedHeight - 6;
+    if (top + estimatedHeight > vh - margin) {
+      top = rect.top - estimatedHeight - 6;
+      flipY = true;
+    }
     top = Math.max(margin, top);
 
-    setStyle({ position: "fixed", top, left, width: popupWidth, zIndex: 9999, opacity: 1, pointerEvents: "auto" });
+    // Transform-origin relative to the popup's own top-left corner
+    const originX = anchorCX - left;
+    const originY = flipY ? estimatedHeight : 0;
+
+    setStyle({
+      position: "fixed",
+      top,
+      left,
+      width: popupWidth,
+      zIndex: 9999,
+      opacity: 1,
+      pointerEvents: "auto",
+      transformOrigin: `${originX}px ${originY}px`,
+    });
   }, [anchorRef]);
 
   // Close on outside click or Escape
@@ -94,15 +116,18 @@ function AuthorPopup({
     };
   }, [onClose, anchorRef]);
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const hasAnyLink = author.website || author.amazon || author.instagram || author.tiktok || author.facebook || author.goodreads;
 
-  return (
+  const popup = (
     <div
       ref={popupRef}
       role="dialog"
       aria-label={`${author.name} author info`}
       className="rounded-2xl border border-[#1A2550] bg-[#0B1224] shadow-2xl overflow-hidden"
-      style={{ ...style, animation: style.opacity === 1 ? "popupIn 0.15s ease forwards" : undefined }}
+      style={{ ...style, animation: style.opacity === 1 ? "liquidReveal 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards" : undefined }}
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3 border-b border-white/8">
@@ -153,6 +178,8 @@ function AuthorPopup({
       )}
     </div>
   );
+
+  return mounted ? createPortal(popup, document.body) : null;
 }
 
 function BookCard({ book, statusBadge, author }: { book: Book; statusBadge?: React.ReactNode; author?: Author }) {

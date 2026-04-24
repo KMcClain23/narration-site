@@ -10,6 +10,16 @@
     "goodreads": ""
   },
   {
+    "name": "B.W. Lacey",
+    "bio": "Dark romance indie author of the viral Psychotic Devotion Trilogy \u2014 cinematic, brutal, and unapologetically raw stories where love bleeds, burns, and sometimes kills.",
+    "website": "",
+    "amazon": "https://www.amazon.com/stores/B.W.-Lacey/author/B0FW7QVLBG",
+    "instagram": "https://www.instagram.com/b.w.lacey/",
+    "tiktok": "https://www.tiktok.com/@b.w..lacey",
+    "facebook": "",
+    "goodreads": "https://www.goodreads.com/author/show/59335831.B_W_Lacey"
+  },
+  {
     "name": "Bethanie Loren",
     "bio": "A mood-writer based in Texas with a wide range of romance titles including LGBTQ+ fiction, contemporary romance, and the Sultry Secrets series.",
     "website": "",
@@ -31,33 +41,43 @@
   },
   {
     "name": "K.E. Noel",
-    "bio": "",
+    "bio": "Contemporary romance author based in rural Alberta, Canada. Creator of the Hearts of New York series \u2014 dual POV stories of powerful but secretly vulnerable men who fall hard.",
     "website": "",
     "amazon": "https://www.amazon.com/K-E-Noel/e/B0G1J951DS/",
     "instagram": "https://www.instagram.com/k.e_noel_author/",
     "tiktok": "https://www.tiktok.com/@k.e.noel.author",
-    "facebook": "",
+    "facebook": "https://www.facebook.com/61577229217747",
     "goodreads": "https://www.goodreads.com/author/show/58454523.K_E_Noel"
   },
   {
     "name": "L.L. McAlister",
-    "bio": "",
+    "bio": "Dark romance author with a thing for hearts. Writes spicy romances with raw passion and just enough chaos to make your Kindle overheat.",
     "website": "",
     "amazon": "https://www.amazon.com/L-L-McAlister/e/B0DSLGKPSX/",
     "instagram": "https://www.instagram.com/llmcalisterauthor/",
     "tiktok": "https://www.tiktok.com/@l.l.mcalisterauthor",
+    "facebook": "https://www.facebook.com/llmcalisterauthor",
+    "goodreads": "https://www.goodreads.com/author/show/51529664.L_L_McAlister"
+  },
+  {
+    "name": "Laetitia Clark",
+    "bio": "Born and raised in France, Laetitia started writing stories as a little girl. Now a debut author of romantasy sprinkled with true crime \u2014 The Book Nook Curse and Santa Promised.",
+    "website": "",
+    "amazon": "https://www.amazon.com/stores/Laetitia-Clark/author/B0DKYP6VSH",
+    "instagram": "https://www.instagram.com/laetitia.clark.writes/",
+    "tiktok": "https://www.tiktok.com/@l.cwrites",
     "facebook": "",
     "goodreads": ""
   },
   {
-    "name": "Laetitia Clark",
-    "bio": "Debut author of holiday romance and romantasy. Her spicy Christmas novella Santa Promised has been praised for its cozy setting and warmth.",
-    "website": "",
+    "name": "Lea Rose",
+    "bio": "Contemporary romance author based in the UK. Writes steamy stories with strong women, men with filthy mouths, and a guaranteed happy ever after \u2014 both slow burn and fast.",
+    "website": "https://www.learose.net",
     "amazon": "",
-    "instagram": "https://www.instagram.com/laetitia.clark.writes/",
+    "instagram": "https://www.instagram.com/authorlearose/",
     "tiktok": "",
     "facebook": "",
-    "goodreads": ""
+    "goodreads": "https://www.goodreads.com/author/show/49282932.Lea_Rose"
   },
   {
     "name": "Lillian Minx Monroe",
@@ -91,11 +111,31 @@
   },
   {
     "name": "River Fox",
-    "bio": "",
+    "bio": "Fantasy and science fiction romance author living on the Isle of Lewis, Scotland. Former member of the armed forces. Creator of the Magic, Monsters & Mates series and Blood on the Asphalt.",
     "website": "https://riverfox.co.uk/",
     "amazon": "https://www.amazon.com/River-Fox/e/B0FRY7V7RY/",
     "instagram": "",
     "tiktok": "https://www.tiktok.com/@riverruin_riverfox",
+    "facebook": "",
+    "goodreads": "https://www.goodreads.com/author/show/60912252.River_Fox"
+  },
+  {
+    "name": "Sarah Monday",
+    "bio": "Dr. Sarah Monday is an Air Force veteran, mother of three, and author of the psychological romance series Code of Souls. She holds a Doctorate in International Business.",
+    "website": "https://www.drmonday.co",
+    "amazon": "https://www.amazon.com/author/drsarahmonday",
+    "instagram": "https://www.instagram.com/therealdrmonday/",
+    "tiktok": "https://www.tiktok.com/@therealdrmonday",
+    "facebook": "https://www.facebook.com/p/Dr-Sarah-Monday-61562094192843/",
+    "goodreads": "https://www.goodreads.com/author/show/50698878.Sarah_Monday"
+  },
+  {
+    "name": "Savena Rachelle",
+    "bio": "Author of dark romance and slow-burn fiction. Her Caged Dove Duet explores trauma, obsession, and dangerous love.",
+    "website": "",
+    "amazon": "https://www.amazon.com/stores/Savena-Rachelle/author/B0GV683TMG",
+    "instagram": "",
+    "tiktok": "",
     "facebook": "",
     "goodreads": ""
   },
@@ -108,5 +148,15 @@
     "tiktok": "https://www.tiktok.com/@shelbygardnerauthor",
     "facebook": "https://www.facebook.com/61580224450935",
     "goodreads": "https://www.goodreads.com/author/show/61100661.Shelby_Gardner"
+  },
+  {
+    "name": "Yvonne Hamilton",
+    "bio": "Author of emotionally charged dark romance and paranormal fantasy. Creator of the Flame Cursed Inheritance Saga and co-author of the Hexed Valentine series with B. Wills.",
+    "website": "",
+    "amazon": "https://www.amazon.com/stores/Yvonne-Hamilton/author/B0DZ513P63",
+    "instagram": "",
+    "tiktok": "https://www.tiktok.com/@yvonnehamiltonauthor",
+    "facebook": "",
+    "goodreads": ""
   }
 ]
