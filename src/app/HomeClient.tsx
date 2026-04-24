@@ -91,47 +91,67 @@ function DemoPlayer({
   const pct = duration > 0 ? (current / duration) * 100 : 0;
 
   return (
-    <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg transition hover:border-[#D4AF37]/50 flex flex-col h-full">
-      <div className="flex items-start justify-between gap-4 min-h-[64px]">
-        <div className="flex-1">
-          <h3 className="font-semibold text-lg text-white leading-tight">{title}</h3>
-          <p className="mt-1 text-sm text-white/70">{desc}</p>
+    <div className={`group relative rounded-2xl overflow-hidden transition-all duration-500 ${isActive ? "ring-1 ring-[#D4AF37]/50" : "hover:ring-1 hover:ring-white/10"}`}
+      style={{ background: isActive ? "linear-gradient(135deg, rgba(212,175,55,0.08) 0%, rgba(11,18,36,1) 60%)" : "rgba(11,18,36,1)" }}>
+
+      {/* Ambient glow when active */}
+      {isActive && (
+        <div className="absolute inset-0 opacity-20 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at top left, rgba(212,175,55,0.4), transparent 60%)" }} />
+      )}
+
+      <div className="relative p-6 flex flex-col h-full">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 mb-auto">
+          <div>
+            <h3 className="font-semibold text-base text-white leading-snug">{title}</h3>
+            <p className="mt-1 text-sm text-white/50">{desc}</p>
+          </div>
+          {isActive && (
+            <div className="flex items-center gap-1 shrink-0 pt-0.5">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="w-0.5 rounded-full bg-[#D4AF37]"
+                  style={{ height: 14, animation: `barPulse 0.8s ease-in-out ${i * 0.15}s infinite alternate` }} />
+              ))}
+            </div>
+          )}
         </div>
-        <span className={`shrink-0 mt-1 rounded-full border px-3 py-1 text-[10px] uppercase tracking-wider font-bold transition-colors duration-300 ${isActive ? "border-[#D4AF37]/40 bg-[#D4AF37]/10 text-[#F5DE85]" : "border-white/10 bg-white/5 text-white/40"}`}>
-          {isActive ? "Now playing" : "Demo"}
-        </span>
-      </div>
-      <div className="mt-auto pt-6">
-        <div className="rounded-xl border border-[#1A2550] bg-[#050814] p-4">
+
+        {/* Player */}
+        <div className="mt-6 rounded-xl border border-white/8 bg-black/30 p-4">
           <div className="flex items-center gap-4">
             <button onClick={toggle} aria-label={playing ? "Pause" : "Play"} type="button"
-              className={`relative h-14 w-14 shrink-0 rounded-full flex items-center justify-center transition active:scale-95 border-2 border-white/20 bg-white/5 text-white shadow-xl hover:border-[#D4AF37]/70 ${!src ? "opacity-50 pointer-events-none" : "cursor-pointer"}`}>
-              {buffering ? (
-                <div className="h-6 w-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
-              ) : playing ? (
-                <svg className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5h3v14H8zM13 5h3v14h-3z" /></svg>
-              ) : (
-                <svg className="h-7 w-7 translate-x-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
-              )}
+              className={`relative h-12 w-12 shrink-0 rounded-full flex items-center justify-center transition-all duration-300 ${
+                isActive
+                  ? "bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20 scale-110"
+                  : "border border-white/15 bg-white/5 text-white hover:border-[#D4AF37]/50 hover:bg-white/10"
+              } ${!src ? "opacity-40 pointer-events-none" : "cursor-pointer"}`}>
+              {buffering
+                ? <div className="h-5 w-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                : playing
+                  ? <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5h3v14H8zM13 5h3v14h-3z" /></svg>
+                  : <svg className="h-5 w-5 translate-x-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
+              }
             </button>
             <div className="flex-1 min-w-0">
               <button type="button" aria-label="Seekbar" onClick={handleSeek}
-                className="relative block w-full h-2 rounded-full overflow-hidden bg-white/10 cursor-pointer z-10">
-                <div className="absolute left-0 top-0 h-full bg-[#D4AF37]" style={{ width: `${pct}%` }} />
+                className="relative block w-full h-1.5 rounded-full overflow-hidden bg-white/10 cursor-pointer">
+                <div className="absolute left-0 top-0 h-full rounded-full bg-[#D4AF37] transition-all duration-100"
+                  style={{ width: `${pct}%` }} />
               </button>
-              <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-white/40 tracking-tighter">
+              <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-white/30">
                 <span>{formatTime(current)}</span>
                 <span>{formatTime(duration)}</span>
               </div>
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-3 border-t border-white/5 pt-3">
-            <svg className="h-4 w-4 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <div className="mt-3 flex items-center gap-3 border-t border-white/5 pt-3">
+            <svg className="h-3.5 w-3.5 text-white/20 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
               <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
             </svg>
-            <input type="range" min="0" max="1" step="0.01" value={volume} aria-label="Volume control"
-              onChange={handleVolume} className="flex-1 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#D4AF37]" />
+            <input type="range" min="0" max="1" step="0.01" value={volume} aria-label="Volume"
+              onChange={handleVolume} className="flex-1 h-0.5 bg-white/10 rounded appearance-none cursor-pointer accent-[#D4AF37]" />
           </div>
           <audio ref={(el) => { audioRefs.current[index] = el; }} src={src} preload="metadata" />
         </div>
@@ -153,11 +173,10 @@ function HomeContent() {
     startTransition(async () => {
       const result = await sendEmail(formData);
       if (result.success) {
-        setFormStatus({ success: true, message: "Thanks! Inquiry sent. Talk soon!" });
+        setFormStatus({ success: true, message: "Thanks — I'll be in touch soon." });
         formRef.current?.reset();
       } else {
-        const errorMsg = typeof result.error === "string" ? result.error : "Please check the form and try again.";
-        setFormStatus({ success: false, message: errorMsg });
+        setFormStatus({ success: false, message: typeof result.error === "string" ? result.error : "Something went wrong. Please try again." });
       }
     });
   };
@@ -165,8 +184,7 @@ function HomeContent() {
   useEffect(() => {
     audioRefs.current.forEach((audio, i) => {
       if (audio && activeIndex !== null && i !== activeIndex) {
-        audio.pause();
-        audio.currentTime = 0;
+        audio.pause(); audio.currentTime = 0;
       }
     });
   }, [activeIndex]);
@@ -182,39 +200,96 @@ function HomeContent() {
 
   return (
     <main className="min-h-screen bg-[#050814] text-white">
+      {/* Keyframes */}
+      <style>{`
+        @keyframes barPulse {
+          from { transform: scaleY(0.4); opacity: 0.6; }
+          to   { transform: scaleY(1);   opacity: 1;   }
+        }
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(16px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-up { animation: fadeUp 0.7s ease forwards; }
+        .fade-up-1 { animation: fadeUp 0.7s 0.1s ease both; }
+        .fade-up-2 { animation: fadeUp 0.7s 0.2s ease both; }
+        .fade-up-3 { animation: fadeUp 0.7s 0.35s ease both; }
+        .fade-up-4 { animation: fadeUp 0.7s 0.5s ease both; }
+      `}</style>
+
       <div id="top" />
 
-      {/* HERO */}
-      <section className="relative overflow-hidden -mt-16 pt-16" aria-label="Introduction">
+      {/* ── HERO ── */}
+      <section className="relative overflow-hidden -mt-16 pt-16 min-h-[88vh] flex items-center" aria-label="Introduction">
+        {/* Full bleed background */}
         <div className="absolute inset-0">
-          <Image src={BANNER_URL} alt="Dean Miller recording studio" fill priority sizes="100vw" className="object-cover opacity-30" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050814]/80 via-[#050814]/70 to-[#050814]" />
+          <Image src={BANNER_URL} alt="Dean Miller recording studio" fill priority sizes="100vw"
+            className="object-cover opacity-25 scale-105" style={{ objectPosition: "center 30%" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(5,8,20,0.5) 0%, rgba(5,8,20,0.4) 40%, rgba(5,8,20,1) 100%)" }} />
+          {/* Subtle vignette edges */}
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(5,8,20,0.7) 100%)" }} />
         </div>
-        <div className="relative max-w-5xl mx-auto px-5 sm:px-6 py-16 sm:py-20 md:py-28">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-10 items-center">
-            <div className="md:col-span-7">
-              <p className="text-xs tracking-[0.28em] text-white/60 uppercase">Audiobook narrator · Dark romance &amp; romantasy</p>
-              <h1 className="mt-3 text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.05]">Dean Miller</h1>
-              <p className="mt-5 text-base sm:text-lg text-white/85 max-w-xl leading-relaxed">
-                Character-driven narration for fiction that demands emotional depth. Specializing in dark romance, romantasy, and multi-character drama — delivered broadcast-ready with 24–48 hour turnaround.
-              </p>
-              <div className="mt-7 flex flex-wrap gap-3">
-                <a href="/#demos" className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-7 py-3 font-semibold transition hover:bg-[#E0C15A]">Listen to demos</a>
-                <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center rounded-md border border-white/25 px-7 py-3 font-semibold transition hover:border-white/60">Request availability</a>
-              </div>
+
+        <div className="relative max-w-5xl mx-auto px-5 sm:px-6 py-24 w-full">
+          <div className="max-w-2xl">
+            {/* Eyebrow */}
+            <div className="fade-up flex items-center gap-3 mb-6">
+              <div className="h-px w-8 bg-[#D4AF37]" />
+              <p className="text-[11px] uppercase tracking-[0.3em] text-[#D4AF37]">Audiobook narrator</p>
             </div>
-            <div className="hidden md:flex md:col-span-5 flex-col items-center gap-6">
-              <div className="relative h-56 w-56 rounded-full overflow-hidden border-2 border-[#D4AF37]/30 shadow-2xl">
-                <Image src={PROFILE_URL} alt="Dean Miller, audiobook narrator" fill sizes="224px" className="object-cover" priority />
-              </div>
-              <div className="grid grid-cols-3 gap-3 w-full text-center">
-                {[{ label: "Genres", value: "6+" }, { label: "Turnaround", value: "24–48h" }, { label: "Platform", value: "ACX" }].map((s) => (
-                  <div key={s.label} className="rounded-xl border border-[#1A2550] bg-[#0B1224] py-3 px-2">
-                    <p className="text-[#D4AF37] font-bold text-lg leading-none">{s.value}</p>
-                    <p className="mt-1 text-[10px] uppercase tracking-wider text-white/50">{s.label}</p>
+
+            {/* Name */}
+            <h1 className="fade-up-1 text-5xl sm:text-6xl md:text-7xl font-bold leading-[1.0] tracking-tight">
+              Dean<br />Miller
+            </h1>
+
+            {/* Tagline */}
+            <p className="fade-up-2 mt-6 text-lg sm:text-xl text-white/70 leading-relaxed max-w-xl">
+              Character-driven narration for fiction that demands emotional depth —
+              dark romance, romantasy, and multi-character drama.
+            </p>
+
+            {/* CTAs */}
+            <div className="fade-up-3 mt-10 flex flex-wrap gap-4">
+              <a href="/#demos"
+                className="inline-flex items-center gap-2.5 rounded-full bg-[#D4AF37] text-black px-7 py-3.5 text-sm font-bold tracking-wide transition hover:bg-[#E0C15A] hover:scale-[1.02] active:scale-[0.98]">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
+                Listen to demos
+              </a>
+              <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-7 py-3.5 text-sm font-semibold text-white/80 transition hover:border-white/50 hover:text-white hover:scale-[1.02] active:scale-[0.98]">
+                Request availability
+              </a>
+            </div>
+
+            {/* Quick credential strip */}
+            <div className="fade-up-4 mt-14 flex flex-wrap items-center gap-6">
+              {[
+                { label: "Turnaround", value: "24–48h" },
+                { label: "Platform", value: "ACX-ready" },
+                { label: "Specialties", value: "Dark romance · romantasy · drama" },
+              ].map(s => (
+                <div key={s.label} className="flex items-center gap-2.5">
+                  <div className="h-3.5 w-px bg-[#D4AF37]/40" />
+                  <div>
+                    <p className="text-[9px] uppercase tracking-[0.2em] text-white/30">{s.label}</p>
+                    <p className="text-xs text-white/70 mt-0.5">{s.value}</p>
                   </div>
-                ))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Profile image — floats right on desktop */}
+          <div className="hidden md:block absolute right-6 bottom-0 w-64 lg:w-72">
+            <div className="relative" style={{ aspectRatio: "3/4" }}>
+              <div className="absolute inset-0 rounded-2xl overflow-hidden">
+                <Image src={PROFILE_URL} alt="Dean Miller, audiobook narrator" fill sizes="288px"
+                  className="object-cover object-top" priority />
+                <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(5,8,20,1) 0%, rgba(5,8,20,0.4) 40%, transparent 70%)" }} />
               </div>
+              {/* Gold accent line */}
+              <div className="absolute left-0 bottom-0 top-0 w-px bg-gradient-to-b from-transparent via-[#D4AF37]/40 to-transparent" />
             </div>
           </div>
         </div>
@@ -222,150 +297,230 @@ function HomeContent() {
 
       <div className="max-w-5xl mx-auto px-5 sm:px-6">
 
-        {/* DEMOS */}
-        <section id="demos" className="mt-4 scroll-mt-24" aria-label="Audio demos">
-          <h2 className="text-3xl font-bold">Featured audiobook demos</h2>
-          <p className="mt-2 text-white/60">Six targeted clips showcasing range, character work, and emotional depth across genres.</p>
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* ── DEMOS ── */}
+        <section id="demos" className="pt-4 scroll-mt-24" aria-label="Audio demos">
+          {/* Section label */}
+          <div className="flex items-center gap-4 mb-10">
+            <div className="h-px w-6 bg-[#D4AF37]" />
+            <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Featured demos</p>
+            <div className="flex-1 h-px bg-white/6" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {demos.map((demo, index) => (
-              <DemoPlayer key={demo.title} title={demo.title} desc={demo.desc} src={demo.src} index={index} activeIndex={activeIndex} setActiveIndex={setActiveIndex} audioRefs={audioRefs} />
+              <DemoPlayer key={demo.title} title={demo.title} desc={demo.desc} src={demo.src}
+                index={index} activeIndex={activeIndex} setActiveIndex={setActiveIndex} audioRefs={audioRefs} />
             ))}
           </div>
+
           <div className="mt-8 text-center">
-            <Link href="/narrated-works" className="inline-flex items-center gap-2 text-sm text-[#D4AF37] hover:text-[#E0C15A] transition">
+            <Link href="/narrated-works"
+              className="inline-flex items-center gap-2 text-sm text-white/40 hover:text-[#D4AF37] transition-colors">
               Browse the full portfolio
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
             </Link>
           </div>
         </section>
 
-        {/* ABOUT */}
-        <section id="about" className="mt-24 scroll-mt-24" aria-label="About Dean Miller">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-10 items-start">
-            <div className="md:col-span-7">
-              <h2 className="text-3xl font-bold">About Dean Miller</h2>
-              <p className="mt-4 text-white/85 text-base leading-relaxed">
-                I&apos;m a professional audiobook narrator with a background in music and theatre. My focus is immersive, character-forward performance — the kind where listeners forget they&apos;re listening to a single person.
+        {/* ── ABOUT ── */}
+        <section id="about" className="mt-28 scroll-mt-24" aria-label="About Dean Miller">
+          <div className="flex items-center gap-4 mb-12">
+            <div className="h-px w-6 bg-[#D4AF37]" />
+            <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">About</p>
+            <div className="flex-1 h-px bg-white/6" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-10 lg:gap-16 items-start">
+            <div className="md:col-span-7 space-y-5">
+              <h2 className="text-3xl sm:text-4xl font-bold leading-tight">
+                The kind of narration where listeners forget there's a narrator at all.
+              </h2>
+              <p className="text-white/70 text-base leading-relaxed">
+                I'm a professional audiobook narrator with a background in music and theatre. My focus is
+                immersive, character-forward performance — finding the emotional truth in every scene and
+                making each voice distinct enough that the listener never loses the thread.
               </p>
-              <p className="mt-4 text-white/75 text-base leading-relaxed">
-                I specialize in dark romance, romantasy, LGBTQ+ fiction, thriller, and drama. Strong in emotionally complex scenes, multi-character dialogue, and accent work including British RP. Every project gets a full character voice list sent for author approval before recording begins.
+              <p className="text-white/60 text-base leading-relaxed">
+                I specialize in dark romance, romantasy, LGBTQ+ fiction, thriller, and drama, with strong
+                accent range including British RP. Every project starts with a full character voice list sent
+                for author approval before a single line is recorded.
               </p>
-              <p className="mt-4 text-white/75 text-base leading-relaxed">
-                My home studio delivers ACX-ready, broadcast-quality audio on a Shure MV7+ in a custom-treated acoustic space. Milestone updates throughout, and pickups handled promptly.
+              <p className="text-white/60 text-base leading-relaxed">
+                My home studio delivers ACX-ready, broadcast-quality audio on a Shure MV7+ in a
+                custom-treated acoustic space. Milestone updates throughout. Pickups handled promptly.
               </p>
             </div>
-            <aside className="md:col-span-5 rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6">
-              <p className="text-xs uppercase tracking-[0.2em] text-[#D4AF37] font-semibold">What to expect</p>
-              <ul className="mt-4 space-y-3">
-                {[
-                  "Character voice list sent for approval before recording",
-                  "First-15 review — approve tone and voices early",
-                  "Milestone updates throughout the project",
-                  "ACX-ready masters, clean edits, no outsourced mastering",
-                  "Fast pickups and clear communication",
-                  "Option to livestream recording sessions for promo content",
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-sm text-white/80">
-                    <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-6 border-t border-white/10 pt-5">
-                <Link href="/welcome" className="text-sm text-[#D4AF37] hover:text-[#E0C15A] transition inline-flex items-center gap-1">
-                  Full process &amp; welcome packet
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                </Link>
+
+            {/* What to expect sidebar */}
+            <aside className="md:col-span-5">
+              <div className="rounded-2xl overflow-hidden border border-white/8">
+                <div className="px-5 py-4 border-b border-white/8">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37]">What to expect</p>
+                </div>
+                <ul className="divide-y divide-white/6">
+                  {[
+                    "Character voice list sent for approval before recording",
+                    "First-15 review — lock tone and voices early",
+                    "Milestone updates throughout production",
+                    "ACX-ready masters, no outsourced mastering",
+                    "Fast pickups and clear communication",
+                    "Option to livestream sessions for promo content",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-3 px-5 py-3.5 text-sm text-white/65 hover:bg-white/[0.02] transition-colors">
+                      <span className="mt-1.5 h-1 w-1 rounded-full bg-[#D4AF37] shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <div className="px-5 py-4 border-t border-white/8">
+                  <Link href="/welcome"
+                    className="text-sm text-[#D4AF37] hover:text-[#E0C15A] transition-colors inline-flex items-center gap-1.5">
+                    Full process & welcome packet
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                </div>
               </div>
             </aside>
           </div>
         </section>
 
-        {/* CONTACT */}
-        <section id="contact" className="mt-24 scroll-mt-24" aria-label="Contact and booking">
-          <h2 className="text-3xl font-bold">Get in touch</h2>
-          <p className="mt-2 text-white/60">Ready to cast your next project? Send an inquiry or book a call directly.</p>
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <form ref={formRef} action={handleNativeSubmit} className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 shadow-lg">
+        {/* ── CONTACT ── */}
+        <section id="contact" className="mt-28 mb-24 scroll-mt-24" aria-label="Contact and booking">
+          <div className="flex items-center gap-4 mb-12">
+            <div className="h-px w-6 bg-[#D4AF37]" />
+            <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Get in touch</p>
+            <div className="flex-1 h-px bg-white/6" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Form */}
+            <form ref={formRef} action={handleNativeSubmit}
+              className="rounded-2xl border border-white/8 bg-[#0B1224]/60 p-6 backdrop-blur-sm">
               {formStatus && (
-                <div className={`mb-6 p-4 rounded-md text-sm border ${formStatus.success ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-100" : "bg-red-500/10 border-red-500/30 text-red-100"}`}>
+                <div className={`mb-5 px-4 py-3 rounded-lg text-sm border ${
+                  formStatus.success
+                    ? "bg-emerald-500/8 border-emerald-500/20 text-emerald-300"
+                    : "bg-red-500/8 border-red-500/20 text-red-300"
+                }`}>
                   {formStatus.message}
                 </div>
               )}
               <input type="text" name="_hp_name" style={{ display: "none" }} tabIndex={-1} autoComplete="off" />
               <div className="space-y-4">
+                {[
+                  { name: "name", label: "Name", type: "text", placeholder: "Your name" },
+                  { name: "email", label: "Email", type: "email", placeholder: "you@example.com" },
+                ].map(f => (
+                  <label key={f.name} className="block">
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-white/30 font-medium">{f.label}</span>
+                    <input name={f.name} type={f.type} required disabled={isPending}
+                      placeholder={f.placeholder}
+                      className="mt-2 w-full rounded-lg bg-black/30 border border-white/8 px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition disabled:opacity-50" />
+                  </label>
+                ))}
                 <label className="block">
-                  <span className="text-sm text-white/80 font-medium">Name</span>
-                  <input name="name" required disabled={isPending} className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70 disabled:opacity-50" placeholder="Your name" />
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/30 font-medium">Project details</span>
+                  <textarea name="message" required rows={4} disabled={isPending}
+                    placeholder="Genre, word count, deadline, etc."
+                    className="mt-2 w-full rounded-lg bg-black/30 border border-white/8 px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition disabled:opacity-50 resize-none" />
                 </label>
-                <label className="block">
-                  <span className="text-sm text-white/80 font-medium">Email</span>
-                  <input name="email" type="email" required disabled={isPending} className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70 disabled:opacity-50" placeholder="you@example.com" />
-                </label>
-                <label className="block">
-                  <span className="text-sm text-white/80 font-medium">Project details</span>
-                  <textarea name="message" required rows={5} disabled={isPending} className="mt-2 w-full rounded-md bg-[#050814] border border-[#1A2550] px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]/70 disabled:opacity-50" placeholder="Genre, word count, deadline, etc." />
-                </label>
-                <button type="submit" disabled={isPending} className="mt-2 w-full inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-6 py-3 font-semibold transition hover:bg-[#E0C15A] active:scale-[0.98] disabled:opacity-50">
+                <button type="submit" disabled={isPending}
+                  className="w-full rounded-full bg-[#D4AF37] text-black px-6 py-3.5 text-sm font-bold tracking-wide transition hover:bg-[#E0C15A] hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 mt-2">
                   {isPending ? "Sending…" : "Send inquiry"}
                 </button>
               </div>
             </form>
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6">
-                <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-semibold">Book a call</p>
-                <p className="mt-2 text-sm text-white/70 leading-relaxed">Prefer to talk through your project first? Check availability and book a free 15-minute call.</p>
-                <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer" className="mt-4 w-full inline-flex items-center justify-center rounded-md border border-white/20 px-5 py-2.5 text-sm font-semibold transition hover:border-[#D4AF37]/60 hover:text-white">
+
+            {/* Right column */}
+            <div className="flex flex-col gap-4">
+              {/* Book a call */}
+              <div className="rounded-2xl border border-white/8 bg-[#0B1224]/60 p-6">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] mb-3">Book a call</p>
+                <p className="text-sm text-white/55 leading-relaxed mb-5">
+                  Prefer to talk through your project first? Check availability and book a free 15-minute call.
+                </p>
+                <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex w-full items-center justify-center rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white/70 transition hover:border-[#D4AF37]/50 hover:text-white">
                   Check availability
                 </a>
               </div>
-              <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6">
-                <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-semibold">Direct email</p>
-                <button onClick={() => { if (!showEmail) { setShowEmail(true); } else { window.location.href = "mailto:Dean@DMNarration.com"; } }} className="mt-2 text-base font-semibold text-white hover:text-[#D4AF37] transition-colors">
-                  {showEmail ? "Dean@DMNarration.com" : "Click to reveal email"}
+
+              {/* Direct email */}
+              <div className="rounded-2xl border border-white/8 bg-[#0B1224]/60 p-6">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] mb-3">Direct email</p>
+                <button
+                  onClick={() => { if (!showEmail) setShowEmail(true); else window.location.href = "mailto:Dean@DMNarration.com"; }}
+                  className="text-base font-semibold text-white hover:text-[#D4AF37] transition-colors">
+                  {showEmail ? "Dean@DMNarration.com" : "Click to reveal"}
                 </button>
-                <p className="mt-1 text-sm text-white/50">Typical response within 24–48 hours.</p>
+                <p className="mt-1 text-xs text-white/30">Response within 24–48 hours.</p>
               </div>
-              <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6">
-                <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-semibold">Find me on</p>
-                <ul className="mt-3 space-y-2 text-sm text-white/75">
-                  <li><a href="https://www.acx.com/narrator?p=A3DYAXR7JFPXPE" target="_blank" rel="noopener noreferrer" className="hover:text-[#D4AF37] transition">ACX narrator profile</a></li>
-                  <li><a href="https://www.tiktok.com/@deanmillernarration" target="_blank" rel="noopener noreferrer" className="hover:text-[#D4AF37] transition">TikTok — @deanmillernarration</a></li>
-                  <li><a href="https://www.instagram.com/deanmillernarrator" target="_blank" rel="noopener noreferrer" className="hover:text-[#D4AF37] transition">Instagram — @deanmillernarrator</a></li>
+
+              {/* Find me on */}
+              <div className="rounded-2xl border border-white/8 bg-[#0B1224]/60 p-6">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] mb-4">Find me on</p>
+                <ul className="space-y-2.5">
+                  {[
+                    { label: "ACX narrator profile", href: "https://www.acx.com/narrator?p=A3DYAXR7JFPXPE" },
+                    { label: "TikTok — @deanmillernarration", href: "https://www.tiktok.com/@deanmillernarration" },
+                    { label: "Instagram — @deanmillernarrator", href: "https://www.instagram.com/deanmillernarrator" },
+                  ].map(l => (
+                    <li key={l.href}>
+                      <a href={l.href} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center justify-between text-sm text-white/50 hover:text-[#D4AF37] transition-colors group">
+                        {l.label}
+                        <svg className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    </li>
+                  ))}
                 </ul>
               </div>
             </div>
           </div>
         </section>
 
-        {/* FOOTER */}
-        <footer className="relative mt-24 border-t border-white/5 pt-12 pb-8 text-sm text-white/40">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 text-center sm:text-left mb-10">
-            <div>
-              <h4 className="text-white font-semibold mb-4 uppercase tracking-wider text-xs">Navigation</h4>
-              <ul className="space-y-2">
-                <li><Link href="/narrated-works" className="hover:text-[#D4AF37]">Narrated works</Link></li>
-                <li><Link href="/welcome" className="hover:text-[#D4AF37]">Working together</Link></li>
-                <li><a href="/#demos" className="hover:text-[#D4AF37]">Audio demos</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-white font-semibold mb-4 uppercase tracking-wider text-xs">Profiles</h4>
-              <ul className="space-y-2">
-                <li><a href="https://www.acx.com/narrator?p=A3DYAXR7JFPXPE" target="_blank" rel="noopener" className="hover:text-[#D4AF37]">ACX</a></li>
-                <li><a href="https://www.audible.com/search?searchNarrator=Dean+Miller" target="_blank" rel="noopener" className="hover:text-[#D4AF37]">Audible</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-white font-semibold mb-4 uppercase tracking-wider text-xs">Social</h4>
-              <ul className="space-y-2">
-                <li><a href="https://www.tiktok.com/@deanmillernarration" target="_blank" rel="noopener" className="hover:text-[#D4AF37]">TikTok</a></li>
-                <li><a href="https://www.instagram.com/deanmillernarrator" target="_blank" rel="noopener" className="hover:text-[#D4AF37]">Instagram</a></li>
-              </ul>
-            </div>
+        {/* ── FOOTER ── */}
+        <footer className="relative border-t border-white/6 pt-12 pb-8 text-sm text-white/25">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mb-10">
+            {[
+              { heading: "Navigation", links: [
+                { label: "Narrated works", href: "/narrated-works" },
+                { label: "Working together", href: "/welcome" },
+                { label: "Audio demos", href: "/#demos" },
+              ]},
+              { heading: "Profiles", links: [
+                { label: "ACX", href: "https://www.acx.com/narrator?p=A3DYAXR7JFPXPE" },
+                { label: "Audible", href: "https://www.audible.com/search?searchNarrator=Dean+Miller" },
+              ]},
+              { heading: "Social", links: [
+                { label: "TikTok", href: "https://www.tiktok.com/@deanmillernarration" },
+                { label: "Instagram", href: "https://www.instagram.com/deanmillernarrator" },
+              ]},
+            ].map(col => (
+              <div key={col.heading}>
+                <p className="text-[10px] uppercase tracking-[0.22em] text-white/20 mb-4">{col.heading}</p>
+                <ul className="space-y-2.5">
+                  {col.links.map(l => (
+                    <li key={l.href}>
+                      <a href={l.href} target={l.href.startsWith("http") ? "_blank" : undefined}
+                        rel={l.href.startsWith("http") ? "noopener" : undefined}
+                        className="text-white/35 hover:text-[#D4AF37] transition-colors text-sm">
+                        {l.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
-          <div className="text-center pt-8 border-t border-white/5">
-            <p>© {new Date().getFullYear()} Dean Miller Narration. All rights reserved.</p>
+          <div className="border-t border-white/5 pt-8 text-center text-xs text-white/20">
+            © {new Date().getFullYear()} Dean Miller Narration. All rights reserved.
           </div>
           <Link href="/admin/login" className="absolute bottom-2 right-2 w-4 h-4 opacity-0" aria-label="Admin login" />
         </footer>
