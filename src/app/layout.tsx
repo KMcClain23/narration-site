@@ -128,7 +128,7 @@ export default function RootLayout({
         />
       </head>
 
-      <body className="min-h-screen bg-[#050814] text-white antialiased pt-20">
+      <body className="min-h-screen bg-[#050814] text-white antialiased pt-20 overflow-x-hidden">
         {/* Audit Fix: Integrated your unique GA4 Measurement ID
             Place GA as early as possible in the body so it reliably fires */}
         <GoogleAnalytics gaId="G-WN5GMY7ZN7" />

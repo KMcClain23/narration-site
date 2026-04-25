@@ -192,7 +192,7 @@ function BookCard({ book, statusBadge, author }: { book: Book; statusBadge?: Rea
       className="group relative rounded-2xl overflow-visible cursor-default"
       itemScope
       itemType="https://schema.org/Book"
-      style={{ aspectRatio: "2/3", marginBottom: "3.5rem" }}
+      style={{ aspectRatio: "2/3", marginBottom: "4.5rem" }}
     >
       {/* Cover wrapper — clip to card shape */}
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
@@ -226,10 +226,10 @@ function BookCard({ book, statusBadge, author }: { book: Book; statusBadge?: Rea
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 text-[9px] font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-2.5 py-1 rounded-full transition-colors"
+              className="inline-flex items-center gap-2 text-xs font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-4 py-2 rounded-full transition-colors shadow-lg"
               aria-label={`Listen to ${book.title} on Audible`}
             >
-              <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
               Listen on Audible
             </a>
           )}
@@ -376,7 +376,7 @@ export default function NarratedWorks() {
   const totalBooks = completed.length + inProgress.length + comingSoon.length;
 
   return (
-    <main className="min-h-screen bg-[#050814] text-white">
+    <main className="min-h-screen bg-[#050814] text-white overflow-x-clip">
       <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-8 pb-20">
 
         {/* Page header */}

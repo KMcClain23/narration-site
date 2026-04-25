@@ -211,7 +211,7 @@ function HomeContent() {
   ];
 
   return (
-    <main className="min-h-screen bg-[#050814] text-white">
+    <main className="min-h-screen bg-[#050814] text-white overflow-x-clip">
       {/* Keyframes */}
       <style>{`
         @keyframes barPulse {
