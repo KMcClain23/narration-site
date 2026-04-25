@@ -135,8 +135,8 @@ function DemoPlayer({
             </button>
             <div className="flex-1 min-w-0">
               <button type="button" aria-label="Seekbar" onClick={handleSeek}
-                className="relative block w-full h-1.5 rounded-full overflow-hidden bg-white/10 cursor-pointer">
-                <div className="absolute left-0 top-0 h-full rounded-full bg-[#D4AF37] transition-all duration-100"
+                className="relative block w-full h-2 rounded-full bg-white/15 cursor-pointer overflow-hidden">
+                <div className="absolute left-0 top-0 h-full bg-[#D4AF37] transition-all duration-100"
                   style={{ width: `${pct}%` }} />
               </button>
               <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-white/30">
@@ -256,9 +256,9 @@ function HomeContent() {
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
                 Listen to demos
               </a>
-              <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer"
+              <a href="/#contact"
                 className="inline-flex items-center gap-2 rounded-full border border-white/20 px-7 py-3.5 text-sm font-semibold text-white/80 transition hover:border-white/50 hover:text-white hover:scale-[1.02] active:scale-[0.98]">
-                Request availability
+                Get in touch
               </a>
             </div>
 
@@ -281,7 +281,7 @@ function HomeContent() {
           </div>
 
           {/* Profile image — floats right on desktop */}
-          <div className="hidden md:block absolute right-6 bottom-0 w-64 lg:w-72">
+          <div className="hidden md:block absolute right-6 top-1/2 -translate-y-1/2 w-56 lg:w-64">
             <div className="relative" style={{ aspectRatio: "3/4" }}>
               <div className="absolute inset-0 rounded-2xl overflow-hidden">
                 <Image src={PROFILE_URL} alt="Dean Miller, audiobook narrator" fill sizes="288px"
@@ -325,7 +325,7 @@ function HomeContent() {
         </section>
 
         {/* ── ABOUT ── */}
-        <section id="about" className="mt-28 scroll-mt-24" aria-label="About Dean Miller">
+        <section id="about" className="mt-16 scroll-mt-24" aria-label="About Dean Miller">
           <div className="flex items-center gap-4 mb-12">
             <div className="h-px w-6 bg-[#D4AF37]" />
             <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">About</p>
@@ -389,7 +389,7 @@ function HomeContent() {
         </section>
 
         {/* ── CONTACT ── */}
-        <section id="contact" className="mt-28 mb-24 scroll-mt-24" aria-label="Contact and booking">
+        <section id="contact" className="mt-16 mb-16 scroll-mt-24" aria-label="Contact and booking">
           <div className="flex items-center gap-4 mb-12">
             <div className="h-px w-6 bg-[#D4AF37]" />
             <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Get in touch</p>

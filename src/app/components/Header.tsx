@@ -161,22 +161,7 @@ export default function Header() {
             })}
           </nav>
 
-          {/* Desktop CTA */}
-          <a
-            href={BOOKINGS_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={[
-              "hidden md:inline-flex items-center justify-center",
-              "rounded-md border border-white/20",
-              "px-4 py-2 text-sm font-semibold",
-              "text-white/90 bg-white/0",
-              "hover:border-[#D4AF37]/60 hover:bg-white/10 hover:text-white transition",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814]",
-            ].join(" ")}
-          >
-            Request availability
-          </a>
+          {/* Desktop CTA removed — contact is in nav */}
 
           {/* Social Links */}
           <div className="flex items-center gap-4 text-xl">
@@ -259,14 +244,7 @@ export default function Header() {
                 Listen to demos
               </a>
 
-              <a
-                href={BOOKINGS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center rounded-md border border-white/20 px-4 py-3 font-semibold text-white/90 hover:border-[#D4AF37]/60 hover:text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814]"
-              >
-                Request availability
-              </a>
+
             </div>
           </nav>
         </div>
