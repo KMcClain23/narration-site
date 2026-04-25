@@ -252,10 +252,10 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
         )}
       </div>
 
-      {/* Floating pill — sits over the bottom edge of the card */}
+      {/* Floating pill — compact default, expands on hover */}
       <div className="absolute -bottom-px inset-x-0 z-30 translate-y-1/2 group-hover:-translate-y-0 transition-transform duration-300">
         <div
-          className="rounded-xl px-5 py-6" /* v2 */
+          className="rounded-xl transition-all duration-300"
           style={{
             background: "rgba(5, 8, 20, 0.97)",
             backdropFilter: "blur(14px)",
@@ -264,25 +264,40 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
             boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
           }}
         >
-          <h3
-            className="font-bold text-xl leading-snug text-white"
-            itemProp="name"
-          >
-            {book.title}
-          </h3>
-          {book.subtitle && (
-            <p className="text-sm text-white mt-1.5 leading-snug font-medium">{book.subtitle}</p>
-          )}
-          <button
-            ref={authorBtnRef}
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
-            className="mt-2 text-base text-[#D4AF37] font-bold hover:text-[#F0D060] transition-colors text-left hover:underline underline-offset-2 block"
-            itemProp="author"
-            aria-label={`View ${book.author} author info`}
-          >
-            {book.author}
-          </button>
+          {/* Default (compact) state */}
+          <div className="block group-hover:hidden px-4 py-3">
+            <h3 className="font-semibold text-sm leading-snug text-white truncate" itemProp="name">
+              {book.title}
+            </h3>
+            <button
+              ref={authorBtnRef}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
+              className="text-xs text-[#D4AF37] font-medium hover:text-[#F0D060] transition-colors text-left block truncate w-full"
+              itemProp="author"
+              aria-label={`View ${book.author} author info`}
+            >
+              {book.author}
+            </button>
+          </div>
+          {/* Expanded (hover) state */}
+          <div className="hidden group-hover:block px-5 py-5">
+            <h3 className="font-bold text-xl leading-snug text-white" itemProp="name">
+              {book.title}
+            </h3>
+            {book.subtitle && (
+              <p className="text-sm text-white mt-1.5 leading-snug font-medium">{book.subtitle}</p>
+            )}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
+              className="mt-2 text-base text-[#D4AF37] font-bold hover:text-[#F0D060] transition-colors text-left hover:underline underline-offset-2 block"
+              itemProp="author"
+              aria-label={`View ${book.author} author info`}
+            >
+              {book.author}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -314,7 +329,7 @@ function SectionGrid({
   if (books.length === 0) return null;
   return (
     <section className="mb-20">
-      <div className="flex items-center gap-4 mb-7">
+      <div className="flex items-center gap-4 mb-7 scroll-mt-36">
         <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/40">{title}</h2>
         <div className="flex-1 h-px bg-white/8" />
         <span className="text-xs text-white/25">{books.length}</span>
@@ -389,7 +404,7 @@ export default function NarratedWorks() {
       <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-8 pb-20">
 
         {/* Page title + search — sticky */}
-        <div className="sticky top-20 z-40 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 mb-10"
+        <div className="sticky top-20 z-40 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 mb-6"
           style={{ background: "rgba(5,8,20,0.94)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
 
           {/* Title + search row */}
