@@ -41,7 +41,7 @@ function DemoPlayer({
     a.paused ? a.play().catch(() => {}) : a.pause();
   };
 
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleSeek = (e: React.MouseEvent<HTMLElement>) => {
     const a = audioRefs.current[index];
     if (!a || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -141,16 +141,11 @@ function DemoPlayer({
                 aria-valuemin={0}
                 aria-valuemax={100}
                 onClick={handleSeek}
-                className="relative block w-full h-2.5 rounded-full bg-white/15 cursor-pointer overflow-hidden group/seek"
-              >
-                <div
-                  className="absolute inset-y-0 left-0 bg-[#D4AF37] rounded-full origin-left"
-                  style={{ width: `${pct}%`, transition: "width 80ms linear" }}
-                />
-                <div
-                  className="absolute inset-y-0 left-0 w-full bg-[#D4AF37]/20 scale-x-0 origin-left group-hover/seek:scale-x-100 transition-transform duration-200 rounded-full"
-                />
-              </div>
+                className="relative block w-full h-2.5 rounded-full cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, #D4AF37 ${pct}%, rgba(255,255,255,0.15) ${pct}%)`,
+                }}
+              />
               <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-white/30">
                 <span>{formatTime(current)}</span>
                 <span>{formatTime(duration)}</span>
