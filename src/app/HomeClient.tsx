@@ -232,7 +232,7 @@ function HomeContent() {
       <div id="top" />
 
       {/* ── HERO ── */}
-      <section className="relative flex items-center" aria-label="Introduction">
+      <section className="relative min-h-[60vh] flex items-center" aria-label="Introduction">
         {/* Full bleed background */}
         <div className="absolute inset-0">
           <Image src={BANNER_URL} alt="Dean Miller recording studio" fill priority
@@ -243,7 +243,7 @@ function HomeContent() {
           <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(6,8,46,0.7) 100%)" }} />
         </div>
 
-        <div className="relative max-w-5xl mx-auto px-5 sm:px-6 pt-6 pb-10 w-full">
+        <div className="relative max-w-5xl mx-auto px-5 sm:px-6 pt-10 pb-12 w-full">
           <div className="max-w-2xl">
             {/* Eyebrow */}
             <div className="fade-up flex items-center gap-3 mb-6">
