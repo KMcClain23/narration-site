@@ -79,10 +79,10 @@ export default function WelcomePage() {
   ];
 
   const arLinks = [
-    { title: "Authors Republic: About the Platform", href: "https://www.authorsrepublic.com/about", description: "Overview of Authors Republic — a non-exclusive audiobook distributor that sends your title to 40+ retailers and libraries including Apple Books, Spotify, Scribd, Hoopla, and more." },
-    { title: "Authors Republic: For Authors", href: "https://www.authorsrepublic.com/authors", description: "How authors submit, manage, and distribute audiobooks through the platform, including pricing and royalty structure." },
-    { title: "Authors Republic: Distribution Network", href: "https://www.authorsrepublic.com/distribution", description: "The full list of retailers, streaming services, and library platforms Authors Republic distributes to." },
-    { title: "Authors Republic: Getting Started Guide", href: "https://www.authorsrepublic.com/get-started", description: "Step-by-step guide to setting up your account, submitting your audiobook, and going live on distribution." },
+    { title: "Author's Republic: How It Works", href: "https://www.authorsrepublic.com/how-it-works", description: "Overview of the full platform — how to produce your audiobook, submit for distribution, and sell to 50+ retail, library, and streaming channels worldwide." },
+    { title: "Author's Republic: Create an Audiobook — The AR Studio", href: "https://www.authorsrepublic.com/learn/blog/69/create-an-audiobook-the-authors-republic-stud", description: "How the narrator marketplace works on Authors Republic — audition process, per-finished-hour rates, file approval, and delivery to the platform." },
+    { title: "Author's Republic: Distribution Partners", href: "https://www.authorsrepublic.com/our-partners", description: "The complete list of 50+ retail, library, and streaming partners AR distributes to — including Audible, Apple Books, Spotify, Google Play, Hoopla, Scribd, Chirp, and more." },
+    { title: "Author's Republic: FAQ", href: "https://www.authorsrepublic.com/learn/faqs", description: "Answers to common questions about production, distribution, payments, audio requirements, exclusivity, and working with narrators through the platform." },
   ];
 
   const activeSteps = isACX ? acxSteps : arSteps;
@@ -140,8 +140,12 @@ export default function WelcomePage() {
             </div>
           </div>
 
-          {/* AR context note */}
-          {!isACX && (
+          {/* Platform context note */}
+          {isACX ? (
+            <div className="mt-4 rounded-xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-5 py-4 text-sm text-white/75 leading-relaxed">
+              <span className="text-[#D4AF37] font-semibold">ACX (Audiobook Creation Exchange)</span> is Amazon&apos;s audiobook production platform, connecting authors with narrators and distributing finished titles to Audible, Amazon, and iTunes. It supports both per-finished-hour and royalty share payment structures, and manages the full production workflow — auditions, file review, and approval — on-platform. Finished audiobooks distributed through ACX are exclusive to Audible and Amazon by default, though a non-exclusive option is available at a lower royalty rate.
+            </div>
+          ) : (
             <div className="mt-4 rounded-xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-5 py-4 text-sm text-white/75 leading-relaxed">
               <span className="text-[#D4AF37] font-semibold">Authors Republic</span> distributes to 40+ platforms including Apple Books, Spotify, Scribd, and Hoopla. It is non-exclusive — you keep full control and can distribute elsewhere simultaneously. Production is handled directly between us, off-platform.
             </div>
