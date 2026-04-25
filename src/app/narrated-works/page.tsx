@@ -192,7 +192,7 @@ function BookCard({ book, statusBadge, author }: { book: Book; statusBadge?: Rea
       className="group relative rounded-2xl overflow-visible cursor-default"
       itemScope
       itemType="https://schema.org/Book"
-      style={{ aspectRatio: "2/3", marginBottom: "2rem" }}
+      style={{ aspectRatio: "2/3", marginBottom: "3.5rem" }}
     >
       {/* Cover wrapper — clip to card shape */}
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
@@ -201,7 +201,7 @@ function BookCard({ book, statusBadge, author }: { book: Book; statusBadge?: Rea
           alt={`${book.title} audiobook narrated by Dean Miller`}
           fill
           className="object-cover transition-transform duration-700 group-hover:scale-110"
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 220px"
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
           itemProp="image"
         />
 
@@ -310,7 +310,7 @@ function SectionGrid({
         <div className="flex-1 h-px bg-white/8" />
         <span className="text-xs text-white/25">{books.length}</span>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5 sm:gap-6 items-start" style={{ paddingBottom: "1.5rem" }}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 sm:gap-8 items-start" style={{ paddingBottom: "2rem" }}>
         {books.map((book) => (
           <BookCard key={book.id} book={book} statusBadge={statusBadge} author={authors[book.author]} />
         ))}
@@ -377,7 +377,7 @@ export default function NarratedWorks() {
 
   return (
     <main className="min-h-screen bg-[#050814] text-white">
-      <div className="max-w-6xl mx-auto px-5 sm:px-6 pt-14 pb-20">
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-8 pb-20">
 
         {/* Page header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-14">

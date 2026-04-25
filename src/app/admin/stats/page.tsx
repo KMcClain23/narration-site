@@ -44,7 +44,7 @@ export default async function AdminStatsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#050814] text-white p-6 md:p-12">
+    <main className="min-h-screen bg-[#050814] text-white p-6 pt-8 md:p-12 md:pt-8">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between border-b border-[#1A2550] pb-8">
           <h1 className="text-4xl font-bold text-[#D4AF37]">Dean Miller Admin</h1>

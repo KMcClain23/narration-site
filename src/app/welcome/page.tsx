@@ -94,7 +94,7 @@ export default function WelcomePage() {
 
       {/* Hero */}
       <section className="bg-[radial-gradient(circle_at_top,rgba(212,175,55,0.15),transparent_35%)]">
-        <div className="mx-auto max-w-5xl px-5 py-16 sm:px-6 sm:py-20">
+        <div className="mx-auto max-w-5xl px-5 pt-10 pb-16 sm:px-6 sm:pt-12 sm:pb-20">
           <p className="text-xs uppercase tracking-[0.24em] text-[#D4AF37]">
             Dean Miller Narration
           </p>
