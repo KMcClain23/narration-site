@@ -255,7 +255,7 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
       {/* Floating pill — sits over the bottom edge of the card */}
       <div className="absolute -bottom-px inset-x-0 z-30 translate-y-1/2 group-hover:-translate-y-0 transition-transform duration-300">
         <div
-          className="rounded-xl px-5 py-5"
+          className="rounded-xl px-5 py-6" /* v2 */
           style={{
             background: "rgba(5, 8, 20, 0.97)",
             backdropFilter: "blur(14px)",
@@ -265,19 +265,19 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
           }}
         >
           <h3
-            className="font-bold text-lg leading-snug text-white"
+            className="font-bold text-xl leading-snug text-white"
             itemProp="name"
           >
             {book.title}
           </h3>
           {book.subtitle && (
-            <p className="text-sm text-white/80 mt-1 leading-snug">{book.subtitle}</p>
+            <p className="text-sm text-white mt-1.5 leading-snug font-medium">{book.subtitle}</p>
           )}
           <button
             ref={authorBtnRef}
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
-            className="mt-2 text-base text-[#E0C15A] font-bold hover:text-[#F0D060] transition-colors text-left hover:underline underline-offset-2 block"
+            className="mt-2 text-base text-[#D4AF37] font-bold hover:text-[#F0D060] transition-colors text-left hover:underline underline-offset-2 block"
             itemProp="author"
             aria-label={`View ${book.author} author info`}
           >
