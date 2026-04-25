@@ -220,7 +220,7 @@ function HomeContent() {
       <div id="top" />
 
       {/* ── HERO ── */}
-      <section className="relative overflow-hidden min-h-[92vh] flex items-center" aria-label="Introduction">
+      <section className="relative min-h-[92vh] flex items-center" aria-label="Introduction">
         {/* Full bleed background */}
         <div className="absolute inset-0">
           <Image src={BANNER_URL} alt="Dean Miller recording studio" fill priority sizes="100vw"
