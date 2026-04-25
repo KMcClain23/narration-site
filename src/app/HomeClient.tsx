@@ -146,7 +146,7 @@ function DemoPlayer({
                   background: `linear-gradient(to right, #D4AF37 ${pct}%, rgba(255,255,255,0.2) ${pct}%)`,
                   transition: "background 100ms linear",
                 }}
-              />
+              ></div>
               <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-white/30">
                 <span>{formatTime(current)}</span>
                 <span>{formatTime(duration)}</span>
