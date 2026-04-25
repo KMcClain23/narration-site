@@ -141,11 +141,13 @@ function DemoPlayer({
                 aria-valuemin={0}
                 aria-valuemax={100}
                 onClick={handleSeek}
-                className="relative block w-full h-2.5 rounded-full cursor-pointer"
-                style={{
-                  background: `linear-gradient(to right, #D4AF37 ${pct}%, rgba(255,255,255,0.15) ${pct}%)`,
-                }}
-              />
+                className="relative block w-full h-2.5 rounded-full cursor-pointer bg-white/20"
+              >
+                <div
+                  className="absolute left-0 top-0 h-full rounded-full bg-[#D4AF37]"
+                  style={{ width: `${Math.max(pct, 0)}%`, minWidth: pct > 0 ? "6px" : "0px", transition: "width 100ms linear" }}
+                />
+              </div>
               <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-white/30">
                 <span>{formatTime(current)}</span>
                 <span>{formatTime(duration)}</span>
