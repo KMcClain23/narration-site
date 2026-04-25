@@ -223,7 +223,8 @@ function HomeContent() {
       <section className="relative min-h-[92vh] flex items-center" aria-label="Introduction">
         {/* Full bleed background */}
         <div className="absolute inset-0">
-          <Image src={BANNER_URL} alt="Dean Miller recording studio" fill priority sizes="100vw"
+          <Image src={BANNER_URL} alt="Dean Miller recording studio" fill priority
+            sizes="(max-width: 768px) 100vw, 100vw"
             className="object-cover opacity-25" style={{ objectPosition: "center 30%", transform: "scale(1.05)", transformOrigin: "center" }} />
           <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(5,8,20,0.5) 0%, rgba(5,8,20,0.4) 40%, rgba(5,8,20,1) 100%)" }} />
           {/* Subtle vignette edges */}
@@ -284,7 +285,8 @@ function HomeContent() {
           <div className="hidden md:block absolute right-6 top-1/2 -translate-y-1/2 w-56 lg:w-64">
             <div className="relative" style={{ aspectRatio: "3/4" }}>
               <div className="absolute inset-0 rounded-2xl overflow-hidden">
-                <Image src={PROFILE_URL} alt="Dean Miller, audiobook narrator" fill sizes="288px"
+                <Image src={PROFILE_URL} alt="Dean Miller, audiobook narrator" fill
+                  sizes="(max-width: 1024px) 224px, 288px"
                   className="object-cover" style={{ objectPosition: "center top" }} priority />
                 <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(5,8,20,1) 0%, rgba(5,8,20,0.4) 40%, transparent 70%)" }} />
               </div>
