@@ -237,10 +237,10 @@ function HomeContent() {
         <div className="absolute inset-0">
           <Image src={BANNER_URL} alt="Dean Miller recording studio" fill priority
             sizes="(max-width: 768px) 100vw, 100vw"
-            className="object-cover opacity-25" style={{ objectPosition: "center 30%", transform: "scale(1.05)", transformOrigin: "center" }} />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(6,8,46,0.5) 0%, rgba(6,8,46,0.4) 40%, rgba(6,8,46,1) 100%)" }} />
-          {/* Subtle vignette edges */}
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(6,8,46,0.7) 100%)" }} />
+            className="object-cover opacity-20" style={{ objectPosition: "center center" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(6,8,46,0.6) 0%, rgba(6,8,46,0.3) 40%, rgba(6,8,46,1) 100%)" }} />
+          {/* Strong vignette to clip edges */}
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 30%, rgba(6,8,46,0.85) 70%, rgba(6,8,46,1) 100%)" }} />
         </div>
 
         <div className="relative max-w-5xl mx-auto px-5 sm:px-6 pt-10 pb-12 w-full">
