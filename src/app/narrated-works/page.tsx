@@ -182,7 +182,7 @@ function AuthorPopup({
   return mounted ? createPortal(popup, document.body) : null;
 }
 
-function BookCard({ book, statusBadge, author }: { book: Book; statusBadge?: React.ReactNode; author?: Author }) {
+function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statusBadge?: React.ReactNode; author?: Author; onTagClick: (tag: string) => void }) {
   const hasLink = Boolean(book.link?.trim());
   const [showAuthorPopup, setShowAuthorPopup] = useState(false);
   const authorBtnRef = useRef<HTMLButtonElement>(null);
@@ -192,7 +192,7 @@ function BookCard({ book, statusBadge, author }: { book: Book; statusBadge?: Rea
       className="group relative rounded-2xl overflow-visible cursor-default"
       itemScope
       itemType="https://schema.org/Book"
-      style={{ aspectRatio: "2/3", marginBottom: "4.5rem" }}
+      style={{ aspectRatio: "2/3", marginBottom: "5.5rem" }}
     >
       {/* Cover wrapper — clip to card shape */}
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
@@ -210,28 +210,37 @@ function BookCard({ book, statusBadge, author }: { book: Book; statusBadge?: Rea
 
         {/* Hover overlay — full card face */}
         <div
-          className="absolute inset-0 z-20 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-between p-5"
-          style={{ background: "linear-gradient(to bottom, rgba(5,8,20,0.80) 0%, rgba(5,8,20,0.15) 45%, rgba(5,8,20,0.80) 100%)" }}
+          className="absolute inset-0 z-20 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col p-4"
+          style={{ background: "linear-gradient(to bottom, rgba(5,8,20,0.85) 0%, rgba(5,8,20,0.1) 40%, rgba(5,8,20,0.1) 60%, rgba(5,8,20,0.0) 100%)" }}
         >
+          {/* Tags — top, clickable to filter */}
           <div className="flex flex-wrap gap-2">
             {book.tags.slice(0, 3).map((tag) => (
-              <span key={tag} className="text-sm font-bold uppercase tracking-wide text-white bg-[#D4AF37]/30 border border-[#D4AF37]/60 px-3 py-1.5 rounded-full backdrop-blur-sm">
+              <button
+                key={tag}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onTagClick(tag); }}
+                className="text-sm font-bold uppercase tracking-wide text-white bg-[#D4AF37]/30 border border-[#D4AF37]/60 px-3 py-1.5 rounded-full backdrop-blur-sm hover:bg-[#D4AF37]/50 hover:border-[#D4AF37] transition-colors cursor-pointer"
+              >
                 {tag}
-              </span>
+              </button>
             ))}
           </div>
+          {/* Listen on Audible — centred */}
           {hasLink && (
-            <a
-              href={book.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="self-start inline-flex items-center gap-2.5 text-sm font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-5 py-3 rounded-full transition-colors shadow-xl"
-              aria-label={`Listen to ${book.title} on Audible`}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
-              Listen on Audible
-            </a>
+            <div className="flex-1 flex items-center justify-center">
+              <a
+                href={book.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-2 text-sm font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-5 py-2.5 rounded-full transition-colors shadow-xl"
+                aria-label={`Listen to ${book.title} on Audible`}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
+                Listen on Audible
+              </a>
+            </div>
           )}
         </div>
 
@@ -296,11 +305,13 @@ function SectionGrid({
   books,
   statusBadge,
   authors,
+  onTagClick,
 }: {
   title: string;
   books: Book[];
   statusBadge?: React.ReactNode;
   authors: Record<string, Author>;
+  onTagClick: (tag: string) => void;
 }) {
   if (books.length === 0) return null;
   return (
@@ -312,7 +323,7 @@ function SectionGrid({
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 sm:gap-8 items-start" style={{ paddingBottom: "2rem" }}>
         {books.map((book) => (
-          <BookCard key={book.id} book={book} statusBadge={statusBadge} author={authors[book.author]} />
+          <BookCard key={book.id} book={book} statusBadge={statusBadge} author={authors[book.author]} onTagClick={onTagClick} />
         ))}
       </div>
     </section>
@@ -379,16 +390,20 @@ export default function NarratedWorks() {
     <main className="min-h-screen bg-[#050814] text-white overflow-x-clip">
       <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-8 pb-20">
 
-        {/* Page header */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-14">
-          <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-white/40 mb-2">Portfolio</p>
-            <h1 className="text-3xl font-bold text-white">Narrated works</h1>
-            {!isLoading && totalBooks > 0 && (
-              <p className="mt-1 text-sm text-white/35">{totalBooks} titles across dark romance, romantasy, thriller & more</p>
-            )}
-          </div>
-          <div className="relative sm:w-64">
+        {/* Page title — not sticky, scrolls away */}
+        <div className="mb-6">
+          <p className="text-xs uppercase tracking-[0.28em] text-white/40 mb-2">Portfolio</p>
+          <h1 className="text-3xl font-bold text-white">Narrated works</h1>
+          {!isLoading && totalBooks > 0 && (
+            <p className="mt-1 text-sm text-white/35">{totalBooks} titles across dark romance, romantasy, thriller & more</p>
+          )}
+        </div>
+
+        {/* Search + filter — sticky */}
+        <div className="sticky top-20 z-40 -mx-5 sm:-mx-8 px-5 sm:px-8 py-3 mb-10"
+          style={{ background: "rgba(5,8,20,0.94)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="relative sm:w-72">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg className="h-3.5 w-3.5 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -409,6 +424,27 @@ export default function NarratedWorks() {
           </div>
         </div>
 
+        {/* Active tag filter indicator */}
+        {searchQuery && (
+          <div className="flex items-center gap-3 pt-2">
+            <span className="text-sm text-white/40">Filtering by:</span>
+            <span className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-white bg-[#D4AF37]/20 border border-[#D4AF37]/40 px-3 py-1.5 rounded-full">
+              {searchQuery}
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="text-white/50 hover:text-white transition-colors ml-1"
+                aria-label="Clear filter"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          </div>
+        )}
+        </div>{/* end sticky wrapper */}
+
         {isLoading ? (
           <div className="py-32 text-center">
             <div className="inline-block h-6 w-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
@@ -420,9 +456,9 @@ export default function NarratedWorks() {
           </div>
         ) : (
           <>
-            <SectionGrid title="Completed" books={filteredCompleted} authors={authors} />
-            <SectionGrid title="Currently narrating" books={filteredInProgress} statusBadge="In Progress" authors={authors} />
-            <SectionGrid title="Coming soon" books={filteredComingSoon} statusBadge="Soon" authors={authors} />
+            <SectionGrid title="Completed" books={filteredCompleted} authors={authors} onTagClick={setSearchQuery} />
+            <SectionGrid title="Currently narrating" books={filteredInProgress} statusBadge="In Progress" authors={authors} onTagClick={setSearchQuery} />
+            <SectionGrid title="Coming soon" books={filteredComingSoon} statusBadge="Soon" authors={authors} onTagClick={setSearchQuery} />
           </>
         )}
 
