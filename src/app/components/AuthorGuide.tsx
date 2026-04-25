@@ -125,7 +125,7 @@ const STEPS: Step[] = [
     resources: [
       { label: "ACX: Find a narrator", href: "https://www.acx.com" },
       { label: "Author's Republic: Narrator marketplace", href: "https://www.authorsrepublic.com/how-it-works" },
-      { label: "Working with Dean Miller →", href: "/welcome" },
+      { label: "Listen to Dean's demos →", href: "/#demos" },
     ],
     deanNote: "This is where I come in. I specialise in dark romance, romantasy, and character-driven drama — and I bring a background in music and theatre to every project. If your book has complex characters, emotional depth, or multi-POV scenes, let's talk.",
   },
@@ -395,11 +395,11 @@ export default function AuthorGuide() {
                     <div className="mt-4 rounded-xl border border-[#D4AF37]/25 bg-[#D4AF37]/8 px-4 py-4">
                       <p className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37] font-bold mb-2">A note from Dean</p>
                       <p className="text-sm text-white/80 leading-relaxed">{step.deanNote}</p>
-                      <Link href="/welcome"
+                      <a href="/#contact"
                         className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#D4AF37] hover:text-[#E0C15A] transition-colors">
-                        Learn about working together
+                        Get in touch with Dean
                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                      </Link>
+                      </a>
                     </div>
                   )}
 
