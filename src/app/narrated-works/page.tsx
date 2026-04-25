@@ -192,7 +192,7 @@ function BookCard({ book, statusBadge, author }: { book: Book; statusBadge?: Rea
       className="group relative rounded-2xl overflow-visible cursor-default"
       itemScope
       itemType="https://schema.org/Book"
-      style={{ aspectRatio: "2/3" }}
+      style={{ aspectRatio: "2/3", marginBottom: "2rem" }}
     >
       {/* Cover wrapper — clip to card shape */}
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
@@ -208,75 +208,75 @@ function BookCard({ book, statusBadge, author }: { book: Book; statusBadge?: Rea
         {/* Ambient glow */}
         <div className="absolute -inset-2 opacity-0 group-hover:opacity-30 transition-opacity duration-700 blur-2xl bg-[#D4AF37] pointer-events-none z-0" />
 
-        {/* Bottom gradient */}
-        <div
-          className="absolute inset-0 z-10"
-          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.7) 35%, rgba(0,0,0,0.1) 65%, transparent 100%)" }}
-        />
+        {/* Hover: tags + listen link at top */}
+        <div className="absolute inset-x-3 top-3 z-20 opacity-0 group-hover:opacity-100 transition-all duration-300">
+          <div className="flex flex-wrap gap-1 mb-2">
+            {book.tags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="text-[7px] font-bold uppercase tracking-wide text-white/70 bg-black/50 backdrop-blur-sm border border-white/10 px-1.5 py-0.5 rounded-full"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+          {hasLink && (
+            <a
+              href={book.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1.5 text-[9px] font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-2.5 py-1 rounded-full transition-colors"
+              aria-label={`Listen to ${book.title} on Audible`}
+            >
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
+              Listen on Audible
+            </a>
+          )}
+        </div>
 
-        {/* Text content */}
-        <div className="absolute inset-0 z-20 flex flex-col justify-end p-4 translate-y-2 group-hover:translate-y-0 transition-transform duration-400">
-          <div>
+        {/* Status badge */}
+        {statusBadge && (
+          <div className="absolute top-3 right-3 z-30 bg-[#D4AF37] text-black text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+            {statusBadge}
+          </div>
+        )}
+      </div>
+
+      {/* Floating pill — sits over the bottom edge of the card */}
+      <div className="absolute -bottom-px inset-x-2 z-30 translate-y-1/2 group-hover:-translate-y-0 transition-transform duration-300">
+        <div
+          className="rounded-xl px-3 py-2 flex items-center justify-between gap-2"
+          style={{
+            background: "rgba(11, 18, 36, 0.82)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+          }}
+        >
+          <div className="min-w-0 flex-1">
             <h3
-              className="font-semibold text-sm leading-snug text-white line-clamp-2"
+              className="font-semibold text-[11px] leading-snug text-white truncate"
               itemProp="name"
-              style={{ textShadow: "0 1px 4px rgba(0,0,0,0.9), 0 0 12px rgba(0,0,0,0.7)" }}
             >
               {book.title}
             </h3>
-            {book.subtitle && (
-              <p className="text-[10px] text-white/60 mt-0.5 line-clamp-1" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>
-                {book.subtitle}
-              </p>
-            )}
-            {/* Author button */}
             <button
               ref={authorBtnRef}
               type="button"
               onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
-              className="mt-0.5 text-xs text-[#D4AF37] font-semibold hover:text-[#E0C15A] transition-colors text-left underline-offset-2 hover:underline"
+              className="text-[10px] text-[#D4AF37] font-medium hover:text-[#E0C15A] transition-colors text-left hover:underline underline-offset-2 truncate block max-w-full"
               itemProp="author"
-              style={{ textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}
               aria-label={`View ${book.author} author info`}
             >
               {book.author}
             </button>
           </div>
-
-          {/* Tags + listen link */}
-          <div className="mt-3 opacity-0 group-hover:opacity-100 transition-all duration-300 delay-75">
-            <div className="flex flex-wrap gap-1 mb-3">
-              {book.tags.slice(0, 3).map((tag) => (
-                <span
-                  key={tag}
-                  className="text-[8px] font-bold uppercase tracking-wide text-white/60 bg-white/10 border border-white/15 px-1.5 py-0.5 rounded"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-            {hasLink && (
-              <a
-                href={book.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-3 py-1.5 rounded-md transition-colors"
-                aria-label={`Listen to ${book.title} on Audible`}
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
-                Listen on Audible
-              </a>
-            )}
-          </div>
+          {book.subtitle && (
+            <p className="text-[8px] text-white/30 shrink-0 hidden sm:block truncate max-w-[60px]">{book.subtitle}</p>
+          )}
         </div>
-
-        {/* Status badge */}
-        {statusBadge && (
-          <div className="absolute top-3 right-3 z-30 bg-[#D4AF37] text-black text-[8px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">
-            {statusBadge}
-          </div>
-        )}
       </div>
 
       {/* Author popup — outside the overflow:hidden wrapper */}
@@ -310,7 +310,7 @@ function SectionGrid({
         <div className="flex-1 h-px bg-white/8" />
         <span className="text-xs text-white/25">{books.length}</span>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5 sm:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5 sm:gap-6 items-start" style={{ paddingBottom: "1.5rem" }}>
         {books.map((book) => (
           <BookCard key={book.id} book={book} statusBadge={statusBadge} author={authors[book.author]} />
         ))}

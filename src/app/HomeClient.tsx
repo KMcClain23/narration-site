@@ -41,7 +41,7 @@ function DemoPlayer({
     a.paused ? a.play().catch(() => {}) : a.pause();
   };
 
-  const handleSeek = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     const a = audioRefs.current[index];
     if (!a || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -134,11 +134,23 @@ function DemoPlayer({
               }
             </button>
             <div className="flex-1 min-w-0">
-              <button type="button" aria-label="Seekbar" onClick={handleSeek}
-                className="relative block w-full h-2 rounded-full bg-white/15 cursor-pointer overflow-hidden">
-                <div className="absolute left-0 top-0 h-full bg-[#D4AF37] transition-all duration-100"
-                  style={{ width: `${pct}%` }} />
-              </button>
+              <div
+                role="slider"
+                aria-label="Seekbar"
+                aria-valuenow={Math.round(pct)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                onClick={handleSeek}
+                className="relative block w-full h-2.5 rounded-full bg-white/15 cursor-pointer overflow-hidden group/seek"
+              >
+                <div
+                  className="absolute inset-y-0 left-0 bg-[#D4AF37] rounded-full origin-left"
+                  style={{ width: `${pct}%`, transition: "width 80ms linear" }}
+                />
+                <div
+                  className="absolute inset-y-0 left-0 w-full bg-[#D4AF37]/20 scale-x-0 origin-left group-hover/seek:scale-x-100 transition-transform duration-200 rounded-full"
+                />
+              </div>
               <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-white/30">
                 <span>{formatTime(current)}</span>
                 <span>{formatTime(duration)}</span>
