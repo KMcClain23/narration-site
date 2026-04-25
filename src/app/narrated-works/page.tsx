@@ -192,7 +192,7 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
       className="group relative rounded-2xl overflow-visible cursor-default"
       itemScope
       itemType="https://schema.org/Book"
-      style={{ aspectRatio: "2/3", marginBottom: "5.5rem" }}
+      style={{ aspectRatio: "2/3", marginBottom: "7rem" }}
     >
       {/* Cover wrapper — clip to card shape */}
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
@@ -253,7 +253,7 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
       </div>
 
       {/* Floating pill — sits over the bottom edge of the card */}
-      <div className="absolute -bottom-px inset-x-2 z-30 translate-y-1/2 group-hover:-translate-y-0 transition-transform duration-300">
+      <div className="absolute -bottom-px inset-x-0 z-30 translate-y-1/2 group-hover:-translate-y-0 transition-transform duration-300">
         <div
           className="rounded-xl px-3 py-2 flex items-center justify-between gap-2"
           style={{
