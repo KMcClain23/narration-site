@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import WelcomeSectionNav from "../components/WelcomeSectionNav";
+import AuthorGuide from "../components/AuthorGuide";
 
 function Section({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
   return (
@@ -299,6 +300,16 @@ export default function WelcomePage() {
                   Use the contact form
                 </Link>
               </div>
+            </div>
+
+            {/* Author guide */}
+            <div id="author-guide" className="scroll-mt-24">
+              <div className="mb-5">
+                <p className="text-[11px] uppercase tracking-[0.28em] text-white/40 mb-1">Free resource</p>
+                <h2 className="text-2xl font-bold text-white">What comes next?</h2>
+                <p className="mt-1 text-sm text-white/55">A step-by-step walkthrough for authors — from final edits to launch day.</p>
+              </div>
+              <AuthorGuide />
             </div>
 
           </div>
