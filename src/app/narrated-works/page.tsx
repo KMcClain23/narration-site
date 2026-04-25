@@ -192,7 +192,7 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
       className="group relative rounded-2xl overflow-visible cursor-default"
       itemScope
       itemType="https://schema.org/Book"
-      style={{ aspectRatio: "2/3", marginBottom: "7rem" }}
+      style={{ aspectRatio: "2/3", marginBottom: "8rem" }}
     >
       {/* Cover wrapper — clip to card shape */}
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
@@ -255,36 +255,34 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
       {/* Floating pill — sits over the bottom edge of the card */}
       <div className="absolute -bottom-px inset-x-0 z-30 translate-y-1/2 group-hover:-translate-y-0 transition-transform duration-300">
         <div
-          className="rounded-xl px-3 py-2 flex items-center justify-between gap-2"
+          className="rounded-xl px-5 py-5"
           style={{
-            background: "rgba(11, 18, 36, 0.82)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+            background: "rgba(5, 8, 20, 0.97)",
+            backdropFilter: "blur(14px)",
+            WebkitBackdropFilter: "blur(14px)",
+            border: "1px solid rgba(255,255,255,0.09)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
           }}
         >
-          <div className="min-w-0 flex-1">
-            <h3
-              className="font-semibold text-[11px] leading-snug text-white truncate"
-              itemProp="name"
-            >
-              {book.title}
-            </h3>
-            <button
-              ref={authorBtnRef}
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
-              className="text-[10px] text-[#D4AF37] font-medium hover:text-[#E0C15A] transition-colors text-left hover:underline underline-offset-2 truncate block max-w-full"
-              itemProp="author"
-              aria-label={`View ${book.author} author info`}
-            >
-              {book.author}
-            </button>
-          </div>
+          <h3
+            className="font-bold text-lg leading-snug text-white"
+            itemProp="name"
+          >
+            {book.title}
+          </h3>
           {book.subtitle && (
-            <p className="text-[8px] text-white/30 shrink-0 hidden sm:block truncate max-w-[60px]">{book.subtitle}</p>
+            <p className="text-sm text-white/80 mt-1 leading-snug">{book.subtitle}</p>
           )}
+          <button
+            ref={authorBtnRef}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
+            className="mt-2 text-base text-[#E0C15A] font-bold hover:text-[#F0D060] transition-colors text-left hover:underline underline-offset-2 block"
+            itemProp="author"
+            aria-label={`View ${book.author} author info`}
+          >
+            {book.author}
+          </button>
         </div>
       </div>
 
@@ -390,60 +388,61 @@ export default function NarratedWorks() {
     <main className="min-h-screen bg-[#050814] text-white overflow-x-clip">
       <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-8 pb-20">
 
-        {/* Page title — not sticky, scrolls away */}
-        <div className="mb-6">
-          <p className="text-xs uppercase tracking-[0.28em] text-white/40 mb-2">Portfolio</p>
-          <h1 className="text-3xl font-bold text-white">Narrated works</h1>
-          {!isLoading && totalBooks > 0 && (
-            <p className="mt-1 text-sm text-white/35">{totalBooks} titles across dark romance, romantasy, thriller & more</p>
-          )}
-        </div>
-
-        {/* Search + filter — sticky */}
-        <div className="sticky top-20 z-40 -mx-5 sm:-mx-8 px-5 sm:px-8 py-3 mb-10"
+        {/* Page title + search — sticky */}
+        <div className="sticky top-20 z-40 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 mb-10"
           style={{ background: "rgba(5,8,20,0.94)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="relative sm:w-72">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-3.5 w-3.5 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <input
-              type="text"
-              placeholder="Title, author, or genre…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 pl-9 pr-9 text-sm focus:outline-none focus:border-[#D4AF37]/40 focus:bg-white/8 transition-all placeholder:text-white/20 text-white/80"
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute inset-y-0 right-0 pr-3 flex items-center text-white/25 hover:text-white/60 transition" type="button" aria-label="Clear search">
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            )}
-          </div>
-        </div>
 
-        {/* Active tag filter indicator */}
-        {searchQuery && (
-          <div className="flex items-center gap-3 pt-2">
-            <span className="text-sm text-white/40">Filtering by:</span>
-            <span className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-white bg-[#D4AF37]/20 border border-[#D4AF37]/40 px-3 py-1.5 rounded-full">
-              {searchQuery}
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="text-white/50 hover:text-white transition-colors ml-1"
-                aria-label="Clear filter"
-              >
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          {/* Title + search row */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.28em] text-white/40 mb-1">Portfolio</p>
+              <h1 className="text-2xl font-bold text-white leading-none">Narrated works</h1>
+              {!isLoading && totalBooks > 0 && (
+                <p className="mt-1 text-xs text-white/35">{totalBooks} titles across dark romance, romantasy, thriller & more</p>
+              )}
+            </div>
+            <div className="relative sm:w-72">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-3.5 w-3.5 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-              </button>
-            </span>
+              </div>
+              <input
+                type="text"
+                placeholder="Title, author, or genre…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 pl-9 pr-9 text-sm focus:outline-none focus:border-[#D4AF37]/40 focus:bg-white/8 transition-all placeholder:text-white/20 text-white/80"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery("")} className="absolute inset-y-0 right-0 pr-3 flex items-center text-white/25 hover:text-white/60 transition" type="button" aria-label="Clear search">
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              )}
+            </div>
           </div>
-        )}
-        </div>{/* end sticky wrapper */}
+
+          {/* Active tag filter indicator */}
+          {searchQuery && (
+            <div className="flex items-center gap-3 pt-3">
+              <span className="text-sm text-white/40">Filtering by:</span>
+              <span className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-white bg-[#D4AF37]/20 border border-[#D4AF37]/40 px-3 py-1.5 rounded-full">
+                {searchQuery}
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="text-white/50 hover:text-white transition-colors ml-1"
+                  aria-label="Clear filter"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
+            </div>
+          )}
+
+        </div>{/* end sticky */}
 
         {isLoading ? (
           <div className="py-32 text-center">
