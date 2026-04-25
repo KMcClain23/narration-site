@@ -133,7 +133,7 @@ function DemoPlayer({
                   : <svg className="h-5 w-5 translate-x-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
               }
             </button>
-            <div className="flex-1 min-w-0">
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 role="slider"
                 aria-label="Seekbar"
@@ -141,8 +141,12 @@ function DemoPlayer({
                 aria-valuemin={0}
                 aria-valuemax={100}
                 onClick={handleSeek}
-                className="relative block w-full h-2.5 rounded-full cursor-pointer"
                 style={{
+                  display: "block",
+                  width: "100%",
+                  height: "10px",
+                  borderRadius: "9999px",
+                  cursor: "pointer",
                   background: `linear-gradient(to right, #D4AF37 ${pct}%, rgba(255,255,255,0.2) ${pct}%)`,
                   transition: "background 100ms linear",
                 }}

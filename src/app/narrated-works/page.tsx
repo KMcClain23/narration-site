@@ -192,7 +192,7 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
       className="group relative rounded-2xl overflow-visible cursor-default"
       itemScope
       itemType="https://schema.org/Book"
-      style={{ aspectRatio: "2/3", marginBottom: "8rem" }}
+      style={{ aspectRatio: "2/3", marginBottom: "clamp(4rem, 8vw, 8rem)" }}
     >
       {/* Cover wrapper — clip to card shape */}
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
@@ -210,7 +210,7 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
 
         {/* Hover overlay — full card face */}
         <div
-          className="absolute inset-0 z-20 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col p-4"
+          className="absolute inset-0 z-20 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col p-3 sm:p-4"
           style={{ background: "linear-gradient(to bottom, rgba(6,8,46,0.85) 0%, rgba(6,8,46,0.1) 40%, rgba(6,8,46,0.1) 60%, rgba(6,8,46,0.0) 100%)" }}
         >
           {/* Tags — top, clickable to filter */}
@@ -220,7 +220,7 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
                 key={tag}
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onTagClick(tag); }}
-                className="text-sm font-bold uppercase tracking-wide text-white bg-[#D4AF37]/30 border border-[#D4AF37]/60 px-3 py-1.5 rounded-full backdrop-blur-sm hover:bg-[#D4AF37]/50 hover:border-[#D4AF37] transition-colors cursor-pointer"
+                className="text-[10px] sm:text-sm font-bold uppercase tracking-wide text-white bg-[#D4AF37]/30 border border-[#D4AF37]/60 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full backdrop-blur-sm hover:bg-[#D4AF37]/50 hover:border-[#D4AF37] transition-colors cursor-pointer"
               >
                 {tag}
               </button>
@@ -237,7 +237,7 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
                 className="inline-flex items-center gap-2 text-sm font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-5 py-2.5 rounded-full transition-colors shadow-xl"
                 aria-label={`Listen to ${book.title} on Audible`}
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
+                <svg width="10" height="10" className="sm:w-[13px] sm:h-[13px]" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
                 Listen on Audible
               </a>
             </div>
@@ -273,14 +273,14 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
           }}
         >
           {/* Default (compact) state */}
-          <div className="block group-hover:hidden px-4 py-3">
-            <h3 className="font-semibold text-sm leading-snug text-white truncate" itemProp="name">
+          <div className="block group-hover:hidden px-3 py-2.5 sm:px-4 sm:py-3">
+            <h3 className="font-semibold text-xs sm:text-sm leading-snug text-white truncate" itemProp="name">
               {book.title}
             </h3>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
-              className="text-xs text-[#D4AF37] font-medium hover:text-[#F0D060] transition-colors text-left block truncate w-full"
+              className="text-[10px] sm:text-xs text-[#D4AF37] font-medium hover:text-[#F0D060] transition-colors text-left block truncate w-full"
               itemProp="author"
               aria-label={`View ${book.author} author info`}
             >
@@ -288,17 +288,17 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
             </button>
           </div>
           {/* Expanded (hover) state */}
-          <div className="hidden group-hover:block px-5 py-5">
-            <h3 className="font-bold text-xl leading-snug text-white" itemProp="name">
+          <div className="hidden group-hover:block px-3 py-4 sm:px-5 sm:py-5">
+            <h3 className="font-bold text-base sm:text-xl leading-snug text-white" itemProp="name">
               {book.title}
             </h3>
             {book.subtitle && (
-              <p className="text-sm text-white mt-1.5 leading-snug font-medium">{book.subtitle}</p>
+              <p className="text-xs sm:text-sm text-white mt-1 sm:mt-1.5 leading-snug font-medium">{book.subtitle}</p>
             )}
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
-              className="mt-2 text-base text-[#D4AF37] font-bold hover:text-[#F0D060] transition-colors text-left hover:underline underline-offset-2 block"
+              className="mt-1.5 sm:mt-2 text-sm sm:text-base text-[#D4AF37] font-bold hover:text-[#F0D060] transition-colors text-left hover:underline underline-offset-2 block"
               itemProp="author"
               aria-label={`View ${book.author} author info`}
             >
