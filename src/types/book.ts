@@ -6,6 +6,7 @@ export type Book = {
   subtitle?: string;
   author: string;
   link: string;
+  ar_link?: string;
   cover_url: string;
   tags: string[];
   description?: string;

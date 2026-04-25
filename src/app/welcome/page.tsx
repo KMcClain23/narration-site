@@ -1,24 +1,11 @@
-import type { Metadata } from "next";
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import WelcomeSectionNav from "../components/WelcomeSectionNav";
 
-export const metadata: Metadata = {
-  title: "Working Together | Dean Miller Narration",
-  description:
-    "Everything you need to know about working with Dean Miller: manuscript prep, character approvals, the First 15 review, delivery, and payment — from inquiry to ACX-ready master.",
-  alternates: {
-    canonical: "https://www.dmnarration.com/welcome",
-  },
-  openGraph: {
-    title: "Working Together | Dean Miller Narration",
-    description:
-      "A clear guide to Dean Miller's audiobook narration process — from manuscript handoff through final delivery.",
-    url: "https://www.dmnarration.com/welcome",
-    type: "website",
-  },
-};
-
-const helpfulLinks = [
+// helpfulLinks moved into component
+const _unused = [
   {
     title: "ACX: Dual and Duet Narration Overview",
     href: "https://www.acx.com/mp/blog/it-takes-two-dual-and-duet-narrations-are-spicing-up-romance",
@@ -89,6 +76,24 @@ function StepBadge({ n }: { n: number }) {
 }
 
 export default function WelcomePage() {
+  const [platform, setPlatform] = useState<"acx" | "ar">("acx");
+
+  const acxLinks = [
+    { title: "ACX: Dual and Duet Narration Overview", href: "https://www.acx.com/mp/blog/it-takes-two-dual-and-duet-narrations-are-spicing-up-romance", description: "ACX's explanation of dual and duet production, including how multi-narrator projects are commonly structured on the platform." },
+    { title: "ACX: Independent Contractor Agreements", href: "https://www.acx.com/mp/blog/the-four-agreements", description: "Helpful when additional narrators, editors, or engineers need separate off-platform agreements." },
+    { title: "ACX: How It Works for Authors", href: "https://www.acx.com/help/authors-as-narrators/200626860", description: "Overview of ACX workflow, approvals, and the production process from the rights holder side." },
+    { title: "ACX: How It Works for Narrators & Studios", href: "https://www.acx.com/mp/how-it-works/narrators-and-studios", description: "Helpful for understanding producer responsibilities and what retail-ready delivery includes." },
+  ];
+
+  const arLinks = [
+    { title: "Authors Republic: How It Works", href: "https://www.authorsrepublic.com/how-it-works", description: "Overview of the Authors Republic platform for audiobook distribution and production." },
+    { title: "Authors Republic: For Authors", href: "https://www.authorsrepublic.com/authors", description: "Details on submitting and distributing your audiobook through Authors Republic." },
+    { title: "Authors Republic: Distribution Network", href: "https://www.authorsrepublic.com/distribution", description: "The wide network of retailers and libraries Authors Republic distributes to." },
+    { title: "Authors Republic: Narrator Marketplace", href: "https://www.authorsrepublic.com/narrators", description: "How narrators and authors connect on the Authors Republic platform." },
+  ];
+
+  const activeLinks = platform === "acx" ? acxLinks : arLinks;
+
   return (
     <main className="min-h-screen bg-[#06082E] text-white">
 
@@ -135,6 +140,27 @@ export default function WelcomePage() {
                 <p className="mt-2 text-white/90">{item.value}</p>
               </div>
             ))}
+          </div>
+
+          {/* Platform toggle */}
+          <div className="mt-6 flex items-center gap-3">
+            <span className="text-sm text-white/50">Platform:</span>
+            <div className="flex rounded-full border border-white/15 overflow-hidden text-sm font-bold">
+              <button
+                type="button"
+                onClick={() => setPlatform("acx")}
+                className={`px-5 py-2 transition-colors ${platform === "acx" ? "bg-[#D4AF37] text-black" : "text-white/50 hover:text-white"}`}
+              >
+                ACX / Audible
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlatform("ar")}
+                className={`px-5 py-2 transition-colors ${platform === "ar" ? "bg-[#D4AF37] text-black" : "text-white/50 hover:text-white"}`}
+              >
+                Authors Republic
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -197,7 +223,9 @@ export default function WelcomePage() {
                   {
                     n: 6,
                     title: "Payment & release",
-                    body: "ACX projects: handled through ACX. Off-platform or duet: I provide a project estimate based on final word count. Payment via Check, Venmo, PayPal, Credit Card, or Direct Deposit.",
+                    body: platform === "acx"
+                      ? "ACX projects: handled through ACX. Off-platform or duet: I provide a project estimate based on final word count. Payment via Check, Venmo, PayPal, Credit Card, or Direct Deposit."
+                      : "Authors Republic projects are handled off-platform with a direct contract. I provide a project estimate based on final word count. Payment via Check, Venmo, PayPal, Credit Card, or Direct Deposit.",
                   },
                 ].map((step) => (
                   <div key={step.n} className="flex gap-4">
@@ -305,7 +333,7 @@ export default function WelcomePage() {
               </div>
 
               <div className="grid gap-4 pt-2">
-                {helpfulLinks.map((link) => (
+                {activeLinks.map((link) => (
                   <a
                     key={link.href}
                     href={link.href}

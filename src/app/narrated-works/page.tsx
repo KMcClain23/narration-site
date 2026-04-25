@@ -192,7 +192,7 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
       className="group relative rounded-2xl overflow-visible cursor-default"
       itemScope
       itemType="https://schema.org/Book"
-      style={{ aspectRatio: "2/3", marginBottom: "clamp(4rem, 8vw, 8rem)" }}
+      style={{ aspectRatio: "2/3", marginBottom: "clamp(3rem, 6vw, 6rem)" }}
     >
       {/* Cover wrapper — clip to card shape */}
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
@@ -321,27 +321,20 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
 }
 
 function SectionGrid({
-  title,
-  books,
-  statusBadge,
-  authors,
-  onTagClick,
+  title, books, statusBadge, authors, onTagClick,
 }: {
-  title: string;
-  books: Book[];
-  statusBadge?: React.ReactNode;
-  authors: Record<string, Author>;
-  onTagClick: (tag: string) => void;
+  title: string; books: Book[]; statusBadge?: React.ReactNode;
+  authors: Record<string, Author>; onTagClick: (tag: string) => void;
 }) {
   if (books.length === 0) return null;
   return (
-    <section className="mb-20">
-      <div className="flex items-center gap-4 mb-7 scroll-mt-36">
+    <section className="mb-10">
+      <div className="flex items-center gap-4 mb-5 scroll-mt-36">
         <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/40">{title}</h2>
         <div className="flex-1 h-px bg-white/8" />
         <span className="text-xs text-white/25">{books.length}</span>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 sm:gap-8 items-start" style={{ paddingBottom: "2rem" }}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 items-start" style={{ paddingBottom: "1rem" }}>
         {books.map((book) => (
           <BookCard key={book.id} book={book} statusBadge={statusBadge} author={authors[book.author]} onTagClick={onTagClick} />
         ))}
@@ -408,10 +401,10 @@ export default function NarratedWorks() {
 
   return (
     <main className="min-h-screen bg-[#06082E] text-white overflow-x-clip">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-8 pb-20">
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-6 pb-12">
 
         {/* Page title + search — sticky */}
-        <div className="sticky top-20 z-40 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 mb-6"
+        <div className="sticky top-20 z-40 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 mb-8"
           style={{ background: "rgba(6,8,46,0.94)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
 
           {/* Title + search row */}
