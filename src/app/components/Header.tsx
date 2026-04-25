@@ -75,8 +75,8 @@ export default function Header() {
   };
 
   const headerClass = isScrolled
-    ? "bg-[#050814]/55 backdrop-blur-xl border-b border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
-    : "bg-[#050814]/60 backdrop-blur-md border-b border-white/5";
+    ? "bg-[#06082E]/55 backdrop-blur-xl border-b border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
+    : "bg-[#06082E]/60 backdrop-blur-md border-b border-white/5";
 
   const handleSecretAdminTrigger = (e: React.MouseEvent) => {
     // Let normal navigation still happen
@@ -144,7 +144,7 @@ export default function Header() {
                   className={[
                     "relative px-1 py-2 transition",
                     "text-white/80 hover:text-white",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814] rounded",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06082E] rounded",
                     active ? "text-white" : "",
                   ].join(" ")}
                   aria-current={active ? "page" : undefined}
@@ -169,7 +169,7 @@ export default function Header() {
               href="https://www.tiktok.com/@deanmillernarration"
               target="_blank"
               rel="noopener noreferrer"
-              className="md:hidden text-white/80 hover:text-[#D4AF37] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814] rounded"
+              className="md:hidden text-white/80 hover:text-[#D4AF37] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06082E] rounded"
               aria-label="TikTok"
             >
               <FaTiktok />
@@ -180,7 +180,7 @@ export default function Header() {
                 href="https://www.tiktok.com/@deanmillernarration"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-white/80 hover:text-[#D4AF37] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814] rounded"
+                className="text-white/80 hover:text-[#D4AF37] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06082E] rounded"
                 aria-label="TikTok"
               >
                 <FaTiktok />
@@ -189,7 +189,7 @@ export default function Header() {
                 href="https://www.instagram.com/deanmillernarrator"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-white/80 hover:text-[#D4AF37] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814] rounded"
+                className="text-white/80 hover:text-[#D4AF37] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06082E] rounded"
                 aria-label="Instagram"
               >
                 <FaInstagram />
@@ -198,7 +198,7 @@ export default function Header() {
                 href="https://discord.com/users/1425271466538045512"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-white/80 hover:text-[#D4AF37] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814] rounded"
+                className="text-white/80 hover:text-[#D4AF37] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06082E] rounded"
                 aria-label="Discord"
               >
                 <FaDiscord />
@@ -208,7 +208,7 @@ export default function Header() {
 
           {/* Hamburger Menu Toggle */}
           <button
-            className="md:hidden text-2xl text-white/80 hover:text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814] rounded"
+            className="md:hidden text-2xl text-white/80 hover:text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06082E] rounded"
             onClick={toggleMenu}
             aria-label="Toggle Menu"
             aria-expanded={isOpen}
@@ -220,13 +220,13 @@ export default function Header() {
 
       {/* Mobile Menu Overlay */}
       {isOpen ? (
-        <div className="md:hidden border-t border-white/10 bg-[#050814]/75 backdrop-blur-xl">
+        <div className="md:hidden border-t border-white/10 bg-[#06082E]/75 backdrop-blur-xl">
           <nav className="max-w-6xl mx-auto px-5 sm:px-6 py-4">
             <div className="grid gap-2">
               {navLinks.map((link) => (
                 <a
                   key={link.name}
-                  className="rounded-lg px-3 py-3 text-white/85 hover:text-white hover:bg-white/5 transition text-base font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814]"
+                  className="rounded-lg px-3 py-3 text-white/85 hover:text-white hover:bg-white/5 transition text-base font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06082E]"
                   href={link.href}
                   onClick={() => handleHashScroll(link.href)}
                 >
@@ -239,7 +239,7 @@ export default function Header() {
               <a
                 href="/#demos"
                 onClick={() => handleHashScroll("/#demos")}
-                className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-4 py-3 font-semibold transition hover:bg-[#E0C15A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050814]"
+                className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-4 py-3 font-semibold transition hover:bg-[#E0C15A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06082E]"
               >
                 Listen to demos
               </a>

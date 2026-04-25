@@ -126,7 +126,7 @@ function AuthorPopup({
       ref={popupRef}
       role="dialog"
       aria-label={`${author.name} author info`}
-      className="rounded-2xl border border-[#1A2550] bg-[#0B1224] shadow-2xl overflow-hidden"
+      className="rounded-2xl border border-[#1A2070] bg-[#0A0D3A] shadow-2xl overflow-hidden"
       style={{ ...style, animation: style.opacity === 1 ? "liquidReveal 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards" : undefined }}
     >
       {/* Header */}
@@ -211,7 +211,7 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
         {/* Hover overlay — full card face */}
         <div
           className="absolute inset-0 z-20 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col p-4"
-          style={{ background: "linear-gradient(to bottom, rgba(5,8,20,0.85) 0%, rgba(5,8,20,0.1) 40%, rgba(5,8,20,0.1) 60%, rgba(5,8,20,0.0) 100%)" }}
+          style={{ background: "linear-gradient(to bottom, rgba(6,8,46,0.85) 0%, rgba(6,8,46,0.1) 40%, rgba(6,8,46,0.1) 60%, rgba(6,8,46,0.0) 100%)" }}
         >
           {/* Tags — top, clickable to filter */}
           <div className="flex flex-wrap gap-2">
@@ -254,13 +254,21 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
 
       {/* Floating pill — compact default, expands on hover */}
       <div className="absolute -bottom-px inset-x-0 z-30 translate-y-1/2 group-hover:-translate-y-0 transition-transform duration-300">
+        {/* Invisible anchor for popup positioning — always present */}
+        <button
+          ref={authorBtnRef}
+          type="button"
+          className="absolute opacity-0 pointer-events-none w-0 h-0"
+          aria-hidden="true"
+          tabIndex={-1}
+        />
         <div
           className="rounded-xl transition-all duration-300"
           style={{
-            background: "rgba(5, 8, 20, 0.97)",
+            background: "rgba(8, 12, 60, 0.97)",
             backdropFilter: "blur(14px)",
             WebkitBackdropFilter: "blur(14px)",
-            border: "1px solid rgba(255,255,255,0.09)",
+            border: "1px solid rgba(100, 120, 255, 0.25)",
             boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
           }}
         >
@@ -270,7 +278,6 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
               {book.title}
             </h3>
             <button
-              ref={authorBtnRef}
               type="button"
               onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
               className="text-xs text-[#D4AF37] font-medium hover:text-[#F0D060] transition-colors text-left block truncate w-full"
@@ -400,12 +407,12 @@ export default function NarratedWorks() {
   const totalBooks = completed.length + inProgress.length + comingSoon.length;
 
   return (
-    <main className="min-h-screen bg-[#050814] text-white overflow-x-clip">
+    <main className="min-h-screen bg-[#06082E] text-white overflow-x-clip">
       <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-8 pb-20">
 
         {/* Page title + search — sticky */}
         <div className="sticky top-20 z-40 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 mb-6"
-          style={{ background: "rgba(5,8,20,0.94)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          style={{ background: "rgba(6,8,46,0.94)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
 
           {/* Title + search row */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

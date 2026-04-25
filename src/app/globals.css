@@ -2,14 +2,14 @@
 
 /* Brand base */
 :root {
-  --background: #050814;
+  --background: #06082E;
   --foreground: #ffffff;
 }
 
 /* Force dark always */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #050814;
+    --background: #06082E;
     --foreground: #ffffff;
   }
 }

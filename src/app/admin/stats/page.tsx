@@ -44,7 +44,7 @@ export default async function AdminStatsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#050814] text-white p-6 pt-8 md:p-12 md:pt-8">
+    <main className="min-h-screen bg-[#06082E] text-white p-6 pt-8 md:p-12 md:pt-8">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between border-b border-[#1A2550] pb-8">
           <h1 className="text-4xl font-bold text-[#D4AF37]">Dean Miller Admin</h1>
@@ -85,7 +85,7 @@ export default async function AdminStatsPage() {
                     </form>
                   </div>
                 </div>
-                <div className="mt-4 p-4 bg-[#050814] rounded-lg border border-[#1A2550]/50 text-white/80 text-sm leading-relaxed">
+                <div className="mt-4 p-4 bg-[#06082E] rounded-lg border border-[#1A2550]/50 text-white/80 text-sm leading-relaxed">
                   {inquiry.message}
                 </div>
               </div>

@@ -60,7 +60,7 @@ function AdminBookCard({
     <div
       draggable
       onDragStart={() => onDragStart(book)}
-      className="rounded-xl border border-[#1A2550] bg-[#050814] p-4 shadow-md cursor-grab active:cursor-grabbing hover:border-[#D4AF37]/40 transition-colors"
+      className="rounded-xl border border-[#1A2550] bg-[#06082E] p-4 shadow-md cursor-grab active:cursor-grabbing hover:border-[#D4AF37]/40 transition-colors"
     >
       <div className="flex items-start gap-3">
         <img
@@ -162,7 +162,7 @@ function CategoryColumn({
         <h2 className="text-sm font-bold uppercase tracking-widest text-white/90">
           {categoryLabels[category]}
         </h2>
-        <span className="rounded-full bg-[#050814] border border-[#1A2550] px-2.5 py-1 text-xs text-white/60">
+        <span className="rounded-full bg-[#06082E] border border-[#1A2550] px-2.5 py-1 text-xs text-white/60">
           {books.length}
         </span>
       </div>
@@ -518,7 +518,7 @@ export default function AdminPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#050814] text-white px-6 py-12">
+    <main className="min-h-screen bg-[#06082E] text-white px-6 py-12">
       <div className="max-w-7xl mx-auto">
         <header className="mb-10">
           <h1 className="text-3xl md:text-4xl font-bold">Admin: Manage Books</h1>
@@ -556,7 +556,7 @@ export default function AdminPage() {
                 value={form.title}
                 onChange={handleChange}
                 required
-                className="w-full rounded-lg bg-[#050814] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
+                className="w-full rounded-lg bg-[#06082E] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
               />
             </div>
 
@@ -570,7 +570,7 @@ export default function AdminPage() {
                 type="text"
                 value={form.subtitle}
                 onChange={handleChange}
-                className="w-full rounded-lg bg-[#050814] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
+                className="w-full rounded-lg bg-[#06082E] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
               />
             </div>
 
@@ -585,7 +585,7 @@ export default function AdminPage() {
                 value={form.author}
                 onChange={handleChange}
                 required
-                className="w-full rounded-lg bg-[#050814] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
+                className="w-full rounded-lg bg-[#06082E] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
               />
             </div>
 
@@ -600,7 +600,7 @@ export default function AdminPage() {
                 value={form.link}
                 onChange={handleChange}
                 placeholder="https://"
-                className="w-full rounded-lg bg-[#050814] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
+                className="w-full rounded-lg bg-[#06082E] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
               />
             </div>
 
@@ -615,7 +615,7 @@ export default function AdminPage() {
                 onChange={handleChange}
                 required
                 rows={6}
-                className="w-full rounded-lg bg-[#050814] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
+                className="w-full rounded-lg bg-[#06082E] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
               />
             </div>
 
@@ -630,7 +630,7 @@ export default function AdminPage() {
                 value={form.tags}
                 onChange={handleChange}
                 placeholder="Dark Romance, Mystery, Duet"
-                className="w-full rounded-lg bg-[#050814] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
+                className="w-full rounded-lg bg-[#06082E] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
               />
               <p className="text-xs text-white/45 mt-2">
                 Separate tags with commas.
@@ -646,7 +646,7 @@ export default function AdminPage() {
                 name="category"
                 value={form.category}
                 onChange={handleChange}
-                className="w-full rounded-lg bg-[#050814] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
+                className="w-full rounded-lg bg-[#06082E] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
               >
                 <option value="completed">Completed Audiobook Projects</option>
                 <option value="in-progress">Currently Narrating</option>
@@ -664,7 +664,7 @@ export default function AdminPage() {
                 accept="image/*"
                 onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
                 required={!isEditing}
-                className="w-full rounded-lg bg-[#050814] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
+                className="w-full rounded-lg bg-[#06082E] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
               />
               {isEditing && (
                 <p className="text-xs text-white/45 mt-2">

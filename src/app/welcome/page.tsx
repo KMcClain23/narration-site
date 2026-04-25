@@ -90,7 +90,7 @@ function StepBadge({ n }: { n: number }) {
 
 export default function WelcomePage() {
   return (
-    <main className="min-h-screen bg-[#050814] text-white">
+    <main className="min-h-screen bg-[#06082E] text-white">
 
       {/* Hero */}
       <section className="bg-[radial-gradient(circle_at_top,rgba(212,175,55,0.15),transparent_35%)]">

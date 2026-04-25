@@ -211,7 +211,7 @@ function HomeContent() {
   ];
 
   return (
-    <main className="min-h-screen bg-[#050814] text-white overflow-x-clip">
+    <main className="min-h-screen bg-[#06082E] text-white overflow-x-clip">
       {/* Keyframes */}
       <style>{`
         @keyframes barPulse {
@@ -238,9 +238,9 @@ function HomeContent() {
           <Image src={BANNER_URL} alt="Dean Miller recording studio" fill priority
             sizes="(max-width: 768px) 100vw, 100vw"
             className="object-cover opacity-25" style={{ objectPosition: "center 30%", transform: "scale(1.05)", transformOrigin: "center" }} />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(5,8,20,0.5) 0%, rgba(5,8,20,0.4) 40%, rgba(5,8,20,1) 100%)" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(6,8,46,0.5) 0%, rgba(6,8,46,0.4) 40%, rgba(6,8,46,1) 100%)" }} />
           {/* Subtle vignette edges */}
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(5,8,20,0.7) 100%)" }} />
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(6,8,46,0.7) 100%)" }} />
         </div>
 
         <div className="relative max-w-5xl mx-auto px-5 sm:px-6 pt-8 pb-16 w-full">
@@ -300,7 +300,7 @@ function HomeContent() {
                 <Image src={PROFILE_URL} alt="Dean Miller, audiobook narrator" fill
                   sizes="(max-width: 1024px) 224px, 288px"
                   className="object-cover" style={{ objectPosition: "center top" }} priority />
-                <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(5,8,20,1) 0%, rgba(5,8,20,0.4) 40%, transparent 70%)" }} />
+                <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(6,8,46,1) 0%, rgba(6,8,46,0.4) 40%, transparent 70%)" }} />
               </div>
               {/* Gold accent line */}
               <div className="absolute left-0 bottom-0 top-0 w-px bg-gradient-to-b from-transparent via-[#D4AF37]/40 to-transparent" />
@@ -413,7 +413,7 @@ function HomeContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Form */}
             <form ref={formRef} action={handleNativeSubmit}
-              className="rounded-2xl border border-white/8 bg-[#0B1224]/60 p-6 backdrop-blur-sm">
+              className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6 backdrop-blur-sm">
               {formStatus && (
                 <div className={`mb-5 px-4 py-3 rounded-lg text-sm border ${
                   formStatus.success
@@ -452,7 +452,7 @@ function HomeContent() {
             {/* Right column */}
             <div className="flex flex-col gap-4">
               {/* Book a call */}
-              <div className="rounded-2xl border border-white/8 bg-[#0B1224]/60 p-6">
+              <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] mb-3">Book a call</p>
                 <p className="text-sm text-white/55 leading-relaxed mb-5">
                   Prefer to talk through your project first? Check availability and book a free 15-minute call.
@@ -464,7 +464,7 @@ function HomeContent() {
               </div>
 
               {/* Direct email */}
-              <div className="rounded-2xl border border-white/8 bg-[#0B1224]/60 p-6">
+              <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] mb-3">Direct email</p>
                 <button
                   onClick={() => { if (!showEmail) setShowEmail(true); else window.location.href = "mailto:Dean@DMNarration.com"; }}
@@ -475,7 +475,7 @@ function HomeContent() {
               </div>
 
               {/* Find me on */}
-              <div className="rounded-2xl border border-white/8 bg-[#0B1224]/60 p-6">
+              <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] mb-4">Find me on</p>
                 <ul className="space-y-2.5">
                   {[

@@ -50,7 +50,7 @@ function Field({
   required?: boolean;
 }) {
   const base =
-    "w-full bg-[#050814] border border-[#1A2550] rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/60 transition";
+    "w-full bg-[#050814] border border-[#1A2070] rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/60 transition";
   return (
     <div className="space-y-1.5">
       <label className="text-[10px] font-bold uppercase tracking-widest text-white/40">
@@ -214,7 +214,7 @@ export default function AuthorManager() {
     [a.website, a.amazon, a.instagram, a.tiktok, a.facebook, a.goodreads].filter(Boolean).length;
 
   return (
-    <section className="mt-12 pt-12 border-t border-[#1A2550]">
+    <section className="mt-12 pt-12 border-t border-[#1A2070]">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-semibold text-white">Author profiles</h2>
@@ -242,7 +242,7 @@ export default function AuthorManager() {
 
       {/* Add form */}
       {adding && (
-        <div className="mb-6 rounded-2xl border border-[#D4AF37]/30 bg-[#0B1224] p-6">
+        <div className="mb-6 rounded-2xl border border-[#D4AF37]/30 bg-[#0A0D3A] p-6">
           <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-bold mb-4">New author</p>
           <AuthorForm
             initial={EMPTY_FORM}
@@ -258,7 +258,7 @@ export default function AuthorManager() {
           <div className="inline-block h-5 w-5 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : authors.length === 0 ? (
-        <div className="py-16 text-center rounded-2xl border border-dashed border-[#1A2550]">
+        <div className="py-16 text-center rounded-2xl border border-dashed border-[#1A2070]">
           <p className="text-white/20 italic text-sm">No authors yet. Add one above.</p>
         </div>
       ) : (
@@ -271,8 +271,8 @@ export default function AuthorManager() {
             return (
               <div
                 key={author.id}
-                className={`rounded-2xl border bg-[#0B1224] transition ${
-                  isEditing ? "border-[#D4AF37]/40" : "border-[#1A2550] hover:border-[#1A2550]/80"
+                className={`rounded-2xl border bg-[#0A0D3A] transition ${
+                  isEditing ? "border-[#D4AF37]/40" : "border-[#1A2070] hover:border-[#1A2070]/80"
                 }`}
               >
                 {isEditing ? (
@@ -333,7 +333,7 @@ export default function AuthorManager() {
 
                     {/* Expanded link preview */}
                     {isExpanded && (
-                      <div className="border-t border-[#1A2550] px-5 py-4">
+                      <div className="border-t border-[#1A2070] px-5 py-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
                           {FIELDS.map((f) => (
                             <div key={f.key} className="flex items-center gap-2 text-xs">
