@@ -91,7 +91,7 @@ function DemoPlayer({
   const pct = duration > 0 ? (current / duration) * 100 : 0;
 
   return (
-    <div className={`group relative rounded-2xl overflow-hidden transition-all duration-500 ${isActive ? "ring-1 ring-[#D4AF37]/50" : "hover:ring-1 hover:ring-white/10"}`}
+    <div className={`group relative rounded-2xl transition-all duration-500 ${isActive ? "ring-1 ring-[#D4AF37]/50" : "hover:ring-1 hover:ring-white/10"}`}
       style={{ background: isActive ? "linear-gradient(135deg, rgba(212,175,55,0.08) 0%, rgba(11,18,36,1) 60%)" : "rgba(11,18,36,1)" }}>
 
       {/* Ambient glow when active */}
@@ -141,13 +141,12 @@ function DemoPlayer({
                 aria-valuemin={0}
                 aria-valuemax={100}
                 onClick={handleSeek}
-                className="relative block w-full h-2.5 rounded-full cursor-pointer bg-white/20"
-              >
-                <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-[#D4AF37]"
-                  style={{ width: `${Math.max(pct, 0)}%`, minWidth: pct > 0 ? "6px" : "0px", transition: "width 100ms linear" }}
-                />
-              </div>
+                className="relative block w-full h-2.5 rounded-full cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, #D4AF37 ${pct}%, rgba(255,255,255,0.2) ${pct}%)`,
+                  transition: "background 100ms linear",
+                }}
+              />
               <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-white/30">
                 <span>{formatTime(current)}</span>
                 <span>{formatTime(duration)}</span>
