@@ -208,14 +208,14 @@ function BookCard({ book, statusBadge, author }: { book: Book; statusBadge?: Rea
         {/* Ambient glow */}
         <div className="absolute -inset-2 opacity-0 group-hover:opacity-30 transition-opacity duration-700 blur-2xl bg-[#D4AF37] pointer-events-none z-0" />
 
-        {/* Hover: tags + listen link at top */}
-        <div className="absolute inset-x-3 top-3 z-20 opacity-0 group-hover:opacity-100 transition-all duration-300">
-          <div className="flex flex-wrap gap-1 mb-2">
+        {/* Hover overlay — full card face */}
+        <div
+          className="absolute inset-0 z-20 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-between p-5"
+          style={{ background: "linear-gradient(to bottom, rgba(5,8,20,0.80) 0%, rgba(5,8,20,0.15) 45%, rgba(5,8,20,0.80) 100%)" }}
+        >
+          <div className="flex flex-wrap gap-2">
             {book.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="text-[7px] font-bold uppercase tracking-wide text-white/70 bg-black/50 backdrop-blur-sm border border-white/10 px-1.5 py-0.5 rounded-full"
-              >
+              <span key={tag} className="text-sm font-bold uppercase tracking-wide text-white bg-[#D4AF37]/30 border border-[#D4AF37]/60 px-3 py-1.5 rounded-full backdrop-blur-sm">
                 {tag}
               </span>
             ))}
@@ -226,10 +226,10 @@ function BookCard({ book, statusBadge, author }: { book: Book; statusBadge?: Rea
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-2 text-xs font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-4 py-2 rounded-full transition-colors shadow-lg"
+              className="self-start inline-flex items-center gap-2.5 text-sm font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-5 py-3 rounded-full transition-colors shadow-xl"
               aria-label={`Listen to ${book.title} on Audible`}
             >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
               Listen on Audible
             </a>
           )}
