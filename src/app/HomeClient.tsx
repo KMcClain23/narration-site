@@ -220,17 +220,17 @@ function HomeContent() {
       <div id="top" />
 
       {/* ── HERO ── */}
-      <section className="relative overflow-hidden -mt-16 pt-16 min-h-[88vh] flex items-center" aria-label="Introduction">
+      <section className="relative overflow-hidden min-h-[92vh] flex items-center" aria-label="Introduction">
         {/* Full bleed background */}
         <div className="absolute inset-0">
           <Image src={BANNER_URL} alt="Dean Miller recording studio" fill priority sizes="100vw"
-            className="object-cover opacity-25 scale-105" style={{ objectPosition: "center 30%" }} />
+            className="object-cover opacity-25" style={{ objectPosition: "center 30%", transform: "scale(1.05)", transformOrigin: "center" }} />
           <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(5,8,20,0.5) 0%, rgba(5,8,20,0.4) 40%, rgba(5,8,20,1) 100%)" }} />
           {/* Subtle vignette edges */}
           <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(5,8,20,0.7) 100%)" }} />
         </div>
 
-        <div className="relative max-w-5xl mx-auto px-5 sm:px-6 py-24 w-full">
+        <div className="relative max-w-5xl mx-auto px-5 sm:px-6 pt-32 pb-16 w-full">
           <div className="max-w-2xl">
             {/* Eyebrow */}
             <div className="fade-up flex items-center gap-3 mb-6">
@@ -285,7 +285,7 @@ function HomeContent() {
             <div className="relative" style={{ aspectRatio: "3/4" }}>
               <div className="absolute inset-0 rounded-2xl overflow-hidden">
                 <Image src={PROFILE_URL} alt="Dean Miller, audiobook narrator" fill sizes="288px"
-                  className="object-cover object-top" priority />
+                  className="object-cover" style={{ objectPosition: "center top" }} priority />
                 <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(5,8,20,1) 0%, rgba(5,8,20,0.4) 40%, transparent 70%)" }} />
               </div>
               {/* Gold accent line */}

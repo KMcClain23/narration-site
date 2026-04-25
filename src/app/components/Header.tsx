@@ -76,7 +76,7 @@ export default function Header() {
 
   const headerClass = isScrolled
     ? "bg-[#050814]/55 backdrop-blur-xl border-b border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
-    : "bg-transparent border-b border-white/10";
+    : "bg-[#050814]/60 backdrop-blur-md border-b border-white/5";
 
   const handleSecretAdminTrigger = (e: React.MouseEvent) => {
     // Let normal navigation still happen
