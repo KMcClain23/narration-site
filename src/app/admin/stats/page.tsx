@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import LogoutButton from "./LogoutButton";
 import QuickLinks from "./QuickLinks";
 import AuthorManager from "./AuthorManager";
+import CoNarratorManager from "./CoNarratorManager";
 import TestimonialQueue from "./TestimonialQueue";
 
 export const dynamic = "force-dynamic";
@@ -102,10 +103,13 @@ export default async function AdminStatsPage() {
         {/* 2. AUTHOR PROFILES */}
         <AuthorManager />
 
-        {/* 3. TESTIMONIAL QUEUE */}
+        {/* 3. CO-NARRATOR PROFILES */}
+        <CoNarratorManager />
+
+        {/* 4. TESTIMONIAL QUEUE */}
         <TestimonialQueue />
 
-        {/* 4. QUICK ANALYTICS */}
+        {/* 5. QUICK ANALYTICS */}
         <section className="mt-12 pt-12 border-t border-[#1A2550]">
           <div className="bg-[#0B1224] border border-[#1A2550] rounded-2xl p-8 inline-block">
             <p className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-bold">Total Demo Plays</p>

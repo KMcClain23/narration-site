@@ -7,6 +7,7 @@ export type Book = {
   author: string;
   link: string;
   ar_link?: string;
+  co_narrator?: string;
   cover_url: string;
   tags: string[];
   description?: string;

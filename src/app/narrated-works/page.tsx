@@ -6,6 +6,18 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 import type { Book } from "@/types/book";
 
+interface CoNarrator {
+  id: string;
+  name: string;
+  bio: string;
+  website: string;
+  amazon: string;
+  instagram: string;
+  tiktok: string;
+  facebook: string;
+  goodreads: string;
+}
+
 interface Author {
   id: string;
   name: string;
@@ -42,10 +54,12 @@ function AuthorPopup({
   author,
   anchorRef,
   onClose,
+  label = "Author",
 }: {
   author: Author;
   anchorRef: React.RefObject<HTMLButtonElement | null>;
   onClose: () => void;
+  label?: string;
 }) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<React.CSSProperties>({ opacity: 0, pointerEvents: "none" });
@@ -132,7 +146,7 @@ function AuthorPopup({
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3 border-b border-white/8">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37] font-semibold">Author</p>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37] font-semibold">{label}</p>
           <p className="mt-0.5 font-semibold text-white text-sm leading-tight">{author.name}</p>
         </div>
         <button
@@ -182,10 +196,13 @@ function AuthorPopup({
   return mounted ? createPortal(popup, document.body) : null;
 }
 
-function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statusBadge?: React.ReactNode; author?: Author; onTagClick: (tag: string) => void }) {
+function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book: Book; statusBadge?: React.ReactNode; author?: Author; onTagClick: (tag: string) => void; coNarrators: Record<string, CoNarrator> }) {
   const hasLink = Boolean(book.link?.trim());
   const [showAuthorPopup, setShowAuthorPopup] = useState(false);
   const authorBtnRef = useRef<HTMLButtonElement>(null);
+  const coNarratorBtnRef = useRef<HTMLButtonElement>(null);
+  const [showCoNarratorPopup, setShowCoNarratorPopup] = useState(false);
+  const coNarrator = book.co_narrator ? coNarrators[book.co_narrator] : undefined;
 
   return (
     <div
@@ -316,15 +333,26 @@ function BookCard({ book, statusBadge, author, onTagClick }: { book: Book; statu
           onClose={() => setShowAuthorPopup(false)}
         />
       )}
+
+      {/* Co-narrator popup */}
+      {showCoNarratorPopup && coNarrator && (
+        <AuthorPopup
+          author={{ ...coNarrator, __type: "narrator" } as Author}
+          anchorRef={coNarratorBtnRef}
+          onClose={() => setShowCoNarratorPopup(false)}
+          label="Co-narrator"
+        />
+      )}
     </div>
   );
 }
 
 function SectionGrid({
-  title, books, statusBadge, authors, onTagClick,
+  title, books, statusBadge, authors, onTagClick, coNarrators,
 }: {
   title: string; books: Book[]; statusBadge?: React.ReactNode;
   authors: Record<string, Author>; onTagClick: (tag: string) => void;
+  coNarrators: Record<string, CoNarrator>;
 }) {
   if (books.length === 0) return null;
   return (
@@ -336,7 +364,7 @@ function SectionGrid({
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 items-start" style={{ paddingBottom: "1rem" }}>
         {books.map((book) => (
-          <BookCard key={book.id} book={book} statusBadge={statusBadge} author={authors[book.author]} onTagClick={onTagClick} />
+          <BookCard key={book.id} book={book} statusBadge={statusBadge} author={authors[book.author]} onTagClick={onTagClick} coNarrators={coNarrators} />
         ))}
       </div>
     </section>
@@ -347,23 +375,31 @@ export default function NarratedWorks() {
   const [searchQuery, setSearchQuery] = useState("");
   const [books, setBooks] = useState<Book[]>([]);
   const [authors, setAuthors] = useState<Record<string, Author>>({});
+  const [coNarrators, setCoNarrators] = useState<Record<string, CoNarrator>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const [booksRes, authorsRes] = await Promise.all([
+        const [booksRes, authorsRes, coNarratorsRes] = await Promise.all([
           fetch("/api/books"),
           fetch("/api/authors"),
+          fetch("/api/co-narrators"),
         ]);
         const booksData = await booksRes.json();
         const authorsData = await authorsRes.json();
+        const coNarratorsData = await coNarratorsRes.json();
         if (booksRes.ok) setBooks(booksData.books || []);
         if (authorsRes.ok) {
           const map: Record<string, Author> = {};
           for (const a of authorsData.authors || []) map[a.name] = a;
           setAuthors(map);
+        }
+        if (coNarratorsRes.ok) {
+          const map: Record<string, CoNarrator> = {};
+          for (const n of coNarratorsData.co_narrators || []) map[n.name] = n;
+          setCoNarrators(map);
         }
       } catch (error) {
         console.error(error);
@@ -470,9 +506,9 @@ export default function NarratedWorks() {
           </div>
         ) : (
           <>
-            <SectionGrid title="Completed" books={filteredCompleted} authors={authors} onTagClick={setSearchQuery} />
-            <SectionGrid title="Currently narrating" books={filteredInProgress} statusBadge="In Progress" authors={authors} onTagClick={setSearchQuery} />
-            <SectionGrid title="Coming soon" books={filteredComingSoon} statusBadge="Soon" authors={authors} onTagClick={setSearchQuery} />
+            <SectionGrid title="Completed" books={filteredCompleted} authors={authors} onTagClick={setSearchQuery} coNarrators={coNarrators} />
+            <SectionGrid title="Currently narrating" books={filteredInProgress} statusBadge="In Progress" authors={authors} onTagClick={setSearchQuery} coNarrators={coNarrators} />
+            <SectionGrid title="Coming soon" books={filteredComingSoon} statusBadge="Soon" authors={authors} onTagClick={setSearchQuery} coNarrators={coNarrators} />
           </>
         )}
 
