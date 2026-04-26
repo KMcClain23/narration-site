@@ -174,7 +174,8 @@ function DemoPlayer({
 
 
 interface Testimonial {
-  quote: string;
+  quote?: string;
+  paragraphs?: string[];
   author: string;
   title: string;
   book?: string;
@@ -188,7 +189,15 @@ const TESTIMONIALS: Testimonial[] = [
     book: "Blood on the Asphalt",
   },
   {
-    quote: "If you're looking for a male narrator, Dean is your guy. No hesitation, no second guessing—just trust me on this one. From the very beginning, he has been nothing short of incredible to work with. He actually listens—like really listens—to what you want for your story and then brings it to life in a way that somehow feels even better than what you had in your head. He doesn't just read your words, he understands them. The tone, the tension, the emotion—he gets it, and he delivers every single time. On top of that, he's been insanely supportive through the entire process. Whether it was questions, ideas, or me overthinking something for the hundredth time, he always had an answer and never once made it feel like I was asking too much. That kind of patience and dedication? You don't find that everywhere. And let's talk about personality for a second—because this matters. Dean is one of the easiest people to get along with. If you're nervous, awkward, unsure, whatever… he kills that energy immediately. You settle in fast, and suddenly you're not stressed—you're excited. That comfort makes a huge difference, especially when you're trusting someone with your work. He's professional, talented, reliable, and just an all-around solid human. The kind of narrator you want in your corner. Truly, I could not recommend him more. And Dean… when you blow up—and you will—you better not forget about me. I'm claiming early supporter rights forever.",
+    paragraphs: [
+      "If you're looking for a male narrator, Dean is your guy. No hesitation, no second guessing—just trust me on this one.",
+      "From the very beginning, he has been nothing short of incredible to work with. He actually listens—like really listens—to what you want for your story and then brings it to life in a way that somehow feels even better than what you had in your head. He doesn't just read your words, he understands them. The tone, the tension, the emotion—he gets it, and he delivers every single time.",
+      "On top of that, he's been insanely supportive through the entire process. Whether it was questions, ideas, or me overthinking something for the hundredth time, he always had an answer and never once made it feel like I was asking too much. That kind of patience and dedication? You don't find that everywhere.",
+      "And let's talk about personality for a second—because this matters. Dean is one of the easiest people to get along with. If you're nervous, awkward, unsure, whatever… he kills that energy immediately. You settle in fast, and suddenly you're not stressed—you're excited. That comfort makes a huge difference, especially when you're trusting someone with your work.",
+      "He's professional, talented, reliable, and just an all-around solid human. The kind of narrator you want in your corner.",
+      "Truly, I could not recommend him more.",
+      "And Dean… when you blow up—and you will—you better not forget about me. I'm claiming early supporter rights forever.",
+    ],
     author: "E.A. Harper",
     title: "Author",
     book: "Whiskey & Lies",
@@ -199,10 +208,17 @@ const TRUNCATE_LENGTH = 280;
 
 function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
   const [expanded, setExpanded] = useState(false);
-  const isLong = testimonial.quote.length > TRUNCATE_LENGTH;
+  const hasParagraphs = Boolean(testimonial.paragraphs?.length);
+  const fullText = hasParagraphs ? "" : (testimonial.quote || "");
+  const isLong = !hasParagraphs && fullText.length > TRUNCATE_LENGTH;
   const displayQuote = isLong && !expanded
-    ? testimonial.quote.slice(0, TRUNCATE_LENGTH).trimEnd() + "…"
-    : testimonial.quote;
+    ? fullText.slice(0, TRUNCATE_LENGTH).trimEnd() + "…"
+    : fullText;
+
+  // For paragraph quotes, show first 2 paragraphs collapsed
+  const paragraphs = testimonial.paragraphs || [];
+  const visibleParagraphs = hasParagraphs && !expanded ? paragraphs.slice(0, 2) : paragraphs;
+  const hasMoreParagraphs = hasParagraphs && paragraphs.length > 2;
 
   return (
     <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6 flex flex-col gap-4 hover:border-[#D4AF37]/20 transition-colors">
@@ -211,18 +227,40 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
 
       {/* Quote text */}
       <div className="flex-1">
-        <p className="text-white/75 text-sm leading-relaxed">{displayQuote}</p>
-        {isLong && (
-          <button
-            type="button"
-            onClick={() => setExpanded(v => !v)}
-            className="mt-3 text-xs font-semibold text-[#D4AF37] hover:text-[#E0C15A] transition-colors inline-flex items-center gap-1"
-          >
-            {expanded ? "Show less" : "Read more"}
-            <svg className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+        {hasParagraphs ? (
+          <div className="space-y-3">
+            {visibleParagraphs.map((p, i) => (
+              <p key={i} className="text-white/75 text-sm leading-relaxed">{p}</p>
+            ))}
+            {hasMoreParagraphs && (
+              <button
+                type="button"
+                onClick={() => setExpanded(v => !v)}
+                className="mt-1 text-xs font-semibold text-[#D4AF37] hover:text-[#E0C15A] transition-colors inline-flex items-center gap-1"
+              >
+                {expanded ? "Show less" : `Read more (${paragraphs.length - 2} more paragraphs)`}
+                <svg className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <p className="text-white/75 text-sm leading-relaxed">{displayQuote}</p>
+            {isLong && (
+              <button
+                type="button"
+                onClick={() => setExpanded(v => !v)}
+                className="mt-3 text-xs font-semibold text-[#D4AF37] hover:text-[#E0C15A] transition-colors inline-flex items-center gap-1"
+              >
+                {expanded ? "Show less" : "Read more"}
+                <svg className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            )}
+          </>
         )}
       </div>
 
