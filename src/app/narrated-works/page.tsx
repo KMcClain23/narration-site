@@ -76,26 +76,36 @@ function AuthorPopup({
       const margin = 10;
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      const actualHeight = popup ? popup.offsetHeight : 320;
 
       const anchorCX = rect.left + rect.width / 2;
 
       let left = rect.left;
-      let top = rect.bottom + 6;
-      let flipY = false;
-
       if (left + popupWidth > vw - margin) left = rect.right - popupWidth;
       left = Math.max(margin, Math.min(left, vw - popupWidth - margin));
 
-      if (top + actualHeight > vh - margin) {
-        top = rect.top - actualHeight - 6;
+      // Space available below and above anchor
+      const spaceBelow = vh - rect.bottom - margin - 6;
+      const spaceAbove = rect.top - margin - 6;
+
+      // Prefer below; flip above if more space there
+      let top: number;
+      let maxHeight: number;
+      let flipY = false;
+
+      if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
+        // Show below
+        top = rect.bottom + 6;
+        maxHeight = spaceBelow;
+      } else {
+        // Show above
         flipY = true;
+        maxHeight = spaceAbove;
+        top = rect.top - 6 - Math.min(maxHeight, popup ? popup.scrollHeight : 400);
+        top = Math.max(margin, top);
       }
-      // Hard clamp — never go off screen top or bottom
-      top = Math.max(margin, Math.min(top, vh - actualHeight - margin));
 
       const originX = anchorCX - left;
-      const originY = flipY ? actualHeight : 0;
+      const originY = flipY ? maxHeight : 0;
 
       setStyle({
         position: "fixed",
@@ -106,8 +116,7 @@ function AuthorPopup({
         opacity: 1,
         pointerEvents: "auto",
         transformOrigin: `${originX}px ${originY}px`,
-        maxHeight: vh - margin * 2,
-        overflowY: "auto",
+        maxHeight: Math.max(maxHeight, 150),
       });
     };
 
