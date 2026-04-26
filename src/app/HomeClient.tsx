@@ -631,6 +631,7 @@ function HomeContent() {
                 { label: "Narrated works", href: "/narrated-works" },
                 { label: "Working together", href: "/welcome" },
                 { label: "Audio demos", href: "/#demos" },
+                { label: "Leave a review", href: "/leave-a-review" },
               ]},
               { heading: "Profiles", links: [
                 { label: "ACX", href: "https://www.acx.com/narrator?p=A3DYAXR7JFPXPE" },

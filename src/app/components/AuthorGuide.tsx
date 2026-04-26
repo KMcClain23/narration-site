@@ -121,7 +121,7 @@ const STEPS: Step[] = [
       "ACX royalty share requires no upfront cost but ties you to Audible exclusivity for 7 years",
       "PFH (per-finished-hour) gives you ownership and flexibility — a 90,000-word book is roughly 10 finished hours",
       "Lock your manuscript before production begins — changes after recording are expensive",
-      "Plan your ALC (Audiobook Listener Copy) strategy before release — ACX gives 25 free promo codes per title, AR projects use direct download links via BookFunnel",
+      "Plan your ALC (Advanced Listener Copy) strategy before release — ACX gives 25 free promo codes per title, AR projects use direct download links via BookFunnel",
       "Provide a character voice list and pronunciation guide before the narrator starts",
     ],
     resources: [
@@ -137,7 +137,7 @@ const STEPS: Step[] = [
     title: "ARCs, ALCs & early reviews",
     duration: "3–6 weeks before launch",
     summary: "Get your book into readers' hands — and ears — before launch day to build reviews and word-of-mouth.",
-    detail: "ARC (Advance Review Copy) is a pre-publication ebook or print copy distributed to readers, bloggers, and influencers in exchange for honest reviews. ALC (Audiobook Listener Copy) is the exact same concept for audiobooks — a free listening copy given to reviewers before the audio release. Both are essential if you want reviews live on launch day, and both should be distributed at the same time if possible so your audio and ebook launch together with reviews on both formats.",
+    detail: "ARC (Advance Review Copy) is a pre-publication ebook or print copy distributed to readers, bloggers, and influencers in exchange for honest reviews. ALC (Advanced Listener Copy) is the exact same concept for audiobooks — a free listening copy given to reviewers before the audio release. Both are essential if you want reviews live on launch day, and both should be distributed at the same time if possible so your audio and ebook launch together with reviews on both formats.",
     tips: [
       "ARC and ALC reviewers are often different people — audio listeners follow different accounts and communities",
       "For ACX projects: request promo codes directly through ACX (you get 25 free codes per title)",
