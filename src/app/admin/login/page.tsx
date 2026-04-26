@@ -522,7 +522,7 @@ export default function AdminPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#06082E] text-white px-6 py-12">
+    <main className="min-h-screen bg-[#06082E] text-white px-6 pt-24 pb-12 md:px-12 md:pt-24">
       <div className="max-w-7xl mx-auto">
         <header className="mb-10">
           <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
