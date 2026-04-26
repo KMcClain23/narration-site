@@ -160,11 +160,10 @@ const STEPS: Step[] = [
       "Ask if the author wants to be involved in or notified about any live streaming of sessions",
       "Never start full recording without an approved First 15 — it's your protection as much as theirs",
     ],
-    resources: [],
     deanNote: "The character voice list, First 15 process, and milestone communication are the core of how I work with every author. These habits build trust and generate repeat bookings. If you're interested in how I structure projects, the Working Together section above covers my full process.",
     resources: [
       { label: "Narrators Roadmap: Working with indie authors", href: "https://www.narratorsroadmap.com/audiobook-production-workflow/" },
-    ],,
+    ],
   },
   {
     id: "editing-mastering",
