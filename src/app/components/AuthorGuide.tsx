@@ -48,6 +48,7 @@ const STEPS: Step[] = [
       "Test at 80×80px — if you can't read the title or see the genre, redesign",
     ],
     resources: [
+      { label: "Books and Moods: Cover design & formatting", href: "https://www.booksandmoods.com" },
       { label: "Reedsy: Cover designers", href: "https://reedsy.com/design" },
       { label: "99designs: Book covers", href: "https://99designs.com/book-cover-design" },
     ],
@@ -66,6 +67,7 @@ const STEPS: Step[] = [
       "Use consistent chapter heading styles — they power the ebook's table of contents",
     ],
     resources: [
+      { label: "Books and Moods: Formatting & cover design", href: "https://www.booksandmoods.com" },
       { label: "Vellum (Mac)", href: "https://vellum.pub" },
       { label: "Atticus (cross-platform)", href: "https://www.atticus.io" },
     ],
