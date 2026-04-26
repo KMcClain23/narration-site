@@ -64,87 +64,99 @@ function AuthorPopup({
   const popupRef = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<React.CSSProperties>({ opacity: 0, pointerEvents: "none" });
 
-  // Position using fixed coords — measure actual height after render
+  // Position popup — render offscreen first, measure, then place correctly
   useEffect(() => {
     const anchor = anchorRef.current;
     if (!anchor) return;
 
-    const position = () => {
-      const popup = popupRef.current;
-      const rect = anchor.getBoundingClientRect();
-      const margin = 10;
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const isMobile = vw < 640;
+    const margin = 10;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const isMobile = vw < 640;
 
-      // On mobile use full-width sheet from bottom; on desktop use anchored popup
-      if (isMobile) {
-        const maxHeight = vh * 0.6;
-        setStyle({
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          width: "100%",
-          zIndex: 9999,
-          opacity: 1,
-          pointerEvents: "auto",
-          maxHeight,
-          borderRadius: "1rem 1rem 0 0",
-          transformOrigin: "bottom center",
-        });
-        return;
-      }
-
-      // Desktop: anchor-relative popup
-      const popupWidth = 272;
-      const anchorCX = rect.left + rect.width / 2;
-
-      let left = rect.left;
-      if (left + popupWidth > vw - margin) left = rect.right - popupWidth;
-      left = Math.max(margin, Math.min(left, vw - popupWidth - margin));
-
-      const spaceBelow = vh - rect.bottom - margin - 6;
-      const spaceAbove = rect.top - margin - 6;
-
-      let top: number;
-      let maxHeight: number;
-      let flipY = false;
-
-      if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
-        top = rect.bottom + 6;
-        maxHeight = spaceBelow;
-      } else {
-        flipY = true;
-        maxHeight = spaceAbove;
-        top = rect.top - 6 - Math.min(maxHeight, popup ? popup.scrollHeight : 400);
-        top = Math.max(margin, top);
-      }
-
-      const originX = anchorCX - left;
-      const originY = flipY ? maxHeight : 0;
-
+    if (isMobile) {
       setStyle({
         position: "fixed",
-        top,
-        left,
-        width: popupWidth,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        width: "100%",
         zIndex: 9999,
         opacity: 1,
         pointerEvents: "auto",
-        transformOrigin: `${originX}px ${originY}px`,
-        maxHeight: Math.max(maxHeight, 150),
+        maxHeight: vh * 0.65,
+        borderRadius: "1rem 1rem 0 0",
+        transformOrigin: "bottom center",
       });
-    };
+      return;
+    }
 
-    // Run once immediately, then again after paint so we use actual rendered height
-    position();
-    const raf1 = requestAnimationFrame(() => {
-      position();
-      const raf2 = requestAnimationFrame(position);
-      return raf2;
+    // Step 1: render offscreen to measure actual height
+    setStyle({
+      position: "fixed",
+      top: -9999,
+      left: -9999,
+      width: 272,
+      zIndex: 9999,
+      opacity: 0,
+      pointerEvents: "none",
     });
-    return () => cancelAnimationFrame(raf1);
+
+    // Step 2: after render, measure and reposition
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const popup = popupRef.current;
+        if (!popup) return;
+
+        const rect = anchor.getBoundingClientRect();
+        const popupWidth = 272;
+        const popupHeight = popup.scrollHeight;
+
+        let left = rect.left;
+        if (left + popupWidth > vw - margin) left = rect.right - popupWidth;
+        left = Math.max(margin, Math.min(left, vw - popupWidth - margin));
+
+        const spaceBelow = vh - rect.bottom - margin - 6;
+        const spaceAbove = rect.top - margin - 6;
+
+        let top: number;
+        let maxHeight: number;
+        let flipY = false;
+
+        if (popupHeight <= spaceBelow) {
+          // Fits below — no clipping needed
+          top = rect.bottom + 6;
+          maxHeight = spaceBelow;
+        } else if (spaceAbove > spaceBelow) {
+          // More room above — flip
+          flipY = true;
+          maxHeight = spaceAbove;
+          top = rect.top - 6 - Math.min(popupHeight, maxHeight);
+          top = Math.max(margin, top);
+        } else {
+          // Not enough room either way — show below with scroll
+          top = rect.bottom + 6;
+          maxHeight = spaceBelow;
+        }
+
+        const anchorCX = rect.left + rect.width / 2;
+        const originX = anchorCX - left;
+        const originY = flipY ? Math.min(popupHeight, maxHeight) : 0;
+
+        setStyle({
+          position: "fixed",
+          top,
+          left,
+          width: popupWidth,
+          zIndex: 9999,
+          opacity: 1,
+          pointerEvents: "auto",
+          transformOrigin: `${originX}px ${originY}px`,
+          maxHeight: Math.max(maxHeight, 150),
+          animation: "liquidReveal 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+        });
+      });
+    });
   }, [anchorRef]);
 
   // Close on outside click or Escape
