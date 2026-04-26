@@ -207,14 +207,22 @@ export default function AdminPage() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
+  const [authorNames, setAuthorNames] = useState<string[]>([]);
+  const [coNarratorNames, setCoNarratorNames] = useState<string[]>([]);
 
   useEffect(() => {
     const loadBooks = async () => {
       try {
         setIsLoadingBooks(true);
 
-        const response = await fetch("/api/books");
+        const [response, authorsRes, coNarratorsRes] = await Promise.all([
+          fetch("/api/books"),
+          fetch("/api/authors"),
+          fetch("/api/co-narrators"),
+        ]);
         const result = await response.json();
+        const authorsData = await authorsRes.json();
+        const coNarratorsData = await coNarratorsRes.json();
 
         if (!response.ok) {
           setStatus(result.error || "Failed to load books.");
@@ -222,6 +230,8 @@ export default function AdminPage() {
         }
 
         setBooks(result.books || []);
+        setAuthorNames((authorsData.authors || []).map((a: {name: string}) => a.name).sort());
+        setCoNarratorNames((coNarratorsData.co_narrators || []).map((n: {name: string}) => n.name).sort());
       } catch (error) {
         console.error(error);
         setStatus("Failed to load books.");
@@ -346,6 +356,7 @@ export default function AdminPage() {
             .filter(Boolean),
           category: form.category,
           sort_order: existingBook.sort_order ?? 0,
+          co_narrator: form.co_narrator,
         };
 
         const response = await fetch("/api/books", {
@@ -396,6 +407,7 @@ export default function AdminPage() {
             .filter(Boolean),
           category: form.category,
           sort_order: 0,
+          co_narrator: form.co_narrator,
         }),
       });
 
@@ -619,17 +631,21 @@ export default function AdminPage() {
 
             <div>
               <label htmlFor="co_narrator" className="block text-sm font-medium mb-2">
-                Co-narrator <span className="text-white/30 font-normal normal-case text-xs">(optional — must match a name in Co-narrator profiles)</span>
+                Co-narrator <span className="text-white/30 font-normal normal-case text-xs">(optional)</span>
               </label>
               <input
                 id="co_narrator"
                 name="co_narrator"
                 type="text"
+                list="co-narrator-list"
                 value={form.co_narrator}
                 onChange={handleChange}
                 placeholder="e.g. Ann Dahlia"
                 className="w-full rounded-lg bg-[#06082E] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
               />
+              <datalist id="co-narrator-list">
+                {coNarratorNames.map(name => <option key={name} value={name} />)}
+              </datalist>
             </div>
 
             <div>

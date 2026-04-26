@@ -143,6 +143,7 @@ export async function PUT(req: Request) {
       description: updatedBook.description?.trim() || "",
       category: updatedBook.category,
       sort_order: updatedBook.sort_order ?? 0,
+      co_narrator: updatedBook.co_narrator?.trim() || "",
     };
 
     const { data, error } = await supabaseAdmin
