@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import WelcomeSectionNav from "../components/WelcomeSectionNav";
 import AuthorGuide from "../components/AuthorGuide";
+import NarratorGuide from "../components/NarratorGuide";
 
 function Section({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
   return (
@@ -52,6 +53,7 @@ function ResourceLink({ title, href, description }: { title: string; href: strin
 
 export default function WelcomePage() {
   const [platform, setPlatform] = useState<"acx" | "ar">("acx");
+  const [guideTab, setGuideTab] = useState<"author" | "narrator">("author");
   const isACX = platform === "acx";
 
   const acxSteps = [
@@ -114,7 +116,7 @@ export default function WelcomePage() {
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
-              Free author guide
+              Free guides
             </a>
           </div>
 
@@ -309,14 +311,33 @@ export default function WelcomePage() {
               </div>
             </div>
 
-            {/* Author guide */}
+            {/* Guides — tabbed */}
             <div id="author-guide" className="scroll-mt-24">
               <div className="mb-5">
-                <p className="text-[11px] uppercase tracking-[0.28em] text-white/40 mb-1">Free resource</p>
-                <h2 className="text-2xl font-bold text-white">What comes next?</h2>
-                <p className="mt-1 text-sm text-white/55">A step-by-step walkthrough for authors — from final edits to launch day.</p>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-white/40 mb-1">Free resources</p>
+                <h2 className="text-2xl font-bold text-white">Step-by-step guides</h2>
+                <p className="mt-1 text-sm text-white/55">Whether you're an author or an aspiring narrator — there's a guide for you.</p>
               </div>
-              <AuthorGuide />
+
+              {/* Tab switcher */}
+              <div className="flex rounded-full border border-white/10 overflow-hidden text-sm font-bold w-fit mb-6">
+                <button type="button" onClick={() => setGuideTab("author")}
+                  className={`flex items-center gap-2 px-5 py-2.5 transition-colors ${guideTab === "author" ? "bg-[#D4AF37] text-black" : "text-white/50 hover:text-white"}`}>
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                  For authors
+                </button>
+                <button type="button" onClick={() => setGuideTab("narrator")}
+                  className={`flex items-center gap-2 px-5 py-2.5 transition-colors ${guideTab === "narrator" ? "bg-[#D4AF37] text-black" : "text-white/50 hover:text-white"}`}>
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  </svg>
+                  For narrators
+                </button>
+              </div>
+
+              {guideTab === "author" ? <AuthorGuide /> : <NarratorGuide />}
             </div>
 
           </div>
