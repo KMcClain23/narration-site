@@ -296,10 +296,10 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
         {/* Ambient glow */}
         <div className="absolute -inset-2 opacity-0 group-hover:opacity-30 transition-opacity duration-700 blur-2xl bg-[#D4AF37] pointer-events-none z-0" />
 
-        {/* Hover overlay — full card face */}
+        {/* Hover overlay — tags only, top portion */}
         <div
           className="absolute inset-0 z-20 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col p-3 sm:p-4"
-          style={{ background: "linear-gradient(to bottom, rgba(6,8,46,0.85) 0%, rgba(6,8,46,0.1) 40%, rgba(6,8,46,0.1) 60%, rgba(6,8,46,0.0) 100%)" }}
+          style={{ background: "linear-gradient(to bottom, rgba(6,8,46,0.85) 0%, rgba(6,8,46,0.1) 40%, transparent 100%)" }}
         >
           {/* Tags — top, clickable to filter */}
           <div className="flex flex-wrap gap-2">
@@ -314,22 +314,6 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
               </button>
             ))}
           </div>
-          {/* Listen on Audible — centred */}
-          {hasLink && (
-            <div className="flex-1 flex items-center justify-center">
-              <a
-                href={book.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-2 text-sm font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-5 py-2.5 rounded-full transition-colors shadow-xl"
-                aria-label={`Listen to ${book.title} on Audible`}
-              >
-                <svg width="10" height="10" className="sm:w-[13px] sm:h-[13px]" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
-                Listen on Audible
-              </a>
-            </div>
-          )}
         </div>
 
         {/* Status badge */}
@@ -420,6 +404,19 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
                   {coNarratorList[0]}
                 </button>
               </div>
+            )}
+            {/* Audible button in expanded pill */}
+            {hasLink && (
+              <a
+                href={book.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="mt-3 self-start inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-3 py-2 sm:px-4 sm:py-2 rounded-full transition-colors shadow-lg"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
+                Listen on Audible
+              </a>
             )}
             {coNarratorList.length > 1 && (
               <div className="mt-2 relative">
