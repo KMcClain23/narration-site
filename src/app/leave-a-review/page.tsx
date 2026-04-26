@@ -1,12 +1,26 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 
 export default function LeaveAReviewPage() {
   const [isPending, startTransition] = useTransition();
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [bookTitle, setBookTitle] = useState("");
+  const [books, setBooks] = useState<string[]>([]);
+  const [useCustomTitle, setUseCustomTitle] = useState(false);
+
+  // Fetch book titles on load
+  useEffect(() => {
+    fetch("/api/books")
+      .then(r => r.json())
+      .then(data => {
+        const titles = (data.books || []).map((b: { title: string }) => b.title).sort();
+        setBooks(titles);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -14,7 +28,7 @@ export default function LeaveAReviewPage() {
     const data = {
       reviewer_name: (form.elements.namedItem("reviewer_name") as HTMLInputElement).value,
       reviewer_role: (form.elements.namedItem("reviewer_role") as HTMLSelectElement).value,
-      book_title: (form.elements.namedItem("book_title") as HTMLInputElement).value,
+      book_title: bookTitle,
       quote: (form.elements.namedItem("quote") as HTMLTextAreaElement).value,
     };
 
@@ -109,16 +123,52 @@ export default function LeaveAReviewPage() {
               </select>
             </label>
 
-            {/* Book title */}
-            <label className="block">
-              <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Book title <span className="text-white/25 normal-case tracking-normal text-[10px]">(optional)</span></span>
-              <input
-                name="book_title"
-                disabled={isPending}
-                placeholder="e.g. Whiskey & Lies"
-                className="mt-2 w-full rounded-lg bg-black/30 border border-white/8 px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition disabled:opacity-50"
-              />
-            </label>
+            {/* Book title — dropdown + custom option */}
+            <div>
+              <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium block mb-2">
+                Book title <span className="text-white/25 normal-case tracking-normal text-[10px]">(optional)</span>
+              </span>
+
+              {!useCustomTitle ? (
+                <div className="space-y-2">
+                  <select
+                    value={bookTitle}
+                    onChange={e => setBookTitle(e.target.value)}
+                    disabled={isPending}
+                    className="w-full rounded-lg bg-black/30 border border-white/8 px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 transition disabled:opacity-50 appearance-none"
+                  >
+                    <option value="">— Select a book —</option>
+                    {books.map(title => (
+                      <option key={title} value={title}>{title}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setUseCustomTitle(true)}
+                    className="text-xs text-white/30 hover:text-[#D4AF37] transition-colors"
+                  >
+                    My book isn&apos;t listed — type it instead
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <input
+                    value={bookTitle}
+                    onChange={e => setBookTitle(e.target.value)}
+                    disabled={isPending}
+                    placeholder="e.g. Whiskey & Lies"
+                    className="w-full rounded-lg bg-black/30 border border-white/8 px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition disabled:opacity-50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setUseCustomTitle(false); setBookTitle(""); }}
+                    className="text-xs text-white/30 hover:text-[#D4AF37] transition-colors"
+                  >
+                    ← Choose from the list instead
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Review */}
             <label className="block">
