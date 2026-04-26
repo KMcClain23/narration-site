@@ -64,49 +64,57 @@ function AuthorPopup({
   const popupRef = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<React.CSSProperties>({ opacity: 0, pointerEvents: "none" });
 
-  // Position using fixed coords — anchored to click point, always in viewport
+  // Position using fixed coords — measure actual height after render
   useEffect(() => {
     const anchor = anchorRef.current;
     if (!anchor) return;
 
-    const rect = anchor.getBoundingClientRect();
-    const popupWidth = 272;
-    const margin = 10;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const estimatedHeight = 300;
+    const position = () => {
+      const popup = popupRef.current;
+      const rect = anchor.getBoundingClientRect();
+      const popupWidth = 272;
+      const margin = 10;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const actualHeight = popup ? popup.offsetHeight : 320;
 
-    // Anchor origin: centre of the button
-    const anchorCX = rect.left + rect.width / 2;
-    const anchorCY = rect.top + rect.height / 2;
+      const anchorCX = rect.left + rect.width / 2;
 
-    let left = rect.left;
-    let top = rect.bottom + 6;
-    let flipY = false;
+      let left = rect.left;
+      let top = rect.bottom + 6;
+      let flipY = false;
 
-    if (left + popupWidth > vw - margin) left = rect.right - popupWidth;
-    left = Math.max(margin, left);
+      if (left + popupWidth > vw - margin) left = rect.right - popupWidth;
+      left = Math.max(margin, Math.min(left, vw - popupWidth - margin));
 
-    if (top + estimatedHeight > vh - margin) {
-      top = rect.top - estimatedHeight - 6;
-      flipY = true;
-    }
-    top = Math.max(margin, top);
+      if (top + actualHeight > vh - margin) {
+        top = rect.top - actualHeight - 6;
+        flipY = true;
+      }
+      // Hard clamp — never go off screen top or bottom
+      top = Math.max(margin, Math.min(top, vh - actualHeight - margin));
 
-    // Transform-origin relative to the popup's own top-left corner
-    const originX = anchorCX - left;
-    const originY = flipY ? estimatedHeight : 0;
+      const originX = anchorCX - left;
+      const originY = flipY ? actualHeight : 0;
 
-    setStyle({
-      position: "fixed",
-      top,
-      left,
-      width: popupWidth,
-      zIndex: 9999,
-      opacity: 1,
-      pointerEvents: "auto",
-      transformOrigin: `${originX}px ${originY}px`,
-    });
+      setStyle({
+        position: "fixed",
+        top,
+        left,
+        width: popupWidth,
+        zIndex: 9999,
+        opacity: 1,
+        pointerEvents: "auto",
+        transformOrigin: `${originX}px ${originY}px`,
+        maxHeight: vh - margin * 2,
+        overflowY: "auto",
+      });
+    };
+
+    // Run immediately then again after render to use real height
+    position();
+    const raf = requestAnimationFrame(position);
+    return () => cancelAnimationFrame(raf);
   }, [anchorRef]);
 
   // Close on outside click or Escape
