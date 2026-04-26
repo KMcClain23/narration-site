@@ -172,6 +172,81 @@ function DemoPlayer({
   );
 }
 
+
+interface Testimonial {
+  quote: string;
+  author: string;
+  title: string;
+  book?: string;
+}
+
+const TESTIMONIALS: Testimonial[] = [
+  {
+    quote: "Working with Dean has been such a pleasure! He is friendly, professional, and incredibly talented. I've honestly loved every second of the production process for my audiobook with him!",
+    author: "River Fox",
+    title: "Author",
+    book: "Blood on the Asphalt",
+  },
+  {
+    quote: "If you're looking for a male narrator, Dean is your guy. No hesitation, no second guessing—just trust me on this one. From the very beginning, he has been nothing short of incredible to work with. He actually listens—like really listens—to what you want for your story and then brings it to life in a way that somehow feels even better than what you had in your head. He doesn't just read your words, he understands them. The tone, the tension, the emotion—he gets it, and he delivers every single time. On top of that, he's been insanely supportive through the entire process. Whether it was questions, ideas, or me overthinking something for the hundredth time, he always had an answer and never once made it feel like I was asking too much. That kind of patience and dedication? You don't find that everywhere. And let's talk about personality for a second—because this matters. Dean is one of the easiest people to get along with. If you're nervous, awkward, unsure, whatever… he kills that energy immediately. You settle in fast, and suddenly you're not stressed—you're excited. That comfort makes a huge difference, especially when you're trusting someone with your work. He's professional, talented, reliable, and just an all-around solid human. The kind of narrator you want in your corner. Truly, I could not recommend him more. And Dean… when you blow up—and you will—you better not forget about me. I'm claiming early supporter rights forever.",
+    author: "E.A. Harper",
+    title: "Author",
+    book: "Whiskey & Lies",
+  },
+];
+
+const TRUNCATE_LENGTH = 280;
+
+function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = testimonial.quote.length > TRUNCATE_LENGTH;
+  const displayQuote = isLong && !expanded
+    ? testimonial.quote.slice(0, TRUNCATE_LENGTH).trimEnd() + "…"
+    : testimonial.quote;
+
+  return (
+    <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6 flex flex-col gap-4 hover:border-[#D4AF37]/20 transition-colors">
+      {/* Quote mark */}
+      <div className="text-[#D4AF37]/30 text-5xl font-serif leading-none select-none">&ldquo;</div>
+
+      {/* Quote text */}
+      <div className="flex-1">
+        <p className="text-white/75 text-sm leading-relaxed">{displayQuote}</p>
+        {isLong && (
+          <button
+            type="button"
+            onClick={() => setExpanded(v => !v)}
+            className="mt-3 text-xs font-semibold text-[#D4AF37] hover:text-[#E0C15A] transition-colors inline-flex items-center gap-1"
+          >
+            {expanded ? "Show less" : "Read more"}
+            <svg className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Author */}
+      <div className="border-t border-white/6 pt-4">
+        <p className="font-semibold text-white text-sm">{testimonial.author}</p>
+        <p className="text-xs text-white/40 mt-0.5">
+          {testimonial.title}{testimonial.book ? ` · ${testimonial.book}` : ""}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function TestimonialsGrid() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      {TESTIMONIALS.map((t) => (
+        <TestimonialCard key={t.author} testimonial={t} />
+      ))}
+    </div>
+  );
+}
+
 function HomeContent() {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
@@ -336,6 +411,17 @@ function HomeContent() {
               </svg>
             </Link>
           </div>
+        </section>
+
+
+        {/* ── TESTIMONIALS ── */}
+        <section id="testimonials" className="mt-16 scroll-mt-24" aria-label="Author testimonials">
+          <div className="flex items-center gap-4 mb-10">
+            <div className="h-px w-6 bg-[#D4AF37]" />
+            <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Author testimonials</p>
+            <div className="flex-1 h-px bg-white/6" />
+          </div>
+          <TestimonialsGrid />
         </section>
 
         {/* ── ABOUT ── */}
