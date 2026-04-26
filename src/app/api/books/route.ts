@@ -41,10 +41,17 @@ export async function GET() {
       throw error;
     }
 
-    return NextResponse.json({
-      success: true,
-      books: data,
+    // Normalize co_narrator — Supabase may return JSON strings from old text column
+    const normalized = (data || []).map((book: Record<string, unknown>) => {
+      let cn = book.co_narrator;
+      if (!cn) cn = [];
+      else if (typeof cn === "string") {
+        try { cn = JSON.parse(cn as string); } catch { cn = cn ? [cn] : []; }
+      }
+      if (!Array.isArray(cn)) cn = [cn];
+      return { ...book, co_narrator: (cn as unknown[]).filter(Boolean) };
     });
+    return NextResponse.json({ success: true, books: normalized });
   } catch (error) {
     console.error("GET /api/books failed:", error);
 

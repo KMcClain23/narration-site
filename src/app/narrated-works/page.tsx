@@ -72,32 +72,49 @@ function AuthorPopup({
     const position = () => {
       const popup = popupRef.current;
       const rect = anchor.getBoundingClientRect();
-      const popupWidth = 272;
       const margin = 10;
       const vw = window.innerWidth;
       const vh = window.innerHeight;
+      const isMobile = vw < 640;
 
+      // On mobile use full-width sheet from bottom; on desktop use anchored popup
+      if (isMobile) {
+        const maxHeight = vh * 0.6;
+        setStyle({
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          width: "100%",
+          zIndex: 9999,
+          opacity: 1,
+          pointerEvents: "auto",
+          maxHeight,
+          borderRadius: "1rem 1rem 0 0",
+          transformOrigin: "bottom center",
+        });
+        return;
+      }
+
+      // Desktop: anchor-relative popup
+      const popupWidth = 272;
       const anchorCX = rect.left + rect.width / 2;
 
       let left = rect.left;
       if (left + popupWidth > vw - margin) left = rect.right - popupWidth;
       left = Math.max(margin, Math.min(left, vw - popupWidth - margin));
 
-      // Space available below and above anchor
       const spaceBelow = vh - rect.bottom - margin - 6;
       const spaceAbove = rect.top - margin - 6;
 
-      // Prefer below; flip above if more space there
       let top: number;
       let maxHeight: number;
       let flipY = false;
 
       if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
-        // Show below
         top = rect.bottom + 6;
         maxHeight = spaceBelow;
       } else {
-        // Show above
         flipY = true;
         maxHeight = spaceAbove;
         top = rect.top - 6 - Math.min(maxHeight, popup ? popup.scrollHeight : 400);
@@ -160,8 +177,12 @@ function AuthorPopup({
       className="rounded-2xl border border-[#1A2070] bg-[#0A0D3A] shadow-2xl flex flex-col"
       style={{ ...style, animation: style.opacity === 1 ? "liquidReveal 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards" : undefined, maxHeight: "calc(100vh - 24px)", overflow: "hidden" }}
     >
+      {/* Mobile drag handle */}
+      <div className="sm:hidden flex justify-center pt-2 pb-1 shrink-0">
+        <div className="h-1 w-10 rounded-full bg-white/20" />
+      </div>
       {/* Header — fixed */}
-      <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3 border-b border-white/8 shrink-0">
+      <div className="flex items-center justify-between gap-3 px-4 pt-2 sm:pt-4 pb-3 border-b border-white/8 shrink-0">
         <div>
           <p className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37] font-semibold">{label}</p>
           <p className="mt-0.5 font-semibold text-white text-sm leading-tight">{author.name}</p>
@@ -221,7 +242,22 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
   const [showCoNarratorPopup, setShowCoNarratorPopup] = useState(false);
   const [activeCoNarrator, setActiveCoNarrator] = useState<string>("");
   const [showMulticast, setShowMulticast] = useState(false);
-  const coNarratorList = Array.isArray(book.co_narrator) ? book.co_narrator.filter(Boolean) : (book.co_narrator ? [book.co_narrator] : []);
+  const coNarratorList = (() => {
+    const raw = book.co_narrator;
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw.filter(Boolean);
+    if (typeof raw === "string") {
+      // Handle JSON-stringified arrays like '["Ann Dahlia"]'
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+        return parsed ? [parsed] : [];
+      } catch {
+        return raw ? [raw] : [];
+      }
+    }
+    return [];
+  })();
 
   return (
     <div
@@ -436,7 +472,7 @@ function SectionGrid({
   if (books.length === 0) return null;
   return (
     <section className="mb-10">
-      <div className="flex items-center gap-4 mb-5 scroll-mt-36">
+      <div className="flex items-center gap-4 mb-5 scroll-mt-28 sm:scroll-mt-36">
         <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/40">{title}</h2>
         <div className="flex-1 h-px bg-white/8" />
         <span className="text-xs text-white/25">{books.length}</span>
@@ -517,7 +553,7 @@ export default function NarratedWorks() {
 
   return (
     <main className="min-h-screen bg-[#06082E] text-white overflow-x-clip">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-6 pb-12">
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-4 pb-12">
 
         {/* Page title + search — sticky */}
         <div className="sticky top-20 z-40 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 mb-8"
