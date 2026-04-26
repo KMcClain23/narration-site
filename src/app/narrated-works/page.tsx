@@ -280,7 +280,7 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
       className="group relative rounded-2xl overflow-visible cursor-default"
       itemScope
       itemType="https://schema.org/Book"
-      style={{ aspectRatio: "2/3", marginBottom: "clamp(3rem, 6vw, 6rem)" }}
+      style={{ aspectRatio: "2/3", marginBottom: "clamp(1.5rem, 3vw, 3rem)" }}
     >
       {/* Cover wrapper — clip to card shape */}
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
@@ -341,7 +341,7 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
       </div>
 
       {/* Floating pill — compact default, expands on hover */}
-      <div className="absolute -bottom-px inset-x-0 z-30 translate-y-1/2 group-hover:-translate-y-0 transition-transform duration-300">
+      <div className="absolute bottom-0 inset-x-0 z-30 translate-y-[calc(100%-2.5rem)] group-hover:translate-y-0 transition-transform duration-300">
         {/* Invisible anchor for popup positioning — always present */}
         <button
           ref={authorBtnRef}
