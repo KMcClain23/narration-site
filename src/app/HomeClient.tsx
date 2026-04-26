@@ -220,13 +220,13 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
   const hasMoreParagraphs = hasParagraphs && paragraphs.length > 2;
 
   return (
-    <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6 flex flex-col gap-4 hover:border-[#D4AF37]/20 transition-colors h-full">
+    <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6 flex flex-col gap-4 hover:border-[#D4AF37]/20 transition-colors">
       <div className="text-[#D4AF37]/30 text-5xl font-serif leading-none select-none">&ldquo;</div>
       <div className="flex-1">
         {hasParagraphs ? (
           <div className="space-y-3">
             {visibleParagraphs.map((p, i) => (
-              <p key={i} className="text-white/75 text-sm leading-relaxed">{p}</p>
+              <p key={i} className="text-white/75 text-sm leading-relaxed font-normal">{p}</p>
             ))}
             {hasMoreParagraphs && (
               <button type="button" onClick={() => setExpanded(v => !v)}
@@ -240,7 +240,7 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
           </div>
         ) : (
           <>
-            <p className="text-white/75 text-sm leading-relaxed">{displayQuote}</p>
+            <p className="text-white/75 text-sm leading-relaxed font-normal">{displayQuote}</p>
             {isLong && (
               <button type="button" onClick={() => setExpanded(v => !v)}
                 className="mt-3 text-xs font-semibold text-[#D4AF37] hover:text-[#E0C15A] transition-colors inline-flex items-center gap-1">
@@ -312,7 +312,7 @@ function TestimonialsCarousel() {
   return (
     <div className="relative">
       {/* Cards — show current + peek of next on larger screens */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
         {testimonials.slice(current, current + 3).concat(
           current + 3 > testimonials.length ? testimonials.slice(0, (current + 3) % testimonials.length) : []
         ).slice(0, Math.min(3, testimonials.length)).map((t, i) => (
