@@ -137,10 +137,14 @@ function AuthorPopup({
       });
     };
 
-    // Run immediately then again after render to use real height
+    // Run once immediately, then again after paint so we use actual rendered height
     position();
-    const raf = requestAnimationFrame(position);
-    return () => cancelAnimationFrame(raf);
+    const raf1 = requestAnimationFrame(() => {
+      position();
+      const raf2 = requestAnimationFrame(position);
+      return raf2;
+    });
+    return () => cancelAnimationFrame(raf1);
   }, [anchorRef]);
 
   // Close on outside click or Escape
@@ -553,10 +557,10 @@ export default function NarratedWorks() {
 
   return (
     <main className="min-h-screen bg-[#06082E] text-white overflow-x-clip">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-4 pb-12">
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-0 pb-12">
 
         {/* Page title + search — sticky */}
-        <div className="sticky top-20 z-40 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 mb-8"
+        <div className="sticky top-12 sm:top-16 z-40 -mx-5 sm:-mx-8 px-5 sm:px-8 py-2 sm:py-3 mb-4 sm:mb-6"
           style={{ background: "rgba(6,8,46,0.94)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
 
           {/* Title + search row */}
