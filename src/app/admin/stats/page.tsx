@@ -46,7 +46,7 @@ export default async function AdminStatsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#06082E] text-white p-6 pt-8 md:p-12 md:pt-8">
+    <main className="min-h-screen bg-[#06082E] text-white p-6 pt-24 md:p-12 md:pt-24">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
           <a href="/admin/login"
@@ -60,7 +60,6 @@ export default async function AdminStatsPage() {
         </div>
         <div className="flex items-center justify-between border-b border-[#1A2550] pb-8">
           <h1 className="text-4xl font-bold text-[#D4AF37]">Dean Miller Admin</h1>
-          <LogoutButton />
         </div>
 
         {/* 1. INBOX: NARRATION REQUESTS */}
