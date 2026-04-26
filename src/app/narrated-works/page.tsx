@@ -361,7 +361,7 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
           }}
         >
           {/* Default (compact) state */}
-          <div className="block group-hover:hidden px-3 py-2.5 sm:px-4 sm:py-3">
+          <div className="block group-hover:hidden px-3 py-2.5 sm:px-4 sm:py-3 pointer-events-none">
             <h3 className="font-semibold text-xs sm:text-sm leading-snug text-white truncate" itemProp="name">
               {book.title}
             </h3>
