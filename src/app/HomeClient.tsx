@@ -181,7 +181,8 @@ interface Testimonial {
   book?: string;
 }
 
-const TESTIMONIALS: Testimonial[] = [
+// Hardcoded seed testimonials — always shown even if API is down
+const SEED_TESTIMONIALS: Testimonial[] = [
   {
     quote: "Working with Dean has been such a pleasure! He is friendly, professional, and incredibly talented. I've honestly loved every second of the production process for my audiobook with him!",
     author: "River Fox",
@@ -214,18 +215,13 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
   const displayQuote = isLong && !expanded
     ? fullText.slice(0, TRUNCATE_LENGTH).trimEnd() + "…"
     : fullText;
-
-  // For paragraph quotes, show first 2 paragraphs collapsed
   const paragraphs = testimonial.paragraphs || [];
   const visibleParagraphs = hasParagraphs && !expanded ? paragraphs.slice(0, 2) : paragraphs;
   const hasMoreParagraphs = hasParagraphs && paragraphs.length > 2;
 
   return (
-    <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6 flex flex-col gap-4 hover:border-[#D4AF37]/20 transition-colors">
-      {/* Quote mark */}
+    <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6 flex flex-col gap-4 hover:border-[#D4AF37]/20 transition-colors h-full">
       <div className="text-[#D4AF37]/30 text-5xl font-serif leading-none select-none">&ldquo;</div>
-
-      {/* Quote text */}
       <div className="flex-1">
         {hasParagraphs ? (
           <div className="space-y-3">
@@ -233,11 +229,8 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
               <p key={i} className="text-white/75 text-sm leading-relaxed">{p}</p>
             ))}
             {hasMoreParagraphs && (
-              <button
-                type="button"
-                onClick={() => setExpanded(v => !v)}
-                className="mt-1 text-xs font-semibold text-[#D4AF37] hover:text-[#E0C15A] transition-colors inline-flex items-center gap-1"
-              >
+              <button type="button" onClick={() => setExpanded(v => !v)}
+                className="mt-1 text-xs font-semibold text-[#D4AF37] hover:text-[#E0C15A] transition-colors inline-flex items-center gap-1">
                 {expanded ? "Show less" : `Read more (${paragraphs.length - 2} more paragraphs)`}
                 <svg className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -249,11 +242,8 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
           <>
             <p className="text-white/75 text-sm leading-relaxed">{displayQuote}</p>
             {isLong && (
-              <button
-                type="button"
-                onClick={() => setExpanded(v => !v)}
-                className="mt-3 text-xs font-semibold text-[#D4AF37] hover:text-[#E0C15A] transition-colors inline-flex items-center gap-1"
-              >
+              <button type="button" onClick={() => setExpanded(v => !v)}
+                className="mt-3 text-xs font-semibold text-[#D4AF37] hover:text-[#E0C15A] transition-colors inline-flex items-center gap-1">
                 {expanded ? "Show less" : "Read more"}
                 <svg className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -263,8 +253,6 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
           </>
         )}
       </div>
-
-      {/* Author */}
       <div className="border-t border-white/6 pt-4">
         <p className="font-semibold text-white text-sm">{testimonial.author}</p>
         <p className="text-xs text-white/40 mt-0.5">
@@ -275,12 +263,107 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
   );
 }
 
-function TestimonialsGrid() {
+function TestimonialsCarousel() {
+  const [testimonials, setTestimonials] = useState<Testimonial[]>(SEED_TESTIMONIALS);
+  const [current, setCurrent] = useState(0);
+  const [autoPlay, setAutoPlay] = useState(true);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fetch approved testimonials from API and merge with seeds
+  useEffect(() => {
+    fetch("/api/testimonials")
+      .then(r => r.json())
+      .then(data => {
+        if (!data.testimonials?.length) return;
+        // Convert API format to Testimonial shape, exclude any already in seeds
+        const seedAuthors = new Set(SEED_TESTIMONIALS.map(t => t.author.toLowerCase()));
+        const apiOnes: Testimonial[] = data.testimonials
+          .filter((t: { reviewer_name: string }) => !seedAuthors.has(t.reviewer_name.toLowerCase()))
+          .map((t: { reviewer_name: string; reviewer_role: string; book_title: string; quote: string }) => ({
+            quote: t.quote,
+            author: t.reviewer_name,
+            title: t.reviewer_role === "author" ? "Author" : "Narrator",
+            book: t.book_title || undefined,
+          }));
+        if (apiOnes.length) setTestimonials([...SEED_TESTIMONIALS, ...apiOnes]);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Auto-advance every 6 seconds
+  useEffect(() => {
+    if (!autoPlay || testimonials.length <= 1) return;
+    timerRef.current = setTimeout(() => {
+      setCurrent(c => (c + 1) % testimonials.length);
+    }, 6000);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [current, autoPlay, testimonials.length]);
+
+  const go = (idx: number) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setAutoPlay(false);
+    setCurrent((idx + testimonials.length) % testimonials.length);
+    // Resume auto-play after 10s of inactivity
+    setTimeout(() => setAutoPlay(true), 10000);
+  };
+
+  if (testimonials.length === 0) return null;
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-      {TESTIMONIALS.map((t) => (
-        <TestimonialCard key={t.author} testimonial={t} />
-      ))}
+    <div className="relative">
+      {/* Cards — show current + peek of next on larger screens */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {testimonials.slice(current, current + 3).concat(
+          current + 3 > testimonials.length ? testimonials.slice(0, (current + 3) % testimonials.length) : []
+        ).slice(0, Math.min(3, testimonials.length)).map((t, i) => (
+          <div key={`${t.author}-${i}`}
+            className={`transition-all duration-500 ${i === 0 ? "opacity-100" : i === 1 ? "hidden md:block opacity-80" : "hidden lg:block opacity-60"}`}>
+            <TestimonialCard testimonial={t} />
+          </div>
+        ))}
+      </div>
+
+      {/* Controls */}
+      {testimonials.length > 1 && (
+        <div className="mt-6 flex items-center justify-between">
+          {/* Dot indicators */}
+          <div className="flex gap-2">
+            {testimonials.map((_, i) => (
+              <button key={i} type="button" onClick={() => go(i)}
+                aria-label={`Go to testimonial ${i + 1}`}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  i === current ? "bg-[#D4AF37] w-6" : "bg-white/20 w-1.5 hover:bg-white/40"
+                }`} />
+            ))}
+          </div>
+          {/* Prev/next */}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => go(current - 1)}
+              className="h-8 w-8 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:border-[#D4AF37]/50 hover:text-[#D4AF37] transition-colors">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button type="button" onClick={() => go(current + 1)}
+              className="h-8 w-8 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:border-[#D4AF37]/50 hover:text-[#D4AF37] transition-colors">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Leave a review link */}
+      <div className="mt-4 text-center">
+        <a href="/leave-a-review"
+          className="text-xs text-white/30 hover:text-[#D4AF37] transition-colors inline-flex items-center gap-1.5">
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          Worked with Dean? Leave a review
+        </a>
+      </div>
     </div>
   );
 }
@@ -459,7 +542,7 @@ function HomeContent() {
             <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Author testimonials</p>
             <div className="flex-1 h-px bg-white/6" />
           </div>
-          <TestimonialsGrid />
+          <TestimonialsCarousel />
         </section>
 
         {/* ── ABOUT ── */}
