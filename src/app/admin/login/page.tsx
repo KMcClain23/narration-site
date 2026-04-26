@@ -633,19 +633,16 @@ export default function AdminPage() {
               <label htmlFor="co_narrator" className="block text-sm font-medium mb-2">
                 Co-narrator <span className="text-white/30 font-normal normal-case text-xs">(optional)</span>
               </label>
-              <input
+              <select
                 id="co_narrator"
                 name="co_narrator"
-                type="text"
-                list="co-narrator-list"
                 value={form.co_narrator}
                 onChange={handleChange}
-                placeholder="e.g. Ann Dahlia"
-                className="w-full rounded-lg bg-[#06082E] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
-              />
-              <datalist id="co-narrator-list">
-                {coNarratorNames.map(name => <option key={name} value={name} />)}
-              </datalist>
+                className="w-full rounded-lg bg-[#06082E] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60 text-white appearance-none"
+              >
+                <option value="">— None —</option>
+                {coNarratorNames.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
             </div>
 
             <div>

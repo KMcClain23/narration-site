@@ -66,6 +66,7 @@ export async function POST(req: Request) {
       subtitle = "",
       author,
       link = "",
+      co_narrator = "",
       cover_url,
       tags = [],
       description = "",
@@ -94,6 +95,7 @@ export async function POST(req: Request) {
         description: description.trim(),
         category,
         sort_order,
+        co_narrator: co_narrator.trim(),
       })
       .select()
       .single();

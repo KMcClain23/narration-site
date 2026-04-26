@@ -303,6 +303,18 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
             >
               {book.author}
             </button>
+            {book.co_narrator && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="text-[9px] text-white/30 uppercase tracking-wide">with</span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setShowCoNarratorPopup((v) => !v); }}
+                  className="text-[10px] sm:text-xs text-[#D4AF37]/70 font-medium hover:text-[#D4AF37] transition-colors text-left truncate"
+                >
+                  {book.co_narrator}
+                </button>
+              </div>
+            )}
           </div>
           {/* Expanded (hover) state */}
           <div className="hidden group-hover:block px-3 py-4 sm:px-5 sm:py-5">
