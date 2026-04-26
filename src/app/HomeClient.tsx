@@ -290,9 +290,9 @@ function TestimonialsCarousel() {
       .catch(() => {});
   }, []);
 
-  // Auto-advance every 6 seconds
+  // Auto-advance every 6 seconds — only if more than 3 testimonials
   useEffect(() => {
-    if (!autoPlay || testimonials.length <= 1) return;
+    if (!autoPlay || testimonials.length <= 3) return;
     timerRef.current = setTimeout(() => {
       setCurrent(c => (c + 1) % testimonials.length);
     }, 6000);
@@ -303,8 +303,16 @@ function TestimonialsCarousel() {
     if (timerRef.current) clearTimeout(timerRef.current);
     setAutoPlay(false);
     setCurrent((idx + testimonials.length) % testimonials.length);
-    // Resume auto-play after 10s of inactivity
     setTimeout(() => setAutoPlay(true), 10000);
+  };
+
+  const pauseAutoPlay = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setAutoPlay(false);
+  };
+
+  const resumeAutoPlay = () => {
+    if (testimonials.length > 3) setAutoPlay(true);
   };
 
   if (testimonials.length === 0) return null;
@@ -312,19 +320,23 @@ function TestimonialsCarousel() {
   return (
     <div className="relative">
       {/* Cards — show current + peek of next on larger screens */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
+      <div
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-start"
+        onMouseEnter={pauseAutoPlay}
+        onMouseLeave={resumeAutoPlay}
+      >
         {testimonials.slice(current, current + 3).concat(
           current + 3 > testimonials.length ? testimonials.slice(0, (current + 3) % testimonials.length) : []
         ).slice(0, Math.min(3, testimonials.length)).map((t, i) => (
           <div key={`${t.author}-${i}`}
-            className={`transition-all duration-500 ${i === 0 ? "opacity-100" : i === 1 ? "hidden md:block opacity-80" : "hidden lg:block opacity-60"}`}>
+            className={`transition-all duration-700 ease-in-out ${i === 0 ? "opacity-100 translate-x-0" : i === 1 ? "hidden md:block opacity-75" : "hidden lg:block opacity-50"}`}>
             <TestimonialCard testimonial={t} />
           </div>
         ))}
       </div>
 
       {/* Controls */}
-      {testimonials.length > 1 && (
+      {testimonials.length > 3 && (
         <div className="mt-6 flex items-center justify-between">
           {/* Dot indicators */}
           <div className="flex gap-2">
