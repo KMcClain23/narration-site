@@ -405,19 +405,6 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
                 </button>
               </div>
             )}
-            {/* Audible button in expanded pill */}
-            {hasLink && (
-              <a
-                href={book.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="mt-3 self-start inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-3 py-2 sm:px-4 sm:py-2 rounded-full transition-colors shadow-lg"
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
-                Listen on Audible
-              </a>
-            )}
             {coNarratorList.length > 1 && (
               <div className="mt-2 relative">
                 <button
@@ -447,7 +434,33 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
                     ))}
                   </div>
                 )}
+                {/* Audible after multicast */}
+                {hasLink && (
+                  <a
+                    href={book.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-3 self-start inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-3 py-2 sm:px-4 sm:py-2 rounded-full transition-colors shadow-lg"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
+                    Listen on Audible
+                  </a>
+                )}
               </div>
+            )}
+            {/* Audible for no co-narrator or single co-narrator */}
+            {coNarratorList.length <= 1 && hasLink && (
+              <a
+                href={book.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="mt-3 self-start inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-3 py-2 sm:px-4 sm:py-2 rounded-full transition-colors shadow-lg"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
+                Listen on Audible
+              </a>
             )}
           </div>
         </div>

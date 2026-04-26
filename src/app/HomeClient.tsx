@@ -190,7 +190,7 @@ const SEED_TESTIMONIALS: Testimonial[] = [
     book: "Blood on the Asphalt",
   },
   {
-    quote: "Dean Miller, what a guy. When I started narrating duets I was so nervous about depending on others. Well Dean has set the bar for dream co-narrators! He's a hidden gem of talent and one of the most honest, genuine people I've had the pleasure to know and work with. I'm so blessed...",
+    quote: "Dean Miller, what a guy! When I started narrating duets, I was so nervous about depending on others. Well, Dean has set the bar pretty high for dream co-narrators! He's a hidden gem of talent and one of the most honest, genuine people I've had the pleasure to know and work with. I'm so blessed to have him in my corner as a peer and to continue working with him on more projects to come! Highly recommend!!!!!",
     author: "Stephanie Betschart/Ann Dahlia",
     title: "Narrator",
     book: "Blood on the Asphalt",
@@ -211,7 +211,7 @@ const SEED_TESTIMONIALS: Testimonial[] = [
   },
 ];
 
-const TRUNCATE_LENGTH = 280;
+const TRUNCATE_LENGTH = 320;
 
 function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
   const [expanded, setExpanded] = useState(false);
@@ -235,7 +235,7 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
               <p key={i} className="text-white/75 text-sm leading-relaxed font-normal">{p}</p>
             ))}
             {hasMoreParagraphs && (
-              <button type="button" onClick={() => setExpanded(v => !v)}
+              <button type="button" onClick={(e) => { e.stopPropagation(); setExpanded(v => !v); }}
                 className="mt-1 text-xs font-semibold text-[#D4AF37] hover:text-[#E0C15A] transition-colors inline-flex items-center gap-1">
                 {expanded ? "Show less" : `Read more (${paragraphs.length - 2} more paragraphs)`}
                 <svg className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -248,7 +248,7 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
           <>
             <p className="text-white/75 text-sm leading-relaxed font-normal">{displayQuote}</p>
             {isLong && (
-              <button type="button" onClick={() => setExpanded(v => !v)}
+              <button type="button" onClick={(e) => { e.stopPropagation(); setExpanded(v => !v); }}
                 className="mt-3 text-xs font-semibold text-[#D4AF37] hover:text-[#E0C15A] transition-colors inline-flex items-center gap-1">
                 {expanded ? "Show less" : "Read more"}
                 <svg className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -274,6 +274,7 @@ function TestimonialsCarousel() {
   const [current, setCurrent] = useState(0);
   const [autoPlay, setAutoPlay] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartX = useRef<number>(0);
 
   // Fetch approved testimonials from API and merge with seeds
   useEffect(() => {
