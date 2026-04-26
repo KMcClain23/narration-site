@@ -9,7 +9,7 @@ type FormState = {
   subtitle: string;
   author: string;
   link: string;
-  co_narrator: string;
+  co_narrator: string[];
   description: string;
   tags: string;
   category: BookCategory;
@@ -24,7 +24,7 @@ const initialForm: FormState = {
   subtitle: "",
   author: "",
   link: "",
-  co_narrator: "",
+  co_narrator: [],
   description: "",
   tags: "",
   category: "completed",
@@ -42,7 +42,7 @@ function formStateFromBook(book: Book): FormState {
     subtitle: book.subtitle || "",
     author: book.author,
     link: book.link,
-    co_narrator: book.co_narrator || "",
+    co_narrator: Array.isArray(book.co_narrator) ? book.co_narrator : (book.co_narrator ? [book.co_narrator] : []),
     description: book.description || "",
     tags: book.tags.join(", "),
     category: book.category,
@@ -633,16 +633,30 @@ export default function AdminPage() {
               <label htmlFor="co_narrator" className="block text-sm font-medium mb-2">
                 Co-narrator <span className="text-white/30 font-normal normal-case text-xs">(optional)</span>
               </label>
-              <select
-                id="co_narrator"
-                name="co_narrator"
-                value={form.co_narrator}
-                onChange={handleChange}
-                className="w-full rounded-lg bg-[#06082E] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60 text-white appearance-none"
-              >
-                <option value="">— None —</option>
-                {coNarratorNames.map(name => <option key={name} value={name}>{name}</option>)}
-              </select>
+              {coNarratorNames.length === 0 ? (
+                <p className="text-xs text-white/30 italic">No co-narrators added yet. Add them in Stats & Profiles first.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {coNarratorNames.map(name => (
+                    <label key={name} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.co_narrator.includes(name)}
+                        onChange={(e) => {
+                          setForm(f => ({
+                            ...f,
+                            co_narrator: e.target.checked
+                              ? [...f.co_narrator, name]
+                              : f.co_narrator.filter(n => n !== name)
+                          }));
+                        }}
+                        className="accent-[#D4AF37] w-4 h-4"
+                      />
+                      <span className="text-sm text-white">{name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>

@@ -7,7 +7,7 @@ export type Book = {
   author: string;
   link: string;
   ar_link?: string;
-  co_narrator?: string;
+  co_narrator?: string[]; // array of co-narrator names
   cover_url: string;
   tags: string[];
   description?: string;

@@ -202,7 +202,9 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
   const authorBtnRef = useRef<HTMLButtonElement>(null);
   const coNarratorBtnRef = useRef<HTMLButtonElement>(null);
   const [showCoNarratorPopup, setShowCoNarratorPopup] = useState(false);
-  const coNarrator = book.co_narrator ? coNarrators[book.co_narrator] : undefined;
+  const [activeCoNarrator, setActiveCoNarrator] = useState<string>("");
+  const [showMulticast, setShowMulticast] = useState(false);
+  const coNarratorList = Array.isArray(book.co_narrator) ? book.co_narrator.filter(Boolean) : (book.co_narrator ? [book.co_narrator] : []);
 
   return (
     <div
@@ -303,17 +305,21 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
             >
               {book.author}
             </button>
-            {book.co_narrator && (
+            {coNarratorList.length === 1 && (
               <div className="flex items-center gap-1 mt-0.5">
                 <span className="text-[9px] text-white/30 uppercase tracking-wide">with</span>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setShowCoNarratorPopup((v) => !v); }}
+                <button type="button"
+                  onClick={(e) => { e.stopPropagation(); setActiveCoNarrator(coNarratorList[0]); setShowCoNarratorPopup(true); }}
                   className="text-[10px] sm:text-xs text-[#D4AF37]/70 font-medium hover:text-[#D4AF37] transition-colors text-left truncate"
                 >
-                  {book.co_narrator}
+                  {coNarratorList[0]}
                 </button>
               </div>
+            )}
+            {coNarratorList.length > 1 && (
+              <span className="inline-block mt-0.5 text-[9px] font-bold uppercase tracking-wide text-[#D4AF37]/70 border border-[#D4AF37]/30 bg-[#D4AF37]/10 px-1.5 py-0.5 rounded-full">
+                Multicast
+              </span>
             )}
           </div>
           {/* Expanded (hover) state */}
@@ -333,6 +339,50 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
             >
               {book.author}
             </button>
+            {coNarratorList.length === 1 && (
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className="text-xs text-white/30 uppercase tracking-wide">with</span>
+                <button
+                  ref={coNarratorBtnRef}
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setActiveCoNarrator(coNarratorList[0]); setShowCoNarratorPopup(true); }}
+                  className="text-sm text-[#D4AF37]/80 font-semibold hover:text-[#D4AF37] transition-colors text-left hover:underline underline-offset-2"
+                >
+                  {coNarratorList[0]}
+                </button>
+              </div>
+            )}
+            {coNarratorList.length > 1 && (
+              <div className="mt-2">
+                <button
+                  ref={coNarratorBtnRef}
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setShowMulticast(v => !v); }}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-[#D4AF37] border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-2.5 py-1 rounded-full hover:bg-[#D4AF37]/20 transition-colors"
+                >
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Multicast
+                  <svg className={`h-3 w-3 transition-transform ${showMulticast ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showMulticast && (
+                  <div className="mt-2 space-y-1">
+                    {coNarratorList.map((name) => (
+                      <button key={name} type="button"
+                        onClick={(e) => { e.stopPropagation(); setActiveCoNarrator(name); setShowCoNarratorPopup(true); }}
+                        className="flex items-center gap-1.5 text-sm text-[#D4AF37]/80 font-semibold hover:text-[#D4AF37] transition-colors hover:underline underline-offset-2"
+                      >
+                        <span className="h-1 w-1 rounded-full bg-[#D4AF37]/50" />
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -347,9 +397,9 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
       )}
 
       {/* Co-narrator popup */}
-      {showCoNarratorPopup && coNarrator && (
+      {showCoNarratorPopup && activeCoNarrator && coNarrators[activeCoNarrator] && (
         <AuthorPopup
-          author={{ ...coNarrator, __type: "narrator" } as Author}
+          author={{ ...coNarrators[activeCoNarrator], __type: "narrator" } as Author}
           anchorRef={coNarratorBtnRef}
           onClose={() => setShowCoNarratorPopup(false)}
           label="Co-narrator"

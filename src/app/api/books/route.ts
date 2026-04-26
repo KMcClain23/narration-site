@@ -7,7 +7,7 @@ type CreateBookBody = {
   subtitle?: string;
   author?: string;
   link?: string;
-  co_narrator?: string;
+  co_narrator?: string[];
   cover_url?: string;
   tags?: string[];
   description?: string;
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
       subtitle = "",
       author,
       link = "",
-      co_narrator = "",
+      co_narrator = [] as string[],
       cover_url,
       tags = [],
       description = "",
@@ -96,7 +96,7 @@ export async function POST(req: Request) {
         description: description.trim(),
         category,
         sort_order,
-        co_narrator: co_narrator.trim(),
+        co_narrator: Array.isArray(co_narrator) ? co_narrator.filter(Boolean) : [],
       })
       .select()
       .single();
@@ -146,7 +146,7 @@ export async function PUT(req: Request) {
       description: updatedBook.description?.trim() || "",
       category: updatedBook.category,
       sort_order: updatedBook.sort_order ?? 0,
-      co_narrator: updatedBook.co_narrator?.trim() || "",
+      co_narrator: Array.isArray(updatedBook.co_narrator) ? updatedBook.co_narrator.filter(Boolean) : [],
     };
 
     const { data, error } = await supabaseAdmin
