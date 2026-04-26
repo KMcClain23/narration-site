@@ -7,6 +7,7 @@ type CreateBookBody = {
   subtitle?: string;
   author?: string;
   link?: string;
+  co_narrator?: string;
   cover_url?: string;
   tags?: string[];
   description?: string;
