@@ -148,11 +148,11 @@ function AuthorPopup({
       ref={popupRef}
       role="dialog"
       aria-label={`${author.name} author info`}
-      className="rounded-2xl border border-[#1A2070] bg-[#0A0D3A] shadow-2xl overflow-hidden"
-      style={{ ...style, animation: style.opacity === 1 ? "liquidReveal 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards" : undefined }}
+      className="rounded-2xl border border-[#1A2070] bg-[#0A0D3A] shadow-2xl flex flex-col"
+      style={{ ...style, animation: style.opacity === 1 ? "liquidReveal 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards" : undefined, maxHeight: "calc(100vh - 24px)", overflow: "hidden" }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3 border-b border-white/8">
+      {/* Header — fixed */}
+      <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3 border-b border-white/8 shrink-0">
         <div>
           <p className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37] font-semibold">{label}</p>
           <p className="mt-0.5 font-semibold text-white text-sm leading-tight">{author.name}</p>
