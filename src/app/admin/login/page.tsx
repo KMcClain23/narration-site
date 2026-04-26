@@ -8,6 +8,7 @@ type FormState = {
   subtitle: string;
   author: string;
   link: string;
+  co_narrator: string;
   description: string;
   tags: string;
   category: BookCategory;
@@ -22,6 +23,7 @@ const initialForm: FormState = {
   subtitle: "",
   author: "",
   link: "",
+  co_narrator: "",
   description: "",
   tags: "",
   category: "completed",
@@ -39,6 +41,7 @@ function formStateFromBook(book: Book): FormState {
     subtitle: book.subtitle || "",
     author: book.author,
     link: book.link,
+    co_narrator: book.co_narrator || "",
     description: book.description || "",
     tags: book.tags.join(", "),
     category: book.category,
@@ -600,6 +603,21 @@ export default function AdminPage() {
                 value={form.link}
                 onChange={handleChange}
                 placeholder="https://"
+                className="w-full rounded-lg bg-[#06082E] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="co_narrator" className="block text-sm font-medium mb-2">
+                Co-narrator <span className="text-white/30 font-normal normal-case text-xs">(optional — must match a name in Co-narrator profiles)</span>
+              </label>
+              <input
+                id="co_narrator"
+                name="co_narrator"
+                type="text"
+                value={form.co_narrator}
+                onChange={handleChange}
+                placeholder="e.g. Ann Dahlia"
                 className="w-full rounded-lg bg-[#06082E] border border-[#1A2550] p-3 outline-none focus:border-[#D4AF37]/60"
               />
             </div>
