@@ -406,7 +406,7 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
               </div>
             )}
             {coNarratorList.length > 1 && (
-              <div className="mt-2">
+              <div className="mt-2 relative">
                 <button
                   ref={coNarratorBtnRef}
                   type="button"
@@ -422,13 +422,13 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
                   </svg>
                 </button>
                 {showMulticast && (
-                  <div className="mt-2 space-y-1">
+                  <div className="absolute bottom-full left-0 right-0 mb-2 rounded-xl border border-[#D4AF37]/25 bg-[#0A0D3A] shadow-xl p-3 space-y-1 max-h-40 overflow-y-auto">
                     {coNarratorList.map((name) => (
                       <button key={name} type="button"
-                        onClick={(e) => { e.stopPropagation(); setActiveCoNarrator(name); setShowCoNarratorPopup(true); }}
-                        className="flex items-center gap-1.5 text-sm text-[#D4AF37]/80 font-semibold hover:text-[#D4AF37] transition-colors hover:underline underline-offset-2"
+                        onClick={(e) => { e.stopPropagation(); setActiveCoNarrator(name); setShowCoNarratorPopup(true); setShowMulticast(false); }}
+                        className="flex items-center gap-1.5 text-sm text-[#D4AF37]/80 font-semibold hover:text-[#D4AF37] transition-colors hover:underline underline-offset-2 w-full text-left"
                       >
-                        <span className="h-1 w-1 rounded-full bg-[#D4AF37]/50" />
+                        <span className="h-1 w-1 rounded-full bg-[#D4AF37]/50 shrink-0" />
                         {name}
                       </button>
                     ))}
