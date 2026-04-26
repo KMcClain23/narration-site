@@ -452,6 +452,7 @@ function SectionGrid({
 
 export default function NarratedWorks() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [books, setBooks] = useState<Book[]>([]);
   const [authors, setAuthors] = useState<Record<string, Author>>({});
   const [coNarrators, setCoNarrators] = useState<Record<string, CoNarrator>>({});
@@ -526,12 +527,13 @@ export default function NarratedWorks() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-white/40 mb-1">Portfolio</p>
-              <h1 className="text-2xl font-bold text-white leading-none">Narrated works</h1>
+              <h1 className="text-lg sm:text-2xl font-bold text-white leading-none">Narrated works</h1>
               {!isLoading && totalBooks > 0 && (
-                <p className="mt-1 text-xs text-white/35">{totalBooks} titles across dark romance, romantasy, thriller & more</p>
+                <p className="mt-1 text-xs text-white/35 hidden sm:block">{totalBooks} titles across dark romance, romantasy, thriller & more</p>
               )}
             </div>
-            <div className="relative sm:w-72">
+            {/* Desktop search — always visible */}
+            <div className="hidden sm:block relative w-72">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg className="h-3.5 w-3.5 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -542,11 +544,38 @@ export default function NarratedWorks() {
                 placeholder="Title, author, or genre…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 pl-9 pr-9 text-sm focus:outline-none focus:border-[#D4AF37]/40 focus:bg-white/8 transition-all placeholder:text-white/20 text-white/80"
+                className="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 pl-9 pr-9 text-sm focus:outline-none focus:border-[#D4AF37]/40 transition-all placeholder:text-white/20 text-white/80"
               />
               {searchQuery && (
                 <button onClick={() => setSearchQuery("")} className="absolute inset-y-0 right-0 pr-3 flex items-center text-white/25 hover:text-white/60 transition" type="button" aria-label="Clear search">
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              )}
+            </div>
+            {/* Mobile search — icon tap to expand */}
+            <div className="sm:hidden flex items-center gap-2">
+              {searchOpen ? (
+                <div className="relative w-48">
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Search…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg py-1.5 pl-3 pr-8 text-sm focus:outline-none focus:border-[#D4AF37]/40 text-white/80 placeholder:text-white/20"
+                  />
+                  <button type="button" onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
+                    className="absolute inset-y-0 right-0 pr-2 flex items-center text-white/30 hover:text-white">
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setSearchOpen(true)}
+                  className="p-1.5 text-white/50 hover:text-white transition rounded-lg hover:bg-white/8"
+                  aria-label="Search">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </button>
               )}
             </div>
