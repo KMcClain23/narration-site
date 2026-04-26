@@ -93,12 +93,25 @@ export default function Header() {
 
     if (secretClicks.current >= 5) {
       secretClicks.current = 0;
-
-      // Optional: prevent the last click from navigating home
-      // so you immediately land on admin login.
       e.preventDefault();
 
-      router.push("/admin/login");
+      const key = window.prompt("Admin key:");
+      if (!key) return;
+
+      fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            router.push("/admin/stats");
+          } else {
+            alert("Invalid key.");
+          }
+        })
+        .catch(() => alert("Login failed."));
     }
   };
 
