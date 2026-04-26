@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 const COOKIE_NAME = "dmn_admin_key";
 const INQUIRY_KEY = "dmn_inquiries";
+const ARCHIVE_KEY = "dmn_inquiries_archived";
 
 const redis = new Redis({
   url: process.env.KV_REST_API_URL ?? "",
@@ -29,9 +30,11 @@ export default async function AdminStatsPage() {
   const totalPlays = (await redis.get<number>("total_demo_plays")) ?? 0;
   const rawInquiries = await redis.lrange(INQUIRY_KEY, 0, -1);
   const inquiries = rawInquiries.map((i: any) => (typeof i === 'string' ? JSON.parse(i) : i));
+  const rawArchived = await redis.lrange(ARCHIVE_KEY, 0, -1);
+  const archived = rawArchived.map((i: any) => (typeof i === 'string' ? JSON.parse(i) : i));
 
   // --- ACTIONS ---
-  async function deleteInquiry(formData: FormData) {
+  async function archiveInquiry(formData: FormData) {
     "use server";
     const id = formData.get("id");
     const raw = await redis.lrange(INQUIRY_KEY, 0, -1);
@@ -39,6 +42,37 @@ export default async function AdminStatsPage() {
       const inquiry = typeof item === 'string' ? JSON.parse(item) : item;
       if (inquiry.id === id) {
         await redis.lrem(INQUIRY_KEY, 1, JSON.stringify(inquiry));
+        await redis.lpush(ARCHIVE_KEY, JSON.stringify({ ...inquiry, archivedAt: new Date().toISOString() }));
+        break;
+      }
+    }
+    revalidatePath("/admin/stats");
+  }
+
+  async function deleteArchivedInquiry(formData: FormData) {
+    "use server";
+    const id = formData.get("id");
+    const raw = await redis.lrange(ARCHIVE_KEY, 0, -1);
+    for (const item of raw) {
+      const inquiry = typeof item === 'string' ? JSON.parse(item) : item;
+      if (inquiry.id === id) {
+        await redis.lrem(ARCHIVE_KEY, 1, JSON.stringify(inquiry));
+        break;
+      }
+    }
+    revalidatePath("/admin/stats");
+  }
+
+  async function restoreInquiry(formData: FormData) {
+    "use server";
+    const id = formData.get("id");
+    const raw = await redis.lrange(ARCHIVE_KEY, 0, -1);
+    for (const item of raw) {
+      const inquiry = typeof item === 'string' ? JSON.parse(item) : item;
+      if (inquiry.id === id) {
+        await redis.lrem(ARCHIVE_KEY, 1, JSON.stringify(inquiry));
+        const { archivedAt: _, ...restored } = inquiry;
+        await redis.lpush(INQUIRY_KEY, JSON.stringify(restored));
         break;
       }
     }
@@ -64,11 +98,19 @@ export default async function AdminStatsPage() {
 
         {/* 1. INBOX: NARRATION REQUESTS */}
         <section className="mt-12">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
             <h2 className="text-2xl font-semibold text-white">Inquiries Inbox</h2>
-            <span className="bg-[#D4AF37]/20 text-[#D4AF37] text-xs px-3 py-1 rounded-full font-bold">
-              {inquiries.length} Messages
-            </span>
+            <div className="flex items-center gap-3">
+              {archived.length > 0 && (
+                <a href="/admin/stats?view=archived"
+                  className="text-xs font-semibold text-white/40 hover:text-white border border-white/15 px-3 py-1.5 rounded-full transition-colors">
+                  View archived ({archived.length})
+                </a>
+              )}
+              <span className="bg-[#D4AF37]/20 text-[#D4AF37] text-xs px-3 py-1 rounded-full font-bold">
+                {inquiries.length} Messages
+              </span>
+            </div>
           </div>
 
           <div className="grid gap-4">
@@ -88,9 +130,9 @@ export default async function AdminStatsPage() {
                     <p className="text-[10px] text-white/30 uppercase font-mono">
                       {new Date(inquiry.createdAt).toLocaleDateString()}
                     </p>
-                    <form action={deleteInquiry} className="mt-2">
+                    <form action={archiveInquiry} className="mt-2">
                       <input type="hidden" name="id" value={inquiry.id} />
-                      <button className="text-xs text-red-400/50 hover:text-red-400 transition underline">
+                      <button className="text-xs text-[#D4AF37]/50 hover:text-[#D4AF37] transition underline">
                         Archive
                       </button>
                     </form>
@@ -107,6 +149,51 @@ export default async function AdminStatsPage() {
               </div>
             )}
           </div>
+
+          {/* Archived messages */}
+          {archived.length > 0 && (
+            <div className="mt-10">
+              <div className="flex items-center gap-4 mb-5">
+                <h3 className="text-lg font-semibold text-white/40">Archived</h3>
+                <div className="flex-1 h-px bg-white/6" />
+                <span className="text-xs text-white/25">{archived.length}</span>
+              </div>
+              <div className="grid gap-3">
+                {archived.map((inquiry: any) => (
+                  <div key={inquiry.id} className="bg-[#0B1224]/50 border border-[#1A2550]/50 p-5 rounded-2xl opacity-70 hover:opacity-100 transition">
+                    <div className="flex flex-wrap justify-between items-start gap-4">
+                      <div>
+                        <h3 className="font-semibold text-white/70">{inquiry.name}</h3>
+                        <p className="text-sm text-[#D4AF37]/60">{inquiry.email}</p>
+                        {inquiry.archivedAt && (
+                          <p className="text-[10px] text-white/25 mt-1">
+                            Archived {new Date(inquiry.archivedAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-3">
+                        <form action={restoreInquiry}>
+                          <input type="hidden" name="id" value={inquiry.id} />
+                          <button className="text-xs text-emerald-400/50 hover:text-emerald-400 transition underline">
+                            Restore
+                          </button>
+                        </form>
+                        <form action={deleteArchivedInquiry}>
+                          <input type="hidden" name="id" value={inquiry.id} />
+                          <button className="text-xs text-red-400/40 hover:text-red-400 transition underline">
+                            Delete
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                    <div className="mt-3 p-3 bg-[#06082E]/50 rounded-lg border border-[#1A2550]/30 text-white/50 text-xs leading-relaxed line-clamp-3">
+                      {inquiry.message}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* 2. AUTHOR PROFILES */}

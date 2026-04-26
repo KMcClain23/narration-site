@@ -190,6 +190,12 @@ const SEED_TESTIMONIALS: Testimonial[] = [
     book: "Blood on the Asphalt",
   },
   {
+    quote: "Dean Miller, what a guy. When I started narrating duets I was so nervous about depending on others. Well Dean has set the bar for dream co-narrators! He's a hidden gem of talent and one of the most honest, genuine people I've had the pleasure to know and work with. I'm so blessed...",
+    author: "Stephanie Betschart/Ann Dahlia",
+    title: "Narrator",
+    book: "Blood on the Asphalt",
+  },
+  {
     paragraphs: [
       "If you're looking for a male narrator, Dean is your guy. No hesitation, no second guessing—just trust me on this one.",
       "From the very beginning, he has been nothing short of incredible to work with. He actually listens—like really listens—to what you want for your story and then brings it to life in a way that somehow feels even better than what you had in your head. He doesn't just read your words, he understands them. The tone, the tension, the emotion—he gets it, and he delivers every single time.",
@@ -329,7 +335,7 @@ function TestimonialsCarousel() {
           current + 3 > testimonials.length ? testimonials.slice(0, (current + 3) % testimonials.length) : []
         ).slice(0, Math.min(3, testimonials.length)).map((t, i) => (
           <div key={`${t.author}-${i}`}
-            className={`transition-all duration-700 ease-in-out ${i === 0 ? "opacity-100 translate-x-0" : i === 1 ? "hidden md:block opacity-75" : "hidden lg:block opacity-50"}`}>
+            className={`transition-all duration-700 ease-in-out ${i === 0 ? "opacity-100" : i === 1 ? "hidden md:block opacity-100" : "hidden lg:block opacity-100"}`}>
             <TestimonialCard testimonial={t} />
           </div>
         ))}
