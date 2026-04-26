@@ -191,7 +191,7 @@ export default function CoNarratorManager() {
         <div className="space-y-3">
           {coNarrators.map(n => {
             const isExpanded = expandedId === n.id;
-            const links = LINK_FIELDS.filter(f => (n as Record<string, string>)[f.key]);
+            const links = LINK_FIELDS.filter(f => (n as unknown as Record<string, string>)[f.key]);
             return (
               <div key={n.id} className="rounded-2xl border border-[#1A2070] bg-[#0A0D3A] overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-4 cursor-pointer"
@@ -221,7 +221,7 @@ export default function CoNarratorManager() {
                     {links.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {links.map(f => (
-                          <a key={f.key} href={(n as Record<string, string>)[f.key]} target="_blank" rel="noopener noreferrer"
+                          <a key={f.key} href={(n as unknown as Record<string, string>)[f.key]} target="_blank" rel="noopener noreferrer"
                             className="text-xs text-[#D4AF37] border border-[#D4AF37]/25 px-3 py-1 rounded-full hover:bg-[#D4AF37]/10 transition inline-flex items-center gap-1">
                             {f.label} ↗
                           </a>
