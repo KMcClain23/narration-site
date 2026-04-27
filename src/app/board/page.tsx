@@ -124,7 +124,7 @@ export default function BoardPage() {
   const F = ({label,k,placeholder,type="text"}:{label:string;k:string;placeholder?:string;type?:string}) => (
     <label className="block">
       <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">{label}</span>
-      <input type={type} value={(form as Record<string,string>)[k]}
+      <input type={type} value={(form as unknown as Record<string,string>)[k]}
         onChange={e=>setForm(p=>({...p,[k]:e.target.value}))}
         placeholder={placeholder}
         className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/>
