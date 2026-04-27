@@ -757,48 +757,21 @@ export default function AdminPage() {
         </section>
 
         <section>
-          <div className="mb-5">
-            <h2 className="text-xl font-bold">Move, Edit, or Delete Books</h2>
-            <p className="text-white/55 text-sm mt-2">
-              Drag a book card to another column to change its status, or use the edit and delete buttons on each card.
-            </p>
+          <div className="rounded-2xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 p-6 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="text-lg font-bold text-white">Production Board</h2>
+              <p className="text-sm text-white/50 mt-1">
+                Move projects through Audition → Contracted → Recording → Editing → Released. Drag & drop, manage deadlines, share author links, and sync to the public portfolio.
+              </p>
+            </div>
+            <a href="/board"
+              className="inline-flex items-center gap-2 bg-[#D4AF37] text-black font-bold px-6 py-3 rounded-full text-sm hover:bg-[#E0C15A] transition-colors shrink-0">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+              </svg>
+              Open Production Board
+            </a>
           </div>
-
-          {isLoadingBooks ? (
-            <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-8 text-white/60">
-              Loading books...
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <CategoryColumn
-                category="coming-soon"
-                books={comingSoonBooks}
-                onDropBook={handleDropBook}
-                draggedBook={draggedBook}
-                setDraggedBook={setDraggedBook}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-              <CategoryColumn
-                category="in-progress"
-                books={inProgressBooks}
-                onDropBook={handleDropBook}
-                draggedBook={draggedBook}
-                setDraggedBook={setDraggedBook}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-              <CategoryColumn
-                category="completed"
-                books={completedBooks}
-                onDropBook={handleDropBook}
-                draggedBook={draggedBook}
-                setDraggedBook={setDraggedBook}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            </div>
-          )}
         </section>
 
         {status && (
