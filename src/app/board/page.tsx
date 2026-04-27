@@ -59,7 +59,18 @@ export default function BoardPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const col = (id: string) => cards.filter(c=>c.status===id).sort((a,b)=>a.sort_order-b.sort_order);
+  const col = (id: string) => cards.filter(c=>c.status===id).sort((a,b) => {
+              const getEarliest = (card: BoardCard) => {
+                const dates = [card.first15_due, card.deadline].filter(Boolean).map(d => {
+                  const [y,m,dy] = d!.split("-"); return new Date(+y,+m-1,+dy).getTime();
+                });
+                return dates.length ? Math.min(...dates) : Infinity;
+              };
+              const aDate = getEarliest(a);
+              const bDate = getEarliest(b);
+              if (aDate !== bDate) return aDate - bDate;
+              return a.sort_order - b.sort_order;
+            });
 
   const drop = async (e: React.DragEvent, status: string) => {
     e.preventDefault(); setDragOver(null);
@@ -129,8 +140,8 @@ export default function BoardPage() {
       fd.append("file", file);
       const res = await fetch("/api/upload-cover", { method: "POST", body: fd });
       const data = await res.json();
-      if (data.url) setForm(p => ({ ...p, cover_url: data.url }));
-      else setError("Cover upload failed.");
+      if (data.coverUrl) setForm(p => ({ ...p, cover_url: data.coverUrl }));
+      else setError(data.error || "Cover upload failed.");
     } catch { setError("Cover upload failed."); }
     setUploadingCover(false);
   };
@@ -383,8 +394,25 @@ export default function BoardPage() {
               </div>
 
               <div className="px-3 pb-3 space-y-3">
+                {/* Add button at top */}
+                <button onClick={()=>{setShowForm(true);setEditCard(null);setForm({...EMPTY,status:col.id,chapters:[]});}}
+                  className="w-full py-2 text-xs text-white/25 hover:text-[#D4AF37] hover:bg-[#D4AF37]/5 border border-dashed border-white/10 hover:border-[#D4AF37]/30 rounded-xl transition-colors flex items-center justify-center gap-1.5">
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+                  Add to {col.label}
+                </button>
                 {loading ? <div className="h-24 rounded-xl bg-white/5 animate-pulse"/> :
-                cards.filter(c=>c.status===col.id).sort((a,b)=>a.sort_order-b.sort_order).map(card=>(
+                cards.filter(c=>c.status===col.id).sort((a,b) => {
+              const getEarliest = (card: BoardCard) => {
+                const dates = [card.first15_due, card.deadline].filter(Boolean).map(d => {
+                  const [y,m,dy] = d!.split("-"); return new Date(+y,+m-1,+dy).getTime();
+                });
+                return dates.length ? Math.min(...dates) : Infinity;
+              };
+              const aDate = getEarliest(a);
+              const bDate = getEarliest(b);
+              if (aDate !== bDate) return aDate - bDate;
+              return a.sort_order - b.sort_order;
+            }).map(card=>(
                   <div key={card.id} draggable onDragStart={()=>setDragId(card.id)}
                     className={`rounded-xl bg-[#06082E]/80 border border-white/8 hover:border-white/15 transition-all cursor-grab active:cursor-grabbing shadow-md group ${dragId===card.id?"opacity-30 scale-95":""} ${syncing===card.id?"opacity-60":""}`}>
 
@@ -419,16 +447,16 @@ export default function BoardPage() {
                       {card.deadline && (
                         <div className="flex items-center gap-1 mt-2">
                           <svg className="h-3 w-3 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                          <span className={`text-[10px] ${new Date(card.deadline)<new Date()&&col.id!=="released"?"text-red-400":"text-white/30"}`}>
-                            Due: {new Date(card.deadline).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}
+                          <span className={`text-[10px] ${(() => { const [y,m,d] = card.deadline.split("-"); return new Date(+y,+m-1,+d) < new Date() && col.id !== "released"; })() ? "text-red-400" : "text-white/30"}`}>
+                            Due: {(() => { const [y,m,d] = card.deadline.split("-"); return new Date(+y, +m-1, +d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); })()}
                           </span>
                         </div>
                       )}
                       {card.first15_due && (
                         <div className="flex items-center gap-1 mt-1">
                           <svg className="h-3 w-3 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.868V15.131a1 1 0 01-1.447.894L15 14M3 8h12a1 1 0 011 1v6a1 1 0 01-1 1H3a1 1 0 01-1-1V9a1 1 0 011-1z"/></svg>
-                          <span className={`text-[10px] ${new Date(card.first15_due)<new Date()&&col.id==="contracted"?"text-orange-400":"text-white/30"}`}>
-                            First 15: {new Date(card.first15_due).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
+                          <span className={`text-[10px] ${(() => { const [y,m,d] = card.first15_due.split("-"); return new Date(+y,+m-1,+d) < new Date() && col.id === "contracted"; })() ? "text-orange-400" : "text-white/30"}`}>
+                            First 15: {(() => { const [y,m,d] = card.first15_due.split("-"); return new Date(+y, +m-1, +d).toLocaleDateString("en-US",{month:"short",day:"numeric"}); })()}
                           </span>
                         </div>
                       )}
@@ -500,11 +528,7 @@ export default function BoardPage() {
                   </div>
                 ))}
 
-                <button onClick={()=>{setShowForm(true);setEditCard(null);setForm({...EMPTY,status:col.id});}}
-                  className="w-full py-2.5 text-xs text-white/20 hover:text-white/50 hover:bg-white/5 rounded-xl transition-colors flex items-center justify-center gap-1.5">
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-                  Add to {col.label}
-                </button>
+
               </div>
             </div>
           ))}
