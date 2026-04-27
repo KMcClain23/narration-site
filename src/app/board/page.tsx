@@ -17,12 +17,13 @@ interface BoardCard {
   status: string; deadline?: string; notes: string; author_notes: string;
   links: Link[]; co_narrator: string; author_token: string; sort_order: number;
   subtitle: string; tags: string[]; description: string; audible_link: string; ar_link: string;
+  chapters: { status: string }[];
 }
 
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
   title:"", author:"", cover_url:"", status:"audition", deadline:"",
   notes:"", author_notes:"", links:[], co_narrator:"",
-  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"",
+  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", chapters:[],
 };
 
 export default function BoardPage() {
