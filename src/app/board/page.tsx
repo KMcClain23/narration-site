@@ -97,16 +97,25 @@ export default function BoardPage() {
     setSyncing(null);
   };
 
+  const cleanForm = (f: typeof form) => ({
+    ...f,
+    // Only save deadline/first15 if all parts are present
+    deadline: f.deadline && f.deadline.split("-").filter(Boolean).length === 3 && !f.deadline.startsWith("-") ? f.deadline : "",
+    first15_due: f.first15_due && f.first15_due.split("-").filter(Boolean).length === 3 && !f.first15_due.startsWith("-") ? f.first15_due : "",
+  });
+
   const save = async () => {
     setSaving(true);
     try {
       if (editCard) {
-        const r = await fetch("/api/board",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:editCard.id,...form})});
+        const r = await fetch("/api/board",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:editCard.id,...cleanForm(form)})});
         const d = await r.json();
-        if (d.card) setCards(p=>p.map(c=>c.id===editCard.id?d.card:c));
+        // Use returned card if available, otherwise merge form data into existing card
+        const updatedCard = d.card || {...editCard, ...cleanForm(form)};
+        setCards(p=>p.map(c=>c.id===editCard.id ? updatedCard : c));
         setEditCard(null);
       } else {
-        const r = await fetch("/api/board",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,sort_order:col(form.status).length})});
+        const r = await fetch("/api/board",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...cleanForm(form),sort_order:col(form.status).length})});
         const d = await r.json();
         if (d.card) setCards(p=>[...p,d.card]);
         setShowForm(false);
