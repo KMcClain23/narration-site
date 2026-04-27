@@ -73,16 +73,7 @@ export async function PUT(req: Request) {
     const { id, token, ...fields } = body;
     if (!id) return NextResponse.json({ error: "ID required." }, { status: 400 });
 
-    // Single card by ID
-  const cardId = searchParams.get("id");
-  if (cardId) {
-    const { data, error } = await supabaseAdmin
-      .from("board_cards").select("*").eq("id", cardId).single();
-    if (error) return NextResponse.json({ error: "Card not found." }, { status: 404 });
-    return NextResponse.json({ card: data });
-  }
-
-  if (token) {
+    if (token) {
       // Co-narrator can update notes only
       const { data, error } = await supabaseAdmin
         .from("board_cards")
