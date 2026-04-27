@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import Link from "next/link";
 
 const COLUMNS = [
   { id: "audition",   label: "Audition",   color: "border-purple-500/30 bg-purple-500/5",  dot: "bg-purple-400",  text: "text-purple-300" },
