@@ -21,7 +21,7 @@ const COLUMN_COLORS: Record<string, string> = {
 export default async function AuthorBoardView({ params }: { params: { token: string } }) {
   const { data: card } = await supabaseAdmin
     .from("board_cards")
-    .select("id, title, author, cover_url, column, deadline, author_notes, links")
+    .select("id, title, author, cover_url, status, deadline, author_notes, links")
     .eq("author_token", params.token)
     .single();
 
