@@ -108,7 +108,7 @@ export default function BoardPage() {
       deadline:card.deadline||"",notes:card.notes,author_notes:card.author_notes,
       links:card.links,co_narrator:card.co_narrator,subtitle:card.subtitle||"",
       tags:card.tags||[],description:card.description||"",
-      audible_link:card.audible_link||"",ar_link:card.ar_link||""});
+      audible_link:card.audible_link||"",ar_link:card.ar_link||"",chapters:card.chapters||[]});
     setShowForm(false);
   };
 
