@@ -41,11 +41,15 @@ export default function BoardPage() {
   const [tagInput, setTagInput] = useState("");
   const [syncing, setSyncing] = useState<string|null>(null);
   const [error, setError] = useState<string|null>(null);
+  const [coNarratorNames, setCoNarratorNames] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const r = await fetch("/api/board"); const d = await r.json(); setCards(d.cards||[]); }
-    catch { setError("Failed to load."); } finally { setLoading(false); }
+    try {
+      const [r, cnr] = await Promise.all([fetch("/api/board"), fetch("/api/co-narrators")]);
+      const d = await r.json(); setCards(d.cards||[]);
+      const cn = await cnr.json(); setCoNarratorNames((cn.co_narrators||[]).map((n:{name:string})=>n.name).sort());
+    } catch { setError("Failed to load."); } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -167,7 +171,14 @@ export default function BoardPage() {
                 <F label="Book title *" k="title" placeholder="e.g. Whiskey & Lies"/>
                 <F label="Subtitle" k="subtitle" placeholder="e.g. Sultry Secrets Book 4"/>
                 <F label="Author" k="author" placeholder="e.g. E.A. Harper"/>
-                <F label="Co-narrator" k="co_narrator" placeholder="e.g. Ann Dahlia"/>
+                <label className="block">
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Co-narrator</span>
+                  <select value={form.co_narrator} onChange={e=>setForm(p=>({...p,co_narrator:e.target.value}))}
+                    className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 appearance-none">
+                    <option value="">— None —</option>
+                    {coNarratorNames.map(n=><option key={n} value={n}>{n}</option>)}
+                  </select>
+                </label>
                 <F label="Cover image URL" k="cover_url" placeholder="https://..."/>
                 <F label="Audible / Amazon link" k="audible_link" placeholder="https://..."/>
                 <F label="Authors Republic link" k="ar_link" placeholder="https://..."/>

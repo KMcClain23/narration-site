@@ -198,7 +198,16 @@ export default function CardDetailPage() {
             <h1 className="font-bold text-white text-base leading-snug">{card.title}</h1>
             {card.subtitle && <p className="text-xs text-white/40">{card.subtitle}</p>}
             {card.author && <p className="text-sm text-[#D4AF37]">{card.author}</p>}
-            {card.co_narrator && <p className="text-xs text-white/35">with {card.co_narrator}</p>}
+            {card.co_narrator && (
+              <p className="text-xs text-white/35">with {
+                (() => {
+                  try {
+                    const parsed = JSON.parse(card.co_narrator);
+                    return Array.isArray(parsed) ? parsed.join(", ") : card.co_narrator;
+                  } catch { return card.co_narrator; }
+                })()
+              }</p>
+            )}
             {card.deadline && <p className="text-xs text-white/35">Deadline: {new Date(card.deadline).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>}
           </div>
 
