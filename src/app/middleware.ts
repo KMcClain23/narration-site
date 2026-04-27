@@ -6,7 +6,7 @@ const COOKIE_NAME = "dmn_admin_key";
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
+  if ((pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) || (pathname === "/board" && !pathname.startsWith("/board/"))) {
     const cookie = req.cookies.get(COOKIE_NAME)?.value ?? "";
     if (!cookie) {
       const url = req.nextUrl.clone();
