@@ -13,7 +13,7 @@ export async function GET(req: Request) {
       // Co-narrator sees all their cards
       const { data, error } = await supabaseAdmin
         .from("board_cards")
-        .select("id, title, author, cover_url, column, deadline, notes, author_notes, links, co_narrator")
+        .select("id, title, author, cover_url, status, deadline, notes, author_notes, links, co_narrator")
         .eq("co_narrator", token)
         .order("sort_order");
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
       // Author sees only their card
       const { data, error } = await supabaseAdmin
         .from("board_cards")
-        .select("id, title, author, cover_url, column, deadline, author_notes, links")
+        .select("id, title, author, cover_url, status, deadline, author_notes, links")
         .eq("author_token", token)
         .single();
       if (error) return NextResponse.json({ error: "Project not found." }, { status: 404 });
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     if (!title?.trim()) return NextResponse.json({ error: "Title required." }, { status: 400 });
     const { data, error } = await supabaseAdmin
       .from("board_cards")
-      .insert({ title: title.trim(), author, cover_url, column, deadline: deadline || null, notes, author_notes, links, co_narrator, sort_order })
+      .insert({ title: title.trim(), author, cover_url, status, deadline: deadline || null, notes, author_notes, links, co_narrator, sort_order })
       .select().single();
     if (error) throw error;
     return NextResponse.json({ success: true, card: data });
