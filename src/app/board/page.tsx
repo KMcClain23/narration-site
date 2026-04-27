@@ -18,12 +18,15 @@ interface BoardCard {
   links: Link[]; co_narrator: string; author_token: string; sort_order: number;
   subtitle: string; tags: string[]; description: string; audible_link: string; ar_link: string;
   chapters: { status: string }[];
+  word_count: number;
+  first15_due: string;
+  pfh_rate: number;
 }
 
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
   title:"", author:"", cover_url:"", status:"audition", deadline:"",
   notes:"", author_notes:"", links:[], co_narrator:"",
-  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", chapters:[],
+  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0,
 };
 
 export default function BoardPage() {
@@ -112,7 +115,8 @@ export default function BoardPage() {
       deadline:card.deadline||"",notes:card.notes,author_notes:card.author_notes,
       links:card.links,co_narrator:card.co_narrator,subtitle:card.subtitle||"",
       tags:card.tags||[],description:card.description||"",
-      audible_link:card.audible_link||"",ar_link:card.ar_link||"",chapters:card.chapters||[]});
+      audible_link:card.audible_link||"",ar_link:card.ar_link||"",chapters:card.chapters||[],
+      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0});
     setShowForm(false);
   };
 
@@ -189,7 +193,35 @@ export default function BoardPage() {
                     {COLUMNS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
                   </select>
                 </label>
-                <F label="Deadline" k="deadline" type="date"/>
+                <div>
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium block mb-1.5">Deadline</span>
+                  <div className="flex gap-2">
+                    <select value={form.deadline ? form.deadline.split("-")[1] : ""}
+                      onChange={e => { const p = form.deadline?.split("-") || [new Date().getFullYear().toString(),"","01"]; setForm(f=>({...f,deadline:e.target.value?`${p[0]||new Date().getFullYear()}-${e.target.value}-${p[2]||"01"}`:""}))} }
+                      className="flex-1 rounded-lg bg-black/30 border border-white/8 px-2 py-2.5 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 appearance-none">
+                      <option value="">Month</option>
+                      {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((m,i)=>(
+                        <option key={m} value={String(i+1).padStart(2,"0")}>{m}</option>
+                      ))}
+                    </select>
+                    <select value={form.deadline ? form.deadline.split("-")[2] : ""}
+                      onChange={e => { const p = form.deadline?.split("-") || [new Date().getFullYear().toString(),"01",""]; setForm(f=>({...f,deadline:e.target.value?`${p[0]||new Date().getFullYear()}-${p[1]||"01"}-${e.target.value}`:""}))} }
+                      className="w-20 rounded-lg bg-black/30 border border-white/8 px-2 py-2.5 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 appearance-none">
+                      <option value="">Day</option>
+                      {Array.from({length:31},(_,i)=>String(i+1).padStart(2,"0")).map(d=>(
+                        <option key={d} value={d}>{parseInt(d)}</option>
+                      ))}
+                    </select>
+                    <select value={form.deadline ? form.deadline.split("-")[0] : ""}
+                      onChange={e => { const p = form.deadline?.split("-") || ["","01","01"]; setForm(f=>({...f,deadline:e.target.value?`${e.target.value}-${p[1]||"01"}-${p[2]||"01"}`:""}))} }
+                      className="w-24 rounded-lg bg-black/30 border border-white/8 px-2 py-2.5 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 appearance-none">
+                      <option value="">Year</option>
+                      {Array.from({length:6},(_,i)=>new Date().getFullYear()+i).map(y=>(
+                        <option key={y} value={String(y)}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
 
               <label className="block">
@@ -247,6 +279,28 @@ export default function BoardPage() {
                   <button type="button" onClick={addLink} className="bg-white/8 hover:bg-white/15 text-white text-xs px-3 py-2 rounded-lg transition">Add</button>
                 </div>
               </div>
+
+              {/* Author link — only shown when editing existing card */}
+              {editCard && (
+                <div className="rounded-xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 p-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] font-medium mb-2">Author project link</p>
+                  <p className="text-xs text-white/50 mb-3">Share this private link with the author so they can track their project status.</p>
+                  <div className="flex gap-2">
+                    <div className="flex-1 rounded-lg bg-black/30 border border-white/8 px-3 py-2 text-xs text-white/60 font-mono truncate">
+                      {typeof window !== "undefined" ? `${window.location.origin}/board/${editCard.author_token}` : `/board/${editCard.author_token}`}
+                    </div>
+                    <button type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/board/${editCard.author_token}`);
+                        setCopied(editCard.author_token);
+                        setTimeout(() => setCopied(null), 2000);
+                      }}
+                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors shrink-0 ${copied === editCard.author_token ? "bg-emerald-500 text-white" : "bg-[#D4AF37] text-black hover:bg-[#E0C15A]"}`}>
+                      {copied === editCard.author_token ? "✓ Copied" : "Copy link"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Released notice */}
               {form.status==="released" && (
@@ -324,8 +378,22 @@ export default function BoardPage() {
                         <div className="flex items-center gap-1 mt-2">
                           <svg className="h-3 w-3 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                           <span className={`text-[10px] ${new Date(card.deadline)<new Date()&&col.id!=="released"?"text-red-400":"text-white/30"}`}>
-                            {new Date(card.deadline).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}
+                            Due: {new Date(card.deadline).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}
                           </span>
+                        </div>
+                      )}
+                      {card.first15_due && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <svg className="h-3 w-3 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.868V15.131a1 1 0 01-1.447.894L15 14M3 8h12a1 1 0 011 1v6a1 1 0 01-1 1H3a1 1 0 01-1-1V9a1 1 0 011-1z"/></svg>
+                          <span className={`text-[10px] ${new Date(card.first15_due)<new Date()&&col.id==="contracted"?"text-orange-400":"text-white/30"}`}>
+                            First 15: {new Date(card.first15_due).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
+                          </span>
+                        </div>
+                      )}
+                      {card.word_count > 0 && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-[10px] text-white/25">{card.word_count.toLocaleString()} words</span>
+                          {card.pfh_rate > 0 && <span className="text-[10px] text-[#D4AF37]/50">· ${((card.word_count/9400)*card.pfh_rate).toFixed(0)} est.</span>}
                         </div>
                       )}
 
