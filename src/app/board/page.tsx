@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import Link from "next/link";
 
 const COLUMNS = [
   { id: "audition",   label: "Audition",   color: "border-purple-500/30 bg-purple-500/5",  dot: "bg-purple-400",  text: "text-purple-300" },
@@ -291,6 +292,12 @@ export default function BoardPage() {
                       {card.subtitle && <p className="text-[11px] text-white/40 mt-0.5">{card.subtitle}</p>}
                       {card.author && <p className="text-xs text-[#D4AF37]/80 mt-1 font-medium">{card.author}</p>}
                       {card.co_narrator && <p className="text-[10px] text-white/30 mt-0.5">with {card.co_narrator}</p>}
+                      <Link href={`/board/card/${card.id}`}
+                        className="mt-2 inline-flex items-center gap-1 text-[10px] text-[#D4AF37]/60 hover:text-[#D4AF37] transition-colors font-semibold"
+                        onClick={e => e.stopPropagation()}>
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        {card.chapters?.length > 0 ? `${card.chapters.filter((c: {status:string}) => c.status === "live").length}/${card.chapters.length} chapters` : "Track chapters"}
+                      </Link>
 
                       {/* Tags */}
                       {card.tags?.length > 0 && (

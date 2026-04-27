@@ -7,6 +7,15 @@ export async function GET(req: Request) {
   const token = searchParams.get("token");
   const type = searchParams.get("type") || "author"; // author | co_narrator
 
+  // Single card by ID
+  const cardId = searchParams.get("id");
+  if (cardId) {
+    const { data, error } = await supabaseAdmin
+      .from("board_cards").select("*").eq("id", cardId).single();
+    if (error) return NextResponse.json({ error: "Card not found." }, { status: 404 });
+    return NextResponse.json({ card: data });
+  }
+
   if (token) {
     // Token-based access
     if (type === "co_narrator") {
@@ -44,11 +53,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { title, author = "", cover_url = "", status = "audition", deadline, notes = "", author_notes = "", links = [], co_narrator = "", sort_order = 0 } = body;
+    const { title, author = "", cover_url = "", status = "audition", deadline, notes = "", author_notes = "", links = [], co_narrator = "", sort_order = 0, chapters = [], subtitle = "", tags = [], description = "", audible_link = "", ar_link = "" } = body;
     if (!title?.trim()) return NextResponse.json({ error: "Title required." }, { status: 400 });
     const { data, error } = await supabaseAdmin
       .from("board_cards")
-      .insert({ title: title.trim(), author, cover_url, status, deadline: deadline || null, notes, author_notes, links, co_narrator, sort_order })
+      .insert({ title: title.trim(), author, cover_url, status, deadline: deadline || null, notes, author_notes, links, co_narrator, sort_order, chapters, subtitle, tags, description, audible_link, ar_link })
       .select().single();
     if (error) throw error;
     return NextResponse.json({ success: true, card: data });
@@ -64,7 +73,16 @@ export async function PUT(req: Request) {
     const { id, token, ...fields } = body;
     if (!id) return NextResponse.json({ error: "ID required." }, { status: 400 });
 
-    if (token) {
+    // Single card by ID
+  const cardId = searchParams.get("id");
+  if (cardId) {
+    const { data, error } = await supabaseAdmin
+      .from("board_cards").select("*").eq("id", cardId).single();
+    if (error) return NextResponse.json({ error: "Card not found." }, { status: 404 });
+    return NextResponse.json({ card: data });
+  }
+
+  if (token) {
       // Co-narrator can update notes only
       const { data, error } = await supabaseAdmin
         .from("board_cards")
@@ -77,7 +95,7 @@ export async function PUT(req: Request) {
     }
 
     // Admin full update
-    const allowed = ["title", "author", "cover_url", "status", "deadline", "notes", "author_notes", "links", "co_narrator", "sort_order"];
+    const allowed = ["title", "author", "cover_url", "status", "deadline", "notes", "author_notes", "links", "co_narrator", "sort_order", "chapters", "subtitle", "tags", "description", "audible_link", "ar_link"];
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
       if (key in fields) update[key] = fields[key];
