@@ -6,8 +6,7 @@ export const config = {
   },
 };
 
-// Increase body size limit for PDF uploads
-export const maxDuration = 60; // 60 second timeout for Claude processing
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
@@ -15,7 +14,6 @@ export async function POST(req: Request) {
     const file = formData.get("file") as File;
     if (!file) return NextResponse.json({ error: "No file provided." }, { status: 400 });
 
-    // Check file size — warn if over 20MB
     const sizeMB = file.size / (1024 * 1024);
     if (sizeMB > 30) {
       return NextResponse.json({
@@ -87,7 +85,6 @@ Rules:
     const aiData = await response.json();
     const text = aiData.content?.[0]?.text || "";
 
-    // Parse the JSON array from Claude's response
     const clean = text.replace(/```json|```/g, "").trim();
     const chapters = JSON.parse(clean);
 
