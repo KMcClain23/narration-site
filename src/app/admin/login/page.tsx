@@ -552,11 +552,11 @@ export default function AdminPage() {
           </p>
         </header>
 
+        {/* Only show form when editing — adding is done on the board */}
+        {isEditing && (
         <section className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6 md:p-8 shadow-xl mb-10">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl font-bold">
-              {isEditing ? "Edit Book" : "Add a Book"}
-            </h2>
+            <h2 className="text-xl font-bold">Edit Book</h2>
 
             {isEditing && (
               <button
@@ -755,6 +755,7 @@ export default function AdminPage() {
             </div>
           </form>
         </section>
+        )}
 
         <section>
           <div className="rounded-2xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 p-6 flex items-center justify-between gap-4 flex-wrap">

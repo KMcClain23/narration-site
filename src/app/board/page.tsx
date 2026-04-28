@@ -47,6 +47,10 @@ export default function BoardPage() {
   const [error, setError] = useState<string|null>(null);
   const [coNarratorNames, setCoNarratorNames] = useState<string[]>([]);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importBooks, setImportBooks] = useState<{id:string;title:string;author:string;cover_url:string;link:string;ar_link?:string;subtitle?:string;tags?:string[];description?:string;co_narrator?:string[];category:string}[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importingId, setImportingId] = useState<string|null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -142,6 +146,48 @@ export default function BoardPage() {
     setShowForm(false);
   };
 
+  const loadImportBooks = async () => {
+    setImportLoading(true);
+    try {
+      const r = await fetch("/api/books");
+      const d = await r.json();
+      // Filter out books already on the board
+      const boardTitles = new Set(cards.map(c => c.title.toLowerCase()));
+      setImportBooks((d.books || []).filter((b:{title:string}) => !boardTitles.has(b.title.toLowerCase())));
+    } catch { setError("Failed to load books."); }
+    setImportLoading(false);
+  };
+
+  const importBook = async (book: typeof importBooks[0]) => {
+    setImportingId(book.id);
+    const statusMap: Record<string,string> = { "coming-soon": "contracted", "in-progress": "recording", "completed": "released" };
+    try {
+      const r = await fetch("/api/board", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: book.title,
+          subtitle: book.subtitle || "",
+          author: book.author,
+          cover_url: book.cover_url || "",
+          audible_link: book.link || "",
+          ar_link: book.ar_link || "",
+          tags: book.tags || [],
+          description: book.description || "",
+          co_narrator: Array.isArray(book.co_narrator) ? (book.co_narrator[0] || "") : "",
+          status: statusMap[book.category] || "contracted",
+          sort_order: col(statusMap[book.category] || "contracted").length,
+        }),
+      });
+      const d = await r.json();
+      if (d.card) {
+        setCards(p => [...p, d.card]);
+        setImportBooks(p => p.filter(b => b.id !== book.id));
+      }
+    } catch { setError("Import failed."); }
+    setImportingId(null);
+  };
+
   const uploadCover = async (file: File) => {
     setUploadingCover(true);
     try {
@@ -191,6 +237,50 @@ export default function BoardPage() {
           New project
         </button>
       </div>
+
+      {/* Import modal */}
+      {showImport && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
+          onClick={e=>{if(e.target===e.currentTarget) setShowImport(false);}}>
+          <div className="w-full max-w-lg bg-[#0A0D3A] border border-[#1A2070] rounded-2xl shadow-2xl my-8">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/8">
+              <div>
+                <h2 className="font-bold text-white text-lg">Import from books</h2>
+                <p className="text-xs text-white/40 mt-0.5">Add existing books to the production board</p>
+              </div>
+              <button onClick={()=>setShowImport(false)} className="text-white/40 hover:text-white">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              {importLoading ? (
+                <div className="py-10 flex justify-center"><div className="h-6 w-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin"/></div>
+              ) : importBooks.length === 0 ? (
+                <div className="py-10 text-center">
+                  <p className="text-white/30 text-sm">All books are already on the board.</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                  {importBooks.map(book => (
+                    <div key={book.id} className="flex items-center gap-3 rounded-xl border border-white/8 bg-[#06082E] p-3 hover:border-white/15 transition-colors">
+                      {book.cover_url && <img src={book.cover_url} alt={book.title} className="h-12 w-8 object-cover rounded shrink-0"/>}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{book.title}</p>
+                        <p className="text-xs text-[#D4AF37]/70">{book.author}</p>
+                        <p className="text-[10px] text-white/30 capitalize">{book.category?.replace("-"," ")}</p>
+                      </div>
+                      <button type="button" onClick={()=>importBook(book)} disabled={importingId===book.id}
+                        className="shrink-0 text-xs font-bold bg-[#D4AF37]/15 hover:bg-[#D4AF37]/30 text-[#D4AF37] border border-[#D4AF37]/30 px-3 py-1.5 rounded-full transition-colors disabled:opacity-50">
+                        {importingId===book.id ? "…" : "Add"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && <div className="mx-5 mt-3 rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-300 flex justify-between"><span>{error}</span><button onClick={()=>setError(null)} className="text-red-300/50 hover:text-red-300">✕</button></div>}
 
