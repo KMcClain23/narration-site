@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import crypto from "crypto"; // Added for token generation
 
-// GET: admin gets all cards, token gets restricted view
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const token = searchParams.get("token");
-  const type = searchParams.get("type") || "author"; // author | co_narrator
-
-  // Single card by ID
+  const type = searchParams.get("type") || "author";
   const cardId = searchParams.get("id");
+
   if (cardId) {
     const { data, error } = await supabaseAdmin
       .from("board_cards").select("*").eq("id", cardId).single();
@@ -17,9 +16,7 @@ export async function GET(req: Request) {
   }
 
   if (token) {
-    // Token-based access
     if (type === "co_narrator") {
-      // Co-narrator sees all their cards
       const { data, error } = await supabaseAdmin
         .from("board_cards")
         .select("id, title, author, cover_url, status, deadline, notes, author_notes, links, co_narrator")
@@ -28,10 +25,9 @@ export async function GET(req: Request) {
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ cards: data, view: "co_narrator" });
     } else {
-      // Author sees only their card
       const { data, error } = await supabaseAdmin
         .from("board_cards")
-        .select("id, title, author, cover_url, status, deadline, author_notes, links")
+        .select("id, title, author, cover_url, status, deadline, author_notes, links, chapters")
         .eq("author_token", token)
         .single();
       if (error) return NextResponse.json({ error: "Project not found." }, { status: 404 });
@@ -39,7 +35,6 @@ export async function GET(req: Request) {
     }
   }
 
-  // Admin: get all cards
   const { data, error } = await supabaseAdmin
     .from("board_cards")
     .select("*")
@@ -49,16 +44,43 @@ export async function GET(req: Request) {
   return NextResponse.json({ cards: data });
 }
 
-// POST: create card (admin)
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { title, author = "", cover_url = "", status = "audition", deadline, notes = "", author_notes = "", links = [], co_narrator = "", sort_order = 0, chapters = [], subtitle = "", tags = [], description = "", audible_link = "", ar_link = "", word_count = 0, first15_due, pfh_rate = 0, payment_type = "pfh" } = body;
+    const { title, author = "", ...fields } = body;
+    
     if (!title?.trim()) return NextResponse.json({ error: "Title required." }, { status: 400 });
+
+    // Generate a unique token for the author link
+    const author_token = crypto.randomBytes(16).toString("hex");
+
     const { data, error } = await supabaseAdmin
       .from("board_cards")
-      .insert({ title: title.trim(), author, cover_url, status, deadline: deadline || null, notes, author_notes, links, co_narrator, sort_order, chapters, subtitle, tags, description, audible_link, ar_link, word_count, first15_due: first15_due || null, pfh_rate, payment_type })
+      .insert({ 
+        title: title.trim(), 
+        author, 
+        author_token, // FIXED: Now inserting the generated token
+        cover_url: fields.cover_url || "",
+        status: fields.status || "audition",
+        deadline: fields.deadline || null,
+        notes: fields.notes || "",
+        author_notes: fields.author_notes || "",
+        links: fields.links || [],
+        co_narrator: fields.co_narrator || "",
+        sort_order: fields.sort_order || 0,
+        chapters: fields.chapters || [],
+        subtitle: fields.subtitle || "",
+        tags: fields.tags || [],
+        description: fields.description || "",
+        audible_link: fields.audible_link || "",
+        ar_link: fields.ar_link || "",
+        word_count: fields.word_count || 0,
+        first15_due: fields.first15_due || null,
+        pfh_rate: fields.pfh_rate || 0,
+        payment_type: fields.payment_type || "pfh"
+      })
       .select().single();
+
     if (error) throw error;
     return NextResponse.json({ success: true, card: data });
   } catch (e) {
@@ -66,7 +88,6 @@ export async function POST(req: Request) {
   }
 }
 
-// PUT: update card (admin) or author_notes (token)
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
@@ -74,7 +95,6 @@ export async function PUT(req: Request) {
     if (!id) return NextResponse.json({ error: "ID required." }, { status: 400 });
 
     if (token) {
-      // Co-narrator can update notes only
       const { data, error } = await supabaseAdmin
         .from("board_cards")
         .update({ notes: fields.notes, updated_at: new Date().toISOString() })
@@ -85,12 +105,19 @@ export async function PUT(req: Request) {
       return NextResponse.json({ success: true, card: data });
     }
 
-    // Admin full update
-    const allowed = ["title", "author", "cover_url", "status", "deadline", "notes", "author_notes", "links", "co_narrator", "sort_order", "chapters", "subtitle", "tags", "description", "audible_link", "ar_link", "word_count", "first15_due", "pfh_rate", "payment_type"];
+    // List of fields admin is allowed to update
+    const allowed = [
+      "title", "author", "cover_url", "status", "deadline", "notes", 
+      "author_notes", "links", "co_narrator", "sort_order", "chapters", 
+      "subtitle", "tags", "description", "audible_link", "ar_link", 
+      "word_count", "first15_due", "pfh_rate", "payment_type", "author_token"
+    ];
+
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
       if (key in fields) update[key] = fields[key];
     }
+
     const { data, error } = await supabaseAdmin
       .from("board_cards").update(update).eq("id", id).select().single();
     if (error) throw error;
@@ -100,7 +127,6 @@ export async function PUT(req: Request) {
   }
 }
 
-// DELETE: admin only
 export async function DELETE(req: Request) {
   try {
     const { id } = await req.json();
