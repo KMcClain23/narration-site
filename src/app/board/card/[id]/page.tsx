@@ -125,17 +125,66 @@ export default function CardDetailPage() {
     setAiLoading(false);
   };
 
-  // Upload PDF and extract chapters
+  // Upload PDF and extract chapters — calls Anthropic directly from browser
   const handlePdfUpload = async (file: File) => {
     setPdfLoading(true);
     setError(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/board-pdf-chapters", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || "Extraction failed");
-      setChapters(data.chapters.map((c: Omit<Chapter, "status"|"notes">) => ({ ...c, status: "not_started", notes: "" })));
+      // Convert PDF to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const prompt = `You are analyzing a book manuscript PDF for an audiobook narrator tracking production progress.
+
+Extract EVERY chapter and return ONLY a valid JSON array with no other text or markdown.
+
+Format: [{"number":1,"title":"Chapter title","wordCount":2847,"pages":11},...]
+
+Rules:
+- Include ALL chapters (Prologue, Epilogue, numbered/named chapters)
+- title = exactly as written in the book
+- wordCount = actual word count of that chapter body text
+- pages = number of pages the chapter spans
+- EXCLUDE: table of contents, copyright, dedication, acknowledgments, about the author, also by, bonus content
+- Return ONLY the JSON array`;
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || "",
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-5",
+          max_tokens: 4000,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
+              { type: "text", text: prompt },
+            ],
+          }],
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`API error ${response.status}: ${err.slice(0, 200)}`);
+      }
+
+      const aiData = await response.json();
+      const text = aiData.content?.[0]?.text || "";
+      const clean = text.replace(/```json|```/g, "").trim();
+      const chapters = JSON.parse(clean);
+
+      if (!Array.isArray(chapters) || !chapters.length) throw new Error("No chapters returned");
+      setChapters(chapters.map((c: Omit<Chapter, "status"|"notes">) => ({ ...c, status: "not_started", notes: "" })));
     } catch (e) {
       setError(`PDF extraction failed: ${e instanceof Error ? e.message : "Unknown error"}`);
     }
