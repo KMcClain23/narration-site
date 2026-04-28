@@ -306,14 +306,15 @@ export default function CardDetailPage() {
             )}
 
             <div className="mt-4 pt-4 border-t border-white/8">
-              <p className="text-xs text-white/50 mb-2">Or upload the manuscript PDF for exact chapters:</p>
+              <p className="text-xs text-white/50 mb-2">Or upload the manuscript PDF — Claude will read every chapter and count actual words:</p>
               <label className={`flex items-center justify-center gap-2 w-full rounded-lg border-2 border-dashed px-3 py-3 cursor-pointer transition-colors ${pdfLoading ? "border-[#D4AF37]/40 bg-[#D4AF37]/5" : "border-white/15 hover:border-[#D4AF37]/30 hover:bg-white/5"}`}>
                 <input type="file" accept=".pdf" className="hidden"
                   onChange={e => { if(e.target.files?.[0]) handlePdfUpload(e.target.files[0]); }} />
                 {pdfLoading ? (
-                  <div className="flex items-center gap-2 text-xs text-[#D4AF37]">
+                  <div className="flex flex-col items-center gap-1.5 text-xs text-[#D4AF37] py-1">
                     <div className="h-3.5 w-3.5 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin"/>
-                    Extracting chapters…
+                    <span>Claude is reading the manuscript…</span>
+                    <span className="text-[10px] text-[#D4AF37]/50">This may take 20–40 seconds</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 text-xs text-white/35">
@@ -322,7 +323,7 @@ export default function CardDetailPage() {
                   </div>
                 )}
               </label>
-              <p className="text-[10px] text-white/20 mt-1.5">Reads the table of contents directly — most accurate method</p>
+              <p className="text-[10px] text-white/20 mt-1.5">Claude reads the full manuscript and counts real word counts per chapter (~$0.05–0.15 per book)</p>
             </div>
           </div>
         </div>

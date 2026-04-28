@@ -1,81 +1,88 @@
 import { NextResponse } from "next/server";
-import { writeFile, unlink } from "fs/promises";
-import { join } from "path";
-import { exec } from "child_process";
-import { promisify } from "util";
-
-const execAsync = promisify(exec);
 
 export async function POST(req: Request) {
-  const tmpPath = join("/tmp", `book-${Date.now()}.pdf`);
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File;
     if (!file) return NextResponse.json({ error: "No file provided." }, { status: 400 });
 
-    // Write PDF to temp file
     const bytes = await file.arrayBuffer();
-    await writeFile(tmpPath, Buffer.from(bytes));
+    const base64 = Buffer.from(bytes).toString("base64");
 
-    // Extract text from first 10 pages to find TOC
-    const { stdout } = await execAsync(
-      `python3 -c "
-import pdfplumber, re, json, sys
+    const prompt = `You are analyzing a book manuscript PDF for an audiobook narrator who needs to track production progress chapter by chapter.
 
-with pdfplumber.open('${tmpPath}') as pdf:
-    total_pages = len(pdf.pages)
-    
-    # Extract text from first 10 pages looking for TOC
-    toc_text = ''
-    for i in range(min(10, total_pages)):
-        toc_text += (pdf.pages[i].extract_text() or '') + '\\n'
-    
-    # Parse TOC entries: 'Name  PageNumber'
-    lines = toc_text.strip().split('\\n')
-    chapters = []
-    
-    SKIP = {'contents', 'preface', 'acknowledgments', 'copyright', 'dedication',
-            'abouttheauthor', 'about the author', 'also by', 'note', 'author note',
-            'author\\'s note', 'playlist', 'glossary', 'appendix', 'index', 'bonus'}
-    
-    for line in lines:
-        line = line.strip()
-        m = re.match(r'^([A-Za-z][A-Za-z\\-\\s]+?)\\s+(\\d+)\\s*$', line)
-        if m:
-            name = m.group(1).strip()
-            page = int(m.group(2))
-            if name.lower() not in SKIP and len(name) < 60:
-                chapters.append({'title': name, 'page': page})
-    
-    # Calculate word/page counts from page ranges
-    WORDS_PER_PAGE = 250
-    result = []
-    for i, ch in enumerate(chapters):
-        end_page = chapters[i+1]['page'] - 1 if i+1 < len(chapters) else total_pages
-        pages = max(1, end_page - ch['page'] + 1)
-        words = pages * WORDS_PER_PAGE
-        result.append({
-            'number': i+1,
-            'title': ch['title'],
-            'wordCount': words,
-            'pages': pages
-        })
-    
-    print(json.dumps({'chapters': result, 'totalPages': total_pages}))
-"`
-    );
+Please extract EVERY chapter from this book and return ONLY a valid JSON array with no other text, markdown, or explanation.
 
-    await unlink(tmpPath).catch(() => {});
+For each chapter count the actual words in that chapter's text content.
 
-    const data = JSON.parse(stdout.trim());
-    if (!data.chapters?.length) {
-      return NextResponse.json({ error: "Could not find chapter list in PDF. Try the AI import instead." }, { status: 400 });
+Required format:
+[
+  {"number": 1, "title": "Chapter title or name", "wordCount": 2847, "pages": 11},
+  ...
+]
+
+Rules:
+- Include ALL chapters (Prologue, Epilogue, and numbered/named chapters)
+- "title" should be exactly as written in the book (e.g. "One", "Chapter 1", "Prologue", "Twenty-Three")
+- "wordCount" = actual word count of that chapter's body text (count every word)
+- "pages" = number of pages that chapter spans
+- Do NOT include: table of contents, copyright, dedication, acknowledgments, about the author, also by, bonus content
+- Return ONLY the JSON array, nothing else`;
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY || "",
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 4000,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "document",
+                source: {
+                  type: "base64",
+                  media_type: "application/pdf",
+                  data: base64,
+                },
+              },
+              {
+                type: "text",
+                text: prompt,
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error("Anthropic error:", response.status, err);
+      return NextResponse.json({ error: `API error: ${response.status}` }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    const aiData = await response.json();
+    const text = aiData.content?.[0]?.text || "";
+
+    // Parse the JSON array from Claude's response
+    const clean = text.replace(/```json|```/g, "").trim();
+    const chapters = JSON.parse(clean);
+
+    if (!Array.isArray(chapters) || chapters.length === 0) {
+      throw new Error("No chapters returned");
+    }
+
+    return NextResponse.json({ chapters, source: "claude" });
   } catch (e) {
-    await unlink(tmpPath).catch(() => {});
     console.error("PDF chapter extraction error:", e);
-    return NextResponse.json({ error: "Failed to extract chapters from PDF." }, { status: 500 });
+    return NextResponse.json({
+      error: `Failed to extract chapters: ${e instanceof Error ? e.message : "Unknown error"}`,
+    }, { status: 500 });
   }
 }
