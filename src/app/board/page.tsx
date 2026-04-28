@@ -515,11 +515,23 @@ export default function BoardPage() {
                   <div key={card.id} draggable onDragStart={()=>setDragId(card.id)}
                     className={`rounded-xl bg-[#06082E]/80 border border-white/8 hover:border-white/15 transition-all cursor-grab active:cursor-grabbing shadow-md group ${dragId===card.id?"opacity-30 scale-95":""} ${syncing===card.id?"opacity-60":""}`}>
 
-                    {card.cover_url && (
-                      <div className="h-32 rounded-t-xl overflow-hidden">
-                        <img src={card.cover_url} alt={card.title} className="w-full h-full object-cover object-top"/>
-                      </div>
-                    )}
+                    <Link href={`/board/card/${card.id}`} onClick={e=>e.stopPropagation()}>
+                      {card.cover_url ? (
+                        <div className="h-32 rounded-t-xl overflow-hidden relative group/cover">
+                          <img src={card.cover_url} alt={card.title} className="w-full h-full object-cover object-top transition-transform duration-300 group-hover/cover:scale-105"/>
+                          <div className="absolute inset-0 bg-black/0 group-hover/cover:bg-black/30 transition-all duration-300 flex items-center justify-center">
+                            <svg className="h-8 w-8 text-white opacity-0 group-hover/cover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-16 rounded-t-xl bg-[#0A0D3A] flex items-center justify-center border-b border-white/5 hover:bg-[#0D1245] transition-colors">
+                          <span className="text-xs text-white/20 flex items-center gap-1.5">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                            Open details
+                          </span>
+                        </div>
+                      )}
+                    </Link>
 
                     <div className="p-3">
                       <p className="font-semibold text-sm text-white leading-snug">{card.title}</p>
@@ -596,7 +608,7 @@ export default function BoardPage() {
                             await fetch("/api/board",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:card.id,status:s})});
                             if(s==="released") await syncToBooks({...card,status:s});
                           }}
-                          className="text-[10px] bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white/50 appearance-none focus:outline-none hover:border-white/20 transition cursor-pointer">
+                          className="text-[10px] bg-[#06082E] border border-white/10 rounded-lg px-2 py-1 text-white/50 appearance-none focus:outline-none hover:border-white/20 transition cursor-pointer">
                           {COLUMNS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
                         </select>
 

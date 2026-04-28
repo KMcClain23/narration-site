@@ -112,10 +112,15 @@ export default function CardDetailPage() {
         body: JSON.stringify({ title, author: card?.author || "", pageCount, wordCount, chapterCount }),
       });
       const data = await res.json();
-      if (data.chapters) {
+      if (!res.ok || data.error) throw new Error(data.error || `API error ${res.status}`);
+      if (data.chapters?.length) {
         setChapters(data.chapters.map((c: Omit<Chapter, "status" | "notes">) => ({ ...c, status: "not_started", notes: "" })));
+      } else {
+        throw new Error("No chapters returned — try a more specific title.");
       }
-    } catch { setError("AI chapter generation failed."); }
+    } catch (e) {
+      setError(`Chapter generation failed: ${e instanceof Error ? e.message : "Unknown error"}`);
+    }
     setAiLoading(false);
   };
 
@@ -360,7 +365,7 @@ export default function CardDetailPage() {
 
                       {/* Status dropdown */}
                       <select value={ch.status} onChange={e => updateChapter(i, "status", e.target.value)}
-                        className="text-[10px] bg-white/5 border border-white/10 rounded-lg px-1.5 py-1 text-white/40 appearance-none focus:outline-none cursor-pointer hidden sm:block">
+                        className="text-[10px] bg-[#06082E] border border-white/10 rounded-lg px-1.5 py-1 text-white/40 appearance-none focus:outline-none cursor-pointer hidden sm:block">
                         {CHAPTER_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                       </select>
 

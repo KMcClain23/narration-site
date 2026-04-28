@@ -38,11 +38,17 @@ Generate exactly ${estimatedChapters} chapters.`;
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-5",
         max_tokens: 4000,
         messages: [{ role: "user", content: prompt }],
       }),
     });
+
+    if (!response.ok) {
+      const errBody = await response.text();
+      console.error("Anthropic API error:", response.status, errBody);
+      return NextResponse.json({ error: `Anthropic API error: ${response.status}` }, { status: 500 });
+    }
 
     const data = await response.json();
     const text = data.content?.[0]?.text || "[]";
