@@ -3,8 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-// Import the Server Action you just created
-import { extractChaptersAction } from "@/app/actions/extract-chapters";
 
 const CHAPTER_STATUSES = [
   { id: "not_started", label: "Not Started", color: "bg-white/10 text-white/40",        dot: "bg-white/30" },
@@ -119,49 +117,28 @@ export default function CardDetailPage() {
     setAiLoading(false);
   };
 
-  // ✅ FIXED: Using Server Action to bypass 4MB API Route limit
+  // ✅ SECURE: PDF upload routes through server-side API — API key never exposed to browser
   const handlePdfUpload = async (file: File) => {
     setPdfLoading(true);
     setPdfProgress("Uploading manuscript…");
     setError(null);
-    
     try {
-      // 1. Convert File to Base64
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      
-      reader.onload = async () => {
-        try {
-          const base64 = (reader.result as string).split(",")[1];
-          setPdfProgress("Claude is reading every chapter…");
-          
-          // 2. Call the Server Action directly
-          const extractedChapters = await extractChaptersAction(base64);
-          
-          if (!extractedChapters?.length) throw new Error("No chapters found in PDF.");
-          
-          setChapters(extractedChapters.map((c: any) => ({ 
-            number: c.number || 0,
-            title: c.title || "Untitled",
-            wordCount: c.wordCount || 0,
-            pages: c.pages || 0,
-            status: "not_started", 
-            notes: "" 
-          })));
-          
-          setPdfProgress("");
-          setPdfLoading(false);
-        } catch (innerError: any) {
-          setError(`PDF Processing error: ${innerError.message}`);
-          setPdfLoading(false);
-          setPdfProgress("");
-        }
-      };
-    } catch (e: any) {
-      setError(`Upload failed: ${e.message}`);
-      setPdfLoading(false);
-      setPdfProgress("");
+      const formData = new FormData();
+      formData.append("file", file);
+      setPdfProgress("Claude is reading every chapter…");
+      const res = await fetch("/api/board-pdf-chapters", { method: "POST", body: formData });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `Server error ${res.status}` }));
+        throw new Error(err.error || `Server error ${res.status}`);
+      }
+      const data = await res.json();
+      if (!data.chapters?.length) throw new Error("No chapters returned");
+      setChapters(data.chapters.map((c: Omit<Chapter, "status" | "notes">) => ({ ...c, status: "not_started", notes: "" })));
+    } catch (e) {
+      setError(`PDF extraction failed: ${e instanceof Error ? e.message : "Unknown error"}`);
     }
+    setPdfProgress("");
+    setPdfLoading(false);
   };
 
   const saveChapters = async () => {
@@ -221,7 +198,7 @@ export default function CardDetailPage() {
 
   return (
     <main className="min-h-screen bg-[#06082E] text-white pt-14 sm:pt-16">
-      {/* Header and Content remain exactly the same as your previous file */}
+      {/* Sticky header */}
       <div className="sticky top-14 sm:top-16 z-40 bg-[#06082E]/95 backdrop-blur border-b border-white/8 px-5 sm:px-8 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <Link href="/board" className="text-xs text-white/40 hover:text-[#D4AF37] transition-colors shrink-0">← Board</Link>
@@ -245,46 +222,284 @@ export default function CardDetailPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 grid lg:grid-cols-[300px_1fr] gap-8">
-        {/* Left and Right Panels remain as you had them, just showing the core structure */}
-        {/* ... (The rest of your JSX code is unchanged) */}
-        
-        {/* Make sure your PDF upload input matches the label usage */}
+
+        {/* ── Left panel ── */}
         <div className="space-y-5">
-           {/* ... Left Panel Details ... */}
-           <div className="rounded-2xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 p-4">
-             <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] font-medium mb-1">Auto-import chapters</p>
-             {/* PDF upload label and logic from your original snippet */}
-             <label className={`flex items-center justify-center gap-2 w-full rounded-lg border-2 border-dashed px-3 py-3.5 transition-colors ${
-               pdfLoading ? "border-[#D4AF37]/40 bg-[#D4AF37]/5 cursor-not-allowed" : "border-white/15 hover:border-[#D4AF37]/30 hover:bg-white/5 cursor-pointer"
-             }`}>
-               <input type="file" accept=".pdf" className="hidden" disabled={pdfLoading}
-                 onChange={e => { if (e.target.files?.[0]) handlePdfUpload(e.target.files[0]); }} />
-               {pdfLoading ? (
-                 <div className="flex flex-col items-center gap-2 text-xs text-[#D4AF37] py-1">
-                   <div className="h-4 w-4 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin"/>
-                   <span>{pdfProgress || "Processing…"}</span>
-                 </div>
-               ) : (
-                 <div className="flex items-center gap-2 text-xs text-white/35">
-                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                     <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-                   </svg>
-                   Upload manuscript PDF
-                 </div>
-               )}
-             </label>
-           </div>
+          {/* Cover */}
+          <div className="rounded-2xl overflow-hidden border border-white/8">
+            {card.cover_url
+              ? <img src={card.cover_url} alt={card.title} className="w-full aspect-[2/3] object-cover"/>
+              : <div className="w-full aspect-[2/3] bg-[#0A0D3A] flex items-center justify-center text-white/20 text-sm">No cover</div>
+            }
+          </div>
+
+          {/* Book info */}
+          <div className="rounded-2xl border border-white/8 bg-[#0A0D3A] p-4 space-y-2">
+            <h1 className="font-bold text-white text-base leading-snug">{card.title}</h1>
+            {card.subtitle && <p className="text-xs text-white/40">{card.subtitle}</p>}
+            {card.author && <p className="text-sm text-[#D4AF37]">{card.author}</p>}
+            {card.co_narrator && (
+              <p className="text-xs text-white/35">with {(() => {
+                try { const p = JSON.parse(card.co_narrator); return Array.isArray(p) ? p.join(", ") : card.co_narrator; }
+                catch { return card.co_narrator; }
+              })()}</p>
+            )}
+            {card.deadline && (
+              <p className="text-xs text-white/35">
+                Deadline: {new Date(card.deadline).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+              </p>
+            )}
+          </div>
+
+          {/* Progress stats */}
+          {total > 0 && (
+            <div className="rounded-2xl border border-white/8 bg-[#0A0D3A] p-4 space-y-4">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-white/40 font-medium">Progress</p>
+              <div>
+                <div className="flex justify-between text-xs text-white/40 mb-1.5">
+                  <span>{liveCount} of {total} chapters live</span>
+                  <span className="font-bold text-white">{pct}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-white/8 overflow-hidden">
+                  <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${pct}%` }}/>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {CHAPTER_STATUSES.map(s => {
+                  const count = byStat[s.id] || 0;
+                  if (!count) return null;
+                  return (
+                    <div key={s.id} className="flex items-center gap-2">
+                      <div className={`h-2 w-2 rounded-full ${s.dot} shrink-0`}/>
+                      <span className="text-xs text-white/50 flex-1">{s.label}</span>
+                      <span className="text-xs font-bold text-white">{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="border-t border-white/6 pt-3 grid grid-cols-2 gap-3 text-center">
+                <div>
+                  <p className="text-lg font-bold text-white">{totalWords.toLocaleString()}</p>
+                  <p className="text-[10px] text-white/35 uppercase tracking-wide">words</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-white">{totalPages.toLocaleString()}</p>
+                  <p className="text-[10px] text-white/35 uppercase tracking-wide">pages</p>
+                </div>
+                {estimatedHours && (
+                  <div className="col-span-2 pt-1 border-t border-white/6">
+                    <p className="text-xl font-bold text-[#D4AF37]">~{estimatedHours} hrs</p>
+                    <p className="text-[10px] text-white/35 uppercase tracking-wide">estimated finished hours</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Auto-import panel */}
+          <div className="rounded-2xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 p-4">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] font-medium mb-1">Auto-import chapters</p>
+            <p className="text-xs text-white/50 mb-3">Search by title to generate chapters with AI, or upload the manuscript PDF for real word counts.</p>
+
+            {/* Title search */}
+            <div className="flex gap-2 mb-2">
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && searchBooks()}
+                placeholder="Book title..."
+                className="flex-1 rounded-lg bg-black/30 border border-white/8 px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40"
+              />
+              <button
+                onClick={searchBooks}
+                disabled={searching || aiLoading}
+                className="bg-[#D4AF37] text-black text-xs font-bold px-3 py-2 rounded-lg hover:bg-[#E0C15A] transition disabled:opacity-50"
+              >
+                {searching || aiLoading
+                  ? <div className="h-3.5 w-3.5 border-2 border-black border-t-transparent rounded-full animate-spin"/>
+                  : <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                }
+              </button>
+            </div>
+            {(searching || aiLoading) && (
+              <p className="text-xs text-[#D4AF37]/60 animate-pulse mb-3">
+                {searching ? "Searching Google Books…" : "Claude is generating chapters…"}
+              </p>
+            )}
+
+            <div className="flex items-center gap-2 my-3">
+              <div className="flex-1 h-px bg-white/8"/>
+              <span className="text-[10px] text-white/25 uppercase tracking-widest">or</span>
+              <div className="flex-1 h-px bg-white/8"/>
+            </div>
+
+            {/* PDF upload */}
+            <p className="text-xs text-white/50 mb-2">Upload the manuscript PDF — Claude reads every chapter and counts actual words:</p>
+            <label className={`flex items-center justify-center gap-2 w-full rounded-lg border-2 border-dashed px-3 py-3.5 transition-colors ${
+              pdfLoading ? "border-[#D4AF37]/40 bg-[#D4AF37]/5 cursor-not-allowed" : "border-white/15 hover:border-[#D4AF37]/30 hover:bg-white/5 cursor-pointer"
+            }`}>
+              <input type="file" accept=".pdf" className="hidden" disabled={pdfLoading}
+                onChange={e => { if (e.target.files?.[0]) handlePdfUpload(e.target.files[0]); }} />
+              {pdfLoading ? (
+                <div className="flex flex-col items-center gap-2 text-xs text-[#D4AF37] py-1">
+                  <div className="h-4 w-4 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin"/>
+                  <span>{pdfProgress || "Processing…"}</span>
+                  <span className="text-[10px] text-[#D4AF37]/50">This may take 20–60 seconds</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-white/35">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                  </svg>
+                  Upload manuscript PDF
+                </div>
+              )}
+            </label>
+            <p className="text-[10px] text-white/20 mt-1.5 text-center">~$0.05–0.15 per book · 30MB max</p>
+          </div>
         </div>
 
-        {/* Right panel: Chapter list */}
-        <div className="space-y-2">
-            {/* ... Render your chapters mapped from state as before ... */}
-            {chapters.map((ch, i) => (
-                <div key={i} className="rounded-xl border border-white/8 bg-[#0A0D3A] p-4">
-                    {/* ... Existing chapter display logic ... */}
-                    <p className="text-white">{ch.title}</p>
-                </div>
-            ))}
+        {/* ── Right panel: Chapter list ── */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-white text-lg">
+              Chapters <span className="text-white/30 font-normal text-sm">({total})</span>
+            </h2>
+            <button
+              onClick={addChapter}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#D4AF37] border border-[#D4AF37]/30 px-3 py-1.5 rounded-full hover:bg-[#D4AF37]/10 transition-colors"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+              Add chapter
+            </button>
+          </div>
+
+          {error && (
+            <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-300 flex justify-between gap-3">
+              <span>{error}</span>
+              <button onClick={() => setError(null)} className="shrink-0 text-red-400/60 hover:text-red-300">✕</button>
+            </div>
+          )}
+
+          {total === 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/10 py-20 text-center">
+              <svg className="h-10 w-10 text-white/10 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+              </svg>
+              <p className="text-white/20 text-sm mb-1">No chapters yet</p>
+              <p className="text-xs text-white/15">Use auto-import on the left, or add manually</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {chapters.map((ch, i) => {
+                const st = statusStyle(ch.status);
+                const isEditing = editingChapter === i;
+                return (
+                  <div key={i} className={`rounded-xl border transition-all ${isEditing ? "border-[#D4AF37]/30 bg-[#D4AF37]/5" : "border-white/8 bg-[#0A0D3A] hover:border-white/15"}`}>
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <div className="h-7 w-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-white/50 shrink-0">
+                        {ch.number}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {isEditing ? (
+                          <input value={ch.title} onChange={e => updateChapter(i, "title", e.target.value)}
+                            className="w-full bg-transparent text-sm font-semibold text-white border-b border-[#D4AF37]/40 focus:outline-none pb-0.5"/>
+                        ) : (
+                          <p className="text-sm font-semibold text-white truncate">{ch.title}</p>
+                        )}
+                        <div className="flex gap-3 mt-0.5">
+                          {isEditing ? (
+                            <>
+                              <label className="flex items-center gap-1 text-[10px] text-white/35">
+                                Words: <input type="number" value={ch.wordCount} onChange={e => updateChapter(i, "wordCount", parseInt(e.target.value) || 0)}
+                                  className="w-16 bg-transparent border-b border-white/20 text-white/60 focus:outline-none text-[10px]"/>
+                              </label>
+                              <label className="flex items-center gap-1 text-[10px] text-white/35">
+                                Pages: <input type="number" value={ch.pages} onChange={e => updateChapter(i, "pages", parseInt(e.target.value) || 0)}
+                                  className="w-12 bg-transparent border-b border-white/20 text-white/60 focus:outline-none text-[10px]"/>
+                              </label>
+                            </>
+                          ) : (
+                            <>
+                              {ch.wordCount > 0 && <span className="text-[10px] text-white/30">{ch.wordCount.toLocaleString()} words</span>}
+                              {ch.pages > 0 && <span className="text-[10px] text-white/30">{ch.pages} pages</span>}
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <button type="button" onClick={() => advanceStatus(i)} title="Click to advance status"
+                        className={`text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full border shrink-0 transition-all hover:scale-105 ${st.color} border-current/20`}>
+                        {st.label}
+                      </button>
+
+                      <select value={ch.status} onChange={e => updateChapter(i, "status", e.target.value)}
+                        className="text-[10px] bg-[#06082E] border border-white/10 rounded-lg px-1.5 py-1 text-white/40 appearance-none focus:outline-none cursor-pointer hidden sm:block">
+                        {CHAPTER_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                      </select>
+
+                      <div className="flex gap-0.5 shrink-0">
+                        <button type="button" onClick={() => moveChapter(i, -1)} disabled={i === 0}
+                          className="text-white/20 hover:text-white/60 disabled:opacity-0 p-1 rounded transition-colors" title="Move up">
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7"/></svg>
+                        </button>
+                        <button type="button" onClick={() => moveChapter(i, 1)} disabled={i === chapters.length - 1}
+                          className="text-white/20 hover:text-white/60 disabled:opacity-0 p-1 rounded transition-colors" title="Move down">
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <button type="button" onClick={() => setEditingChapter(isEditing ? null : i)}
+                          className={`text-xs p-1 rounded transition-colors ${isEditing ? "text-[#D4AF37]" : "text-white/25 hover:text-white"}`}>
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        </button>
+                        <button type="button" onClick={() => removeChapter(i)}
+                          className="text-white/20 hover:text-red-400 text-xs p-1 rounded transition-colors">
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    {isEditing && (
+                      <div className="px-4 pb-3">
+                        <textarea value={ch.notes} onChange={e => updateChapter(i, "notes", e.target.value)}
+                          rows={2} placeholder="Notes for this chapter..."
+                          className="w-full bg-black/20 border border-white/8 rounded-lg px-3 py-2 text-xs text-white/70 placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/30 resize-none"/>
+                      </div>
+                    )}
+                    {!isEditing && ch.notes && (
+                      <div className="px-4 pb-3">
+                        <p className="text-xs text-white/35 italic">{ch.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {total > 0 && (
+            <div className="mt-6 rounded-2xl border border-white/8 bg-[#0A0D3A] p-4">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-white/40 font-medium mb-3">Status breakdown</p>
+              <div className="flex h-3 rounded-full overflow-hidden gap-px">
+                {CHAPTER_STATUSES.map(s => {
+                  const count = byStat[s.id] || 0;
+                  if (!count) return null;
+                  return <div key={s.id} style={{ width: `${(count / total) * 100}%` }} className={`h-full ${s.dot}`} title={`${s.label}: ${count}`}/>;
+                })}
+              </div>
+              <div className="flex flex-wrap gap-3 mt-3">
+                {CHAPTER_STATUSES.map(s => {
+                  const count = byStat[s.id] || 0;
+                  if (!count) return null;
+                  return (
+                    <div key={s.id} className="flex items-center gap-1.5">
+                      <div className={`h-2 w-2 rounded-full ${s.dot}`}/>
+                      <span className="text-xs text-white/40">{s.label} <span className="text-white/60 font-semibold">{count}</span></span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </main>
