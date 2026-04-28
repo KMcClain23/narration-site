@@ -53,6 +53,7 @@ export default function CardDetailPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [editingChapter, setEditingChapter] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const load = useCallback(async () => {
@@ -122,6 +123,23 @@ export default function CardDetailPage() {
       setError(`Chapter generation failed: ${e instanceof Error ? e.message : "Unknown error"}`);
     }
     setAiLoading(false);
+  };
+
+  // Upload PDF and extract chapters
+  const handlePdfUpload = async (file: File) => {
+    setPdfLoading(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/board-pdf-chapters", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "Extraction failed");
+      setChapters(data.chapters.map((c: Omit<Chapter, "status"|"notes">) => ({ ...c, status: "not_started", notes: "" })));
+    } catch (e) {
+      setError(`PDF extraction failed: ${e instanceof Error ? e.message : "Unknown error"}`);
+    }
+    setPdfLoading(false);
   };
 
   // Save chapters
@@ -286,6 +304,26 @@ export default function CardDetailPage() {
                 {searching ? "Searching Google Books…" : "Claude is generating chapters…"}
               </p>
             )}
+
+            <div className="mt-4 pt-4 border-t border-white/8">
+              <p className="text-xs text-white/50 mb-2">Or upload the manuscript PDF for exact chapters:</p>
+              <label className={`flex items-center justify-center gap-2 w-full rounded-lg border-2 border-dashed px-3 py-3 cursor-pointer transition-colors ${pdfLoading ? "border-[#D4AF37]/40 bg-[#D4AF37]/5" : "border-white/15 hover:border-[#D4AF37]/30 hover:bg-white/5"}`}>
+                <input type="file" accept=".pdf" className="hidden"
+                  onChange={e => { if(e.target.files?.[0]) handlePdfUpload(e.target.files[0]); }} />
+                {pdfLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-[#D4AF37]">
+                    <div className="h-3.5 w-3.5 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin"/>
+                    Extracting chapters…
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-white/35">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                    Upload manuscript PDF
+                  </div>
+                )}
+              </label>
+              <p className="text-[10px] text-white/20 mt-1.5">Reads the table of contents directly — most accurate method</p>
+            </div>
           </div>
         </div>
 
