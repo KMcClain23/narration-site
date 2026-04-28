@@ -3,10 +3,18 @@ import { NextResponse } from "next/server";
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q");
+  const author = searchParams.get("author");
   if (!q) return NextResponse.json({ error: "Query required." }, { status: 400 });
 
   try {
-    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=1&printType=books`;
+    // Build precise query: intitle + inauthor for best match
+    const titlePart = q.replace(/ by .+$/i, "").trim(); // strip "by Author" if already in q
+    const authorPart = author || q.match(/ by (.+)$/i)?.[1] || "";
+    const query = authorPart
+      ? `intitle:${encodeURIComponent(titlePart)}+inauthor:${encodeURIComponent(authorPart)}`
+      : encodeURIComponent(titlePart);
+
+    const url = `https://www.googleapis.com/books/v1/volumes?q=${query}&maxResults=1&printType=books`;
     const res = await fetch(url);
     const data = await res.json();
 

@@ -63,7 +63,7 @@ export default function CardDetailPage() {
       if (data.card) {
         setCard(data.card);
         setChapters(data.card.chapters || []);
-        setSearchQuery(data.card.title || "");
+        setSearchQuery(`${data.card.title || ""}${data.card.author ? " by " + data.card.author : ""}`);
       }
     } catch { setError("Failed to load card."); }
     setLoading(false);
@@ -85,7 +85,7 @@ export default function CardDetailPage() {
     setSearching(true);
     setError(null);
     try {
-      const res = await fetch(`/api/book-search?q=${encodeURIComponent(searchQuery)}`);
+      const res = await fetch(`/api/book-search?q=${encodeURIComponent(searchQuery)}&author=${encodeURIComponent(card?.author || "")}`);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       // Auto-fill card metadata

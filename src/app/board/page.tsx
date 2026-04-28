@@ -543,12 +543,6 @@ export default function BoardPage() {
               </div>
 
               <div className="px-3 pb-3 space-y-3">
-                {/* Add button at top */}
-                <button onClick={()=>{setShowForm(true);setEditCard(null);setForm({...EMPTY,status:col.id,chapters:[]});}}
-                  className="w-full py-2 text-xs text-white/25 hover:text-[#D4AF37] hover:bg-[#D4AF37]/5 border border-dashed border-white/10 hover:border-[#D4AF37]/30 rounded-xl transition-colors flex items-center justify-center gap-1.5">
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-                  Add to {col.label}
-                </button>
                 {loading ? <div className="h-24 rounded-xl bg-white/5 animate-pulse"/> :
                 cards.filter(c=>c.status===col.id).sort((a,b) => {
               const getEarliest = (card: BoardCard) => {
@@ -587,7 +581,7 @@ export default function BoardPage() {
                       <p className="font-semibold text-sm text-white leading-snug">{card.title}</p>
                       {card.subtitle && <p className="text-[11px] text-white/40 mt-0.5">{card.subtitle}</p>}
                       {card.author && <p className="text-xs text-[#D4AF37]/80 mt-1 font-medium">{card.author}</p>}
-                      {card.co_narrator && <p className="text-[10px] text-white/30 mt-0.5">with {card.co_narrator}</p>}
+                      {card.co_narrator && <p className="text-[10px] text-white/30 mt-0.5">with {(() => { try { const p = JSON.parse(card.co_narrator); return Array.isArray(p) ? p.join(", ") : card.co_narrator; } catch { return card.co_narrator; } })()}</p>}
                       <Link href={`/board/card/${card.id}`}
                         className="mt-2 inline-flex items-center gap-1 text-[10px] text-[#D4AF37]/60 hover:text-[#D4AF37] transition-colors font-semibold"
                         onClick={e => e.stopPropagation()}>
