@@ -297,9 +297,9 @@ export default function BoardPage() {
             </div>
             <div className="px-6 py-5 space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
-                <F label="Book title *" k="title" placeholder="e.g. Whiskey & Lies"/>
-                <F label="Subtitle" k="subtitle" placeholder="e.g. Sultry Secrets Book 4"/>
-                <F label="Author" k="author" placeholder="e.g. E.A. Harper"/>
+                <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Book title *</span><input type="text" value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))} placeholder="e.g. Whiskey &amp; Lies" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
+                <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Subtitle</span><input type="text" value={form.subtitle} onChange={e=>setForm(p=>({...p,subtitle:e.target.value}))} placeholder="e.g. Sultry Secrets Book 4" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
+                <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Author</span><input type="text" value={form.author} onChange={e=>setForm(p=>({...p,author:e.target.value}))} placeholder="e.g. E.A. Harper" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Co-narrator</span>
                   <select value={form.co_narrator} onChange={e=>setForm(p=>({...p,co_narrator:e.target.value}))}
@@ -336,8 +336,8 @@ export default function BoardPage() {
                       className="w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2 text-xs text-white/60 placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/>
                   </div>
                 </label>
-                <F label="Audible / Amazon link" k="audible_link" placeholder="https://..."/>
-                <F label="Authors Republic link" k="ar_link" placeholder="https://..."/>
+                <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Audible / Amazon link</span><input type="text" value={form.audible_link} onChange={e=>setForm(p=>({...p,audible_link:e.target.value}))} placeholder="https://..." className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
+                <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Authors Republic link</span><input type="text" value={form.ar_link} onChange={e=>setForm(p=>({...p,ar_link:e.target.value}))} placeholder="https://..." className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Stage</span>
                   <select value={form.status} onChange={e=>setForm(p=>({...p,status:e.target.value}))}
@@ -374,6 +374,56 @@ export default function BoardPage() {
                     </select>
                   </div>
                 </div>
+              </div>
+
+              {/* Production details */}
+              <div className="rounded-xl border border-white/6 bg-white/[0.02] p-4 space-y-4">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-white/30 font-medium">Production details <span className="text-white/20 normal-case tracking-normal text-[10px]">— private</span></p>
+                <div className="grid grid-cols-2 gap-4">
+                  <label className="block">
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Word count</span>
+                    <input type="number" value={form.word_count || ""} onChange={e=>setForm(p=>({...p,word_count:parseInt(e.target.value)||0}))} placeholder="e.g. 90000" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/>
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Payment type</span>
+                    <select value={form.payment_type} onChange={e=>setForm(p=>({...p,payment_type:e.target.value}))} className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 appearance-none">
+                      <option value="pfh">PFH (Per Finished Hour)</option>
+                      <option value="rs">Royalty Share (RS)</option>
+                      <option value="rs_plus">Royalty Share Plus (RS+)</option>
+                    </select>
+                  </label>
+                </div>
+                {(form.payment_type === "pfh" || form.payment_type === "rs_plus") && (
+                  <label className="block">
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">{form.payment_type === "rs_plus" ? "RS+ stipend ($ PFH)" : "PFH rate ($)"}</span>
+                    <input type="number" value={form.pfh_rate || ""} onChange={e=>setForm(p=>({...p,pfh_rate:parseFloat(e.target.value)||0}))} placeholder={form.payment_type === "rs_plus" ? "e.g. 100" : "e.g. 250"} className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/>
+                  </label>
+                )}
+                <div>
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium block mb-1.5">First 15 due date</span>
+                  <div className="flex gap-2">
+                    <select value={form.first15_due ? form.first15_due.split("-")[1] : ""} onChange={e => { const p = form.first15_due?.split("-") || [new Date().getFullYear().toString(),"","01"]; setForm(f=>({...f,first15_due:e.target.value?`${p[0]||new Date().getFullYear()}-${e.target.value}-${p[2]||"01"}`:""}))} } className="flex-1 rounded-lg bg-black/30 border border-white/8 px-2 py-2.5 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 appearance-none">
+                      <option value="">Month</option>
+                      {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((m,i)=><option key={m} value={String(i+1).padStart(2,"0")}>{m}</option>)}
+                    </select>
+                    <select value={form.first15_due ? form.first15_due.split("-")[2] : ""} onChange={e => { const p = form.first15_due?.split("-") || [new Date().getFullYear().toString(),"01",""]; setForm(f=>({...f,first15_due:e.target.value?`${p[0]||new Date().getFullYear()}-${p[1]||"01"}-${e.target.value}`:""}))} } className="w-20 rounded-lg bg-black/30 border border-white/8 px-2 py-2.5 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 appearance-none">
+                      <option value="">Day</option>
+                      {Array.from({length:31},(_,i)=>String(i+1).padStart(2,"0")).map(d=><option key={d} value={d}>{parseInt(d)}</option>)}
+                    </select>
+                    <select value={form.first15_due ? form.first15_due.split("-")[0] : ""} onChange={e => { const p = form.first15_due?.split("-") || ["","01","01"]; setForm(f=>({...f,first15_due:e.target.value?`${e.target.value}-${p[1]||"01"}-${p[2]||"01"}`:""}))} } className="w-24 rounded-lg bg-black/30 border border-white/8 px-2 py-2.5 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 appearance-none">
+                      <option value="">Year</option>
+                      {(() => { const base=Array.from({length:6},(_,i)=>new Date().getFullYear()+i); const ex=form.first15_due?parseInt(form.first15_due.split("-")[0]):null; const yrs=ex&&!base.includes(ex)?[ex,...base]:base; return yrs.map(y=><option key={y} value={String(y)}>{y}</option>); })()}
+                    </select>
+                  </div>
+                </div>
+                {form.word_count > 0 && (
+                  <div className="rounded-lg bg-[#D4AF37]/5 border border-[#D4AF37]/15 px-4 py-3">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#D4AF37]/60 font-medium mb-1">{form.payment_type==="rs"?"Royalty Share":form.payment_type==="rs_plus"?"RS+ — Estimated upfront":"Estimated earnings"}</p>
+                    {form.payment_type==="rs" ? <p className="text-sm text-[#D4AF37]">~{(form.word_count/9400).toFixed(1)} finished hours · earnings depend on sales</p>
+                    : form.pfh_rate>0 ? <p className="text-lg font-bold text-[#D4AF37]">${((form.word_count/9400)*form.pfh_rate).toLocaleString("en-US",{maximumFractionDigits:0})} <span className="text-xs font-normal text-white/30">~{(form.word_count/9400).toFixed(1)} hrs × ${form.pfh_rate}/hr{form.payment_type==="rs_plus"?" + royalties":""}</span></p>
+                    : <p className="text-sm text-[#D4AF37]/60">Enter rate to estimate</p>}
+                  </div>
+                )}
               </div>
 
               <label className="block">
