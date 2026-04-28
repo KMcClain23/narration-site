@@ -63,18 +63,19 @@ export default function BoardPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const col = (id: string) => cards.filter(c=>c.status===id).sort((a,b) => {
-              const getEarliest = (card: BoardCard) => {
-                const dates = [card.first15_due, card.deadline].filter(Boolean).map(d => {
-                  const [y,m,dy] = d!.split("-"); return new Date(+y,+m-1,+dy).getTime();
-                });
-                return dates.length ? Math.min(...dates) : Infinity;
-              };
-              const aDate = getEarliest(a);
-              const bDate = getEarliest(b);
-              if (aDate !== bDate) return aDate - bDate;
-              return a.sort_order - b.sort_order;
-            });
+  const getEarliestDate = (card: BoardCard) => {
+    const dates = [card.first15_due, card.deadline].filter(Boolean).map(d => {
+      const [y,m,dy] = d!.split("-"); return new Date(+y,+m-1,+dy).getTime();
+    });
+    return dates.length ? Math.min(...dates) : Infinity;
+  };
+
+  const sortCards = (a: BoardCard, b: BoardCard) => {
+    const diff = getEarliestDate(a) - getEarliestDate(b);
+    return diff !== 0 ? diff : a.sort_order - b.sort_order;
+  };
+
+  const col = (id: string) => cards.filter(c=>c.status===id).sort(sortCards);
 
   const drop = async (e: React.DragEvent, status: string) => {
     e.preventDefault(); setDragOver(null);
@@ -527,35 +528,24 @@ export default function BoardPage() {
       {/* Kanban board */}
       <div className="px-4 sm:px-6 py-6 overflow-x-auto">
         <div className="flex gap-4 min-w-max pb-6">
-          {COLUMNS.map(col => (
-            <div key={col.id}
-              onDragOver={e=>{e.preventDefault();setDragOver(col.id);}}
-              onDrop={e=>drop(e,col.id)}
+          {COLUMNS.map(column => (
+            <div key={column.id}
+              onDragOver={e=>{e.preventDefault();setDragOver(column.id);}}
+              onDrop={e=>drop(e,column.id)}
               onDragLeave={()=>setDragOver(null)}
-              className={`w-72 flex-shrink-0 rounded-2xl border ${col.color} transition-all duration-200 ${dragOver===col.id?"ring-2 ring-[#D4AF37]/40 scale-[1.01]":""}`}>
+              className={`w-72 flex-shrink-0 rounded-2xl border ${column.color} transition-all duration-200 ${dragOver===column.id?"ring-2 ring-[#D4AF37]/40 scale-[1.01]":""}`}>
 
               <div className="px-4 pt-4 pb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className={`h-2 w-2 rounded-full ${col.dot}`}/>
-                  <h2 className={`text-xs font-bold uppercase tracking-wider ${col.text}`}>{col.label}</h2>
+                  <div className={`h-2 w-2 rounded-full ${column.dot}`}/>
+                  <h2 className={`text-xs font-bold uppercase tracking-wider ${column.text}`}>{column.label}</h2>
                 </div>
-                <span className="text-xs text-white/25 font-mono">{cards.filter(c=>c.status===col.id).length}</span>
+                <span className="text-xs text-white/25 font-mono">{cards.filter(c=>c.status===column.id).length}</span>
               </div>
 
               <div className="px-3 pb-3 space-y-3">
                 {loading ? <div className="h-24 rounded-xl bg-white/5 animate-pulse"/> :
-                cards.filter(c=>c.status===col.id).sort((a,b) => {
-              const getEarliest = (card: BoardCard) => {
-                const dates = [card.first15_due, card.deadline].filter(Boolean).map(d => {
-                  const [y,m,dy] = d!.split("-"); return new Date(+y,+m-1,+dy).getTime();
-                });
-                return dates.length ? Math.min(...dates) : Infinity;
-              };
-              const aDate = getEarliest(a);
-              const bDate = getEarliest(b);
-              if (aDate !== bDate) return aDate - bDate;
-              return a.sort_order - b.sort_order;
-            }).map(card=>(
+                cards.filter(c=>c.status===column.id).sort(sortCards).map(card=>(
                   <div key={card.id} draggable onDragStart={()=>setDragId(card.id)}
                     className={`rounded-xl bg-[#06082E]/80 border border-white/8 hover:border-white/15 transition-all cursor-grab active:cursor-grabbing shadow-md group ${dragId===card.id?"opacity-30 scale-95":""} ${syncing===card.id?"opacity-60":""}`}>
 

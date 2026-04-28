@@ -6,7 +6,11 @@ const COOKIE_NAME = "dmn_admin_key";
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if ((pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) || (pathname === "/board" && !pathname.startsWith("/board/"))) {
+  // Protect /admin/* (except login) and /board/* (except token-based author views)
+  const isAdminRoute = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login");
+  const isBoardRoute = pathname === "/board" || pathname.startsWith("/board/card");
+
+  if (isAdminRoute || isBoardRoute) {
     const cookie = req.cookies.get(COOKIE_NAME)?.value ?? "";
     if (!cookie) {
       const url = req.nextUrl.clone();
@@ -19,5 +23,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/board", "/board/card/:path*"],
 };
