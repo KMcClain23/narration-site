@@ -1,10 +1,27 @@
 import { NextResponse } from "next/server";
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+// Increase body size limit for PDF uploads
+export const maxDuration = 60; // 60 second timeout for Claude processing
+
 export async function POST(req: Request) {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File;
     if (!file) return NextResponse.json({ error: "No file provided." }, { status: 400 });
+
+    // Check file size — warn if over 20MB
+    const sizeMB = file.size / (1024 * 1024);
+    if (sizeMB > 30) {
+      return NextResponse.json({
+        error: `PDF is ${sizeMB.toFixed(1)}MB — please use a file under 30MB. Try compressing the PDF first.`
+      }, { status: 400 });
+    }
 
     const bytes = await file.arrayBuffer();
     const base64 = Buffer.from(bytes).toString("base64");
@@ -64,7 +81,7 @@ Rules:
     if (!response.ok) {
       const err = await response.text();
       console.error("Anthropic error:", response.status, err);
-      return NextResponse.json({ error: `API error: ${response.status}` }, { status: 500 });
+      return NextResponse.json({ error: `API error: ${response.status} — ${err.slice(0, 200)}` }, { status: 500 });
     }
 
     const aiData = await response.json();
