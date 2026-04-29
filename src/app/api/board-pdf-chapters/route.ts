@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { S3Client, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+
 export const maxDuration = 60;
+
 const r2 = new S3Client({
   region: "auto",
   endpoint: process.env.R2_ENDPOINT!,
@@ -9,16 +11,13 @@ const r2 = new S3Client({
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
   },
 });
+
 export async function POST(req: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set." }, { status: 500 });
-  }
+  if (!apiKey) return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set." }, { status: 500 });
 
   const { key, bucket } = await req.json();
-  if (!key || !bucket) {
-    return NextResponse.json({ error: "Missing key or bucket." }, { status: 400 });
-  }
+  if (!key || !bucket) return NextResponse.json({ error: "Missing key or bucket." }, { status: 400 });
 
   const obj = await r2.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
   const bytes = await obj.Body!.transformToByteArray();
@@ -39,25 +38,15 @@ export async function POST(req: Request) {
       messages: [{
         role: "user",
         content: [
-          {
-            type: "document",
-            source: { type: "base64", media_type: "application/pdf", data: base64 },
-          },
-          {
-            type: "text",
-            text: "Extract every chapter from this manuscript and return ONLY a JSON array.\nFormat: [{\"number\":1,\"title\":\"Chapter Title\",\"wordCount\":2500,\"pages\":10}]\nRules:\n- Include Prologue, Epilogue, and all numbered/named chapters\n- Use exact titles as written in the book\n- Count actual words per chapter\n- Count actual pages per chapter\n- Exclude: TOC, copyright, dedication, acknowledgments, about the author\n- Return ONLY the JSON array, no markdown, no explanation",
-          },
+          { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
+          { type: "text", text: "Extract every chapter from this manuscript and return ONLY a JSON array.\nFormat: [{\"number\":1,\"title\":\"Chapter Title\",\"wordCount\":2500,\"pages\":10}]\nRules:\n- Include Prologue, Epilogue, and all numbered/named chapters\n- Use exact titles as written in the book\n- Count actual words per chapter\n- Count actual pages per chapter\n- Exclude: TOC, copyright, dedication, acknowledgments, about the author\n- Return ONLY the JSON array, no markdown, no explanation" },
         ],
       }],
     }),
   });
 
   if (!response.ok) {
-    const err = await response.text();
-    return NextResponse.json(
-      { error: `Anthropic error ${response.status} — please try again.` },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: `Anthropic error ${response.status} — please try again.` }, { status: 500 });
   }
 
   const aiData = await response.json();
