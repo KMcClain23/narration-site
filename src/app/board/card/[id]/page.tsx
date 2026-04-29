@@ -290,7 +290,7 @@ export default function CardDetailPage() {
 
         {/* ── Left panel ── */}
         <div className="space-y-5">
-          {/* Cover — drag PDF here to import chapters */}
+          {/* Cover */}
           <div
             className={`rounded-2xl overflow-hidden border relative transition-colors ${coverDragOver ? "border-[#D4AF37]/60" : "border-white/8"}`}
             onDragOver={e => {
@@ -315,22 +315,9 @@ export default function CardDetailPage() {
               : <div className="w-full aspect-[2/3] bg-[#0A0D3A] flex items-center justify-center text-white/20 text-sm">No cover</div>
             }
 
-            {/* Drop indicator overlay */}
-            {coverDragOver && (
-              <div className="absolute inset-0 bg-[#06082E]/75 border-2 border-dashed border-[#D4AF37]/70 rounded-2xl flex flex-col items-center justify-center gap-2 pointer-events-none">
-                <svg className="h-8 w-8 text-[#D4AF37]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
-                </svg>
-                <span className="text-sm font-semibold text-[#D4AF37]">Drop PDF</span>
-              </div>
-            )}
-
-            {/* Processing overlay */}
             {pdfLoading && (
-              <div className="absolute inset-0 bg-[#06082E]/85 rounded-2xl flex flex-col items-center justify-center gap-2 px-4 text-center pointer-events-none">
+              <div className="absolute inset-0 bg-[#06082E]/80 rounded-2xl flex items-center justify-center pointer-events-none">
                 <div className="h-5 w-5 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin"/>
-                <span className="text-xs font-medium text-[#D4AF37]">{pdfProgress || "Processing…"}</span>
-                <span className="text-[10px] text-[#D4AF37]/50">20–60 seconds</span>
               </div>
             )}
           </div>
@@ -401,7 +388,7 @@ export default function CardDetailPage() {
           {/* Auto-import panel */}
           <div className="rounded-2xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 p-4">
             <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] font-medium mb-1">Auto-import chapters</p>
-            <p className="text-xs text-white/50 mb-3">Search by title to generate chapters with AI, or drop the manuscript PDF onto the cover above.</p>
+            <p className="text-xs text-white/50 mb-3">Search by title to generate chapters with AI.</p>
 
             {/* Title search */}
             <div className="flex gap-2 mb-2">
