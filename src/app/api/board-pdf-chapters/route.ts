@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { S3Client, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
-export const maxDuration = 60;
+export const maxDuration = 800;
 
 const r2 = new S3Client({
   region: "auto",
