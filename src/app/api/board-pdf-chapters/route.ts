@@ -23,9 +23,10 @@ export async function POST(req: Request) {
     r2.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })).catch(() => {});
     if (bytes.length > 20971520) return NextResponse.json({ error: "PDF over 20MB" }, { status: 400 });
     const response = await callAnthropic(apiKey, base64);
-    if (!response.ok) { const err = await response.text(); return NextResponse.json({ error: `Anthropic error ${response.status} — please try again` }, { status: 500 }); }
+    if (!response.ok) { const err = await response.text(); return NextResponse.json({ error: `Anthropic error ${response.status} â€” please try again` }, { status: 500 }); }
     const aiData = await response.json();
-    const chapters = JSON.parse((aiData.content?.[0]?.text || "").replace(/\\\json|\\\/g, "").trim());
+    const text = aiData.content?.[0]?.text || "";
+    const chapters = JSON.parse(text.replace(/```json|```/g, "").trim());
     if (!Array.isArray(chapters) || !chapters.length) throw new Error("No chapters returned");
     return NextResponse.json({ chapters, source: "claude" });
   } catch (e) {
