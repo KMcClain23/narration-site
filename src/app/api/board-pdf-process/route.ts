@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { S3Client, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { createClient } from "@supabase/supabase-js";
-import pdfParse from "pdf-parse";
+import pdfParse = require("pdf-parse");
 
 export const maxDuration = 60;
 
