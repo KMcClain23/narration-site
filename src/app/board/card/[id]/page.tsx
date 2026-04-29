@@ -194,7 +194,7 @@ export default function CardDetailPage() {
     setChapters(prev => prev.map((c, i) => i === idx ? { ...c, status: nextStatus(c.status) } : c));
   };
 
-  const isUnnumbered = (title: string) => /^(prologue|epilogue)$/i.test(title.trim());
+  const isUnnumbered = (title: string) => /^(prologue|epilogue|dedication|content\s*(?:&|and)\s*trigger\s*warnings?|trigger\s*warnings?|content\s*warnings?)$/i.test(title.trim());
 
   const renumber = (list: Chapter[]): Chapter[] => {
     let n = 0;
@@ -401,7 +401,7 @@ export default function CardDetailPage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-white text-lg">
-              Chapters <span className="text-white/30 font-normal text-sm">({total})</span>
+              Chapters <span className="text-white/30 font-normal text-sm">({chapters.filter(c => c.number != null).length})</span>
             </h2>
             <button
               onClick={addChapter}

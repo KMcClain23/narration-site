@@ -146,7 +146,7 @@ export async function POST(req: Request) {
       messages: [
         {
           role: "user",
-          content: `Here are the page numbers and first line of text from each page of a manuscript.\n\n${pageMap}\n\nIdentify which pages begin a new chapter (Prologue, Epilogue, Chapter One, Chapter Two, etc.).\nReturn ONLY a JSON array: [{"number":1,"title":"Chapter Title","startPage":11}]\nNo markdown. No explanation. Only the JSON array.`,
+          content: `Here are the page numbers and first line of text from each page of a manuscript.\n\n${pageMap}\n\nIdentify which pages begin a trackable section. Include:\n- Front matter: Dedication (e.g. "For the good girls…"), Content & Trigger Warnings\n- Body chapters: Prologue, Chapter One, Chapter Two, … (all numbered chapters)\n- Back matter: Epilogue\nReturn ONLY a JSON array: [{"number":1,"title":"Section Title","startPage":11}]\nUse clean titles: "Dedication", "Content & Trigger Warnings", "Prologue", "Chapter One", "Epilogue", etc.\nNo markdown. No explanation. Only the JSON array.`,
         },
       ],
     });
@@ -159,7 +159,7 @@ export async function POST(req: Request) {
     if (!Array.isArray(rawChapters) || !rawChapters.length) throw new Error("No chapters found");
 
     // Step 5 — word counts per chapter from already-extracted text, not from Claude
-    const UNNUMBERED = /^(prologue|epilogue)$/i;
+    const UNNUMBERED = /^(prologue|epilogue|dedication|content\s*(?:&|and)\s*trigger\s*warnings?|trigger\s*warnings?|content\s*warnings?)$/i;
     let chapNum = 0;
     const totalPages = pageWordCounts.length;
     const chapters = rawChapters.map((ch, i) => {
