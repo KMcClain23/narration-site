@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "src/app/api/board-pdf-chapters/route.ts": {
+      "maxDuration": 10
+    }
+  }
+}

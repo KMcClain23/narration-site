@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Increase body size limit for PDF upload route
   experimental: {
     serverActions: {
-      bodySizeLimit: '30mb',
+      bodySizeLimit: "20mb",
     },
   },
   images: {
