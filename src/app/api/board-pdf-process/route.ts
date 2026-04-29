@@ -159,6 +159,8 @@ export async function POST(req: Request) {
     if (!Array.isArray(rawChapters) || !rawChapters.length) throw new Error("No chapters found");
 
     // Step 5 — word counts per chapter from already-extracted text, not from Claude
+    const UNNUMBERED = /^(prologue|epilogue)$/i;
+    let chapNum = 0;
     const totalPages = pageWordCounts.length;
     const chapters = rawChapters.map((ch, i) => {
       const start = Math.max(0, ch.startPage - 1);
@@ -167,7 +169,8 @@ export async function POST(req: Request) {
           ? Math.max(start + 1, rawChapters[i + 1].startPage - 1)
           : totalPages;
       const wordCount = pageWordCounts.slice(start, end).reduce((a, b) => a + b, 0);
-      return { number: i + 1, title: ch.title, wordCount, pages: end - start };
+      const number = UNNUMBERED.test(ch.title.trim()) ? null : ++chapNum;
+      return { number, title: ch.title, wordCount, pages: end - start };
     });
 
     await supabase.from("pdf_jobs").update({ status: "done", chapters }).eq("id", jobId);

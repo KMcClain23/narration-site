@@ -18,7 +18,7 @@ const STAGE_COLORS: Record<string, string> = {
 };
 
 interface Chapter {
-  number: number;
+  number: number | null;
   title: string;
   wordCount: number;
   pages: number;
@@ -194,15 +194,22 @@ export default function CardDetailPage() {
     setChapters(prev => prev.map((c, i) => i === idx ? { ...c, status: nextStatus(c.status) } : c));
   };
 
+  const isUnnumbered = (title: string) => /^(prologue|epilogue)$/i.test(title.trim());
+
+  const renumber = (list: Chapter[]): Chapter[] => {
+    let n = 0;
+    return list.map(c => ({ ...c, number: isUnnumbered(c.title) ? null : ++n }));
+  };
+
   const addChapter = () => {
-    const n = chapters.length + 1;
+    const nextNum = chapters.filter(c => c.number != null).length + 1;
     const avgWords = total > 0 ? Math.round(totalWords / total) : 2500;
     const avgPages = total > 0 ? Math.round(totalPages / total) : 10;
-    setChapters(prev => [...prev, { number: n, title: `Chapter ${n}`, wordCount: avgWords, pages: avgPages, status: "not_started", notes: "" }]);
+    setChapters(prev => [...prev, { number: nextNum, title: `Chapter ${nextNum}`, wordCount: avgWords, pages: avgPages, status: "not_started", notes: "" }]);
   };
 
   const removeChapter = (idx: number) => {
-    setChapters(prev => prev.filter((_, i) => i !== idx).map((c, i) => ({ ...c, number: i + 1 })));
+    setChapters(prev => renumber(prev.filter((_, i) => i !== idx)));
   };
 
   const moveChapter = (idx: number, dir: -1 | 1) => {
@@ -211,7 +218,7 @@ export default function CardDetailPage() {
     setChapters(prev => {
       const arr = [...prev];
       [arr[idx], arr[next]] = [arr[next], arr[idx]];
-      return arr.map((c, i) => ({ ...c, number: i + 1 }));
+      return renumber(arr);
     });
   };
 
@@ -428,9 +435,15 @@ export default function CardDetailPage() {
                 return (
                   <div key={i} className={`rounded-xl border transition-all ${isEditing ? "border-[#D4AF37]/30 bg-[#D4AF37]/5" : "border-white/8 bg-[#0A0D3A] hover:border-white/15"}`}>
                     <div className="flex items-center gap-3 px-4 py-3">
-                      <div className="h-7 w-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-white/50 shrink-0">
-                        {ch.number}
-                      </div>
+                      {ch.number != null ? (
+                        <div className="h-7 w-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-white/50 shrink-0">
+                          {ch.number}
+                        </div>
+                      ) : (
+                        <div className="h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-bold text-white/50 shrink-0 px-2">
+                          {ch.title}
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         {isEditing ? (
                           <input value={ch.title} onChange={e => updateChapter(i, "title", e.target.value)}
