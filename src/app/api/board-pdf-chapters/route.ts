@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { S3Client, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { PDFDocument } from "pdf-lib";
 
 export const maxDuration = 60;
 
@@ -12,18 +13,29 @@ const r2 = new S3Client({
   },
 });
 
-async function extractPageWordCounts(bytes: Uint8Array): Promise<number[]> {
-  // Dynamic import avoids SSR issues with pdfjs
-  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
-  const counts: number[] = [];
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const text = (content.items as any[]).map((item) => item.str).join(" ");
-    counts.push(text.split(/\s+/).filter(Boolean).length);
-  }
-  return counts;
+const CHUNK_SIZE = 50;
+
+async function processChunk(apiKey: string, chunkBase64: string, startPage: number, endPage: number) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 2000,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "document", source: { type: "base64", media_type: "application/pdf", data: chunkBase64 } },
+          { type: "text", text: `This is pages ${startPage}-${endPage} of a manuscript. List any chapters that BEGIN in these pages. Count actual words in each chapter found here. Return ONLY a JSON array ([] if none): [{"title":"Chapter Title","startPage":${startPage},"wordCount":1250}]. Use absolute page numbers from ${startPage}. Exclude TOC, copyright, dedication, acknowledgments, about the author. No markdown.` },
+        ],
+      }],
+    }),
+  });
+  if (!res.ok) throw new Error(`Anthropic ${res.status}`);
+  const data = await res.json();
+  const text = data.content?.[0]?.text ?? "[]";
+  const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+  return Array.isArray(parsed) ? parsed : [];
 }
 
 export async function POST(req: Request) {
@@ -33,56 +45,36 @@ export async function POST(req: Request) {
   const { key, bucket } = await req.json();
   if (!key || !bucket) return NextResponse.json({ error: "Missing key or bucket." }, { status: 400 });
 
-  // Fetch PDF from R2
   const obj = await r2.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
   const bytes = await obj.Body!.transformToByteArray();
   r2.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })).catch(() => {});
 
-  // Extract per-page word counts (runs in parallel with Claude call)
-  const [pageWordCounts, anthropicRes] = await Promise.all([
-    extractPageWordCounts(bytes),
-    fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 2000,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "document", source: { type: "base64", media_type: "application/pdf", data: Buffer.from(bytes).toString("base64") } },
-            { type: "text", text: "List every chapter in this manuscript with its start page number.\nInclude Prologue, Epilogue, and all named/numbered chapters.\nExclude TOC, copyright, dedication, acknowledgments, about the author.\nReturn ONLY a JSON array: [{\"number\":1,\"title\":\"Chapter Title\",\"startPage\":11}]\nNo markdown, no explanation." },
-          ],
-        }],
-      }),
-    }),
-  ]);
+  const srcDoc = await PDFDocument.load(bytes);
+  const totalPages = srcDoc.getPageCount();
+  const chunks: { base64: string; start: number; end: number }[] = [];
 
-  if (!anthropicRes.ok) {
-    return NextResponse.json({ error: `Anthropic error ${anthropicRes.status} — please try again.` }, { status: 500 });
+  for (let start = 0; start < totalPages; start += CHUNK_SIZE) {
+    const end = Math.min(start + CHUNK_SIZE - 1, totalPages - 1);
+    const chunkDoc = await PDFDocument.create();
+    const indices = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+    const copied = await chunkDoc.copyPages(srcDoc, indices);
+    copied.forEach(p => chunkDoc.addPage(p));
+    const chunkBytes = await chunkDoc.save();
+    chunks.push({ base64: Buffer.from(chunkBytes).toString("base64"), start: start + 1, end: end + 1 });
   }
 
-  const aiData = await anthropicRes.json();
-  const rawText = aiData.content?.[0]?.text ?? "";
-  const rawChapters: { number: number; title: string; startPage: number }[] =
-    JSON.parse(rawText.replace(/```json|```/g, "").trim());
+  const results = await Promise.all(chunks.map(c => processChunk(apiKey, c.base64, c.start, c.end)));
 
-  if (!Array.isArray(rawChapters) || !rawChapters.length) {
-    return NextResponse.json({ error: "No chapters returned from Claude." }, { status: 500 });
-  }
+  const allChapters = results.flat()
+    .filter((c: any) => c.title && c.startPage)
+    .sort((a: any, b: any) => a.startPage - b.startPage)
+    .map((ch: any, i: number) => ({
+      number: i + 1,
+      title: ch.title,
+      wordCount: ch.wordCount || 0,
+      pages: ch.endPage ? ch.endPage - ch.startPage + 1 : 0,
+    }));
 
-  // Calculate word counts and page spans from our own extraction
-  const totalPages = pageWordCounts.length;
-  const chapters = rawChapters.map((ch, i) => {
-    const start = Math.max(0, ch.startPage - 1);
-    const end = i + 1 < rawChapters.length ? Math.max(start + 1, rawChapters[i + 1].startPage - 1) : totalPages;
-    const wordCount = pageWordCounts.slice(start, end).reduce((sum, n) => sum + n, 0);
-    return { number: ch.number, title: ch.title, wordCount, pages: end - start };
-  });
-
-  return NextResponse.json({ chapters });
+  if (!allChapters.length) return NextResponse.json({ error: "No chapters found in PDF." }, { status: 500 });
+  return NextResponse.json({ chapters: allChapters });
 }
