@@ -137,9 +137,13 @@ export default function CardDetailPage() {
       const uploadRes = await fetch(uploadUrl, {
         method: "PUT",
         body: file,
-        headers: { "Content-Type": file.type || "application/pdf" },
+        headers: {
+          "Content-Type": file.type || "application/pdf",
+          // R2 does not support AWS checksum headers — omit them
+          "x-amz-sdk-checksum-algorithm": "",
+        },
       });
-      if (!uploadRes.ok) throw new Error("Upload to storage failed");
+      if (!uploadRes.ok) throw new Error(`Upload to storage failed (${uploadRes.status})`);
 
       // Step 3: Tell server to read from R2 and extract chapters with Claude
       setPdfProgress("Claude is reading every chapter…");

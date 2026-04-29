@@ -16,14 +16,8 @@ export async function POST(req: Request) {
     const { filename, contentType } = await req.json();
     const key = `tmp-manuscripts/${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
     const bucket = process.env.R2_DEMOS_BUCKET_NAME!;
-
-    const command = new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      ContentType: contentType || "application/pdf",
-    });
-
-    const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 300 });
+    const command = new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType || "application/pdf", ChecksumAlgorithm: undefined });
+    const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 300, unhoistableHeaders: new Set(["x-amz-checksum-crc32", "x-amz-sdk-checksum-algorithm"]) });
     return NextResponse.json({ uploadUrl, key, bucket });
   } catch (e) {
     console.error("[board-pdf-upload-url]", e);
