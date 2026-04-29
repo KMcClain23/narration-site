@@ -117,16 +117,37 @@ export default function CardDetailPage() {
     setAiLoading(false);
   };
 
-  // ✅ SECURE: PDF upload routes through server-side API — API key never exposed to browser
+  // ✅ SECURE: PDF uploads directly to R2 (bypasses Vercel 4.5MB limit), then server reads from R2
   const handlePdfUpload = async (file: File) => {
     setPdfLoading(true);
-    setPdfProgress("Uploading manuscript…");
     setError(null);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      // Step 1: Get a presigned R2 upload URL from our server
+      setPdfProgress("Preparing upload…");
+      const urlRes = await fetch("/api/board-pdf-upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, contentType: file.type || "application/pdf" }),
+      });
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadUrl, key, bucket } = await urlRes.json();
+
+      // Step 2: Upload PDF directly to R2 (no Vercel size limit)
+      setPdfProgress("Uploading manuscript…");
+      const uploadRes = await fetch(uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type || "application/pdf" },
+      });
+      if (!uploadRes.ok) throw new Error("Upload to storage failed");
+
+      // Step 3: Tell server to read from R2 and extract chapters with Claude
       setPdfProgress("Claude is reading every chapter…");
-      const res = await fetch("/api/board-pdf-chapters", { method: "POST", body: formData });
+      const res = await fetch("/api/board-pdf-chapters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, bucket }),
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `Server error ${res.status}` }));
         throw new Error(err.error || `Server error ${res.status}`);
