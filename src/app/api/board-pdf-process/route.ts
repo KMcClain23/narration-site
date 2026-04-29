@@ -23,6 +23,8 @@ const supabase = createClient(
 // SDK retries 429s automatically with exponential backoff
 const anthropic = new Anthropic({ maxRetries: 4 });
 
+// ─── PDF text extraction ──────────────────────────────────────────────────────
+
 /** Decode PDF literal-string escape sequences (octal, \n, \r, etc.) */
 function decodeLiteralString(s: string): string {
   let out = "";
@@ -51,7 +53,6 @@ function parseContentStream(content: string): string {
   let bm: RegExpExecArray | null;
   while ((bm = btEt.exec(content)) !== null) {
     const block = bm[1];
-    // Match (string) Tj / ' and [(array)] TJ
     const opRe = /\(([^)\\]*(?:\\[\s\S][^)\\]*)*)\)\s*(?:Tj|'|")|(\[[\s\S]*?\])\s*TJ/g;
     let m: RegExpExecArray | null;
     while ((m = opRe.exec(block)) !== null) {
@@ -59,7 +60,6 @@ function parseContentStream(content: string): string {
         const t = decodeLiteralString(m[1]).replace(/\s+/g, " ").trim();
         if (t) parts.push(t);
       } else {
-        // TJ array — collect literal strings, ignore numeric kerning values
         const strRe = /\(([^)\\]*(?:\\[\s\S][^)\\]*)*)\)/g;
         let sm: RegExpExecArray | null;
         const strs: string[] = [];
@@ -74,41 +74,136 @@ function parseContentStream(content: string): string {
 
 /**
  * Pure Node.js PDF text extraction — no external libraries, no browser APIs.
- *
- * Scans every stream/endstream pair in the file, decompresses with zlib
- * (FlateDecode is the standard for modern PDFs), and pulls text from BT…ET
- * content blocks. For manuscript PDFs, streams appear in page order.
+ * Scans every stream/endstream pair, decompresses with zlib, extracts BT…ET text.
  */
 function extractPageTexts(bytes: Uint8Array): string[] {
-  // Work in binary string space to safely handle arbitrary byte values
   const raw = Buffer.from(bytes).toString("binary");
   const pages: string[] = [];
-
   const streamRe = /stream\r?\n/g;
   let m: RegExpExecArray | null;
   while ((m = streamRe.exec(raw)) !== null) {
     const start = m.index + m[0].length;
     const endIdx = raw.indexOf("\nendstream", start);
     if (endIdx < 0) continue;
-
     const blob = Buffer.from(raw.slice(start, endIdx), "binary");
-
-    // Try zlib inflate (FlateDecode with header), then raw deflate, then plain
     let decompressed: Buffer | null = null;
     try { decompressed = inflateSync(blob); } catch { /* not zlib */ }
     if (!decompressed) {
       try { decompressed = inflateRawSync(blob); } catch { /* not raw deflate */ }
     }
-
     const decoded = (decompressed ?? blob).toString("latin1");
     if (!decoded.includes("BT") || !decoded.includes("ET")) continue;
-
     const text = parseContentStream(decoded).trim();
     if (text) pages.push(text);
   }
-
   return pages;
 }
+
+// ─── Table of Contents detection & parsing ───────────────────────────────────
+
+interface TocEntry {
+  title: string;
+  startPage: number;
+}
+
+function cleanTocTitle(raw: string): string {
+  return raw.replace(/^\d+\.\s*/, "").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Try to pull TOC entries from one page's extracted text.
+ * Strategy A: numbered list  "N. Title  pageNum"
+ * Strategy B: keyword-only  "Chapter N  pageNum" / "Prologue  pageNum"
+ *
+ * Strategy A is tried first; if it finds entries Strategy B is skipped
+ * (avoiding false positives from prose text referencing chapter numbers).
+ */
+function extractTocEntries(text: string, out: TocEntry[], seen: Set<string>): void {
+  let found = 0;
+
+  // Strategy A — numbered list entries.
+  // Non-greedy capture + lookahead resolves the digit ambiguity in "Chapter 1  7":
+  // the engine extends [\s\S]+? until the number before the next "M." or end-of-string
+  // is the only candidate left, so it correctly picks 7 as the page, not 1.
+  const numberedRe = /(?:^|\s)\d+\.\s+([\s\S]+?)\s+(\d{1,3})(?=\s+\d+\.\s+|\s*$)/g;
+  let m: RegExpExecArray | null;
+  while ((m = numberedRe.exec(text)) !== null) {
+    const title = cleanTocTitle(m[1]);
+    const page = parseInt(m[2], 10);
+    const key = title.toLowerCase();
+    if (title && page >= 1 && !seen.has(key)) {
+      out.push({ title, startPage: page });
+      seen.add(key);
+      found++;
+    }
+  }
+  if (found > 0) return;
+
+  // Strategy B — keyword-only entries (no numbering prefix).
+  // Conservative: only fires on known section-name keywords, which are rare in prose.
+  const kwRe = /\b(content\s*(?:&|and)\s*trigger\s*warnings?|trigger\s*warnings?|(?:chapter|prologue|epilogue|part|dedication|introduction|preface|afterword|foreword|appendix|acknowledgements?)\s*(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)?)\s+(\d{1,3})(?=\s|$)/gi;
+  while ((m = kwRe.exec(text)) !== null) {
+    const title = cleanTocTitle(m[1]);
+    const page = parseInt(m[2], 10);
+    const key = title.toLowerCase();
+    if (title && page >= 1 && !seen.has(key)) {
+      out.push({ title, startPage: page });
+      seen.add(key);
+    }
+  }
+}
+
+/**
+ * Scan the first 12 pages for a Table of Contents.
+ * Collects entries from all scanned pages (handles multi-page TOCs),
+ * then validates by requiring an ascending page-number sequence.
+ * Returns null when no reliable TOC is detected (triggers Claude fallback).
+ */
+function parseTocFromPages(pageTexts: string[]): TocEntry[] | null {
+  const entries: TocEntry[] = [];
+  const seen = new Set<string>();
+
+  for (let i = 0; i < Math.min(12, pageTexts.length); i++) {
+    extractTocEntries(pageTexts[i], entries, seen);
+  }
+
+  if (entries.length < 3) return null;
+
+  // Sort by page number; a real TOC must be mostly ascending
+  entries.sort((a, b) => a.startPage - b.startPage);
+
+  let ascPairs = 0;
+  for (let i = 1; i < entries.length; i++) {
+    if (entries[i].startPage > entries[i - 1].startPage) ascPairs++;
+  }
+  // Require the majority of consecutive pairs to be ascending
+  if (ascPairs < Math.ceil((entries.length - 1) * 0.75)) return null;
+
+  return entries;
+}
+
+// ─── Chapter numbering ────────────────────────────────────────────────────────
+
+const UNNUMBERED = /^(prologue|epilogue|dedication|content\s*(?:&|and)\s*trigger\s*warnings?|trigger\s*warnings?|content\s*warnings?)$/i;
+
+function assignNumbers(
+  raw: Array<{ title: string; startPage: number }>,
+  pageWordCounts: number[]
+): Array<{ number: number | null; title: string; wordCount: number; pages: number }> {
+  const totalPages = pageWordCounts.length;
+  let chapNum = 0;
+  return raw.map((ch, i) => {
+    const start = Math.max(0, ch.startPage - 1);
+    const end = i + 1 < raw.length
+      ? Math.max(start + 1, raw[i + 1].startPage - 1)
+      : totalPages;
+    const wordCount = pageWordCounts.slice(start, end).reduce((a, b) => a + b, 0);
+    const number = UNNUMBERED.test(ch.title.trim()) ? null : ++chapNum;
+    return { number, title: ch.title, wordCount, pages: end - start };
+  });
+}
+
+// ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
   const { jobId, key, bucket } = await req.json();
@@ -122,56 +217,54 @@ export async function POST(req: Request) {
     const bytes = await obj.Body!.transformToByteArray();
     r2.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })).catch(() => {});
 
-    // Step 1 — extract text from every page locally using only Node.js built-ins
+    // Step 1 — extract text from every page locally (no bytes sent to Anthropic)
     const pageTexts = extractPageTexts(bytes);
+    if (!pageTexts.length) throw new Error("Could not extract any text from PDF");
 
-    // Step 2 — word counts calculated from locally-extracted text
+    // Step 2 — word counts from locally-extracted text
     const pageWordCounts = pageTexts.map((t) => t.split(/\s+/).filter(Boolean).length);
 
-    // Step 3 — compact page map: "pageNum: first 60 chars"  (~5k tokens for a full novel)
-    const pageMap = pageTexts
-      .map((text, i) => {
-        const first = text.trim().slice(0, 60).replace(/\s+/g, " ");
-        return first ? `${i + 1}: ${first}` : null;
-      })
-      .filter(Boolean)
-      .join("\n");
+    // Step 3 — try TOC detection first; fall back to Claude if none found
+    const tocEntries = parseTocFromPages(pageTexts);
 
-    if (!pageMap) throw new Error("Could not extract any text from PDF");
+    let rawSections: Array<{ title: string; startPage: number }>;
 
-    // Step 4 — send ONLY the page map to Claude; no PDF binary or base64 at all
-    const msg = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
-      messages: [
-        {
-          role: "user",
-          content: `Here are the page numbers and first line of text from each page of a manuscript.\n\n${pageMap}\n\nIdentify which pages begin a trackable section. Include:\n- Front matter: Dedication (e.g. "For the good girls…"), Content & Trigger Warnings\n- Body chapters: Prologue, Chapter One, Chapter Two, … (all numbered chapters)\n- Back matter: Epilogue\nReturn ONLY a JSON array: [{"number":1,"title":"Section Title","startPage":11}]\nUse clean titles: "Dedication", "Content & Trigger Warnings", "Prologue", "Chapter One", "Epilogue", etc.\nNo markdown. No explanation. Only the JSON array.`,
-        },
-      ],
-    });
+    if (tocEntries) {
+      // Fast path: parse directly from the TOC — no Claude call needed
+      rawSections = tocEntries;
+    } else {
+      // Slow path: send compact page map to Claude Haiku
+      const pageMap = pageTexts
+        .map((text, i) => {
+          const first = text.trim().slice(0, 60).replace(/\s+/g, " ");
+          return first ? `${i + 1}: ${first}` : null;
+        })
+        .filter(Boolean)
+        .join("\n");
 
-    const rawText = msg.content[0].type === "text" ? msg.content[0].text : "";
-    const rawChapters: { number: number; title: string; startPage: number }[] = JSON.parse(
-      rawText.replace(/```json|```/g, "").trim()
-    );
+      if (!pageMap) throw new Error("Could not extract any text from PDF");
 
-    if (!Array.isArray(rawChapters) || !rawChapters.length) throw new Error("No chapters found");
+      const msg = await anthropic.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1024,
+        messages: [
+          {
+            role: "user",
+            content: `Here are the page numbers and first line of text from each page of a manuscript.\n\n${pageMap}\n\nIdentify which pages begin a trackable section. Include:\n- Front matter: Dedication (e.g. "For the good girls…"), Content & Trigger Warnings\n- Body chapters: Prologue, Chapter One, Chapter Two, … (all numbered chapters)\n- Back matter: Epilogue\nReturn ONLY a JSON array: [{"number":1,"title":"Section Title","startPage":11}]\nUse clean titles: "Dedication", "Content & Trigger Warnings", "Prologue", "Chapter One", "Epilogue", etc.\nNo markdown. No explanation. Only the JSON array.`,
+          },
+        ],
+      });
 
-    // Step 5 — word counts per chapter from already-extracted text, not from Claude
-    const UNNUMBERED = /^(prologue|epilogue|dedication|content\s*(?:&|and)\s*trigger\s*warnings?|trigger\s*warnings?|content\s*warnings?)$/i;
-    let chapNum = 0;
-    const totalPages = pageWordCounts.length;
-    const chapters = rawChapters.map((ch, i) => {
-      const start = Math.max(0, ch.startPage - 1);
-      const end =
-        i + 1 < rawChapters.length
-          ? Math.max(start + 1, rawChapters[i + 1].startPage - 1)
-          : totalPages;
-      const wordCount = pageWordCounts.slice(start, end).reduce((a, b) => a + b, 0);
-      const number = UNNUMBERED.test(ch.title.trim()) ? null : ++chapNum;
-      return { number, title: ch.title, wordCount, pages: end - start };
-    });
+      const rawText = msg.content[0].type === "text" ? msg.content[0].text : "";
+      const parsed: { number: number; title: string; startPage: number }[] = JSON.parse(
+        rawText.replace(/```json|```/g, "").trim()
+      );
+      if (!Array.isArray(parsed) || !parsed.length) throw new Error("No chapters found");
+      rawSections = parsed;
+    }
+
+    // Step 4 — assign chapter numbers and calculate word counts from local text
+    const chapters = assignNumbers(rawSections, pageWordCounts);
 
     await supabase.from("pdf_jobs").update({ status: "done", chapters }).eq("id", jobId);
     return NextResponse.json({ ok: true });
