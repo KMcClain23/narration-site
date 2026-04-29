@@ -56,6 +56,7 @@ export default function CardDetailPage() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [pdfProgress, setPdfProgress] = useState("");
+  const [coverDragOver, setCoverDragOver] = useState(false);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chaptersToSave = useRef<Chapter[]>([]);
@@ -289,12 +290,49 @@ export default function CardDetailPage() {
 
         {/* ── Left panel ── */}
         <div className="space-y-5">
-          {/* Cover */}
-          <div className="rounded-2xl overflow-hidden border border-white/8">
+          {/* Cover — drag PDF here to import chapters */}
+          <div
+            className={`rounded-2xl overflow-hidden border relative transition-colors ${coverDragOver ? "border-[#D4AF37]/60" : "border-white/8"}`}
+            onDragOver={e => {
+              e.preventDefault();
+              if (pdfLoading) return;
+              if (Array.from(e.dataTransfer.items).some(i => i.kind === "file" && i.type === "application/pdf"))
+                setCoverDragOver(true);
+            }}
+            onDragLeave={e => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setCoverDragOver(false);
+            }}
+            onDrop={e => {
+              e.preventDefault();
+              setCoverDragOver(false);
+              if (pdfLoading) return;
+              const file = Array.from(e.dataTransfer.files).find(f => f.type === "application/pdf");
+              if (file) handlePdfUpload(file);
+            }}
+          >
             {card.cover_url
               ? <img src={card.cover_url} alt={card.title} className="w-full aspect-[2/3] object-cover"/>
               : <div className="w-full aspect-[2/3] bg-[#0A0D3A] flex items-center justify-center text-white/20 text-sm">No cover</div>
             }
+
+            {/* Drop indicator overlay */}
+            {coverDragOver && (
+              <div className="absolute inset-0 bg-[#06082E]/75 border-2 border-dashed border-[#D4AF37]/70 rounded-2xl flex flex-col items-center justify-center gap-2 pointer-events-none">
+                <svg className="h-8 w-8 text-[#D4AF37]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+                </svg>
+                <span className="text-sm font-semibold text-[#D4AF37]">Drop PDF</span>
+              </div>
+            )}
+
+            {/* Processing overlay */}
+            {pdfLoading && (
+              <div className="absolute inset-0 bg-[#06082E]/85 rounded-2xl flex flex-col items-center justify-center gap-2 px-4 text-center pointer-events-none">
+                <div className="h-5 w-5 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin"/>
+                <span className="text-xs font-medium text-[#D4AF37]">{pdfProgress || "Processing…"}</span>
+                <span className="text-[10px] text-[#D4AF37]/50">20–60 seconds</span>
+              </div>
+            )}
           </div>
 
           {/* Book info */}
@@ -363,7 +401,7 @@ export default function CardDetailPage() {
           {/* Auto-import panel */}
           <div className="rounded-2xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 p-4">
             <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] font-medium mb-1">Auto-import chapters</p>
-            <p className="text-xs text-white/50 mb-3">Search by title to generate chapters with AI, or upload the manuscript PDF for real word counts.</p>
+            <p className="text-xs text-white/50 mb-3">Search by title to generate chapters with AI, or drop the manuscript PDF onto the cover above.</p>
 
             {/* Title search */}
             <div className="flex gap-2 mb-2">
@@ -386,40 +424,10 @@ export default function CardDetailPage() {
               </button>
             </div>
             {(searching || aiLoading) && (
-              <p className="text-xs text-[#D4AF37]/60 animate-pulse mb-3">
+              <p className="text-xs text-[#D4AF37]/60 animate-pulse">
                 {searching ? "Searching Google Books…" : "Claude is generating chapters…"}
               </p>
             )}
-
-            <div className="flex items-center gap-2 my-3">
-              <div className="flex-1 h-px bg-white/8"/>
-              <span className="text-[10px] text-white/25 uppercase tracking-widest">or</span>
-              <div className="flex-1 h-px bg-white/8"/>
-            </div>
-
-            {/* PDF upload */}
-            <p className="text-xs text-white/50 mb-2">Upload the manuscript PDF — Claude reads every chapter and counts actual words:</p>
-            <label className={`flex items-center justify-center gap-2 w-full rounded-lg border-2 border-dashed px-3 py-3.5 transition-colors ${
-              pdfLoading ? "border-[#D4AF37]/40 bg-[#D4AF37]/5 cursor-not-allowed" : "border-white/15 hover:border-[#D4AF37]/30 hover:bg-white/5 cursor-pointer"
-            }`}>
-              <input type="file" accept=".pdf" className="hidden" disabled={pdfLoading}
-                onChange={e => { if (e.target.files?.[0]) handlePdfUpload(e.target.files[0]); }} />
-              {pdfLoading ? (
-                <div className="flex flex-col items-center gap-2 text-xs text-[#D4AF37] py-1">
-                  <div className="h-4 w-4 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin"/>
-                  <span>{pdfProgress || "Processing…"}</span>
-                  <span className="text-[10px] text-[#D4AF37]/50">This may take 20–60 seconds</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-xs text-white/35">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-                  </svg>
-                  Upload manuscript PDF
-                </div>
-              )}
-            </label>
-            <p className="text-[10px] text-white/20 mt-1.5 text-center">~$0.05–0.15 per book · 30MB max</p>
           </div>
         </div>
 
