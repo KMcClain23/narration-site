@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      console.error("[board-ai-chapters] ANTHROPIC_API_KEY is not set");
+      return NextResponse.json(
+        { error: "Server configuration error: ANTHROPIC_API_KEY is not set. Add it to Vercel Environment Variables and redeploy." },
+        { status: 500 }
+      );
+    }
+
     const { title, author, pageCount, wordCount, chapterCount } = await req.json();
     if (!title) return NextResponse.json({ error: "Title required." }, { status: 400 });
 
@@ -34,7 +43,7 @@ Generate exactly ${estimatedChapters} chapters.`;
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY || "",
+        "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
@@ -46,14 +55,13 @@ Generate exactly ${estimatedChapters} chapters.`;
 
     if (!response.ok) {
       const errBody = await response.text();
-      console.error("Anthropic API error:", response.status, errBody);
+      console.error("[board-ai-chapters] Anthropic API error:", response.status, errBody);
       return NextResponse.json({ error: `Anthropic API error: ${response.status}` }, { status: 500 });
     }
 
     const data = await response.json();
     const text = data.content?.[0]?.text || "[]";
 
-    // Parse the JSON response
     const clean = text.replace(/```json|```/g, "").trim();
     const chapters = JSON.parse(clean);
 
@@ -61,7 +69,7 @@ Generate exactly ${estimatedChapters} chapters.`;
 
     return NextResponse.json({ chapters, estimatedChapters, estimatedWordCount });
   } catch (e) {
-    console.error("AI chapter generation error:", e);
+    console.error("[board-ai-chapters] Error:", e);
     return NextResponse.json({ error: "Failed to generate chapters." }, { status: 500 });
   }
 }

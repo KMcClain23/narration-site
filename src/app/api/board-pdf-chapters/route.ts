@@ -4,6 +4,16 @@ export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
+    // Explicit key check — fail fast with a clear message instead of sending an empty header
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      console.error("[board-pdf-chapters] ANTHROPIC_API_KEY is not set");
+      return NextResponse.json(
+        { error: "Server configuration error: ANTHROPIC_API_KEY is not set. Add it to Vercel Environment Variables and redeploy." },
+        { status: 500 }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File;
     if (!file) return NextResponse.json({ error: "No file provided." }, { status: 400 });
@@ -42,7 +52,7 @@ Rules:
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY || "",
+        "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
@@ -72,7 +82,7 @@ Rules:
 
     if (!response.ok) {
       const err = await response.text();
-      console.error("Anthropic error:", response.status, err);
+      console.error("[board-pdf-chapters] Anthropic error:", response.status, err);
       return NextResponse.json({ error: `API error: ${response.status} — ${err.slice(0, 200)}` }, { status: 500 });
     }
 
@@ -88,7 +98,7 @@ Rules:
 
     return NextResponse.json({ chapters, source: "claude" });
   } catch (e) {
-    console.error("PDF chapter extraction error:", e);
+    console.error("[board-pdf-chapters] Error:", e);
     return NextResponse.json({
       error: `Failed to extract chapters: ${e instanceof Error ? e.message : "Unknown error"}`,
     }, { status: 500 });
