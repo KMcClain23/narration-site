@@ -140,20 +140,31 @@ export default function CardDetailPage() {
       });
       if (!uploadRes.ok) throw new Error(`Upload to storage failed (${uploadRes.status})`);
 
-      // Step 3: Tell server to read from R2 and extract chapters with Claude
+      // Step 3: Start background job
       setPdfProgress("Claude is reading every chapter…");
-      const res = await fetch("/api/board-pdf-chapters", {
+      const startRes = await fetch("/api/board-pdf-start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key, bucket }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: `Server error ${res.status}` }));
-        throw new Error(err.error || `Server error ${res.status}`);
+      if (!startRes.ok) throw new Error("Failed to start extraction job");
+      const { jobId } = await startRes.json();
+
+      // Step 4: Poll for results
+      let elapsed = 0;
+      while (elapsed < 600) {
+        await new Promise(r => setTimeout(r, 4000));
+        elapsed += 4;
+        setPdfProgress(`Claude is reading every chapter… (${elapsed}s)`);
+        const poll = await fetch(`/api/board-pdf-status?jobId=${jobId}`);
+        const result = await poll.json();
+        if (result.status === "done") {
+          if (!result.chapters?.length) throw new Error("No chapters returned");
+          setChapters(result.chapters.map((c: Omit<Chapter, "status" | "notes">) => ({ ...c, status: "not_started", notes: "" })));
+          break;
+        }
+        if (result.status === "error") throw new Error(result.error || "Extraction failed");
       }
-      const data = await res.json();
-      if (!data.chapters?.length) throw new Error("No chapters returned");
-      setChapters(data.chapters.map((c: Omit<Chapter, "status" | "notes">) => ({ ...c, status: "not_started", notes: "" })));
     } catch (e) {
       setError(`PDF extraction failed: ${e instanceof Error ? e.message : "Unknown error"}`);
     }
