@@ -592,7 +592,7 @@ export default function BoardPage() {
                       {card.deadline && (
                         <div className="flex items-center gap-1 mt-2">
                           <svg className="h-3 w-3 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                          <span className={`text-[10px] ${(() => { const [y,m,d] = card.deadline.split("-"); return new Date(+y,+m-1,+d) < new Date() && col.id !== "released"; })() ? "text-red-400" : "text-white/30"}`}>
+                          <span className={`text-[10px] ${(() => { const [y,m,d] = card.deadline.split("-"); return new Date(+y,+m-1,+d) < new Date() && column.id !== "released"; })() ? "text-red-400" : "text-white/30"}`}>
                             Due: {(() => { const [y,m,d] = card.deadline.split("-"); return new Date(+y, +m-1, +d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); })()}
                           </span>
                         </div>
@@ -600,7 +600,7 @@ export default function BoardPage() {
                       {card.first15_due && (
                         <div className="flex items-center gap-1 mt-1">
                           <svg className="h-3 w-3 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.868V15.131a1 1 0 01-1.447.894L15 14M3 8h12a1 1 0 011 1v6a1 1 0 01-1 1H3a1 1 0 01-1-1V9a1 1 0 011-1z"/></svg>
-                          <span className={`text-[10px] ${(() => { const [y,m,d] = card.first15_due.split("-"); return new Date(+y,+m-1,+d) < new Date() && col.id === "contracted"; })() ? "text-orange-400" : "text-white/30"}`}>
+                          <span className={`text-[10px] ${(() => { const [y,m,d] = card.first15_due.split("-"); return new Date(+y,+m-1,+d) < new Date() && column.id === "contracted"; })() ? "text-orange-400" : "text-white/30"}`}>
                             First 15: {(() => { const [y,m,d] = card.first15_due.split("-"); return new Date(+y, +m-1, +d).toLocaleDateString("en-US",{month:"short",day:"numeric"}); })()}
                           </span>
                         </div>
