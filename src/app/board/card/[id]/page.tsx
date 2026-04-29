@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
@@ -57,6 +57,9 @@ export default function CardDetailPage() {
   const [saved, setSaved] = useState(false);
   const [pdfProgress, setPdfProgress] = useState("");
 
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chaptersToSave = useRef<Chapter[]>([]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -72,6 +75,7 @@ export default function CardDetailPage() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
 
   const total = chapters.length;
   const byStat = Object.fromEntries(CHAPTER_STATUSES.map(s => [s.id, chapters.filter(c => c.status === s.id).length]));
@@ -186,12 +190,32 @@ export default function CardDetailPage() {
     setSaving(false);
   };
 
+  const triggerAutoSave = (updated: Chapter[]) => {
+    chaptersToSave.current = updated;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      setSaving(true);
+      try {
+        await fetch("/api/board", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, chapters: chaptersToSave.current }),
+        });
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      } catch { setError("Save failed."); }
+      setSaving(false);
+    }, 800);
+  };
+
   const updateChapter = (idx: number, field: keyof Chapter, value: string | number) => {
     setChapters(prev => prev.map((c, i) => i === idx ? { ...c, [field]: value } : c));
   };
 
   const advanceStatus = (idx: number) => {
-    setChapters(prev => prev.map((c, i) => i === idx ? { ...c, status: nextStatus(c.status) } : c));
+    const updated = chapters.map((c, i) => i === idx ? { ...c, status: nextStatus(c.status) } : c);
+    setChapters(updated);
+    triggerAutoSave(updated);
   };
 
   const isUnnumbered = (title: string) => /^(prologue|epilogue|dedication|content\s*(?:&|and)\s*trigger\s*warnings?|trigger\s*warnings?|content\s*warnings?)$/i.test(title.trim());
@@ -205,7 +229,9 @@ export default function CardDetailPage() {
     const nextNum = chapters.filter(c => c.number != null).length + 1;
     const avgWords = total > 0 ? Math.round(totalWords / total) : 2500;
     const avgPages = total > 0 ? Math.round(totalPages / total) : 10;
-    setChapters(prev => [...prev, { number: nextNum, title: `Chapter ${nextNum}`, wordCount: avgWords, pages: avgPages, status: "not_started", notes: "" }]);
+    const updated = [...chapters, { number: nextNum, title: `Chapter ${nextNum}`, wordCount: avgWords, pages: avgPages, status: "not_started", notes: "" }];
+    setChapters(updated);
+    triggerAutoSave(updated);
   };
 
   const removeChapter = (idx: number) => {
