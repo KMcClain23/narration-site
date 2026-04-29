@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { S3Client, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { createClient } from "@supabase/supabase-js";
+import { getDocumentProxy, extractText } from "unpdf";
 
 export const maxDuration = 60;
 
@@ -18,38 +19,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-interface TextItem {
-  str: string;
-}
-
-interface TextContent {
-  items: TextItem[];
-}
-
-interface PageData {
-  getTextContent: () => Promise<TextContent>;
-}
-
 async function extractPageTexts(buffer: Buffer): Promise<string[]> {
-  // serverExternalPackages prevents Turbopack from bundling this CJS module
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require("pdf-parse") as (
-    buf: Buffer,
-    opts?: Record<string, unknown>
-  ) => Promise<{ numpages: number }>;
-
-  const pageTexts: string[] = [];
-
-  await pdfParse(buffer, {
-    pagerender(pageData: PageData) {
-      return pageData.getTextContent().then((tc) => {
-        pageTexts.push(tc.items.map((i) => i.str).join(" "));
-        return "";
-      });
-    },
-  });
-
-  return pageTexts;
+  const pdf = await getDocumentProxy(new Uint8Array(buffer));
+  const { text } = await extractText(pdf, { mergePages: false });
+  return text as string[];
 }
 
 export async function POST(req: Request) {
