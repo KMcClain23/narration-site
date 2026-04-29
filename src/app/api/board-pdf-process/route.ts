@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { S3Client, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { createClient } from "@supabase/supabase-js";
-import pdfParse = require("pdf-parse");
 
 export const maxDuration = 60;
 
@@ -19,6 +18,37 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Extract text streams from raw PDF bytes — no library needed
+function extractPdfPageTexts(bytes: Uint8Array): string[] {
+  const str = Buffer.from(bytes).toString("binary");
+  const pages: string[] = [];
+  // Split on page boundaries
+  const pageChunks = str.split(/\/Type\s*\/Page\b/);
+  for (const chunk of pageChunks.slice(1)) {
+    // Extract text from BT...ET blocks
+    const textBlocks: string[] = [];
+    const btEtRegex = /BT([\s\S]*?)ET/g;
+    let match;
+    while ((match = btEtRegex.exec(chunk)) !== null) {
+      const block = match[1];
+      // Extract strings from Tj, TJ, ' operators
+      const strRegex = /\(([^)]*)\)\s*(?:Tj|'|")|(\[([^\]]*)\])\s*TJ/g;
+      let strMatch;
+      while ((strMatch = strRegex.exec(block)) !== null) {
+        if (strMatch[1]) textBlocks.push(strMatch[1]);
+        else if (strMatch[3]) {
+          const tjContent = strMatch[3].replace(/\([^)]*\)/g, m =>
+            m.slice(1, -1)
+          ).replace(/-?\d+/g, " ");
+          textBlocks.push(tjContent);
+        }
+      }
+    }
+    pages.push(textBlocks.join(" "));
+  }
+  return pages;
+}
+
 export async function POST(req: Request) {
   const { jobId, key, bucket } = await req.json();
   if (!jobId || !key || !bucket) return NextResponse.json({ error: "Missing params." }, { status: 400 });
@@ -26,41 +56,23 @@ export async function POST(req: Request) {
   try {
     await supabase.from("pdf_jobs").update({ status: "processing" }).eq("id", jobId);
 
-    // Fetch PDF from R2
     const obj = await r2.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
     const bytes = await obj.Body!.transformToByteArray();
     r2.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })).catch(() => {});
 
-    // Extract per-page text and word counts
-    const pageWordCounts: number[] = [];
-    const pageFirstLines: string[] = [];
+    // Extract per-page text
+    const pageTexts = extractPdfPageTexts(bytes);
+    const pageWordCounts = pageTexts.map(t => t.split(/\s+/).filter(Boolean).length);
 
-    const parsed = await pdfParse(Buffer.from(bytes), {
-      pagerender: (pageData: any) => {
-        return pageData.getTextContent().then((content: any) => {
-          const text = content.items.map((i: any) => i.str).join(" ").trim();
-          const words = text.split(/\s+/).filter(Boolean).length;
-          pageWordCounts.push(words);
-          const firstLine = content.items
-            .map((i: any) => i.str)
-            .join("")
-            .trim()
-            .split(/\n/)[0]
-            ?.trim()
-            .slice(0, 80) || "";
-          pageFirstLines.push(firstLine);
-          return text;
-        });
-      }
-    });
-
-    // Build a compact page map for Claude — just page number + first line
-    const pageMap = pageFirstLines
-      .map((line, i) => `${i + 1}: ${line}`)
-      .filter(l => l.split(": ")[1]?.trim())
+    // Send only page numbers + first line to Claude
+    const pageMap = pageTexts
+      .map((text, i) => {
+        const firstLine = text.trim().split(/\s{3,}/)[0]?.trim().slice(0, 60) || "";
+        return firstLine ? `${i + 1}: ${firstLine}` : null;
+      })
+      .filter(Boolean)
       .join("\n");
 
-    // Ask Claude to identify chapter headings from the page map only
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -73,7 +85,7 @@ export async function POST(req: Request) {
         max_tokens: 2000,
         messages: [{
           role: "user",
-          content: `Here is a list of page numbers and the first line of text on each page from a manuscript:\n\n${pageMap}\n\nIdentify which pages begin a new chapter (including Prologue, Epilogue). The font may be garbled so look for patterns like chapter numbers or names.\n\nReturn ONLY a JSON array: [{"number":1,"title":"Chapter Title","startPage":11}]\nUse the cleanest version of the title you can infer. No markdown. No explanation.`,
+          content: `Here are the page numbers and first line of text from each page of a manuscript. The font encoding may be garbled.\n\n${pageMap}\n\nIdentify which pages begin a new chapter (Prologue, Epilogue, Chapter One, Chapter Two, etc.).\nReturn ONLY a JSON array: [{"number":1,"title":"Chapter Title","startPage":11}]\nInfer clean titles from garbled text (e.g. "Chapt/uniE023 One" = "Chapter One").\nNo markdown. No explanation. Only the JSON array.`,
         }],
       }),
     });
@@ -87,7 +99,6 @@ export async function POST(req: Request) {
 
     if (!Array.isArray(rawChapters) || !rawChapters.length) throw new Error("No chapters found");
 
-    // Calculate word counts from our own extraction
     const totalPages = pageWordCounts.length;
     const chapters = rawChapters.map((ch, i) => {
       const start = Math.max(0, ch.startPage - 1);
