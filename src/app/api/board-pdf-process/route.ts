@@ -70,21 +70,19 @@ interface DocxSection {
   wordCount: number;
 }
 
-// Matches lines that look like standalone chapter/section headings.
-// Covers: named sections, "Chapter N" (word or number), and plain number words.
-const DOCX_HEADING_RE =
-  /^(prologue|epilogue|preface|acknowledgments?|dedication|content\s+(?:&\s+)?trigger\s+warnings?|content\s+warnings?|trigger\s+warnings?|afterword|author'?s?\s+note|chapter\s+\w+|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|twenty-\w+|thirty|thirty-\w+|forty|forty-\w+|fifty)\b)$/i;
+/** Strip all HTML tags and collapse whitespace to plain text. */
+function htmlToText(html: string): string {
+  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
 
 /**
- * Extract chapters from a .docx using mammoth.extractRawText — plain text,
- * no HTML, no markdown.
+ * Extract chapters from a .docx using mammoth.convertToHtml.
  *
- * Fast path: find lines that are short, match DOCX_HEADING_RE, and are
- *   surrounded by blank lines (isolated headings). Split on those boundaries
- *   and sum word counts per section. No Claude call needed.
+ * mammoth reliably converts Word "Heading 1" paragraphs → <h1>…</h1>.
+ * We find every <h1>, use it as a chapter boundary, and count words in
+ * the HTML between consecutive headings. No Claude call needed.
  *
- * Fallback: fewer than 2 headings found → return 300-word pseudo-pages for
- *   the Claude fallback path.
+ * Fallback: fewer than 2 <h1> tags → 300-word pseudo-pages for Claude.
  */
 async function processDocx(buffer: Buffer): Promise<
   | { kind: "headings"; sections: DocxSection[] }
@@ -92,47 +90,40 @@ async function processDocx(buffer: Buffer): Promise<
 > {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const mammoth = require("mammoth") as {
+    convertToHtml:  (src: { buffer: Buffer }) => Promise<{ value: string }>;
     extractRawText: (src: { buffer: Buffer }) => Promise<{ value: string }>;
   };
 
-  const { value: rawText } = await mammoth.extractRawText({ buffer });
-  console.log("[docx] extractRawText first 300 chars:", JSON.stringify(rawText.slice(0, 300)));
+  const { value: html } = await mammoth.convertToHtml({ buffer });
+  console.log("[docx] convertToHtml first 300 chars:", JSON.stringify(html.slice(0, 300)));
 
-  const lines = rawText.split(/\r?\n/);
-
-  // Identify heading lines: short, pattern-matched, isolated by surrounding blanks
-  const headingIndices: number[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line || line.length > 60) continue;
-    if (!DOCX_HEADING_RE.test(line)) continue;
-    const prevBlank = i === 0 || lines[i - 1].trim() === "";
-    const nextBlank = i >= lines.length - 1 || lines[i + 1].trim() === "";
-    if (prevBlank || nextBlank) headingIndices.push(i);
+  // Collect every <h1> with its position in the HTML string
+  interface H1 { title: string; index: number; end: number }
+  const headings: H1[] = [];
+  const h1Re = /<h1[^>]*>([\s\S]*?)<\/h1>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = h1Re.exec(html)) !== null) {
+    const title = htmlToText(m[1]);
+    if (title) headings.push({ title, index: m.index, end: m.index + m[0].length });
   }
 
   console.log(
-    `[docx] headings found: ${headingIndices.length} —`,
-    headingIndices.map(i => `"${lines[i].trim()}"`).join(", ")
+    `[docx] <h1> headings: ${headings.length} —`,
+    headings.slice(0, 6).map(h => `"${h.title}"`).join(", ")
   );
 
-  if (headingIndices.length >= 2) {
-    const sections: DocxSection[] = headingIndices.map((hi, i) => {
-      const title = lines[hi].trim();
-      const bodyStart = hi + 1;
-      const bodyEnd = i + 1 < headingIndices.length ? headingIndices[i + 1] : lines.length;
-      const wordCount = lines
-        .slice(bodyStart, bodyEnd)
-        .join(" ")
-        .split(/\s+/)
-        .filter(Boolean).length;
-      return { title, wordCount };
+  if (headings.length >= 2) {
+    const sections: DocxSection[] = headings.map((h, i) => {
+      const bodyHtml = html.slice(h.end, i + 1 < headings.length ? headings[i + 1].index : html.length);
+      const wordCount = htmlToText(bodyHtml).split(/\s+/).filter(Boolean).length;
+      return { title: h.title, wordCount };
     });
     return { kind: "headings", sections };
   }
 
-  // Fallback: no clear headings — split into 300-word pseudo-pages for Claude
-  console.log(`[docx] no headings; raw text ${rawText.length} chars, falling back to Claude`);
+  // Fallback: no <h1> found — split raw text into pseudo-pages for Claude
+  const { value: rawText } = await mammoth.extractRawText({ buffer });
+  console.log(`[docx] no <h1> headings; falling back to Claude. Raw text: ${rawText.length} chars`);
   const words = rawText.split(/\s+/).filter(Boolean);
   const CHUNK = 300;
   const pages: string[] = [];
@@ -379,7 +370,7 @@ export async function POST(req: Request) {
         let chapNum = 0;
         const chapters = docx.sections.map((s) => {
           const number = UNNUMBERED.test(s.title.trim()) ? null : ++chapNum;
-          const pages = Math.max(1, Math.round(s.wordCount / 250));
+          const pages = Math.max(1, Math.ceil(s.wordCount / 250));
           return { number, title: s.title, wordCount: s.wordCount, pages };
         });
         await supabase.from("pdf_jobs").update({ status: "done", chapters }).eq("id", jobId);
