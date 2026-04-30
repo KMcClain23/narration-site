@@ -29,34 +29,58 @@ type DeleteBookBody = {
   id?: string;
 };
 
+// board_cards.status → Book.category
+const STATUS_TO_CATEGORY: Record<string, BookCategory> = {
+  contracted: "coming-soon",
+  recording:  "in-progress",
+  editing:    "in-progress",
+  released:   "completed",
+};
+
 export async function GET() {
   try {
+    // Source of truth is board_cards — no separate books table to maintain.
+    // Exclude audition-stage cards (not public yet) and cards without a cover.
     const { data, error } = await supabaseAdmin
-      .from("books")
-      .select("*")
+      .from("board_cards")
+      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, co_narrator, tags, description, sort_order, status")
+      .in("status", ["contracted", "recording", "editing", "released"])
       .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true });
+      .order("title",      { ascending: true });
 
     if (error) throw error;
 
-    // Normalize co_narrator — Supabase may return JSON strings from old text column
-    const normalized = (data || []).map((book: Record<string, unknown>) => {
-      let cn = book.co_narrator;
-      if (!cn) cn = [];
-      else if (typeof cn === "string") {
-        try { cn = JSON.parse(cn as string); } catch { cn = cn ? [cn] : []; }
-      }
-      if (!Array.isArray(cn)) cn = [cn];
-      return { ...book, co_narrator: (cn as unknown[]).filter(Boolean) };
-    });
+    const books = (data || [])
+      .filter((c: Record<string, unknown>) => c.cover_url) // skip cards with no cover
+      .map((card: Record<string, unknown>) => {
+        // Normalize co_narrator (may be JSON string, array, or plain string)
+        let cn = card.co_narrator;
+        if (!cn) cn = [];
+        else if (typeof cn === "string") {
+          try { cn = JSON.parse(cn); } catch { cn = cn ? [cn] : []; }
+        }
+        if (!Array.isArray(cn)) cn = [cn];
 
-    // Deduplicate by title+author — keeps the first occurrence (lowest sort_order /
-    // earliest created_at). Guards against duplicate rows created by syncToBooks
-    // inserting a book that already exists in the table.
+        return {
+          id:          card.id,
+          title:       card.title,
+          subtitle:    card.subtitle || null,
+          author:      card.author,
+          link:        (card.audible_link as string) || "",
+          ar_link:     (card.ar_link     as string) || "",
+          cover_url:   (card.cover_url   as string),
+          tags:        Array.isArray(card.tags) ? card.tags : [],
+          description: (card.description as string) || "",
+          category:    STATUS_TO_CATEGORY[card.status as string] ?? "coming-soon",
+          co_narrator: (cn as unknown[]).filter(Boolean),
+          sort_order:  (card.sort_order  as number) || 0,
+        };
+      });
+
+    // Deduplicate by title+author (safety net for edge cases)
     const seen = new Set<string>();
-    const deduped = normalized.filter((book) => {
-      const b = book as Record<string, unknown>;
-      const key = `${String(b.title ?? "").trim().toLowerCase()}||${String(b.author ?? "").trim().toLowerCase()}`;
+    const deduped = books.filter((b) => {
+      const key = `${String(b.title).trim().toLowerCase()}||${String(b.author).trim().toLowerCase()}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
