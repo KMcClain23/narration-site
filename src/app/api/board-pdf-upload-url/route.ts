@@ -13,15 +13,21 @@ const r2 = new S3Client({
   responseChecksumValidation: "WHEN_REQUIRED",
 });
 
+const ALLOWED_TYPES = new Set([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
+
 export async function POST(req: Request) {
   try {
     const { filename, contentType } = await req.json();
+    const resolvedType = ALLOWED_TYPES.has(contentType) ? contentType : "application/pdf";
     const key = `tmp-manuscripts/${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
     const bucket = process.env.R2_DEMOS_BUCKET_NAME!;
     const command = new PutObjectCommand({
       Bucket: bucket,
       Key: key,
-      ContentType: contentType || "application/pdf",
+      ContentType: resolvedType,
     });
     const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 300 });
     return NextResponse.json({ uploadUrl, key, bucket });

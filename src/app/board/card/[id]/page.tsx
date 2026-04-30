@@ -122,8 +122,8 @@ export default function CardDetailPage() {
     setAiLoading(false);
   };
 
-  // ✅ SECURE: PDF uploads directly to R2 (bypasses Vercel 4.5MB limit), then server reads from R2
-  const handlePdfUpload = async (file: File) => {
+  // ✅ SECURE: file uploads directly to R2 (bypasses Vercel 4.5MB limit), then server reads from R2
+  const handleFileUpload = async (file: File) => {
     setPdfLoading(true);
     setError(null);
     try {
@@ -171,7 +171,7 @@ export default function CardDetailPage() {
         if (result.status === "error") throw new Error(result.error || "Extraction failed");
       }
     } catch (e) {
-      setError(`PDF extraction failed: ${e instanceof Error ? e.message : "Unknown error"}`);
+      setError(`Extraction failed: ${e instanceof Error ? e.message : "Unknown error"}`);
     }
     setPdfProgress("");
     setPdfLoading(false);
@@ -296,7 +296,7 @@ export default function CardDetailPage() {
             onDragOver={e => {
               e.preventDefault();
               if (pdfLoading) return;
-              if (Array.from(e.dataTransfer.items).some(i => i.kind === "file" && i.type === "application/pdf"))
+              if (Array.from(e.dataTransfer.items).some(i => i.kind === "file" && (i.type === "application/pdf" || i.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document")))
                 setCoverDragOver(true);
             }}
             onDragLeave={e => {
@@ -306,8 +306,11 @@ export default function CardDetailPage() {
               e.preventDefault();
               setCoverDragOver(false);
               if (pdfLoading) return;
-              const file = Array.from(e.dataTransfer.files).find(f => f.type === "application/pdf");
-              if (file) handlePdfUpload(file);
+              const file = Array.from(e.dataTransfer.files).find(f =>
+                f.type === "application/pdf" ||
+                f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              );
+              if (file) handleFileUpload(file);
             }}
           >
             {card.cover_url

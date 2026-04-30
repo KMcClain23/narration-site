@@ -53,6 +53,73 @@ function ensureDOMMatrix() {
   };
 }
 
+// ─── File-type detection ──────────────────────────────────────────────────────
+
+function detectFileType(bytes: Uint8Array): "pdf" | "docx" | "unknown" {
+  // PDF magic: %PDF  (25 50 44 46)
+  if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) return "pdf";
+  // DOCX/ZIP magic: PK\x03\x04  (50 4B 03 04)
+  if (bytes[0] === 0x50 && bytes[1] === 0x4B && bytes[2] === 0x03 && bytes[3] === 0x04) return "docx";
+  return "unknown";
+}
+
+// ─── DOCX extraction ──────────────────────────────────────────────────────────
+
+interface DocxSection {
+  title: string;
+  wordCount: number;
+}
+
+/**
+ * Extract chapters from a Word document using mammoth.
+ *
+ * Fast path: Word heading styles (Heading 1/2/3) → markdown # / ## / ###
+ *   Each heading becomes a chapter boundary; word count = words in that section.
+ *   No Claude call needed for well-formatted .docx files.
+ *
+ * Fallback: no headings found → return pseudo-pages (300 words each) for the
+ *   existing compact-page-map → Claude Haiku path.
+ */
+async function processDocx(buffer: Buffer): Promise<
+  | { kind: "headings"; sections: DocxSection[] }
+  | { kind: "pseudoPages"; pages: string[] }
+> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const mammoth = require("mammoth") as {
+    convertToMarkdown: (src: { buffer: Buffer }) => Promise<{ value: string }>;
+    extractRawText:    (src: { buffer: Buffer }) => Promise<{ value: string }>;
+  };
+
+  const { value: markdown } = await mammoth.convertToMarkdown({ buffer });
+  const lines = markdown.split("\n");
+
+  // Collect heading-delimited sections
+  const sections: DocxSection[] = [];
+  let current: { title: string; words: number } | null = null;
+
+  for (const line of lines) {
+    const hm = line.match(/^#{1,3}\s+(.+)$/);
+    if (hm) {
+      if (current) sections.push({ title: current.title, wordCount: current.words });
+      current = { title: hm[1].trim(), words: 0 };
+    } else if (current) {
+      current.words += line.split(/\s+/).filter(Boolean).length;
+    }
+  }
+  if (current) sections.push({ title: current.title, wordCount: current.words });
+
+  if (sections.length >= 2) return { kind: "headings", sections };
+
+  // Fallback: split raw text into pseudo-pages
+  const { value: rawText } = await mammoth.extractRawText({ buffer });
+  const words = rawText.split(/\s+/).filter(Boolean);
+  const CHUNK = 300;
+  const pages: string[] = [];
+  for (let i = 0; i < words.length; i += CHUNK) pages.push(words.slice(i, i + CHUNK).join(" "));
+
+  return { kind: "pseudoPages", pages };
+}
+
 // ─── PDF text extraction ──────────────────────────────────────────────────────
 
 async function extractPageTexts(buffer: Buffer): Promise<string[]> {
@@ -234,6 +301,34 @@ function assignNumbers(
   });
 }
 
+// ─── Claude fallback ─────────────────────────────────────────────────────────
+
+async function askClaude(pageMap: string): Promise<Array<{ title: string; startPage: number }>> {
+  const msg = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 1024,
+    messages: [
+      {
+        role: "user",
+        content:
+          `Here are the page numbers and first line of text from each page of a manuscript.\n\n${pageMap}\n\n` +
+          `Identify which pages begin a trackable section. Include:\n` +
+          `- Front matter: Dedication, Preface, Acknowledgments, Content & Trigger Warnings\n` +
+          `- Body chapters: Prologue, Chapter One, Chapter Two, … (all numbered chapters)\n` +
+          `- Back matter: Epilogue, Afterword\n` +
+          `Return ONLY a JSON array: [{"number":1,"title":"Section Title","startPage":11}]\n` +
+          `Use clean titles. No markdown. No explanation. Only the JSON array.`,
+      },
+    ],
+  });
+  const raw = msg.content[0].type === "text" ? msg.content[0].text : "";
+  const parsed: { number: number; title: string; startPage: number }[] = JSON.parse(
+    raw.replace(/```json|```/g, "").trim()
+  );
+  if (!Array.isArray(parsed) || !parsed.length) throw new Error("No chapters found");
+  return parsed;
+}
+
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
@@ -248,8 +343,47 @@ export async function POST(req: Request) {
     const bytes = await obj.Body!.transformToByteArray();
     r2.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })).catch(() => {});
 
+    const fileType = detectFileType(bytes);
+    const buf = Buffer.from(bytes);
+
+    // ── DOCX path ──────────────────────────────────────────────────────────────
+    if (fileType === "docx") {
+      const docx = await processDocx(buf);
+
+      if (docx.kind === "headings") {
+        // Fast path: heading styles give us chapters directly — zero Claude cost
+        let chapNum = 0;
+        const chapters = docx.sections.map((s) => {
+          const number = UNNUMBERED.test(s.title.trim()) ? null : ++chapNum;
+          const pages = Math.max(1, Math.round(s.wordCount / 250));
+          return { number, title: s.title, wordCount: s.wordCount, pages };
+        });
+        await supabase.from("pdf_jobs").update({ status: "done", chapters }).eq("id", jobId);
+        return NextResponse.json({ ok: true });
+      }
+
+      // Fallback: pseudo-pages → Claude (unformatted docx without heading styles)
+      const pageTexts = docx.pages;
+      const pageWordCounts = pageTexts.map((t) => t.split(/\s+/).filter(Boolean).length);
+      const pageMap = pageTexts
+        .map((text, i) => {
+          const first = text.trim().slice(0, 60).replace(/\s+/g, " ");
+          return first ? `${i + 1}: ${first}` : null;
+        })
+        .filter(Boolean)
+        .join("\n");
+      if (!pageMap) throw new Error("Could not extract any text from document");
+      const rawSections = await askClaude(pageMap);
+      const chapters = assignNumbers(rawSections, pageWordCounts);
+      await supabase.from("pdf_jobs").update({ status: "done", chapters }).eq("id", jobId);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── PDF path ───────────────────────────────────────────────────────────────
+    if (fileType !== "pdf") throw new Error("Unsupported file type");
+
     // Step 1 — extract per-page text locally with pdf-parse (proper Unicode decoding)
-    const pageTexts = await extractPageTexts(Buffer.from(bytes));
+    const pageTexts = await extractPageTexts(buf);
     if (!pageTexts.length) throw new Error("Could not extract any text from PDF");
 
     // Step 2 — word counts from locally-extracted text
@@ -260,10 +394,8 @@ export async function POST(req: Request) {
     let rawSections: Array<{ title: string; startPage: number }>;
 
     if (tocEntries) {
-      // Fast path: chapter list from TOC — no Claude call, no rate-limit risk
       rawSections = tocEntries;
     } else {
-      // Slow path: compact page map → Claude Haiku (garbled-font books like Whiskey & Lies)
       const pageMap = pageTexts
         .map((text, i) => {
           const first = text.trim().slice(0, 60).replace(/\s+/g, " ");
@@ -271,33 +403,8 @@ export async function POST(req: Request) {
         })
         .filter(Boolean)
         .join("\n");
-
       if (!pageMap) throw new Error("Could not extract any text from PDF");
-
-      const msg = await anthropic.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
-        messages: [
-          {
-            role: "user",
-            content:
-              `Here are the page numbers and first line of text from each page of a manuscript.\n\n${pageMap}\n\n` +
-              `Identify which pages begin a trackable section. Include:\n` +
-              `- Front matter: Dedication, Preface, Acknowledgments, Content & Trigger Warnings\n` +
-              `- Body chapters: Prologue, Chapter One, Chapter Two, … (all numbered chapters)\n` +
-              `- Back matter: Epilogue, Afterword\n` +
-              `Return ONLY a JSON array: [{"number":1,"title":"Section Title","startPage":11}]\n` +
-              `Use clean titles. No markdown. No explanation. Only the JSON array.`,
-          },
-        ],
-      });
-
-      const rawText = msg.content[0].type === "text" ? msg.content[0].text : "";
-      const parsed: { number: number; title: string; startPage: number }[] = JSON.parse(
-        rawText.replace(/```json|```/g, "").trim()
-      );
-      if (!Array.isArray(parsed) || !parsed.length) throw new Error("No chapters found");
-      rawSections = parsed;
+      rawSections = await askClaude(pageMap);
     }
 
     // Step 4 — assign chapter numbers; calculate word counts from local text
