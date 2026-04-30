@@ -53,11 +53,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { title, author = "", cover_url = "", status = "audition", deadline, notes = "", author_notes = "", links = [], co_narrator = "", sort_order = 0, chapters = [], subtitle = "", tags = [], description = "", audible_link = "", ar_link = "", word_count = 0, first15_due, pfh_rate = 0, payment_type = "pfh" } = body;
+    const { title, author = "", cover_url = "", status = "audition", deadline, notes = "", author_notes = "", links = [], co_narrator = "", sort_order = 0, chapters = [], subtitle = "", tags = [], description = "", audible_link = "", ar_link = "", word_count = 0, first15_due, pfh_rate = 0, payment_type = "pfh", first_15_complete = false } = body;
     if (!title?.trim()) return NextResponse.json({ error: "Title required." }, { status: 400 });
     const { data, error } = await supabaseAdmin
       .from("board_cards")
-      .insert({ title: title.trim(), author, cover_url, status, deadline: deadline || null, notes, author_notes, links, co_narrator, sort_order, chapters, subtitle, tags, description, audible_link, ar_link, word_count, first15_due: first15_due || null, pfh_rate, payment_type })
+      .insert({ title: title.trim(), author, cover_url, status, deadline: deadline || null, notes, author_notes, links, co_narrator, sort_order, chapters, subtitle, tags, description, audible_link, ar_link, word_count, first15_due: first15_due || null, pfh_rate, payment_type, first_15_complete })
       .select().single();
     if (error) throw error;
     return NextResponse.json({ success: true, card: data });
@@ -86,7 +86,7 @@ export async function PUT(req: Request) {
     }
 
     // Admin full update
-    const allowed = ["title", "author", "cover_url", "status", "deadline", "notes", "author_notes", "links", "co_narrator", "sort_order", "chapters", "subtitle", "tags", "description", "audible_link", "ar_link", "word_count", "first15_due", "pfh_rate", "payment_type"];
+    const allowed = ["title", "author", "cover_url", "status", "deadline", "notes", "author_notes", "links", "co_narrator", "sort_order", "chapters", "subtitle", "tags", "description", "audible_link", "ar_link", "word_count", "first15_due", "pfh_rate", "payment_type", "first_15_complete"];
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
       if (key in fields) update[key] = fields[key];

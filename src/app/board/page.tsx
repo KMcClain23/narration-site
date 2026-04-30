@@ -22,12 +22,13 @@ interface BoardCard {
   first15_due: string;
   pfh_rate: number;
   payment_type: string; // pfh | rs | rs_plus
+  first_15_complete: boolean;
 }
 
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
   title:"", author:"", cover_url:"", status:"audition", deadline:"",
   notes:"", author_notes:"", links:[], co_narrator:"",
-  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh",
+  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false,
 };
 
 export default function BoardPage() {
@@ -64,9 +65,11 @@ export default function BoardPage() {
   useEffect(() => { load(); }, [load]);
 
   const getEarliestDate = (card: BoardCard) => {
-    const dates = [card.first15_due, card.deadline].filter(Boolean).map(d => {
-      const [y,m,dy] = d!.split("-"); return new Date(+y,+m-1,+dy).getTime();
-    });
+    // Once First 15 is done its due date no longer drives sort priority
+    const dates = [card.first_15_complete ? null : card.first15_due, card.deadline]
+      .filter(Boolean).map(d => {
+        const [y,m,dy] = d!.split("-"); return new Date(+y,+m-1,+dy).getTime();
+      });
     return dates.length ? Math.min(...dates) : Infinity;
   };
 
@@ -143,7 +146,7 @@ export default function BoardPage() {
       links:card.links,co_narrator:card.co_narrator,subtitle:card.subtitle||"",
       tags:card.tags||[],description:card.description||"",
       audible_link:card.audible_link||"",ar_link:card.ar_link||"",chapters:card.chapters||[],
-      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh"});
+      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false});
     setShowForm(false);
   };
 
@@ -556,6 +559,12 @@ export default function BoardPage() {
                           <div className="absolute inset-0 bg-black/0 group-hover/cover:bg-black/30 transition-all duration-300 flex items-center justify-center">
                             <svg className="h-8 w-8 text-white opacity-0 group-hover/cover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                           </div>
+                          {card.first_15_complete && (
+                            <div className="absolute top-2 right-2 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shadow">
+                              <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                              15
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="h-16 rounded-t-xl bg-[#0A0D3A] flex items-center justify-center border-b border-white/5 hover:bg-[#0D1245] transition-colors">
@@ -646,6 +655,28 @@ export default function BoardPage() {
                           {COLUMNS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
                         </select>
 
+                        <div className="flex items-center gap-2">
+                          {/* First 15 toggle */}
+                          <button type="button"
+                            onClick={async e=>{
+                              e.preventDefault(); e.stopPropagation();
+                              const v=!card.first_15_complete;
+                              setCards(p=>p.map(c=>c.id===card.id?{...c,first_15_complete:v}:c));
+                              await fetch("/api/board",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:card.id,first_15_complete:v})});
+                            }}
+                            title={card.first_15_complete?"First 15 complete":"Mark First 15 done"}
+                            className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full border transition-colors ${
+                              card.first_15_complete
+                                ?"bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                :"text-white/30 border-white/10 hover:border-white/30 hover:text-white/60"
+                            }`}>
+                            {card.first_15_complete
+                              ?<svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                              :<span className="h-3 w-3 rounded-sm border border-current inline-block"/>
+                            }
+                            15
+                          </button>
+
                         <div className="flex items-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
                           {/* Author link */}
                           <button type="button" onClick={()=>copyLink(card.author_token)} title="Copy author link"
@@ -667,6 +698,7 @@ export default function BoardPage() {
                           <button type="button" onClick={()=>del(card.id)} className="text-white/40 hover:text-red-400 transition-colors">
                             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                           </button>
+                        </div>
                         </div>
                       </div>
                     </div>

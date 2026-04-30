@@ -31,6 +31,7 @@ interface BoardCard {
   status: string; deadline?: string; notes: string; author_notes: string;
   subtitle: string; tags: string[]; description: string;
   audible_link: string; co_narrator: string; chapters: Chapter[];
+  first15_due?: string; first_15_complete?: boolean;
 }
 
 function statusStyle(id: string) {
@@ -57,6 +58,7 @@ export default function CardDetailPage() {
   const [saved, setSaved] = useState(false);
   const [pdfProgress, setPdfProgress] = useState("");
   const [coverDragOver, setCoverDragOver] = useState(false);
+  const [first15Complete, setFirst15Complete] = useState(false);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chaptersToSave = useRef<Chapter[]>([]);
@@ -69,6 +71,7 @@ export default function CardDetailPage() {
       if (data.card) {
         setCard(data.card);
         setChapters(data.card.chapters || []);
+        setFirst15Complete(data.card.first_15_complete ?? false);
         setSearchQuery(`${data.card.title || ""}${data.card.author ? " by " + data.card.author : ""}`);
       }
     } catch { setError("Failed to load card."); }
@@ -340,6 +343,37 @@ export default function CardDetailPage() {
               <p className="text-xs text-white/35">
                 Deadline: {new Date(card.deadline).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
               </p>
+            )}
+            {card.first15_due && (
+              <div className="flex items-center justify-between pt-1 border-t border-white/6 mt-1">
+                <p className="text-xs text-white/35">
+                  First 15 due: {new Date(card.first15_due).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const v = !first15Complete;
+                    setFirst15Complete(v);
+                    await fetch("/api/board", {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ id, first_15_complete: v }),
+                    });
+                  }}
+                  className={`flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border transition-colors ${
+                    first15Complete
+                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                      : "text-white/40 border-white/10 hover:border-white/30 hover:text-white/70"
+                  }`}
+                >
+                  {first15Complete ? (
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                  ) : (
+                    <span className="h-3 w-3 rounded-sm border border-current inline-block"/>
+                  )}
+                  First 15
+                </button>
+              </div>
             )}
           </div>
 
