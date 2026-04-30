@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 
 const COLUMNS = [
@@ -31,7 +31,191 @@ const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
   subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false,
 };
 
+// ─── Timeline view ────────────────────────────────────────────────────────────
+
+const STATUS_BAR: Record<string, { bg: string; border: string; text: string }> = {
+  audition:   { bg: "bg-purple-500/60", border: "border-purple-400/40",  text: "text-purple-100"  },
+  contracted: { bg: "bg-blue-500/60",   border: "border-blue-400/40",    text: "text-blue-100"    },
+  recording:  { bg: "bg-yellow-500/60", border: "border-yellow-400/40",  text: "text-yellow-100"  },
+  editing:    { bg: "bg-orange-500/60", border: "border-orange-400/40",  text: "text-orange-100"  },
+  released:   { bg: "bg-emerald-500/60",border: "border-emerald-400/40", text: "text-emerald-100" },
+};
+
+function TimelineView({ cards }: { cards: BoardCard[] }) {
+  const [offset, setOffset] = useState(0);
+
+  // Window starts 2 months before today by default (offset=0)
+  const windowStart = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() - 2 + offset, 1);
+  }, [offset]);
+
+  const months = useMemo(() =>
+    Array.from({ length: 6 }, (_, i) =>
+      new Date(windowStart.getFullYear(), windowStart.getMonth() + i, 1)
+    ), [windowStart]);
+
+  // Returns a position 0–12 (6 months × 2 half-columns each)
+  const dateToPos = useCallback((dateStr: string): number => {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const monthOffset = (y - windowStart.getFullYear()) * 12 + (m - 1 - windowStart.getMonth());
+    const colInMonth = d <= 15
+      ? (d - 1) / 15                                   // 0.0 → ~0.93 within first half
+      : 1 + (d - 16) / Math.max(1, daysInMonth - 15); // 1.0 → ~1.94 within second half
+    return monthOffset * 2 + colInMonth;
+  }, [windowStart]);
+
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayPos = dateToPos(todayStr);
+
+  const visibleCards = useMemo(() =>
+    cards
+      .filter(c => c.first15_due || c.deadline)
+      .sort((a, b) =>
+        (a.deadline || a.first15_due || "").localeCompare(b.deadline || b.first15_due || "")
+      ),
+    [cards]);
+
+  return (
+    <div className="px-4 sm:px-6 py-6">
+      {/* Navigation */}
+      <div className="flex items-center gap-2 mb-6">
+        <button onClick={() => setOffset(o => o - 1)}
+          className="p-1.5 text-white/40 hover:text-white hover:bg-white/8 rounded-lg transition-colors">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <span className="text-sm text-white/50 font-medium w-52 text-center">
+          {months[0].toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+          {" — "}
+          {months[5].toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+        </span>
+        <button onClick={() => setOffset(o => o + 1)}
+          className="p-1.5 text-white/40 hover:text-white hover:bg-white/8 rounded-lg transition-colors">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        {offset !== 0 && (
+          <button onClick={() => setOffset(0)}
+            className="text-xs text-[#D4AF37] border border-[#D4AF37]/30 px-3 py-1 rounded-full hover:bg-[#D4AF37]/10 transition-colors ml-1">
+            Today
+          </button>
+        )}
+      </div>
+
+      {visibleCards.length === 0 ? (
+        <div className="py-24 text-center text-white/25 text-sm">No projects with scheduled dates</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <div style={{ minWidth: "760px" }}>
+
+            {/* Month header */}
+            <div className="flex">
+              <div className="shrink-0" style={{ width: 196 }} />
+              <div className="flex-1 grid grid-cols-12">
+                {months.map((m, i) => (
+                  <div key={i} className="col-span-2 text-center text-[10px] font-bold uppercase tracking-widest text-white/40 py-1 border-l border-white/8">
+                    {m.toLocaleDateString("en-US", { month: "short" })}{" "}
+                    <span className="text-white/20">{m.getFullYear()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Half-month sub-header */}
+            <div className="flex mb-1">
+              <div className="shrink-0 text-right pr-3 text-[10px] text-white/20 flex items-end pb-1" style={{ width: 196 }}>
+                Project
+              </div>
+              <div className="flex-1 grid grid-cols-12">
+                {months.map((m, i) => {
+                  const endDay = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+                  return (
+                    <div key={i} className="col-span-2 contents">
+                      <div className="text-center text-[9px] text-white/20 border-l border-white/8 py-0.5">1–15</div>
+                      <div className="text-center text-[9px] text-white/20 border-l border-white/[0.04] py-0.5">16–{endDay}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Rows */}
+            <div className="space-y-1">
+              {visibleCards.map(card => {
+                const s = card.first15_due ? dateToPos(card.first15_due) : null;
+                const e = card.deadline     ? dateToPos(card.deadline)     : null;
+                const rawStart = s ?? (e !== null ? e - 0.25 : null);
+                const rawEnd   = e ?? (s !== null ? s + 0.25 : null);
+                if (rawStart === null || rawEnd === null) return null;
+                if (rawEnd <= 0 || rawStart >= 12) return null;
+
+                const cStart   = Math.max(0, rawStart);
+                const cEnd     = Math.min(12, rawEnd);
+                if (cEnd <= cStart) return null;
+
+                const leftPct  = cStart / 12 * 100;
+                const widthPct = Math.max(0.4, (cEnd - cStart) / 12 * 100);
+                const bar      = STATUS_BAR[card.status] ?? STATUS_BAR.contracted;
+
+                return (
+                  <div key={card.id} className="flex items-center h-8 group/row">
+                    {/* Label */}
+                    <div className="shrink-0 pr-3 text-right" style={{ width: 196 }}>
+                      <p className="text-xs font-semibold text-white/70 truncate group-hover/row:text-white transition-colors leading-tight">{card.title}</p>
+                      {card.author && <p className="text-[10px] text-white/30 truncate leading-tight">{card.author}</p>}
+                    </div>
+
+                    {/* Grid + bar */}
+                    <div className="flex-1 relative h-full">
+                      {/* Column grid lines */}
+                      <div className="absolute inset-0 grid grid-cols-12 pointer-events-none">
+                        {Array.from({ length: 12 }).map((_, ci) => {
+                          const isToday = Math.floor(todayPos) === ci && todayPos >= 0 && todayPos < 12;
+                          return (
+                            <div key={ci} className={`h-full ${ci % 2 === 0 ? "border-l border-white/8" : "border-l border-white/[0.04]"} ${isToday ? "bg-[#D4AF37]/[0.07]" : ""}`} />
+                          );
+                        })}
+                      </div>
+
+                      {/* Today line */}
+                      {todayPos >= 0 && todayPos <= 12 && (
+                        <div className="absolute top-0 bottom-0 w-px bg-[#D4AF37]/60 z-20 pointer-events-none"
+                          style={{ left: `${todayPos / 12 * 100}%` }} />
+                      )}
+
+                      {/* Bar */}
+                      <Link
+                        href={`/board/card/${card.id}`}
+                        className={`absolute inset-y-1 rounded border z-10 flex items-center px-1.5 overflow-hidden hover:brightness-125 transition-all ${bar.bg} ${bar.border}`}
+                        style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+                      >
+                        <span className={`text-[9px] font-semibold truncate ${bar.text}`}>{card.title}</span>
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="mt-6 flex flex-wrap gap-4">
+        {(["audition","contracted","recording","editing","released"] as const).map(s => (
+          <div key={s} className="flex items-center gap-1.5">
+            <div className={`h-2.5 w-5 rounded-sm border ${STATUS_BAR[s].bg} ${STATUS_BAR[s].border}`} />
+            <span className="text-[10px] text-white/30 capitalize">{s}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function BoardPage() {
+  const [view, setView] = useState<"board"|"timeline">("board");
   const [cards, setCards] = useState<BoardCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [editCard, setEditCard] = useState<BoardCard|null>(null);
@@ -63,6 +247,15 @@ export default function BoardPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const saved = localStorage.getItem("boardView");
+    if (saved === "board" || saved === "timeline") setView(saved);
+  }, []);
+
+  const switchView = (v: "board"|"timeline") => {
+    setView(v);
+    localStorage.setItem("boardView", v);
+  };
 
   const getEarliestDate = (card: BoardCard) => {
     // Once First 15 is done its due date no longer drives sort priority
@@ -235,11 +428,31 @@ export default function BoardPage() {
           <h1 className="text-sm font-bold text-white">Production Board</h1>
           <span className="text-xs text-white/25">{cards.length} projects</span>
         </div>
-        <button onClick={()=>{setShowForm(true);setEditCard(null);setForm({...EMPTY});setTagInput("");}}
-          className="inline-flex items-center gap-1.5 bg-[#D4AF37] text-black text-xs font-bold px-4 py-2 rounded-full hover:bg-[#E0C15A] transition-colors">
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-          New project
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Board / Timeline toggle */}
+          <div className="flex items-center bg-white/5 border border-white/10 rounded-full p-0.5">
+            <button
+              onClick={() => switchView("board")}
+              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${view==="board" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}
+            >
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
+              Board
+            </button>
+            <button
+              onClick={() => switchView("timeline")}
+              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${view==="timeline" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}
+            >
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              Timeline
+            </button>
+          </div>
+
+          <button onClick={()=>{setShowForm(true);setEditCard(null);setForm({...EMPTY});setTagInput("");}}
+            className="inline-flex items-center gap-1.5 bg-[#D4AF37] text-black text-xs font-bold px-4 py-2 rounded-full hover:bg-[#E0C15A] transition-colors">
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+            New project
+          </button>
+        </div>
       </div>
 
       {/* Import modal */}
@@ -528,7 +741,10 @@ export default function BoardPage() {
         </div>
       )}
 
-      {/* Kanban board */}
+      {/* Views */}
+      {view === "timeline" ? (
+        <TimelineView cards={cards} />
+      ) : (
       <div className="px-4 sm:px-6 py-6 overflow-x-auto">
         <div className="flex gap-4 min-w-max pb-6">
           {COLUMNS.map(column => (
@@ -711,6 +927,7 @@ export default function BoardPage() {
           ))}
         </div>
       </div>
+      )}
     </main>
   );
 }
