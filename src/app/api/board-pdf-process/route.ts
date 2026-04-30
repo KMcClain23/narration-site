@@ -70,72 +70,73 @@ interface DocxSection {
   wordCount: number;
 }
 
-/**
- * Extract chapters from a Word document using mammoth.
- *
- * Fast path: Word heading styles (Heading 1/2/3) → markdown # / ## / ###
- *   Each heading becomes a chapter boundary; word count = words in that section.
- *   No Claude call needed for well-formatted .docx files.
- *
- * Fallback: no headings found → return pseudo-pages (300 words each) for the
- *   existing compact-page-map → Claude Haiku path.
- */
-/** Strip HTML tags and collapse whitespace from a heading string. */
-function stripHeadingHtml(raw: string): string {
-  return raw.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
-}
+// Matches lines that look like standalone chapter/section headings.
+// Covers: named sections, "Chapter N" (word or number), and plain number words.
+const DOCX_HEADING_RE =
+  /^(prologue|epilogue|preface|acknowledgments?|dedication|content\s+(?:&\s+)?trigger\s+warnings?|content\s+warnings?|trigger\s+warnings?|afterword|author'?s?\s+note|chapter\s+\w+|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|twenty-\w+|thirty|thirty-\w+|forty|forty-\w+|fifty)\b)$/i;
 
+/**
+ * Extract chapters from a .docx using mammoth.extractRawText — plain text,
+ * no HTML, no markdown.
+ *
+ * Fast path: find lines that are short, match DOCX_HEADING_RE, and are
+ *   surrounded by blank lines (isolated headings). Split on those boundaries
+ *   and sum word counts per section. No Claude call needed.
+ *
+ * Fallback: fewer than 2 headings found → return 300-word pseudo-pages for
+ *   the Claude fallback path.
+ */
 async function processDocx(buffer: Buffer): Promise<
   | { kind: "headings"; sections: DocxSection[] }
   | { kind: "pseudoPages"; pages: string[] }
 > {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const mammoth = require("mammoth") as {
-    convertToMarkdown: (src: { buffer: Buffer }) => Promise<{ value: string }>;
-    extractRawText:    (src: { buffer: Buffer }) => Promise<{ value: string }>;
+    extractRawText: (src: { buffer: Buffer }) => Promise<{ value: string }>;
   };
 
-  const { value: markdown } = await mammoth.convertToMarkdown({ buffer });
-
-  // Log a sample so we can see the actual mammoth output structure
-  console.log("[docx] convertToMarkdown sample:", JSON.stringify(markdown.slice(0, 500)));
-
-  const lines = markdown.split(/\r?\n/);
-  const sections: DocxSection[] = [];
-  let current: { title: string; words: number } | null = null;
-
-  for (const line of lines) {
-    // Match # / ## / ### headings — mammoth converts Heading 1/2/3 styles to these
-    const hm = line.match(/^(#{1,3})\s+([\s\S]+)$/);
-    if (hm) {
-      const title = stripHeadingHtml(hm[2]);
-      if (title) {
-        // Commit the previous section before starting a new one
-        if (current) sections.push({ title: current.title, wordCount: current.words });
-        current = { title, words: 0 };
-      }
-      // If stripping HTML produced an empty title, skip this line (it was an anchor-only heading)
-    } else if (current) {
-      // Accumulate word count for the current section's body text
-      const text = stripHeadingHtml(line);
-      current.words += text.split(/\s+/).filter(Boolean).length;
-    }
-  }
-  if (current) sections.push({ title: current.title, wordCount: current.words });
-
-  console.log(`[docx] headings found: ${sections.length} —`, sections.map(s => `"${s.title}"`).join(", "));
-
-  if (sections.length >= 2) return { kind: "headings", sections };
-
-  // Fallback: no usable heading styles — split raw text into pseudo-pages for Claude
   const { value: rawText } = await mammoth.extractRawText({ buffer });
-  console.log(`[docx] no headings; raw text length ${rawText.length}, falling back to Claude`);
+  console.log("[docx] extractRawText first 300 chars:", JSON.stringify(rawText.slice(0, 300)));
 
+  const lines = rawText.split(/\r?\n/);
+
+  // Identify heading lines: short, pattern-matched, isolated by surrounding blanks
+  const headingIndices: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line || line.length > 60) continue;
+    if (!DOCX_HEADING_RE.test(line)) continue;
+    const prevBlank = i === 0 || lines[i - 1].trim() === "";
+    const nextBlank = i >= lines.length - 1 || lines[i + 1].trim() === "";
+    if (prevBlank || nextBlank) headingIndices.push(i);
+  }
+
+  console.log(
+    `[docx] headings found: ${headingIndices.length} —`,
+    headingIndices.map(i => `"${lines[i].trim()}"`).join(", ")
+  );
+
+  if (headingIndices.length >= 2) {
+    const sections: DocxSection[] = headingIndices.map((hi, i) => {
+      const title = lines[hi].trim();
+      const bodyStart = hi + 1;
+      const bodyEnd = i + 1 < headingIndices.length ? headingIndices[i + 1] : lines.length;
+      const wordCount = lines
+        .slice(bodyStart, bodyEnd)
+        .join(" ")
+        .split(/\s+/)
+        .filter(Boolean).length;
+      return { title, wordCount };
+    });
+    return { kind: "headings", sections };
+  }
+
+  // Fallback: no clear headings — split into 300-word pseudo-pages for Claude
+  console.log(`[docx] no headings; raw text ${rawText.length} chars, falling back to Claude`);
   const words = rawText.split(/\s+/).filter(Boolean);
   const CHUNK = 300;
   const pages: string[] = [];
   for (let i = 0; i < words.length; i += CHUNK) pages.push(words.slice(i, i + CHUNK).join(" "));
-
   return { kind: "pseudoPages", pages };
 }
 
