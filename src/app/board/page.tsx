@@ -41,10 +41,18 @@ const STATUS_BAR: Record<string, { bg: string; border: string; text: string }> =
   released:   { bg: "bg-emerald-500/60",border: "border-emerald-400/40", text: "text-emerald-100" },
 };
 
-function TimelineView({ cards }: { cards: BoardCard[] }) {
+function TimelineView({
+  cards,
+  onStatusChange,
+  onEdit,
+}: {
+  cards: BoardCard[];
+  onStatusChange: (id: string, status: string) => void;
+  onEdit: (card: BoardCard) => void;
+}) {
   const [offset, setOffset] = useState(0);
+  const [completedOpen, setCompletedOpen] = useState(false);
 
-  // Window starts 2 months before today by default (offset=0)
   const windowStart = useMemo(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth() - 2 + offset, 1);
@@ -61,8 +69,8 @@ function TimelineView({ cards }: { cards: BoardCard[] }) {
     const daysInMonth = new Date(y, m, 0).getDate();
     const monthOffset = (y - windowStart.getFullYear()) * 12 + (m - 1 - windowStart.getMonth());
     const colInMonth = d <= 15
-      ? (d - 1) / 15                                   // 0.0 → ~0.93 within first half
-      : 1 + (d - 16) / Math.max(1, daysInMonth - 15); // 1.0 → ~1.94 within second half
+      ? (d - 1) / 15
+      : 1 + (d - 16) / Math.max(1, daysInMonth - 15);
     return monthOffset * 2 + colInMonth;
   }, [windowStart]);
 
@@ -70,12 +78,21 @@ function TimelineView({ cards }: { cards: BoardCard[] }) {
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const todayPos = dateToPos(todayStr);
 
-  const visibleCards = useMemo(() =>
+  // Partition cards into three groups
+  const barCards = useMemo(() =>
     cards
-      .filter(c => c.first15_due || c.deadline)
-      .sort((a, b) =>
-        (a.deadline || a.first15_due || "").localeCompare(b.deadline || b.first15_due || "")
-      ),
+      .filter(c => c.status !== "released" && (c.first15_due || c.deadline))
+      .sort((a, b) => (a.deadline || a.first15_due || "").localeCompare(b.deadline || b.first15_due || "")),
+    [cards]);
+
+  const noDates = useMemo(() =>
+    cards.filter(c => c.status !== "released" && !c.first15_due && !c.deadline),
+    [cards]);
+
+  const completed = useMemo(() =>
+    cards
+      .filter(c => c.status === "released")
+      .sort((a, b) => (a.deadline || "").localeCompare(b.deadline || "")),
     [cards]);
 
   return (
@@ -103,12 +120,12 @@ function TimelineView({ cards }: { cards: BoardCard[] }) {
         )}
       </div>
 
-      {visibleCards.length === 0 ? (
-        <div className="py-24 text-center text-white/25 text-sm">No projects with scheduled dates</div>
+      {/* ── Timeline grid ── */}
+      {barCards.length === 0 ? (
+        <div className="py-16 text-center text-white/20 text-sm">No active projects with scheduled dates</div>
       ) : (
         <div className="overflow-x-auto">
           <div style={{ minWidth: "760px" }}>
-
             {/* Month header */}
             <div className="flex">
               <div className="shrink-0" style={{ width: 196 }} />
@@ -140,11 +157,11 @@ function TimelineView({ cards }: { cards: BoardCard[] }) {
               </div>
             </div>
 
-            {/* Rows */}
+            {/* Bar rows */}
             <div className="space-y-1">
-              {visibleCards.map(card => {
+              {barCards.map(card => {
                 const s = card.first15_due ? dateToPos(card.first15_due) : null;
-                const e = card.deadline     ? dateToPos(card.deadline)     : null;
+                const e = card.deadline    ? dateToPos(card.deadline)    : null;
                 const rawStart = s ?? (e !== null ? e - 0.25 : null);
                 const rawEnd   = e ?? (s !== null ? s + 0.25 : null);
                 if (rawStart === null || rawEnd === null) return null;
@@ -160,15 +177,13 @@ function TimelineView({ cards }: { cards: BoardCard[] }) {
 
                 return (
                   <div key={card.id} className="flex items-center h-8 group/row">
-                    {/* Label */}
                     <div className="shrink-0 pr-3 text-right" style={{ width: 196 }}>
                       <p className="text-xs font-semibold text-white/70 truncate group-hover/row:text-white transition-colors leading-tight">{card.title}</p>
                       {card.author && <p className="text-[10px] text-white/30 truncate leading-tight">{card.author}</p>}
                     </div>
 
-                    {/* Grid + bar */}
                     <div className="flex-1 relative h-full">
-                      {/* Column grid lines */}
+                      {/* Grid lines */}
                       <div className="absolute inset-0 grid grid-cols-12 pointer-events-none">
                         {Array.from({ length: 12 }).map((_, ci) => {
                           const isToday = Math.floor(todayPos) === ci && todayPos >= 0 && todayPos < 12;
@@ -184,14 +199,25 @@ function TimelineView({ cards }: { cards: BoardCard[] }) {
                           style={{ left: `${todayPos / 12 * 100}%` }} />
                       )}
 
-                      {/* Bar */}
-                      <Link
-                        href={`/board/card/${card.id}`}
-                        className={`absolute inset-y-1 rounded border z-10 flex items-center px-1.5 overflow-hidden hover:brightness-125 transition-all ${bar.bg} ${bar.border}`}
+                      {/* Bar — Link for navigation + separate complete button */}
+                      <div
+                        className={`absolute inset-y-1 rounded border z-10 flex items-center overflow-hidden hover:brightness-125 transition-all group/bar ${bar.bg} ${bar.border}`}
                         style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
                       >
-                        <span className={`text-[9px] font-semibold truncate ${bar.text}`}>{card.title}</span>
-                      </Link>
+                        <Link href={`/board/card/${card.id}`}
+                          className={`flex-1 min-w-0 flex items-center pl-1.5 h-full ${bar.text}`}>
+                          <span className="text-[9px] font-semibold truncate">{card.title}</span>
+                        </Link>
+                        {/* Complete button — appears on bar hover */}
+                        <button
+                          type="button"
+                          title="Mark as released"
+                          onClick={e => { e.stopPropagation(); onStatusChange(card.id, "released"); }}
+                          className="shrink-0 mr-1 h-4 w-4 rounded-full flex items-center justify-center opacity-0 group-hover/bar:opacity-100 hover:!opacity-100 bg-white/15 hover:bg-emerald-500/90 transition-all"
+                        >
+                          <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -202,14 +228,80 @@ function TimelineView({ cards }: { cards: BoardCard[] }) {
       )}
 
       {/* Legend */}
-      <div className="mt-6 flex flex-wrap gap-4">
-        {(["audition","contracted","recording","editing","released"] as const).map(s => (
+      <div className="mt-5 flex flex-wrap gap-4">
+        {(["audition","contracted","recording","editing"] as const).map(s => (
           <div key={s} className="flex items-center gap-1.5">
             <div className={`h-2.5 w-5 rounded-sm border ${STATUS_BAR[s].bg} ${STATUS_BAR[s].border}`} />
             <span className="text-[10px] text-white/30 capitalize">{s}</span>
           </div>
         ))}
       </div>
+
+      {/* ── No dates section ── */}
+      {noDates.length > 0 && (
+        <div className="mt-8 border-t border-white/6 pt-6">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-white/25 font-medium mb-3">No dates set</p>
+          <div className="space-y-1">
+            {noDates.map(card => (
+              <div key={card.id} className="flex items-center gap-3 py-1.5 px-2 rounded-lg hover:bg-white/[0.03] transition-colors group/nd">
+                {card.cover_url
+                  ? <img src={card.cover_url} alt={card.title} className="h-8 w-6 object-cover rounded shrink-0 opacity-60"/>
+                  : <div className="h-8 w-6 bg-white/5 rounded shrink-0"/>
+                }
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-white/50 truncate leading-tight">{card.title}</p>
+                  {card.author && <p className="text-[10px] text-white/25 truncate leading-tight">{card.author}</p>}
+                </div>
+                <button type="button" onClick={() => onEdit(card)}
+                  className="text-[10px] text-white/20 hover:text-[#D4AF37] transition-colors shrink-0 opacity-0 group-hover/nd:opacity-100">
+                  Add deadline →
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Completed section (collapsible) ── */}
+      {completed.length > 0 && (
+        <div className="mt-6 border-t border-white/6 pt-6">
+          <button type="button" onClick={() => setCompletedOpen(v => !v)}
+            className="flex items-center gap-2 w-full text-left mb-3 group/toggle">
+            <svg className={`h-3.5 w-3.5 text-white/30 transition-transform ${completedOpen ? "rotate-90" : ""}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>
+            <span className="text-[11px] uppercase tracking-[0.18em] text-white/30 font-medium group-hover/toggle:text-white/50 transition-colors">
+              Completed ({completed.length})
+            </span>
+          </button>
+
+          {completedOpen && (
+            <div className="space-y-1">
+              {completed.map(card => (
+                <div key={card.id} className="flex items-center gap-3 py-1.5 px-2 rounded-lg hover:bg-white/[0.03] transition-colors">
+                  {card.cover_url
+                    ? <img src={card.cover_url} alt={card.title} className="h-8 w-6 object-cover rounded shrink-0"/>
+                    : <div className="h-8 w-6 bg-white/5 rounded shrink-0"/>
+                  }
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-emerald-300/70 truncate leading-tight">{card.title}</p>
+                    {card.author && <p className="text-[10px] text-white/30 truncate leading-tight">{card.author}</p>}
+                  </div>
+                  {card.deadline && (
+                    <span className="text-[10px] text-white/20 shrink-0">
+                      {new Date(card.deadline + "T12:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                    </span>
+                  )}
+                  <Link href={`/board/card/${card.id}`} className="text-white/20 hover:text-white transition-colors shrink-0">
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -743,7 +835,14 @@ export default function BoardPage() {
 
       {/* Views */}
       {view === "timeline" ? (
-        <TimelineView cards={cards} />
+        <TimelineView
+          cards={cards}
+          onStatusChange={async (id, status) => {
+            setCards(p => p.map(c => c.id === id ? { ...c, status } : c));
+            await fetch("/api/board", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
+          }}
+          onEdit={startEdit}
+        />
       ) : (
       <div className="px-4 sm:px-6 py-6 overflow-x-auto">
         <div className="flex gap-4 min-w-max pb-6">
