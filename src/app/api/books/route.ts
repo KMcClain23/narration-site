@@ -35,11 +35,9 @@ export async function GET() {
       .from("books")
       .select("*")
       .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: true });
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
     // Normalize co_narrator — Supabase may return JSON strings from old text column
     const normalized = (data || []).map((book: Record<string, unknown>) => {
@@ -51,15 +49,24 @@ export async function GET() {
       if (!Array.isArray(cn)) cn = [cn];
       return { ...book, co_narrator: (cn as unknown[]).filter(Boolean) };
     });
-    return NextResponse.json({ success: true, books: normalized });
+
+    // Deduplicate by title+author — keeps the first occurrence (lowest sort_order /
+    // earliest created_at). Guards against duplicate rows created by syncToBooks
+    // inserting a book that already exists in the table.
+    const seen = new Set<string>();
+    const deduped = normalized.filter((book) => {
+      const b = book as Record<string, unknown>;
+      const key = `${String(b.title ?? "").trim().toLowerCase()}||${String(b.author ?? "").trim().toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return NextResponse.json({ success: true, books: deduped });
   } catch (error) {
     console.error("GET /api/books failed:", error);
-
     return NextResponse.json(
-      {
-        error: "Failed to load books.",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Failed to load books.", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }
