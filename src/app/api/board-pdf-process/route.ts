@@ -101,7 +101,7 @@ async function processDocx(buffer: Buffer): Promise<
     const hm = line.match(/^#{1,3}\s+(.+)$/);
     if (hm) {
       if (current) sections.push({ title: current.title, wordCount: current.words });
-      current = { title: hm[1].trim(), words: 0 };
+      current = { title: cleanTocTitle(hm[1]), words: 0 };
     } else if (current) {
       current.words += line.split(/\s+/).filter(Boolean).length;
     }
@@ -171,7 +171,11 @@ function parsePageNum(s: string): number {
 }
 
 function cleanTocTitle(raw: string): string {
-  return raw.replace(/^\d+\.\s*/, "").replace(/\s+/g, " ").trim();
+  return raw
+    .replace(/<[^>]*>/g, "")   // strip HTML tags (e.g. mammoth anchor stubs)
+    .replace(/^\d+\.\s*/, "")  // strip leading "N." list prefix
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 // ── Title patterns ─────────────────────────────────────────────────────────
@@ -326,7 +330,7 @@ async function askClaude(pageMap: string): Promise<Array<{ title: string; startP
     raw.replace(/```json|```/g, "").trim()
   );
   if (!Array.isArray(parsed) || !parsed.length) throw new Error("No chapters found");
-  return parsed;
+  return parsed.map(ch => ({ ...ch, title: cleanTocTitle(ch.title) }));
 }
 
 // ─── Route handler ────────────────────────────────────────────────────────────
