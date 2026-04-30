@@ -41,6 +41,8 @@ const STATUS_BAR: Record<string, { bg: string; border: string; text: string }> =
   released:   { bg: "bg-emerald-500/60",border: "border-emerald-400/40", text: "text-emerald-100" },
 };
 
+const LABEL_W = 240; // px — wide enough for most titles
+
 function TimelineView({
   cards,
   onStatusChange,
@@ -52,31 +54,6 @@ function TimelineView({
 }) {
   const [offset, setOffset] = useState(0);
   const [completedOpen, setCompletedOpen] = useState(false);
-
-  const windowStart = useMemo(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth() - 2 + offset, 1);
-  }, [offset]);
-
-  const months = useMemo(() =>
-    Array.from({ length: 6 }, (_, i) =>
-      new Date(windowStart.getFullYear(), windowStart.getMonth() + i, 1)
-    ), [windowStart]);
-
-  // Returns a position 0–12 (6 months × 2 half-columns each)
-  const dateToPos = useCallback((dateStr: string): number => {
-    const [y, m, d] = dateStr.split("-").map(Number);
-    const daysInMonth = new Date(y, m, 0).getDate();
-    const monthOffset = (y - windowStart.getFullYear()) * 12 + (m - 1 - windowStart.getMonth());
-    const colInMonth = d <= 15
-      ? (d - 1) / 15
-      : 1 + (d - 16) / Math.max(1, daysInMonth - 15);
-    return monthOffset * 2 + colInMonth;
-  }, [windowStart]);
-
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  const todayPos = dateToPos(todayStr);
 
   // Partition cards into three groups
   const barCards = useMemo(() =>
@@ -95,6 +72,51 @@ function TimelineView({
       .sort((a, b) => (a.deadline || "").localeCompare(b.deadline || "")),
     [cards]);
 
+  // Window start = first day of current month (offset=0 → today's month)
+  const windowStart = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  }, [offset]);
+
+  // Window end = latest deadline across bar cards + 14 days; minimum 3 months
+  const numMonths = useMemo(() => {
+    const deadlines = barCards.map(c => c.deadline).filter(Boolean) as string[];
+    let endDate: Date;
+    if (deadlines.length) {
+      const latest = deadlines.sort().pop()!;
+      const [y, m, d] = latest.split("-").map(Number);
+      endDate = new Date(y, m - 1, d + 14);
+    } else {
+      endDate = new Date(windowStart.getFullYear(), windowStart.getMonth() + 3, 0);
+    }
+    const diff =
+      (endDate.getFullYear() - windowStart.getFullYear()) * 12 +
+      (endDate.getMonth() - windowStart.getMonth()) + 1;
+    return Math.max(3, diff);
+  }, [barCards, windowStart]);
+
+  const months = useMemo(() =>
+    Array.from({ length: numMonths }, (_, i) =>
+      new Date(windowStart.getFullYear(), windowStart.getMonth() + i, 1)
+    ), [windowStart, numMonths]);
+
+  const totalCols = numMonths * 2;
+
+  // Returns a float position in half-column units relative to windowStart
+  const dateToPos = useCallback((dateStr: string): number => {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const monthOffset = (y - windowStart.getFullYear()) * 12 + (m - 1 - windowStart.getMonth());
+    const colInMonth = d <= 15
+      ? (d - 1) / 15
+      : 1 + (d - 16) / Math.max(1, daysInMonth - 15);
+    return monthOffset * 2 + colInMonth;
+  }, [windowStart]);
+
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayPos = dateToPos(todayStr);
+
   return (
     <div className="px-4 sm:px-6 py-6">
       {/* Navigation */}
@@ -103,10 +125,10 @@ function TimelineView({
           className="p-1.5 text-white/40 hover:text-white hover:bg-white/8 rounded-lg transition-colors">
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
         </button>
-        <span className="text-sm text-white/50 font-medium w-52 text-center">
+        <span className="text-sm text-white/50 font-medium text-center" style={{ minWidth: "13rem" }}>
           {months[0].toLocaleDateString("en-US", { month: "short", year: "numeric" })}
           {" — "}
-          {months[5].toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+          {months[months.length - 1].toLocaleDateString("en-US", { month: "short", year: "numeric" })}
         </span>
         <button onClick={() => setOffset(o => o + 1)}
           className="p-1.5 text-white/40 hover:text-white hover:bg-white/8 rounded-lg transition-colors">
@@ -125,11 +147,11 @@ function TimelineView({
         <div className="py-16 text-center text-white/20 text-sm">No active projects with scheduled dates</div>
       ) : (
         <div className="overflow-x-auto">
-          <div style={{ minWidth: "760px" }}>
+          <div style={{ minWidth: `${LABEL_W + 560}px` }}>
             {/* Month header */}
             <div className="flex">
-              <div className="shrink-0" style={{ width: 196 }} />
-              <div className="flex-1 grid grid-cols-12">
+              <div className="shrink-0" style={{ width: LABEL_W }} />
+              <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))` }}>
                 {months.map((m, i) => (
                   <div key={i} className="col-span-2 text-center text-[10px] font-bold uppercase tracking-widest text-white/40 py-1 border-l border-white/8">
                     {m.toLocaleDateString("en-US", { month: "short" })}{" "}
@@ -141,10 +163,10 @@ function TimelineView({
 
             {/* Half-month sub-header */}
             <div className="flex mb-1">
-              <div className="shrink-0 text-right pr-3 text-[10px] text-white/20 flex items-end pb-1" style={{ width: 196 }}>
+              <div className="shrink-0 text-right pr-3 text-[10px] text-white/20 flex items-end pb-1" style={{ width: LABEL_W }}>
                 Project
               </div>
-              <div className="flex-1 grid grid-cols-12">
+              <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))` }}>
                 {months.map((m, i) => {
                   const endDay = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
                   return (
@@ -158,35 +180,38 @@ function TimelineView({
             </div>
 
             {/* Bar rows */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {barCards.map(card => {
                 const s = card.first15_due ? dateToPos(card.first15_due) : null;
                 const e = card.deadline    ? dateToPos(card.deadline)    : null;
                 const rawStart = s ?? (e !== null ? e - 0.25 : null);
                 const rawEnd   = e ?? (s !== null ? s + 0.25 : null);
                 if (rawStart === null || rawEnd === null) return null;
-                if (rawEnd <= 0 || rawStart >= 12) return null;
+                if (rawEnd <= 0 || rawStart >= totalCols) return null;
 
                 const cStart   = Math.max(0, rawStart);
-                const cEnd     = Math.min(12, rawEnd);
+                const cEnd     = Math.min(totalCols, rawEnd);
                 if (cEnd <= cStart) return null;
 
-                const leftPct  = cStart / 12 * 100;
-                const widthPct = Math.max(0.4, (cEnd - cStart) / 12 * 100);
+                const leftPct  = cStart / totalCols * 100;
+                const widthPct = Math.max(0.4, (cEnd - cStart) / totalCols * 100);
+                const isShort  = widthPct < 6; // bar too narrow to show text
                 const bar      = STATUS_BAR[card.status] ?? STATUS_BAR.contracted;
 
                 return (
-                  <div key={card.id} className="flex items-center h-8 group/row">
-                    <div className="shrink-0 pr-3 text-right" style={{ width: 196 }}>
+                  <div key={card.id} className="flex items-center group/row" style={{ height: 48 }}>
+                    {/* Label column — 240px wide */}
+                    <div className="shrink-0 pr-4 text-right" style={{ width: LABEL_W }}>
                       <p className="text-xs font-semibold text-white/70 truncate group-hover/row:text-white transition-colors leading-tight">{card.title}</p>
                       {card.author && <p className="text-[10px] text-white/30 truncate leading-tight">{card.author}</p>}
                     </div>
 
                     <div className="flex-1 relative h-full">
-                      {/* Grid lines */}
-                      <div className="absolute inset-0 grid grid-cols-12 pointer-events-none">
-                        {Array.from({ length: 12 }).map((_, ci) => {
-                          const isToday = Math.floor(todayPos) === ci && todayPos >= 0 && todayPos < 12;
+                      {/* Column grid lines */}
+                      <div className="absolute inset-0 grid pointer-events-none"
+                        style={{ gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))` }}>
+                        {Array.from({ length: totalCols }).map((_, ci) => {
+                          const isToday = Math.floor(todayPos) === ci && todayPos >= 0 && todayPos < totalCols;
                           return (
                             <div key={ci} className={`h-full ${ci % 2 === 0 ? "border-l border-white/8" : "border-l border-white/[0.04]"} ${isToday ? "bg-[#D4AF37]/[0.07]" : ""}`} />
                           );
@@ -194,28 +219,35 @@ function TimelineView({
                       </div>
 
                       {/* Today line */}
-                      {todayPos >= 0 && todayPos <= 12 && (
+                      {todayPos >= 0 && todayPos <= totalCols && (
                         <div className="absolute top-0 bottom-0 w-px bg-[#D4AF37]/60 z-20 pointer-events-none"
-                          style={{ left: `${todayPos / 12 * 100}%` }} />
+                          style={{ left: `${todayPos / totalCols * 100}%` }} />
                       )}
 
-                      {/* Bar — Link for navigation + separate complete button */}
+                      {/* Bar */}
                       <div
-                        className={`absolute inset-y-1 rounded border z-10 flex items-center overflow-hidden hover:brightness-125 transition-all group/bar ${bar.bg} ${bar.border}`}
-                        style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+                        className={`absolute rounded border z-10 flex items-center overflow-hidden hover:brightness-125 transition-all group/bar ${bar.bg} ${bar.border}`}
+                        style={{ top: 8, bottom: 8, left: `${leftPct}%`, width: `${widthPct}%` }}
+                        title={isShort ? card.title : undefined}
                       >
-                        <Link href={`/board/card/${card.id}`}
-                          className={`flex-1 min-w-0 flex items-center pl-1.5 h-full ${bar.text}`}>
-                          <span className="text-[9px] font-semibold truncate">{card.title}</span>
+                        {/* Navigation link fills the bar minus the button */}
+                        <Link
+                          href={`/board/card/${card.id}`}
+                          className={`flex-1 min-w-0 flex items-center justify-center h-full ${bar.text}`}
+                        >
+                          {!isShort && (
+                            <span className="text-[10px] font-semibold truncate px-1.5 text-center">{card.title}</span>
+                          )}
                         </Link>
-                        {/* Complete button — appears on bar hover */}
+
+                        {/* Complete button — right side of bar, revealed on hover */}
                         <button
                           type="button"
                           title="Mark as released"
                           onClick={e => { e.stopPropagation(); onStatusChange(card.id, "released"); }}
-                          className="shrink-0 mr-1 h-4 w-4 rounded-full flex items-center justify-center opacity-0 group-hover/bar:opacity-100 hover:!opacity-100 bg-white/15 hover:bg-emerald-500/90 transition-all"
+                          className="shrink-0 mr-1.5 h-5 w-5 rounded-full flex items-center justify-center opacity-0 group-hover/bar:opacity-100 bg-white/20 hover:bg-emerald-500/90 transition-all"
                         >
-                          <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                          <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
                         </button>
                       </div>
                     </div>
