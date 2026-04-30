@@ -80,6 +80,11 @@ interface DocxSection {
  * Fallback: no headings found → return pseudo-pages (300 words each) for the
  *   existing compact-page-map → Claude Haiku path.
  */
+/** Strip HTML tags and collapse whitespace from a heading string. */
+function stripHeadingHtml(raw: string): string {
+  return raw.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
 async function processDocx(buffer: Buffer): Promise<
   | { kind: "headings"; sections: DocxSection[] }
   | { kind: "pseudoPages"; pages: string[] }
@@ -91,27 +96,41 @@ async function processDocx(buffer: Buffer): Promise<
   };
 
   const { value: markdown } = await mammoth.convertToMarkdown({ buffer });
-  const lines = markdown.split("\n");
 
-  // Collect heading-delimited sections
+  // Log a sample so we can see the actual mammoth output structure
+  console.log("[docx] convertToMarkdown sample:", JSON.stringify(markdown.slice(0, 500)));
+
+  const lines = markdown.split(/\r?\n/);
   const sections: DocxSection[] = [];
   let current: { title: string; words: number } | null = null;
 
   for (const line of lines) {
-    const hm = line.match(/^#{1,3}\s+(.+)$/);
+    // Match # / ## / ### headings — mammoth converts Heading 1/2/3 styles to these
+    const hm = line.match(/^(#{1,3})\s+([\s\S]+)$/);
     if (hm) {
-      if (current) sections.push({ title: current.title, wordCount: current.words });
-      current = { title: cleanTocTitle(hm[1]), words: 0 };
+      const title = stripHeadingHtml(hm[2]);
+      if (title) {
+        // Commit the previous section before starting a new one
+        if (current) sections.push({ title: current.title, wordCount: current.words });
+        current = { title, words: 0 };
+      }
+      // If stripping HTML produced an empty title, skip this line (it was an anchor-only heading)
     } else if (current) {
-      current.words += line.split(/\s+/).filter(Boolean).length;
+      // Accumulate word count for the current section's body text
+      const text = stripHeadingHtml(line);
+      current.words += text.split(/\s+/).filter(Boolean).length;
     }
   }
   if (current) sections.push({ title: current.title, wordCount: current.words });
 
+  console.log(`[docx] headings found: ${sections.length} —`, sections.map(s => `"${s.title}"`).join(", "));
+
   if (sections.length >= 2) return { kind: "headings", sections };
 
-  // Fallback: split raw text into pseudo-pages
+  // Fallback: no usable heading styles — split raw text into pseudo-pages for Claude
   const { value: rawText } = await mammoth.extractRawText({ buffer });
+  console.log(`[docx] no headings; raw text length ${rawText.length}, falling back to Claude`);
+
   const words = rawText.split(/\s+/).filter(Boolean);
   const CHUNK = 300;
   const pages: string[] = [];
@@ -355,7 +374,7 @@ export async function POST(req: Request) {
       const docx = await processDocx(buf);
 
       if (docx.kind === "headings") {
-        // Fast path: heading styles give us chapters directly — zero Claude cost
+        console.log(`[docx] PATH: headings → ${docx.sections.length} chapters, no Claude call`);
         let chapNum = 0;
         const chapters = docx.sections.map((s) => {
           const number = UNNUMBERED.test(s.title.trim()) ? null : ++chapNum;
@@ -367,6 +386,7 @@ export async function POST(req: Request) {
       }
 
       // Fallback: pseudo-pages → Claude (unformatted docx without heading styles)
+      console.log(`[docx] PATH: no headings → Claude fallback, ${docx.pages.length} pseudo-pages`);
       const pageTexts = docx.pages;
       const pageWordCounts = pageTexts.map((t) => t.split(/\s+/).filter(Boolean).length);
       const pageMap = pageTexts
@@ -398,8 +418,10 @@ export async function POST(req: Request) {
     let rawSections: Array<{ title: string; startPage: number }>;
 
     if (tocEntries) {
+      console.log(`[pdf] PATH: TOC found → ${tocEntries.length} entries, no Claude call`);
       rawSections = tocEntries;
     } else {
+      console.log(`[pdf] PATH: no TOC → Claude fallback, ${pageTexts.length} pages`);
       const pageMap = pageTexts
         .map((text, i) => {
           const first = text.trim().slice(0, 60).replace(/\s+/g, " ");
