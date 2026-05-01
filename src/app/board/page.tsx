@@ -41,21 +41,21 @@ const STATUS_BAR: Record<string, { bg: string; border: string; text: string }> =
   released:   { bg: "bg-emerald-500/60",border: "border-emerald-400/40", text: "text-emerald-100" },
 };
 
-const LABEL_W = 240; // px — wide enough for most titles
+const LABEL_W = 240;
+const ROW_H   = 52;
+const BAR_INSET = 7; // px top/bottom inside the 52px row
 
 function TimelineView({
   cards,
   onStatusChange,
-  onEdit,
 }: {
   cards: BoardCard[];
   onStatusChange: (id: string, status: string) => void;
-  onEdit: (card: BoardCard) => void;
 }) {
   const [offset, setOffset] = useState(0);
   const [completedOpen, setCompletedOpen] = useState(false);
 
-  // Partition cards into three groups
+  // ── Card partitions ─────────────────────────────────────────────────────────
   const barCards = useMemo(() =>
     cards
       .filter(c => c.status !== "released" && (c.first15_due || c.deadline))
@@ -72,37 +72,40 @@ function TimelineView({
       .sort((a, b) => (a.deadline || "").localeCompare(b.deadline || "")),
     [cards]);
 
-  // Window start = first day of the month 1 month before today (offset=0)
+  // ── Window ──────────────────────────────────────────────────────────────────
+  // numMonths is fixed to the data span (not affected by nav offset) so that
+  // ← / → truly slide the window by exactly one month.
+  const baseNumMonths = useMemo(() => {
+    const now = new Date();
+    const fixedStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const deadlines = barCards.map(c => c.deadline).filter(Boolean) as string[];
+    let endDate: Date;
+    if (deadlines.length) {
+      const latest = [...deadlines].sort().pop()!;
+      const [y, m, d] = latest.split("-").map(Number);
+      endDate = new Date(y, m - 1, d + 14);
+    } else {
+      endDate = new Date(fixedStart.getFullYear(), fixedStart.getMonth() + 3, 0);
+    }
+    const diff =
+      (endDate.getFullYear() - fixedStart.getFullYear()) * 12 +
+      (endDate.getMonth() - fixedStart.getMonth()) + 1;
+    return Math.max(3, diff);
+  }, [barCards]);
+
   const windowStart = useMemo(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth() - 1 + offset, 1);
   }, [offset]);
 
-  // Window end = latest deadline across bar cards + 14 days; minimum 3 months
-  const numMonths = useMemo(() => {
-    const deadlines = barCards.map(c => c.deadline).filter(Boolean) as string[];
-    let endDate: Date;
-    if (deadlines.length) {
-      const latest = deadlines.sort().pop()!;
-      const [y, m, d] = latest.split("-").map(Number);
-      endDate = new Date(y, m - 1, d + 14);
-    } else {
-      endDate = new Date(windowStart.getFullYear(), windowStart.getMonth() + 3, 0);
-    }
-    const diff =
-      (endDate.getFullYear() - windowStart.getFullYear()) * 12 +
-      (endDate.getMonth() - windowStart.getMonth()) + 1;
-    return Math.max(3, diff);
-  }, [barCards, windowStart]);
-
   const months = useMemo(() =>
-    Array.from({ length: numMonths }, (_, i) =>
+    Array.from({ length: baseNumMonths }, (_, i) =>
       new Date(windowStart.getFullYear(), windowStart.getMonth() + i, 1)
-    ), [windowStart, numMonths]);
+    ), [windowStart, baseNumMonths]);
 
-  const totalCols = numMonths * 2;
+  const totalCols = baseNumMonths * 2;
 
-  // Returns a float position in half-column units relative to windowStart
+  // ── Position helpers ────────────────────────────────────────────────────────
   const dateToPos = useCallback((dateStr: string): number => {
     const [y, m, d] = dateStr.split("-").map(Number);
     const daysInMonth = new Date(y, m, 0).getDate();
@@ -117,8 +120,10 @@ function TimelineView({
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const todayPos = dateToPos(todayStr);
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="px-4 sm:px-6 py-6 max-w-7xl mx-auto">
+
       {/* Navigation */}
       <div className="flex items-center gap-2 mb-6">
         <button onClick={() => setOffset(o => o - 1)}
@@ -148,6 +153,7 @@ function TimelineView({
       ) : (
         <div className="overflow-x-auto">
           <div style={{ minWidth: `${LABEL_W + 560}px` }}>
+
             {/* Month header */}
             <div className="flex">
               <div className="shrink-0" style={{ width: LABEL_W }} />
@@ -179,9 +185,22 @@ function TimelineView({
               </div>
             </div>
 
-            {/* Bar rows */}
-            <div className="space-y-1.5">
-              {barCards.map(card => {
+            {/* Rows — wrapped in a relative div for the single spanning today line */}
+            <div className="relative">
+
+              {/* Today line — one element spanning the full grid height */}
+              {todayPos >= 0 && todayPos <= totalCols && (
+                <div
+                  className="absolute top-0 bottom-0 z-30 pointer-events-none"
+                  style={{
+                    left: `calc(${LABEL_W}px + (100% - ${LABEL_W}px) * ${todayPos / totalCols})`,
+                    width: 2,
+                    background: "rgba(239,68,68,0.75)",
+                  }}
+                />
+              )}
+
+              {barCards.map((card, rowIdx) => {
                 const s = card.first15_due ? dateToPos(card.first15_due) : null;
                 const e = card.deadline    ? dateToPos(card.deadline)    : null;
                 const rawStart = s ?? (e !== null ? e - 0.25 : null);
@@ -194,62 +213,75 @@ function TimelineView({
                 if (cEnd <= cStart) return null;
 
                 const leftPct  = cStart / totalCols * 100;
-                const widthPct = Math.max(0.4, (cEnd - cStart) / totalCols * 100);
-                const isShort  = widthPct < 6; // bar too narrow to show text
+                const widthPct = (cEnd - cStart) / totalCols * 100;
                 const bar      = STATUS_BAR[card.status] ?? STATUS_BAR.contracted;
 
                 return (
-                  <div key={card.id} className="flex items-center group/row" style={{ height: 48 }}>
-                    {/* Label column — 240px wide */}
+                  <div
+                    key={card.id}
+                    className={`flex items-center group/row mb-px ${rowIdx % 2 === 1 ? "bg-white/[0.025]" : ""}`}
+                    style={{ height: ROW_H }}
+                  >
+                    {/* Label */}
                     <div className="shrink-0 pr-4 text-right" style={{ width: LABEL_W }}>
                       <p className="text-xs font-semibold text-white/70 truncate group-hover/row:text-white transition-colors leading-tight">{card.title}</p>
                       {card.author && <p className="text-[10px] text-white/30 truncate leading-tight">{card.author}</p>}
                     </div>
 
+                    {/* Grid area */}
                     <div className="flex-1 relative h-full">
-                      {/* Column grid lines */}
+                      {/* Column lines — no per-row today highlight (single line above) */}
                       <div className="absolute inset-0 grid pointer-events-none"
                         style={{ gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))` }}>
-                        {Array.from({ length: totalCols }).map((_, ci) => {
-                          const isToday = Math.floor(todayPos) === ci && todayPos >= 0 && todayPos < totalCols;
-                          return (
-                            <div key={ci} className={`h-full ${ci % 2 === 0 ? "border-l border-white/8" : "border-l border-white/[0.04]"} ${isToday ? "bg-[#D4AF37]/[0.07]" : ""}`} />
-                          );
-                        })}
+                        {Array.from({ length: totalCols }).map((_, ci) => (
+                          <div key={ci} className={`h-full ${ci % 2 === 0 ? "border-l border-white/8" : "border-l border-white/[0.04]"}`} />
+                        ))}
                       </div>
 
-                      {/* Today line */}
-                      {todayPos >= 0 && todayPos <= totalCols && (
-                        <div className="absolute top-0 bottom-0 w-px bg-[#D4AF37]/60 z-20 pointer-events-none"
-                          style={{ left: `${todayPos / totalCols * 100}%` }} />
-                      )}
-
-                      {/* Bar */}
+                      {/* Bar — 80px minimum width, 6px border-radius */}
                       <div
-                        className={`absolute rounded border z-10 flex items-center overflow-hidden hover:brightness-125 transition-all group/bar ${bar.bg} ${bar.border}`}
-                        style={{ top: 8, bottom: 8, left: `${leftPct}%`, width: `${widthPct}%` }}
-                        title={isShort ? card.title : undefined}
+                        className={`absolute z-10 flex items-center overflow-hidden hover:brightness-125 transition-all group/bar border ${bar.bg} ${bar.border}`}
+                        style={{
+                          top: BAR_INSET,
+                          bottom: BAR_INSET,
+                          left: `${leftPct}%`,
+                          width: `${widthPct}%`,
+                          minWidth: "80px",
+                          borderRadius: "6px",
+                        }}
+                        title={card.title}
                       >
-                        {/* Navigation link fills the bar minus the button */}
                         <Link
                           href={`/board/card/${card.id}`}
-                          className={`flex-1 min-w-0 flex items-center justify-center h-full ${bar.text}`}
+                          className={`flex-1 min-w-0 flex items-center justify-center h-full px-2 ${bar.text}`}
                         >
-                          {!isShort && (
-                            <span className="text-[10px] font-semibold truncate px-1.5 text-center">{card.title}</span>
-                          )}
+                          <span className="text-[10px] font-semibold truncate text-center leading-tight">{card.title}</span>
                         </Link>
 
-                        {/* Complete button — right side of bar, revealed on hover */}
+                        {/* Complete button — revealed on hover */}
                         <button
                           type="button"
                           title="Mark as released"
-                          onClick={e => { e.stopPropagation(); onStatusChange(card.id, "released"); }}
+                          onClick={ev => { ev.stopPropagation(); onStatusChange(card.id, "released"); }}
                           className="shrink-0 mr-1.5 h-5 w-5 rounded-full flex items-center justify-center opacity-0 group-hover/bar:opacity-100 bg-white/20 hover:bg-emerald-500/90 transition-all"
                         >
                           <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
                         </button>
                       </div>
+
+                      {/* first15_due diamond marker */}
+                      {s !== null && s >= 0 && s <= totalCols && (
+                        <div
+                          className="absolute z-20 pointer-events-none bg-white/90 border border-white/40"
+                          style={{
+                            width: 8, height: 8,
+                            left: `calc(${s / totalCols * 100}% - 4px)`,
+                            top: "calc(50% - 4px)",
+                            transform: "rotate(45deg)",
+                            borderRadius: 1,
+                          }}
+                        />
+                      )}
                     </div>
                   </div>
                 );
@@ -263,10 +295,18 @@ function TimelineView({
       <div className="mt-5 flex flex-wrap gap-4">
         {(["contracted","recording","editing"] as const).map(s => (
           <div key={s} className="flex items-center gap-1.5">
-            <div className={`h-2.5 w-5 rounded-sm border ${STATUS_BAR[s].bg} ${STATUS_BAR[s].border}`} />
+            <div className={`h-2.5 w-5 border ${STATUS_BAR[s].bg} ${STATUS_BAR[s].border}`} style={{ borderRadius: 3 }} />
             <span className="text-[10px] text-white/30 capitalize">{s}</span>
           </div>
         ))}
+        <div className="flex items-center gap-1.5">
+          <div className="h-2 w-2 bg-white/80 border border-white/40" style={{ transform: "rotate(45deg)", borderRadius: 1 }} />
+          <span className="text-[10px] text-white/30">First 15 due</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-0.5 bg-red-500/70" />
+          <span className="text-[10px] text-white/30">Today</span>
+        </div>
       </div>
 
       {/* ── No dates section ── */}
@@ -283,10 +323,12 @@ function TimelineView({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-semibold text-white/50 truncate leading-tight">{card.title}</p>
-                    <button type="button" onClick={() => onEdit(card)}
-                      className="text-[10px] text-white/20 hover:text-[#D4AF37] transition-colors shrink-0 opacity-0 group-hover/nd:opacity-100 whitespace-nowrap">
-                      + Add deadline
-                    </button>
+                    <Link
+                      href={`/board/card/${card.id}`}
+                      className="text-[10px] text-white/20 hover:text-[#D4AF37] transition-colors shrink-0 opacity-0 group-hover/nd:opacity-100 whitespace-nowrap"
+                    >
+                      Add deadline →
+                    </Link>
                   </div>
                   {card.author && <p className="text-[10px] text-white/25 truncate leading-tight">{card.author}</p>}
                 </div>
@@ -296,11 +338,11 @@ function TimelineView({
         </div>
       )}
 
-      {/* ── Completed section (collapsible) ── */}
+      {/* ── Completed section (collapsible grid) ── */}
       {completed.length > 0 && (
         <div className="mt-6 border-t border-white/6 pt-6">
           <button type="button" onClick={() => setCompletedOpen(v => !v)}
-            className="flex items-center gap-2 w-full text-left mb-3 group/toggle">
+            className="flex items-center gap-2 w-full text-left mb-4 group/toggle">
             <svg className={`h-3.5 w-3.5 text-white/30 transition-transform ${completedOpen ? "rotate-90" : ""}`}
               fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
@@ -311,26 +353,29 @@ function TimelineView({
           </button>
 
           {completedOpen && (
-            <div className="space-y-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {completed.map(card => (
-                <div key={card.id} className="flex items-center gap-3 py-1.5 px-2 rounded-lg hover:bg-white/[0.03] transition-colors">
+                <Link
+                  key={card.id}
+                  href={`/board/card/${card.id}`}
+                  className="rounded-xl border border-white/8 bg-[#0A0D3A] overflow-hidden hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-colors"
+                >
                   {card.cover_url
-                    ? <img src={card.cover_url} alt={card.title} className="h-8 w-6 object-cover rounded shrink-0"/>
-                    : <div className="h-8 w-6 bg-white/5 rounded shrink-0"/>
+                    ? <img src={card.cover_url} alt={card.title} className="w-full aspect-[2/3] object-cover"/>
+                    : <div className="w-full aspect-[2/3] bg-white/5 flex items-center justify-center">
+                        <svg className="h-6 w-6 text-white/10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                      </div>
                   }
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-emerald-300/70 truncate leading-tight">{card.title}</p>
-                    {card.author && <p className="text-[10px] text-white/30 truncate leading-tight">{card.author}</p>}
+                  <div className="p-2.5">
+                    <p className="text-xs font-semibold text-emerald-300/80 truncate leading-tight">{card.title}</p>
+                    {card.author && <p className="text-[10px] text-white/35 truncate mt-0.5">{card.author}</p>}
+                    {card.deadline && (
+                      <p className="text-[9px] text-white/20 mt-1">
+                        {new Date(card.deadline + "T12:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                      </p>
+                    )}
                   </div>
-                  {card.deadline && (
-                    <span className="text-[10px] text-white/20 shrink-0">
-                      {new Date(card.deadline + "T12:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-                    </span>
-                  )}
-                  <Link href={`/board/card/${card.id}`} className="text-white/20 hover:text-white transition-colors shrink-0">
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                  </Link>
-                </div>
+                </Link>
               ))}
             </div>
           )}
@@ -875,7 +920,6 @@ export default function BoardPage() {
             setCards(p => p.map(c => c.id === id ? { ...c, status } : c));
             await fetch("/api/board", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
           }}
-          onEdit={startEdit}
         />
       ) : (
       <div className="px-4 sm:px-6 py-6 overflow-x-auto">
