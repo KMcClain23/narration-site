@@ -499,9 +499,9 @@ function SectionGrid({
   return (
     <section className="mb-10">
       <div className="flex items-center gap-4 mb-5 scroll-mt-28 sm:scroll-mt-36">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/40">{title}</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/60">{title}</h2>
         <div className="flex-1 h-px bg-white/8" />
-        <span className="text-xs text-white/25">{books.length}</span>
+        <span className="text-xs text-white/40">{books.length}</span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 items-start" style={{ paddingBottom: "1rem" }}>
         {books.map((book) => (

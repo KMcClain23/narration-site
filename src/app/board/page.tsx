@@ -72,10 +72,10 @@ function TimelineView({
       .sort((a, b) => (a.deadline || "").localeCompare(b.deadline || "")),
     [cards]);
 
-  // Window start = first day of current month (offset=0 → today's month)
+  // Window start = first day of the month 1 month before today (offset=0)
   const windowStart = useMemo(() => {
     const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    return new Date(now.getFullYear(), now.getMonth() - 1 + offset, 1);
   }, [offset]);
 
   // Window end = latest deadline across bar cards + 14 days; minimum 3 months
@@ -118,7 +118,7 @@ function TimelineView({
   const todayPos = dateToPos(todayStr);
 
   return (
-    <div className="px-4 sm:px-6 py-6">
+    <div className="px-4 sm:px-6 py-6 max-w-7xl mx-auto">
       {/* Navigation */}
       <div className="flex items-center gap-2 mb-6">
         <button onClick={() => setOffset(o => o - 1)}
@@ -261,7 +261,7 @@ function TimelineView({
 
       {/* Legend */}
       <div className="mt-5 flex flex-wrap gap-4">
-        {(["audition","contracted","recording","editing"] as const).map(s => (
+        {(["contracted","recording","editing"] as const).map(s => (
           <div key={s} className="flex items-center gap-1.5">
             <div className={`h-2.5 w-5 rounded-sm border ${STATUS_BAR[s].bg} ${STATUS_BAR[s].border}`} />
             <span className="text-[10px] text-white/30 capitalize">{s}</span>
@@ -281,13 +281,15 @@ function TimelineView({
                   : <div className="h-8 w-6 bg-white/5 rounded shrink-0"/>
                 }
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-white/50 truncate leading-tight">{card.title}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-semibold text-white/50 truncate leading-tight">{card.title}</p>
+                    <button type="button" onClick={() => onEdit(card)}
+                      className="text-[10px] text-white/20 hover:text-[#D4AF37] transition-colors shrink-0 opacity-0 group-hover/nd:opacity-100 whitespace-nowrap">
+                      + Add deadline
+                    </button>
+                  </div>
                   {card.author && <p className="text-[10px] text-white/25 truncate leading-tight">{card.author}</p>}
                 </div>
-                <button type="button" onClick={() => onEdit(card)}
-                  className="text-[10px] text-white/20 hover:text-[#D4AF37] transition-colors shrink-0 opacity-0 group-hover/nd:opacity-100">
-                  Add deadline →
-                </button>
               </div>
             ))}
           </div>
