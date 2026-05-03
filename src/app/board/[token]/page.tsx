@@ -18,11 +18,12 @@ const COLUMN_COLORS: Record<string, string> = {
   released:   "bg-emerald-500",
 };
 
-export default async function AuthorBoardView({ params }: { params: { token: string } }) {
+export default async function AuthorBoardView({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
   const { data: card } = await supabaseAdmin
     .from("board_cards")
     .select("id, title, author, cover_url, status, deadline, author_notes, links")
-    .eq("author_token", params.token)
+    .eq("author_token", token)
     .single();
 
   if (!card) notFound();
