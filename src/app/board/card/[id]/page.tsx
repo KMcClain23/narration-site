@@ -99,9 +99,12 @@ export default function CardDetailPage() {
   useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
 
   const loadMessages = useCallback(async () => {
-    const res = await fetch(`/api/board-messages?cardId=${id}`);
-    const data = await res.json();
-    if (data.messages) setMessages(data.messages);
+    try {
+      const res = await fetch(`/api/board-messages?cardId=${id}`);
+      const data = await res.json();
+      if (data.messages) setMessages(data.messages);
+      // If res is not ok, messages simply stay empty — the send action will show the real error
+    } catch { /* network failure — silently ignore on load */ }
   }, [id]);
 
   useEffect(() => {
@@ -262,13 +265,22 @@ export default function CardDetailPage() {
   const sendMessage = async () => {
     if (!msgText.trim() || sendingMsg) return;
     setSendingMsg(true);
-    await fetch("/api/board-messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId: id, text: msgText.trim(), sender: "dean", senderName: "Dean Miller" }),
-    });
-    setMsgText("");
-    await loadMessages();
+    try {
+      const res = await fetch("/api/board-messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId: id, text: msgText.trim(), sender: "dean", senderName: "Dean Miller" }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error || `Message failed (${res.status}). Run the board_messages SQL migration in Supabase.`);
+      } else {
+        setMsgText("");
+        await loadMessages();
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Message failed — network error.");
+    }
     setSendingMsg(false);
   };
 
