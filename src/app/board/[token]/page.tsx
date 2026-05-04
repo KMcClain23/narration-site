@@ -29,12 +29,24 @@ interface Chapter {
 export default async function AuthorBoardView({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
 
-  const { data: card } = await supabaseAdmin
+  // Try with optional columns first; fall back if migration hasn't run yet.
+  // Explicitly naming a non-existent column causes Supabase to return an error
+  // (not just a missing field), which makes data null and triggers notFound().
+  const BASE_SELECT = "id, title, subtitle, author, cover_url, status, deadline, author_notes, links, co_narrator, chapters";
+
+  const { data: cardFull, error: fullErr } = await supabaseAdmin
     .from("board_cards")
-    .select("id, title, subtitle, author, cover_url, status, deadline, author_notes, links, co_narrator, chapters, dean_message")
+    .select(`${BASE_SELECT}, dean_message`)
     .eq("author_token", token)
     .single();
 
+  // If the query failed (e.g. dean_message column not yet added), retry without it
+  const { data: cardBase } = fullErr
+    ? await supabaseAdmin.from("board_cards").select(BASE_SELECT).eq("author_token", token).single()
+    : { data: null };
+
+  // Cast the base fallback to the full type so dean_message is always optional
+  const card = cardFull ?? (cardBase as typeof cardFull);
   if (!card) notFound();
 
   // Parse co-narrator (stored as JSON string or plain string)
