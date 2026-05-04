@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { cookies } from "next/headers";
 
 const COOKIE = "dmn_admin_key";
 
-async function isAdmin(): Promise<boolean> {
-  const c = await cookies();
-  return !!c.get(COOKIE)?.value;
+/** Read the admin cookie directly from the raw Cookie header — bypasses
+ *  framework-level caching issues with next/headers cookies() in Route Handlers. */
+function isAdminReq(req: Request): boolean {
+  const cookieHeader = req.headers.get("cookie") ?? "";
+  return cookieHeader.split(";").some(part => {
+    const [name, ...rest] = part.trim().split("=");
+    return name.trim() === COOKIE && rest.join("=").trim().length > 0;
+  });
 }
 
 async function verifyToken(cardId: string, token: string): Promise<boolean> {
@@ -28,7 +32,7 @@ export async function GET(req: Request) {
   const summary = searchParams.get("summary");
 
   if (summary === "true") {
-    if (!await isAdmin()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!isAdminReq(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { data } = await supabaseAdmin
       .from("board_messages")
       .select("card_id")
@@ -43,7 +47,7 @@ export async function GET(req: Request) {
 
   if (!cardId) return NextResponse.json({ error: "cardId required" }, { status: 400 });
 
-  const admin = await isAdmin();
+  const admin = isAdminReq(req);
   if (!admin) {
     if (!token || !await verifyToken(cardId, token))
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -61,17 +65,19 @@ export async function GET(req: Request) {
 
 // POST { cardId, text, sender, senderName, token? }
 export async function POST(req: Request) {
-  const { cardId, text, sender, senderName, token } = await req.json();
+  const body = await req.json();
+  const { cardId, text, sender, senderName, token } = body;
 
   if (!cardId || !text?.trim() || !sender)
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
-  const admin = await isAdmin();
+  const admin = isAdminReq(req);
+
   if (sender === "dean") {
-    if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!admin) return NextResponse.json({ error: "Unauthorized — admin cookie not found" }, { status: 401 });
   } else {
     if (!token || !await verifyToken(cardId, token))
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized — invalid token" }, { status: 401 });
   }
 
   const { data, error } = await supabaseAdmin
@@ -93,12 +99,14 @@ export async function POST(req: Request) {
 // PATCH { cardId, viewedBy: "dean"|"author", token? }
 // marks messages from the OTHER party as read
 export async function PATCH(req: Request) {
-  const { cardId, viewedBy, token } = await req.json();
+  const body = await req.json();
+  const { cardId, viewedBy, token } = body;
 
   if (!cardId || !viewedBy)
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
-  const admin = await isAdmin();
+  const admin = isAdminReq(req);
+
   if (viewedBy === "dean") {
     if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   } else {

@@ -102,9 +102,14 @@ export default function CardDetailPage() {
     try {
       const res = await fetch(`/api/board-messages?cardId=${id}`);
       const data = await res.json();
-      if (data.messages) setMessages(data.messages);
-      // If res is not ok, messages simply stay empty — the send action will show the real error
-    } catch { /* network failure — silently ignore on load */ }
+      if (data.messages) {
+        setMessages(data.messages);
+      } else if (!res.ok) {
+        console.error("[board-messages GET]", res.status, data.error);
+      }
+    } catch (e) {
+      console.error("[board-messages GET network error]", e);
+    }
   }, [id]);
 
   useEffect(() => {
