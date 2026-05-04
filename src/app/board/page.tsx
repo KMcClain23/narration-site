@@ -26,12 +26,13 @@ interface BoardCard {
   updated_at?: string;
   author_email?: string;
   dean_message?: string;
+  slug?: string;
 }
 
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
   title:"", author:"", cover_url:"", status:"audition", deadline:"",
   notes:"", author_notes:"", links:[], co_narrator:"",
-  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false,
+  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"",
 };
 
 // ─── Timeline view ────────────────────────────────────────────────────────────
@@ -791,7 +792,7 @@ export default function BoardPage() {
       links:card.links,co_narrator:card.co_narrator,subtitle:card.subtitle||"",
       tags:card.tags||[],description:card.description||"",
       audible_link:card.audible_link||"",ar_link:card.ar_link||"",chapters:card.chapters||[],
-      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false});
+      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||""});
     setShowForm(false);
   };
 
@@ -975,6 +976,7 @@ export default function BoardPage() {
               <div className="grid sm:grid-cols-2 gap-4">
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Book title *</span><input type="text" value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))} placeholder="e.g. Whiskey &amp; Lies" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Subtitle</span><input type="text" value={form.subtitle} onChange={e=>setForm(p=>({...p,subtitle:e.target.value}))} placeholder="e.g. Sultry Secrets Book 4" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
+                <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">URL slug</span><input type="text" value={form.slug||""} onChange={e=>setForm(p=>({...p,slug:e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-").replace(/-+/g,"-")}))} placeholder="e.g. whiskey-and-lies" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition font-mono"/></label>
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Author</span><input type="text" value={form.author} onChange={e=>setForm(p=>({...p,author:e.target.value}))} placeholder="e.g. E.A. Harper" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Co-narrator</span>
