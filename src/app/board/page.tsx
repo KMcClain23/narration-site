@@ -24,6 +24,8 @@ interface BoardCard {
   payment_type: string; // pfh | rs | rs_plus
   first_15_complete: boolean;
   updated_at?: string;
+  author_email?: string;
+  dean_message?: string;
 }
 
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
@@ -659,6 +661,7 @@ function TimelineView({
 
 export default function BoardPage() {
   const [view, setView] = useState<"board"|"timeline"|"dashboard">("dashboard");
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [cards, setCards] = useState<BoardCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [editCard, setEditCard] = useState<BoardCard|null>(null);
@@ -693,6 +696,12 @@ export default function BoardPage() {
   useEffect(() => {
     const saved = localStorage.getItem("boardView");
     if (saved === "board" || saved === "timeline" || saved === "dashboard") setView(saved);
+  }, []);
+  useEffect(() => {
+    fetch("/api/board-messages?summary=true")
+      .then(r => r.json())
+      .then(d => { if (d.counts) setUnreadCounts(d.counts); })
+      .catch(() => {});
   }, []);
 
   const switchView = (v: "board"|"timeline"|"dashboard") => {
@@ -1237,6 +1246,11 @@ export default function BoardPage() {
                             <div className="absolute top-2 right-2 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shadow">
                               <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
                               15
+                            </div>
+                          )}
+                          {unreadCounts[card.id] > 0 && (
+                            <div className="absolute top-2 left-2 bg-[#D4AF37] text-black text-[9px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow">
+                              {unreadCounts[card.id]}
                             </div>
                           )}
                         </div>

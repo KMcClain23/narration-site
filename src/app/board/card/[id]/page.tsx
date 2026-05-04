@@ -32,6 +32,12 @@ interface BoardCard {
   subtitle: string; tags: string[]; description: string;
   audible_link: string; co_narrator: string; chapters: Chapter[];
   first15_due?: string; first_15_complete?: boolean;
+  author_email?: string; dean_message?: string; author_token?: string;
+}
+
+interface Msg {
+  id: string; sender: "dean"|"author"; sender_name: string;
+  text: string; read: boolean; created_at: string;
 }
 
 function statusStyle(id: string) {
@@ -59,6 +65,15 @@ export default function CardDetailPage() {
   const [pdfProgress, setPdfProgress] = useState("");
   const [coverDragOver, setCoverDragOver] = useState(false);
   const [first15Complete, setFirst15Complete] = useState(false);
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [msgText, setMsgText] = useState("");
+  const [sendingMsg, setSendingMsg] = useState(false);
+  const [deanMsg, setDeanMsg] = useState("");
+  const [authorEmail, setAuthorEmail] = useState("");
+  const [emailNote, setEmailNote] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const msgEndRef = useRef<HTMLDivElement>(null);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chaptersToSave = useRef<Chapter[]>([]);
@@ -72,6 +87,8 @@ export default function CardDetailPage() {
         setCard(data.card);
         setChapters(data.card.chapters || []);
         setFirst15Complete(data.card.first_15_complete ?? false);
+        setDeanMsg(data.card.dean_message || "");
+        setAuthorEmail(data.card.author_email || "");
         setSearchQuery(`${data.card.title || ""}${data.card.author ? " by " + data.card.author : ""}`);
       }
     } catch { setError("Failed to load card."); }
@@ -80,6 +97,26 @@ export default function CardDetailPage() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
+
+  const loadMessages = useCallback(async () => {
+    const res = await fetch(`/api/board-messages?cardId=${id}`);
+    const data = await res.json();
+    if (data.messages) setMessages(data.messages);
+  }, [id]);
+
+  useEffect(() => {
+    loadMessages();
+    // mark author messages as read when admin opens the page
+    fetch("/api/board-messages", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: id, viewedBy: "dean" }),
+    }).catch(() => {});
+  }, [id, loadMessages]);
+
+  useEffect(() => {
+    msgEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const total = chapters.length;
   const byStat = Object.fromEntries(CHAPTER_STATUSES.map(s => [s.id, chapters.filter(c => c.status === s.id).length]));
@@ -220,6 +257,40 @@ export default function CardDetailPage() {
     const updated = chapters.map((c, i) => i === idx ? { ...c, status: nextStatus(c.status) } : c);
     setChapters(updated);
     triggerAutoSave(updated);
+  };
+
+  const sendMessage = async () => {
+    if (!msgText.trim() || sendingMsg) return;
+    setSendingMsg(true);
+    await fetch("/api/board-messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: id, text: msgText.trim(), sender: "dean", senderName: "Dean Miller" }),
+    });
+    setMsgText("");
+    await loadMessages();
+    setSendingMsg(false);
+  };
+
+  const saveDeanMsg = async () => {
+    await fetch("/api/board", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, dean_message: deanMsg, author_email: authorEmail }),
+    });
+  };
+
+  const sendEmail = async () => {
+    setSendingEmail(true);
+    setEmailSent(false);
+    const res = await fetch("/api/send-author-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: id, customMessage: emailNote }),
+    });
+    if (res.ok) { setEmailSent(true); setTimeout(() => setEmailSent(false), 4000); }
+    else { const d = await res.json(); setError(d.error || "Email failed."); }
+    setSendingEmail(false);
   };
 
   const isUnnumbered = (title: string) => /^(prologue|epilogue|dedication|content\s*(?:&|and)\s*trigger\s*warnings?|trigger\s*warnings?|content\s*warnings?)$/i.test(title.trim());
@@ -453,6 +524,34 @@ export default function CardDetailPage() {
               </p>
             )}
           </div>
+
+          {/* ── Author contact + dean message ── */}
+          <div className="rounded-2xl border border-white/8 bg-[#0A0D3A] p-4 space-y-3">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-white/40 font-medium">Author contact</p>
+            <div>
+              <label className="text-[10px] text-white/35 uppercase tracking-wide">Author email</label>
+              <input value={authorEmail} onChange={e => setAuthorEmail(e.target.value)} onBlur={saveDeanMsg}
+                placeholder="author@example.com"
+                className="mt-1 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40"/>
+            </div>
+            <div>
+              <label className="text-[10px] text-white/35 uppercase tracking-wide">Message from Dean (shown to author)</label>
+              <textarea value={deanMsg} onChange={e => setDeanMsg(e.target.value)} onBlur={saveDeanMsg}
+                rows={2} placeholder="E.g. Recording is going great! Expect the first 15 by May 1."
+                className="mt-1 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 resize-none"/>
+            </div>
+            <div className="border-t border-white/6 pt-3 space-y-2">
+              <label className="text-[10px] text-white/35 uppercase tracking-wide">Custom email note (optional)</label>
+              <textarea value={emailNote} onChange={e => setEmailNote(e.target.value)}
+                rows={2} placeholder="Add a personal note to include in the email…"
+                className="w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 resize-none"/>
+              <button onClick={sendEmail} disabled={sendingEmail || !authorEmail}
+                title={!authorEmail ? "Add an author email above first" : undefined}
+                className={`w-full text-xs font-bold px-4 py-2.5 rounded-full transition-colors ${emailSent ? "bg-emerald-500 text-white" : "bg-[#D4AF37] text-black hover:bg-[#E0C15A]"} disabled:opacity-40`}>
+                {emailSent ? "✓ Email sent" : sendingEmail ? "Sending…" : "Send token link to author"}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* ── Right panel: Chapter list ── */}
@@ -602,6 +701,62 @@ export default function CardDetailPage() {
               </div>
             </div>
           )}
+
+          {/* ── Messages thread ── */}
+          <div className="mt-6 rounded-2xl border border-white/8 bg-[#0A0D3A] overflow-hidden">
+            <div className="px-4 py-3 border-b border-white/6 flex items-center justify-between">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-white/40 font-medium">Messages</p>
+              {messages.filter(m => m.sender === "author" && !m.read).length > 0 && (
+                <span className="text-[10px] font-bold bg-[#D4AF37] text-black px-2 py-0.5 rounded-full">
+                  {messages.filter(m => m.sender === "author" && !m.read).length} new
+                </span>
+              )}
+            </div>
+
+            {/* Thread */}
+            <div className="p-4 space-y-3 max-h-72 overflow-y-auto">
+              {messages.length === 0 && (
+                <p className="text-xs text-white/25 text-center py-4">No messages yet.</p>
+              )}
+              {messages.map(msg => {
+                const isAuthor = msg.sender === "author";
+                const fmt = new Date(msg.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+                return (
+                  <div key={msg.id} className={`flex ${isAuthor ? "justify-start" : "justify-end"}`}>
+                    <div className={`max-w-[82%] flex flex-col gap-0.5 ${isAuthor ? "items-start" : "items-end"}`}>
+                      <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                        isAuthor
+                          ? `bg-white/5 border ${!msg.read ? "border-[#D4AF37]/40" : "border-white/8"} text-white/85`
+                          : "bg-[#D4AF37]/20 border border-[#D4AF37]/25 text-white"
+                      }`}>
+                        {msg.text}
+                      </div>
+                      <p className="text-[10px] text-white/25 px-1">{msg.sender_name} · {fmt}</p>
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={msgEndRef}/>
+            </div>
+
+            {/* Compose */}
+            <div className="px-4 pb-4">
+              <div className="flex gap-2 items-end">
+                <textarea
+                  value={msgText}
+                  onChange={e => setMsgText(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                  rows={2}
+                  placeholder="Message the author… (Enter to send)"
+                  className="flex-1 rounded-xl bg-black/30 border border-white/8 px-3 py-2.5 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 resize-none"
+                />
+                <button onClick={sendMessage} disabled={!msgText.trim() || sendingMsg}
+                  className="shrink-0 bg-[#D4AF37] text-black text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-[#E0C15A] transition disabled:opacity-40">
+                  {sendingMsg ? "…" : "Send"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </main>

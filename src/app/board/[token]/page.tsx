@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import Link from "next/link";
+import AuthorMessages from "./AuthorMessages";
 
 // Production stages — Audition is internal-only; authors see from Contracted onward
 const STAGES = [
@@ -30,7 +31,7 @@ export default async function AuthorBoardView({ params }: { params: Promise<{ to
 
   const { data: card } = await supabaseAdmin
     .from("board_cards")
-    .select("id, title, subtitle, author, cover_url, status, deadline, author_notes, links, co_narrator, chapters")
+    .select("id, title, subtitle, author, cover_url, status, deadline, author_notes, links, co_narrator, chapters, dean_message")
     .eq("author_token", token)
     .single();
 
@@ -139,6 +140,14 @@ export default async function AuthorBoardView({ params }: { params: Promise<{ to
             </span>
           </div>
         </div>
+
+        {/* ── Message from Dean (editable per-book banner) ── */}
+        {card.dean_message && (
+          <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-5">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-blue-300 font-medium mb-2">Message from Dean</p>
+            <p className="text-sm text-white/85 leading-relaxed">{card.dean_message}</p>
+          </div>
+        )}
 
         {/* ── Note from Dean ── */}
         {card.author_notes && (
@@ -258,6 +267,14 @@ export default async function AuthorBoardView({ params }: { params: Promise<{ to
             </div>
           </div>
         )}
+
+        {/* ── Messages ── */}
+        <AuthorMessages
+          cardId={card.id}
+          token={token}
+          authorName={card.author || "Author"}
+          chapters={chapters.map((c: Chapter) => ({ title: c.title }))}
+        />
 
         {/* ── Footer notice ── */}
         <p className="text-center text-xs text-white/20 pb-4">
