@@ -18,14 +18,17 @@ const STATUS_TO_STYLE: Record<string, string> = {
   released:   "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
 };
 
+function titleToSlug(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
 async function getBook(slug: string) {
   const { data } = await supabaseAdmin
     .from("board_cards")
-    .select("id, title, subtitle, author, cover_url, audible_link, ar_link, co_narrator, tags, description, status, slug")
-    .eq("slug", slug)
-    .in("status", ["contracted", "recording", "editing", "released"])
-    .single();
-  return data;
+    .select("id, title, subtitle, author, cover_url, audible_link, ar_link, co_narrator, tags, description, status")
+    .in("status", ["contracted", "recording", "editing", "released"]);
+  if (!data) return null;
+  return data.find((card) => titleToSlug(card.title ?? "") === slug) ?? null;
 }
 
 export async function generateMetadata(
@@ -61,7 +64,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   const book = await getBook(slug);
   if (!book) notFound();
 
-  // Parse co-narrator
+  // Parse co-narrator (may be JSON string, array, or plain string)
   let coNarrators: string[] = [];
   const rawCn = book.co_narrator;
   if (rawCn) {
@@ -96,7 +99,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
 
           {/* Cover */}
           <div className="mx-auto w-full max-w-[280px] md:max-w-none">
-            <div className="rounded-2xl overflow-hidden shadow-2xl border border-white/10"
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-white/10"
               style={{ aspectRatio: "2/3" }}>
               {book.cover_url ? (
                 <Image
@@ -118,7 +121,8 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
           </div>
 
           {/* Details */}
-          <div className="relative">
+          <div className="relative" itemScope itemType="https://schema.org/AudioObject">
+
             {/* Status badge */}
             {statusLabel && (
               <span className={`inline-flex items-center text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border mb-4 ${statusStyle}`}>
@@ -133,7 +137,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
               <p className="text-lg text-white/50 mb-3 leading-snug">{book.subtitle}</p>
             )}
 
-            <p className="text-[#D4AF37] font-semibold text-lg mb-1" itemProp="author">
+            <p className="text-[#D4AF37] font-semibold text-lg mb-1" itemProp="byArtist">
               {book.author}
             </p>
 
@@ -181,7 +185,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
                   Authors Republic
                 </a>
               )}
-              <Link href="/#contact"
+              <Link href="/contact"
                 className="inline-flex items-center gap-2 border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 font-semibold px-6 py-3 rounded-full transition-colors text-sm">
                 Request a quote
               </Link>
@@ -189,10 +193,10 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
           </div>
         </div>
 
-        {/* Divider */}
+        {/* Bottom CTA */}
         <div className="mt-16 border-t border-white/8 pt-10 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-white/35 text-sm">Interested in having your book narrated?</p>
-          <Link href="/#contact"
+          <Link href="/contact"
             className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-6 py-2.5 text-sm font-semibold hover:bg-[#E0C15A] transition">
             Get in touch
           </Link>

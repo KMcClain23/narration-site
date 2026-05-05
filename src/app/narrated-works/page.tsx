@@ -6,6 +6,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 import type { Book } from "@/types/book";
 
+function makeSlug(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
 interface CoNarrator {
   id: string;
   name: string;
@@ -275,9 +279,11 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
     return [];
   })();
 
+  const bookSlug = makeSlug(book.title);
   return (
-    <div
-      className="group relative rounded-2xl overflow-visible cursor-default"
+    <Link
+      href={`/narrated-works/${bookSlug}`}
+      className="group relative rounded-2xl overflow-visible cursor-pointer block"
       itemScope
       itemType="https://schema.org/Book"
       style={{ aspectRatio: "2/3" }}
@@ -377,20 +383,9 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
           </div>
           {/* Expanded (hover) state */}
           <div className="hidden group-hover:block px-3 py-4 sm:px-5 sm:py-5">
-            {book.slug ? (
-              <Link
-                href={`/narrated-works/${book.slug}`}
-                onClick={(e) => e.stopPropagation()}
-                className="font-bold text-base sm:text-xl leading-snug text-white hover:text-[#D4AF37] transition-colors block"
-                itemProp="name"
-              >
-                {book.title}
-              </Link>
-            ) : (
-              <h3 className="font-bold text-base sm:text-xl leading-snug text-white" itemProp="name">
-                {book.title}
-              </h3>
-            )}
+            <h3 className="font-bold text-base sm:text-xl leading-snug text-white" itemProp="name">
+              {book.title}
+            </h3>
             {book.subtitle && (
               <p className="text-xs sm:text-sm text-white mt-1 sm:mt-1.5 leading-snug font-medium">{book.subtitle}</p>
             )}
@@ -447,43 +442,27 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
                 )}
                 {/* Audible after multicast */}
                 {hasLink && (
-                  <a
-                    href={book.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); window.open(book.link, "_blank", "noopener,noreferrer"); }}
                     className="mt-3 self-start inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-3 py-2 sm:px-4 sm:py-2 rounded-full transition-colors shadow-lg"
                   >
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
                     Listen on Audible
-                  </a>
+                  </button>
                 )}
               </div>
             )}
             {/* Audible for no co-narrator or single co-narrator */}
             {coNarratorList.length <= 1 && hasLink && (
-              <a
-                href={book.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); window.open(book.link, "_blank", "noopener,noreferrer"); }}
                 className="mt-3 self-start inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-3 py-2 sm:px-4 sm:py-2 rounded-full transition-colors shadow-lg"
               >
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
                 Listen on Audible
-              </a>
-            )}
-            {book.slug && (
-              <Link
-                href={`/narrated-works/${book.slug}`}
-                onClick={(e) => e.stopPropagation()}
-                className="mt-2 inline-flex items-center gap-1 text-xs text-white/35 hover:text-white/60 transition-colors"
-              >
-                View details
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
-                </svg>
-              </Link>
+              </button>
             )}
           </div>
         </div>
@@ -507,7 +486,7 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
           label="Co-narrator"
         />
       )}
-    </div>
+    </Link>
   );
 }
 
