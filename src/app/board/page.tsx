@@ -364,12 +364,40 @@ const BAR_INSET = 7; // px top/bottom inside the 52px row
 function TimelineView({
   cards,
   onStatusChange,
+  onCardUpdate,
 }: {
   cards: BoardCard[];
   onStatusChange: (id: string, status: string) => void;
+  onCardUpdate: (id: string, updates: { deadline?: string; first15_due?: string }) => void;
 }) {
   const [offset, setOffset] = useState(0);
   const [completedOpen, setCompletedOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [inlineDates, setInlineDates] = useState({ deadline: "", first15_due: "" });
+  const [savingInline, setSavingInline] = useState(false);
+
+  const openInline = (card: BoardCard) => {
+    setInlineDates({ deadline: card.deadline ?? "", first15_due: card.first15_due ?? "" });
+    setEditingId(card.id);
+  };
+
+  const cancelInline = () => setEditingId(null);
+
+  const saveInline = async () => {
+    if (!editingId) return;
+    setSavingInline(true);
+    const updates: { deadline?: string; first15_due?: string } = {};
+    if (inlineDates.deadline)    updates.deadline    = inlineDates.deadline;
+    if (inlineDates.first15_due) updates.first15_due = inlineDates.first15_due;
+    await fetch("/api/board", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: editingId, ...updates }),
+    });
+    onCardUpdate(editingId, updates);
+    setEditingId(null);
+    setSavingInline(false);
+  };
 
   // ── Card partitions ─────────────────────────────────────────────────────────
   const barCards = useMemo(() =>
@@ -631,24 +659,97 @@ function TimelineView({
           <p className="text-[11px] uppercase tracking-[0.18em] text-white/25 font-medium mb-3">No dates set</p>
           <div className="space-y-1">
             {noDates.map(card => (
-              <div key={card.id} className="flex items-center gap-3 py-1.5 px-2 rounded-lg hover:bg-white/[0.03] transition-colors group/nd">
-                {card.cover_url
-                  ? <img src={card.cover_url} alt={card.title} className="h-8 w-6 object-cover rounded shrink-0 opacity-60"/>
-                  : <div className="h-8 w-6 bg-white/5 rounded shrink-0"/>
-                }
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs font-semibold text-white/50 truncate leading-tight">{card.title}</p>
-                    <Link
-                      href={`/board/card/${card.id}`}
-                      className="text-[10px] text-white/20 hover:text-[#D4AF37] transition-colors shrink-0 opacity-0 group-hover/nd:opacity-100 whitespace-nowrap"
+              editingId === card.id ? (
+                /* ── Inline date picker ── */
+                <div key={card.id} className="rounded-xl border border-[#D4AF37]/25 bg-[#D4AF37]/5 p-3 my-1">
+                  {/* Card identity + close */}
+                  <div className="flex items-center gap-2.5 mb-3">
+                    {card.cover_url
+                      ? <img src={card.cover_url} alt={card.title} className="h-9 w-6 object-cover rounded shrink-0"/>
+                      : <div className="h-9 w-6 bg-white/5 rounded shrink-0"/>}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-white/80 truncate leading-tight">{card.title}</p>
+                      {card.author && <p className="text-[10px] text-white/40 truncate">{card.author}</p>}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={cancelInline}
+                      className="text-white/30 hover:text-white/60 transition-colors p-1"
+                      aria-label="Cancel"
                     >
-                      Add deadline →
-                    </Link>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                      </svg>
+                    </button>
                   </div>
-                  {card.author && <p className="text-[10px] text-white/25 truncate leading-tight">{card.author}</p>}
+
+                  {/* Date fields */}
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/35 block mb-1">
+                        Deadline
+                      </label>
+                      <input
+                        type="date"
+                        value={inlineDates.deadline}
+                        onChange={e => setInlineDates(p => ({ ...p, deadline: e.target.value }))}
+                        className="w-full bg-[#06082E] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/35 block mb-1">
+                        First 15 Due
+                      </label>
+                      <input
+                        type="date"
+                        value={inlineDates.first15_due}
+                        onChange={e => setInlineDates(p => ({ ...p, first15_due: e.target.value }))}
+                        className="w-full bg-[#06082E] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={saveInline}
+                      disabled={savingInline || (!inlineDates.deadline && !inlineDates.first15_due)}
+                      className="text-xs font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-4 py-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {savingInline ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelInline}
+                      className="text-xs text-white/40 hover:text-white/70 px-4 py-1.5 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* ── Normal row ── */
+                <div key={card.id} className="flex items-center gap-3 py-1.5 px-2 rounded-lg hover:bg-white/[0.03] transition-colors group/nd">
+                  {card.cover_url
+                    ? <img src={card.cover_url} alt={card.title} className="h-8 w-6 object-cover rounded shrink-0 opacity-60"/>
+                    : <div className="h-8 w-6 bg-white/5 rounded shrink-0"/>
+                  }
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-semibold text-white/50 truncate leading-tight">{card.title}</p>
+                      <button
+                        type="button"
+                        onClick={() => openInline(card)}
+                        className="text-[10px] text-white/20 hover:text-[#D4AF37] transition-colors shrink-0 opacity-0 group-hover/nd:opacity-100 whitespace-nowrap"
+                      >
+                        Add deadline →
+                      </button>
+                    </div>
+                    {card.author && <p className="text-[10px] text-white/25 truncate leading-tight">{card.author}</p>}
+                  </div>
+                </div>
+              )
             ))}
           </div>
         </div>
@@ -1252,6 +1353,9 @@ export default function BoardPage() {
           onStatusChange={async (id, status) => {
             setCards(p => p.map(c => c.id === id ? { ...c, status } : c));
             await fetch("/api/board", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
+          }}
+          onCardUpdate={(id, updates) => {
+            setCards(p => p.map(c => c.id === id ? { ...c, ...updates } : c));
           }}
         />
       ) : (
