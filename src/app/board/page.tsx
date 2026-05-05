@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import { EmailScanSection } from "./EmailScanSection";
 
 const COLUMNS = [
   { id: "audition",   label: "Audition",   color: "border-purple-500/30 bg-purple-500/5",  dot: "bg-purple-400",  text: "text-purple-300" },
@@ -304,6 +305,9 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
           )}
         </section>
       </div>
+
+      {/* Email scan */}
+      <EmailScanSection />
 
       {/* Empty state */}
       {dueThisWeek.length === 0 && overdueFirst15.length === 0 && inProgress.total === 0 && (

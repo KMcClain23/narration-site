@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdf-parse", "mammoth"],
+  serverExternalPackages: ["pdf-parse", "mammoth", "@microsoft/microsoft-graph-client", "@azure/msal-node"],
   experimental: {
     serverActions: {
       bodySizeLimit: "20mb",
