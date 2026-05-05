@@ -377,9 +377,20 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
           </div>
           {/* Expanded (hover) state */}
           <div className="hidden group-hover:block px-3 py-4 sm:px-5 sm:py-5">
-            <h3 className="font-bold text-base sm:text-xl leading-snug text-white" itemProp="name">
-              {book.title}
-            </h3>
+            {book.slug ? (
+              <Link
+                href={`/narrated-works/${book.slug}`}
+                onClick={(e) => e.stopPropagation()}
+                className="font-bold text-base sm:text-xl leading-snug text-white hover:text-[#D4AF37] transition-colors block"
+                itemProp="name"
+              >
+                {book.title}
+              </Link>
+            ) : (
+              <h3 className="font-bold text-base sm:text-xl leading-snug text-white" itemProp="name">
+                {book.title}
+              </h3>
+            )}
             {book.subtitle && (
               <p className="text-xs sm:text-sm text-white mt-1 sm:mt-1.5 leading-snug font-medium">{book.subtitle}</p>
             )}
@@ -461,6 +472,18 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
                 Listen on Audible
               </a>
+            )}
+            {book.slug && (
+              <Link
+                href={`/narrated-works/${book.slug}`}
+                onClick={(e) => e.stopPropagation()}
+                className="mt-2 inline-flex items-center gap-1 text-xs text-white/35 hover:text-white/60 transition-colors"
+              >
+                View details
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
+                </svg>
+              </Link>
             )}
           </div>
         </div>
@@ -594,7 +617,15 @@ export default function NarratedWorks() {
                 <p className="mt-1 text-xs text-white/35 hidden sm:block">{totalBooks} titles across dark romance, romantasy, thriller & more</p>
               )}
             </div>
-            {/* Desktop search — always visible */}
+            {/* Desktop: CTA + search */}
+            <div className="hidden sm:flex items-center gap-3">
+              <Link
+                href="/#contact"
+                className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-4 py-2 text-xs font-bold uppercase tracking-wider hover:bg-[#E0C15A] transition whitespace-nowrap"
+              >
+                Request a quote
+              </Link>
+            </div>
             <div className="hidden sm:block relative w-72">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg className="h-3.5 w-3.5 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -614,10 +645,16 @@ export default function NarratedWorks() {
                 </button>
               )}
             </div>
-            {/* Mobile search — icon tap to expand */}
+            {/* Mobile: CTA + search icon */}
             <div className="sm:hidden flex items-center gap-2">
+              <Link
+                href="/#contact"
+                className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-3 py-1.5 text-xs font-bold uppercase tracking-wider hover:bg-[#E0C15A] transition whitespace-nowrap"
+              >
+                Quote
+              </Link>
               {searchOpen ? (
-                <div className="relative w-48">
+                <div className="relative w-40">
                   <input
                     type="text"
                     autoFocus

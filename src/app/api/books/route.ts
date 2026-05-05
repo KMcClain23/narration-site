@@ -43,7 +43,7 @@ export async function GET() {
     // Exclude audition-stage cards (not public yet) and cards without a cover.
     const { data, error } = await supabaseAdmin
       .from("board_cards")
-      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, co_narrator, tags, description, sort_order, status")
+      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, co_narrator, tags, description, sort_order, status, slug")
       .in("status", ["contracted", "recording", "editing", "released"])
       .order("sort_order", { ascending: true })
       .order("title",      { ascending: true });
@@ -74,6 +74,7 @@ export async function GET() {
           category:    STATUS_TO_CATEGORY[card.status as string] ?? "coming-soon",
           co_narrator: (cn as unknown[]).filter(Boolean),
           sort_order:  (card.sort_order  as number) || 0,
+          slug:        (card.slug as string) || null,
         };
       });
 

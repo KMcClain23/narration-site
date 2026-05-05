@@ -49,15 +49,24 @@ export async function GET(req: Request) {
   return NextResponse.json({ cards: data });
 }
 
+function makeSlug(title: string): string {
+  return title.toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
+
 // POST: create card (admin)
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { title, author = "", cover_url = "", status = "audition", deadline, notes = "", author_notes = "", links = [], co_narrator = "", sort_order = 0, chapters = [], subtitle = "", tags = [], description = "", audible_link = "", ar_link = "", word_count = 0, first15_due, pfh_rate = 0, payment_type = "pfh", first_15_complete = false, dean_message = "", author_email = "", slug = "" } = body;
     if (!title?.trim()) return NextResponse.json({ error: "Title required." }, { status: 400 });
+    const resolvedSlug = slug || makeSlug(title.trim());
     const { data, error } = await supabaseAdmin
       .from("board_cards")
-      .insert({ title: title.trim(), author, cover_url, status, deadline: deadline || null, notes, author_notes, links, co_narrator, sort_order, chapters, subtitle, tags, description, audible_link, ar_link, word_count, first15_due: first15_due || null, pfh_rate, payment_type, first_15_complete, dean_message: dean_message || null, author_email: author_email || null, slug: slug || null })
+      .insert({ title: title.trim(), author, cover_url, status, deadline: deadline || null, notes, author_notes, links, co_narrator, sort_order, chapters, subtitle, tags, description, audible_link, ar_link, word_count, first15_due: first15_due || null, pfh_rate, payment_type, first_15_complete, dean_message: dean_message || null, author_email: author_email || null, slug: resolvedSlug })
       .select().single();
     if (error) throw error;
     return NextResponse.json({ success: true, card: data });
@@ -90,6 +99,10 @@ export async function PUT(req: Request) {
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
       if (key in fields) update[key] = fields[key];
+    }
+    // Auto-generate slug from title if title changed but slug wasn't explicitly provided
+    if ("title" in fields && fields.title && !("slug" in fields)) {
+      update.slug = makeSlug(String(fields.title).trim());
     }
     const { data, error } = await supabaseAdmin
       .from("board_cards").update(update).eq("id", id).select().single();

@@ -13,6 +13,7 @@ export type Book = {
   description?: string;
   category: BookCategory;
   sort_order?: number;
+  slug?: string;
   created_at?: string;
   updated_at?: string;
 };
