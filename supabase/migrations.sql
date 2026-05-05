@@ -29,11 +29,12 @@ alter table board_cards add column if not exists slug              text;
 -- admin_integrations: stores OAuth tokens for external services (e.g. Microsoft 365)
 create table if not exists admin_integrations (
   id            uuid        primary key default gen_random_uuid(),
-  service       text        not null,
+  service       text        not null unique,
   access_token  text,
   refresh_token text,
   expires_at    timestamptz,
-  created_at    timestamptz default now()
+  created_at    timestamptz default now(),
+  updated_at    timestamptz default now()
 );
 
 create unique index if not exists admin_integrations_service_idx

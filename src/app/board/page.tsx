@@ -111,6 +111,12 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
     [cards, ago30Days]
   );
 
+  const contracted = useMemo(() =>
+    cards.filter(c => c.status === "contracted")
+      .sort((a, b) => a.sort_order - b.sort_order),
+    [cards]
+  );
+
   const inProgress = useMemo(() => {
     const counts = Object.fromEntries(
       (["contracted", "recording", "editing"] as const).map(s => [s, cards.filter(c => c.status === s).length])
@@ -243,6 +249,37 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
                 </Link>
               );
             })}
+          </div>
+        </section>
+      )}
+
+      {/* ── Contracted books ── */}
+      {contracted.length > 0 && (
+        <section>
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-400/80 mb-3">Contracted</h2>
+          <div className="space-y-2">
+            {contracted.map(card => (
+              <Link key={card.id} href={`/board/card/${card.id}`}
+                className="flex items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 hover:border-blue-500/40 hover:bg-blue-500/10 transition-all">
+                {card.cover_url
+                  ? <img src={card.cover_url} alt={card.title} className="h-12 w-8 object-cover rounded shrink-0"/>
+                  : <div className="h-12 w-8 bg-white/5 rounded shrink-0"/>}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white truncate">{card.title}</p>
+                  {card.author && <p className="text-xs text-[#D4AF37]/70 truncate">{card.author}</p>}
+                  {(card.deadline || card.first15_due) && (
+                    <p className="text-[10px] text-white/35 mt-0.5">
+                      {card.deadline    && `Deadline: ${card.deadline}`}
+                      {card.deadline && card.first15_due && " · "}
+                      {card.first15_due && `First 15: ${card.first15_due}`}
+                    </p>
+                  )}
+                </div>
+                <span className="text-xs font-bold text-blue-300 bg-blue-500/15 px-2.5 py-1 rounded-full shrink-0 whitespace-nowrap">
+                  Contracted
+                </span>
+              </Link>
+            ))}
           </div>
         </section>
       )}
