@@ -542,11 +542,13 @@ export default function NarratedWorks() {
   const [authors, setAuthors] = useState<Record<string, Author>>({});
   const [coNarrators, setCoNarrators] = useState<Record<string, CoNarrator>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
+        setFetchError(null);
         const [booksRes, authorsRes, coNarratorsRes] = await Promise.all([
           fetch("/api/books"),
           fetch("/api/authors"),
@@ -555,7 +557,13 @@ export default function NarratedWorks() {
         const booksData = await booksRes.json();
         const authorsData = await authorsRes.json();
         const coNarratorsData = await coNarratorsRes.json();
-        if (booksRes.ok) setBooks(booksData.books || []);
+        if (booksRes.ok) {
+          setBooks(booksData.books || []);
+        } else {
+          const msg = booksData.details || booksData.error || `HTTP ${booksRes.status}`;
+          console.error("Failed to load books:", msg, booksData);
+          setFetchError(msg);
+        }
         if (authorsRes.ok) {
           const map: Record<string, Author> = {};
           for (const a of authorsData.authors || []) map[a.name] = a;
@@ -567,7 +575,8 @@ export default function NarratedWorks() {
           setCoNarrators(map);
         }
       } catch (error) {
-        console.error(error);
+        console.error("Narrated works fetch error:", error);
+        setFetchError(error instanceof Error ? error.message : "Failed to load");
       } finally {
         setIsLoading(false);
       }
@@ -705,6 +714,11 @@ export default function NarratedWorks() {
         {isLoading ? (
           <div className="py-32 text-center">
             <div className="inline-block h-6 w-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : fetchError ? (
+          <div className="py-32 text-center">
+            <p className="text-white/40 text-sm mb-2">Failed to load books</p>
+            <p className="text-white/20 text-xs font-mono">{fetchError}</p>
           </div>
         ) : searchQuery.trim() && !hasResults ? (
           <div className="py-32 text-center">

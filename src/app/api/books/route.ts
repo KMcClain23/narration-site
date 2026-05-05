@@ -37,48 +37,74 @@ const STATUS_TO_CATEGORY: Record<string, BookCategory> = {
   released:   "completed",
 };
 
+type MappedCard = { id: unknown; title: unknown; subtitle: unknown; author: unknown; link: string; ar_link: string; cover_url: string; tags: unknown[]; description: string; category: string; co_narrator: unknown[]; sort_order: number; slug: string | null };
+
+function mapCards(data: Record<string, unknown>[]): MappedCard[] {
+  return data
+    .filter((c) => c.cover_url)
+    .map((card) => {
+      let cn = card.co_narrator;
+      if (!cn) cn = [];
+      else if (typeof cn === "string") {
+        try { cn = JSON.parse(cn); } catch { cn = cn ? [cn] : []; }
+      }
+      if (!Array.isArray(cn)) cn = [cn];
+
+      return {
+        id:          card.id,
+        title:       card.title,
+        subtitle:    card.subtitle || null,
+        author:      card.author,
+        link:        (card.audible_link as string) || "",
+        ar_link:     (card.ar_link     as string) || "",
+        cover_url:   (card.cover_url   as string),
+        tags:        Array.isArray(card.tags) ? card.tags : [],
+        description: (card.description as string) || "",
+        category:    STATUS_TO_CATEGORY[card.status as string] ?? "coming-soon",
+        co_narrator: (cn as unknown[]).filter(Boolean),
+        sort_order:  (card.sort_order  as number) || 0,
+        slug:        (card.slug as string) || null,
+      };
+    });
+}
+
 export async function GET() {
   try {
-    // Source of truth is board_cards — no separate books table to maintain.
-    // Exclude audition-stage cards (not public yet) and cards without a cover.
-    const { data, error } = await supabaseAdmin
+    // Source of truth is board_cards. Try with slug first; fall back without
+    // it if the column hasn't been migrated yet so the page never goes blank.
+    const STATUS_FILTER = ["contracted", "recording", "editing", "released"] as const;
+
+    const primary = await supabaseAdmin
       .from("board_cards")
       .select("id, title, subtitle, author, cover_url, audible_link, ar_link, co_narrator, tags, description, sort_order, status, slug")
-      .in("status", ["contracted", "recording", "editing", "released"])
+      .in("status", STATUS_FILTER)
       .order("sort_order", { ascending: true })
       .order("title",      { ascending: true });
 
-    if (error) throw error;
+    let rows: Record<string, unknown>[];
 
-    const books = (data || [])
-      .filter((c: Record<string, unknown>) => c.cover_url) // skip cards with no cover
-      .map((card: Record<string, unknown>) => {
-        // Normalize co_narrator (may be JSON string, array, or plain string)
-        let cn = card.co_narrator;
-        if (!cn) cn = [];
-        else if (typeof cn === "string") {
-          try { cn = JSON.parse(cn); } catch { cn = cn ? [cn] : []; }
-        }
-        if (!Array.isArray(cn)) cn = [cn];
+    if (primary.error) {
+      console.error("GET /api/books — primary query failed (slug column may be missing):", primary.error.message, primary.error.details ?? "");
+      // Retry without slug
+      const fallback = await supabaseAdmin
+        .from("board_cards")
+        .select("id, title, subtitle, author, cover_url, audible_link, ar_link, co_narrator, tags, description, sort_order, status")
+        .in("status", STATUS_FILTER)
+        .order("sort_order", { ascending: true })
+        .order("title",      { ascending: true });
 
-        return {
-          id:          card.id,
-          title:       card.title,
-          subtitle:    card.subtitle || null,
-          author:      card.author,
-          link:        (card.audible_link as string) || "",
-          ar_link:     (card.ar_link     as string) || "",
-          cover_url:   (card.cover_url   as string),
-          tags:        Array.isArray(card.tags) ? card.tags : [],
-          description: (card.description as string) || "",
-          category:    STATUS_TO_CATEGORY[card.status as string] ?? "coming-soon",
-          co_narrator: (cn as unknown[]).filter(Boolean),
-          sort_order:  (card.sort_order  as number) || 0,
-          slug:        (card.slug as string) || null,
-        };
-      });
+      if (fallback.error) {
+        console.error("GET /api/books — fallback query also failed:", fallback.error.message, fallback.error.details ?? "");
+        throw fallback.error;
+      }
+      rows = (fallback.data || []) as Record<string, unknown>[];
+    } else {
+      rows = (primary.data || []) as Record<string, unknown>[];
+    }
 
-    // Deduplicate by title+author (safety net for edge cases)
+    const books = mapCards(rows);
+
+    // Deduplicate by title+author
     const seen = new Set<string>();
     const deduped = books.filter((b) => {
       const key = `${String(b.title).trim().toLowerCase()}||${String(b.author).trim().toLowerCase()}`;
