@@ -706,7 +706,7 @@ export default function NarratedWorks() {
           <div className="py-32 text-center">
             <div className="inline-block h-6 w-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : !hasResults ? (
+        ) : searchQuery.trim() && !hasResults ? (
           <div className="py-32 text-center">
             <p className="text-white/30">No results for &ldquo;{searchQuery}&rdquo;</p>
             <button onClick={() => setSearchQuery("")} className="mt-3 text-[#D4AF37] text-sm hover:underline" type="button">Clear search</button>
