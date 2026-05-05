@@ -15,25 +15,46 @@ type Suggestion = {
 };
 
 export function EmailScanSection() {
-  const [connected, setConnected]     = useState<boolean | null>(null);
-  const [scanning, setScanning]       = useState(false);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [dismissed, setDismissed]     = useState<Set<number>>(new Set());
-  const [updating, setUpdating]       = useState<Set<number>>(new Set());
-  const [scanStats, setScanStats]     = useState("");
-  const [error, setError]             = useState("");
+  const [connected, setConnected]         = useState<boolean | null>(null);
+  const [scanning, setScanning]           = useState(false);
+  const [suggestions, setSuggestions]     = useState<Suggestion[]>([]);
+  const [dismissed, setDismissed]         = useState<Set<number>>(new Set());
+  const [updating, setUpdating]           = useState<Set<number>>(new Set());
+  const [scanStats, setScanStats]         = useState("");
+  const [error, setError]                 = useState("");
+  const [successToast, setSuccessToast]   = useState(false);
 
-  // Check connection status on mount and after OAuth redirect
   useEffect(() => {
+    // Check connection status from the API
     fetch("/api/email-scan")
       .then(r => r.json())
       .then(d => setConnected(!!d.connected))
       .catch(() => setConnected(false));
 
-    // Show toast if redirected back after OAuth
+    // Handle OAuth redirect params
     const params = new URLSearchParams(window.location.search);
-    if (params.get("ms_connected")) setConnected(true);
-    if (params.get("ms_error")) setError(`Connection failed: ${params.get("ms_error")}`);
+    const ms = params.get("microsoft");
+
+    if (ms === "connected") {
+      setConnected(true);
+      setSuccessToast(true);
+      // Clean URL so the param doesn't persist on refresh
+      const clean = new URL(window.location.href);
+      clean.searchParams.delete("microsoft");
+      window.history.replaceState({}, "", clean.toString());
+      // Auto-dismiss after 4 s
+      const t = setTimeout(() => setSuccessToast(false), 4000);
+      return () => clearTimeout(t);
+    }
+
+    if (ms === "error") {
+      const detail = params.get("ms_error") ?? "unknown error";
+      setError(`Microsoft connection failed: ${detail}`);
+      const clean = new URL(window.location.href);
+      clean.searchParams.delete("microsoft");
+      clean.searchParams.delete("ms_error");
+      window.history.replaceState({}, "", clean.toString());
+    }
   }, []);
 
   async function handleScan() {
@@ -94,6 +115,25 @@ export function EmailScanSection() {
 
   return (
     <section className="rounded-2xl border border-white/8 bg-[#0A0D3A] p-5">
+
+      {/* Success toast */}
+      {successToast && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+          <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+          Microsoft email connected successfully
+          <button
+            onClick={() => setSuccessToast(false)}
+            className="ml-auto text-emerald-400/60 hover:text-emerald-300 transition-colors"
+            aria-label="Dismiss"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">

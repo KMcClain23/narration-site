@@ -20,20 +20,29 @@ export async function GET(req: Request) {
   const code  = searchParams.get("code");
   const state = searchParams.get("state");
   const error = searchParams.get("error");
-  const board = new URL("/board", req.url).toString();
+
+  // Always land back on the board — middleware will pass through because the
+  // admin cookie is same-site at this point in the redirect chain.
+  const dest = new URL("/board", req.url);
 
   if (error) {
     const desc = encodeURIComponent(searchParams.get("error_description") ?? error);
-    return NextResponse.redirect(`${board}?ms_error=${desc}`);
+    dest.searchParams.set("microsoft", "error");
+    dest.searchParams.set("ms_error", desc);
+    return NextResponse.redirect(dest.toString());
   }
 
   // Validate CSRF state
   const storedState = readCookie(req, "ms_oauth_state");
   if (!state || !storedState || state !== storedState) {
-    return NextResponse.redirect(`${board}?ms_error=invalid_state`);
+    dest.searchParams.set("microsoft", "error");
+    dest.searchParams.set("ms_error", "invalid_state");
+    return NextResponse.redirect(dest.toString());
   }
   if (!code) {
-    return NextResponse.redirect(`${board}?ms_error=no_code`);
+    dest.searchParams.set("microsoft", "error");
+    dest.searchParams.set("ms_error", "no_code");
+    return NextResponse.redirect(dest.toString());
   }
 
   // Exchange authorisation code for tokens
@@ -55,7 +64,9 @@ export async function GET(req: Request) {
 
   if (!tokenRes.ok) {
     console.error("Microsoft token exchange failed:", await tokenRes.text());
-    return NextResponse.redirect(`${board}?ms_error=token_exchange_failed`);
+    dest.searchParams.set("microsoft", "error");
+    dest.searchParams.set("ms_error", "token_exchange_failed");
+    return NextResponse.redirect(dest.toString());
   }
 
   const tokens = await tokenRes.json();
@@ -72,7 +83,8 @@ export async function GET(req: Request) {
     { onConflict: "service" }
   );
 
-  const res = NextResponse.redirect(`${board}?ms_connected=1`);
+  dest.searchParams.set("microsoft", "connected");
+  const res = NextResponse.redirect(dest.toString());
   res.cookies.delete("ms_oauth_state");
   return res;
 }
