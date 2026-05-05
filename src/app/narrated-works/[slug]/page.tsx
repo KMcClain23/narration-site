@@ -3,6 +3,8 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { AuthorHoverName, NarratedBySection } from "./NarratedBySection";
+import type { CoNarratorDetail } from "./NarratedBySection";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -26,29 +28,12 @@ function titleToSlug(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
-function getInitials(name: string): string {
-  return name.split(/\s+/).map(w => w[0] ?? "").join("").slice(0, 2).toUpperCase();
-}
-
-// Deterministic avatar background colour from name
-const AVATAR_COLORS = [
-  "bg-violet-800", "bg-indigo-800", "bg-sky-800",
-  "bg-teal-800",   "bg-rose-900",   "bg-amber-900",
-];
-function avatarColor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
-}
-
 // ─── data fetching ────────────────────────────────────────────────────────────
-
-type CoNarratorDetail = { name: string; photo: string | null; bio: string | null };
 
 async function getBook(slug: string) {
   const { data } = await supabaseAdmin
     .from("board_cards")
-    .select("id, title, subtitle, author, cover_url, audible_link, ar_link, co_narrator, tags, description, status")
+    .select("id, title, subtitle, author, author_notes, cover_url, audible_link, ar_link, co_narrator, tags, description, status")
     .in("status", ["contracted", "recording", "editing", "released"]);
   if (!data) return null;
   return data.find((card) => titleToSlug(card.title ?? "") === slug) ?? null;
@@ -57,7 +42,7 @@ async function getBook(slug: string) {
 async function getCoNarratorDetails(names: string[]): Promise<CoNarratorDetail[]> {
   if (!names.length) return [];
 
-  // Try to select photo column; fall back if it doesn't exist yet
+  // Try with photo; fall back if column not yet migrated
   const withPhoto = await supabaseAdmin
     .from("co_narrators")
     .select("name, bio, photo")
@@ -136,6 +121,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   const statusStyle = STATUS_TO_STYLE[book.status] ?? "bg-white/10 text-white/50 border-white/10";
   const tags: string[] = Array.isArray(book.tags) ? book.tags : [];
   const isReleased = book.status === "released";
+  const authorBio = (book.author_notes as string) || null;
 
   return (
     <main className="min-h-screen bg-[#06082E] text-white">
@@ -197,9 +183,8 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
               <p className="text-lg text-white/50 mb-3 leading-snug">{book.subtitle}</p>
             )}
 
-            <p className="text-[#D4AF37] font-semibold text-lg mb-5" itemProp="byArtist">
-              {book.author}
-            </p>
+            {/* Author name — hover popup shows bio */}
+            <AuthorHoverName name={book.author} bio={authorBio} />
 
             {/* Tags */}
             {tags.length > 0 && (
@@ -220,67 +205,11 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
               </p>
             )}
 
-            {/* ── Narrated by ─────────────────────────────────────────── */}
-            <div className="mb-8">
-              <p className="text-[10px] uppercase tracking-[0.22em] text-white/35 font-semibold mb-3">
-                Narrated by
-              </p>
-              <div className="flex flex-wrap gap-5">
-
-                {/* Dean Miller */}
-                <Link
-                  href="/about"
-                  className="flex items-center gap-3 group/dean"
-                  aria-label="About Dean Miller"
-                >
-                  <div className="relative h-11 w-11 rounded-full overflow-hidden border border-white/15 shrink-0 ring-2 ring-transparent group-hover/dean:ring-[#D4AF37]/50 transition-all">
-                    <Image
-                      src="/dean-headshot.jpg"
-                      alt="Dean Miller"
-                      fill
-                      className="object-cover object-top"
-                      sizes="44px"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-white group-hover/dean:text-[#D4AF37] transition-colors leading-tight">
-                      Dean Miller
-                    </p>
-                    <p className="text-[11px] text-white/40 leading-tight">Narrator</p>
-                  </div>
-                </Link>
-
-                {/* Co-narrators */}
-                {coNarratorNames.map(name => {
-                  const detail = coNarratorDetails.find(d => d.name === name);
-                  const initials = getInitials(name);
-                  const color = avatarColor(name);
-                  return (
-                    <div key={name} className="flex items-center gap-3">
-                      <div className={`relative h-11 w-11 rounded-full overflow-hidden border border-white/15 shrink-0 flex items-center justify-center ${!detail?.photo ? color : ""}`}>
-                        {detail?.photo ? (
-                          <Image
-                            src={detail.photo}
-                            alt={name}
-                            fill
-                            className="object-cover"
-                            sizes="44px"
-                          />
-                        ) : (
-                          <span className="text-xs font-bold text-white/80">{initials}</span>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-white leading-tight">{name}</p>
-                        <p className="text-[11px] text-white/40 leading-tight">Co-Narrator</p>
-                      </div>
-                    </div>
-                  );
-                })}
-
-              </div>
-            </div>
-            {/* ────────────────────────────────────────────────────────── */}
+            {/* Narrator / co-narrator row — hover popups for each person */}
+            <NarratedBySection
+              coNarratorNames={coNarratorNames}
+              coNarratorDetails={coNarratorDetails}
+            />
 
             {/* CTAs */}
             <div className="flex flex-wrap gap-3">
