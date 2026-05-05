@@ -61,14 +61,16 @@ export async function GET(req: Request) {
   const tokens = await tokenRes.json();
   const expiresAt = new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString();
 
-  // Upsert into admin_integrations (delete + insert to avoid needing a unique constraint)
-  await supabaseAdmin.from("admin_integrations").delete().eq("service", "microsoft");
-  await supabaseAdmin.from("admin_integrations").insert({
-    service:       "microsoft",
-    access_token:  tokens.access_token,
-    refresh_token: tokens.refresh_token ?? null,
-    expires_at:    expiresAt,
-  });
+  // Upsert using the unique index on (service)
+  await supabaseAdmin.from("admin_integrations").upsert(
+    {
+      service:       "microsoft",
+      access_token:  tokens.access_token,
+      refresh_token: tokens.refresh_token ?? null,
+      expires_at:    expiresAt,
+    },
+    { onConflict: "service" }
+  );
 
   const res = NextResponse.redirect(`${board}?ms_connected=1`);
   res.cookies.delete("ms_oauth_state");

@@ -131,14 +131,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ suggestions: [], message: "No active books on the board to match against." });
   }
 
-  // 3. Fetch last 90 days of emails from Microsoft Graph
+  // 3. Fetch last 90 days of emails from Microsoft Graph.
+  //    $orderby is intentionally omitted — combining it with $filter on
+  //    receivedDateTime causes a 400 on Graph v1.0 (no composite index).
+  //    We sort client-side instead.
   const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const graphParams = new URLSearchParams({
+    "$filter": `receivedDateTime ge ${since}`,
+    "$select": "subject,bodyPreview,from,receivedDateTime",
+    "$top":    "100",
+  });
   const graphRes = await fetch(
-    `https://graph.microsoft.com/v1.0/me/messages` +
-    `?$filter=receivedDateTime ge ${since}` +
-    `&$select=subject,bodyPreview,from,receivedDateTime` +
-    `&$top=100` +
-    `&$orderby=receivedDateTime desc`,
+    `https://graph.microsoft.com/v1.0/me/messages?${graphParams}`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
 
@@ -152,7 +156,10 @@ export async function POST(req: Request) {
   }
 
   const graphData = await graphRes.json();
-  const allEmails: Email[] = graphData.value ?? [];
+  const allEmails: Email[] = (graphData.value ?? []).sort(
+    (a: Email, b: Email) =>
+      new Date(b.receivedDateTime).getTime() - new Date(a.receivedDateTime).getTime()
+  );
 
   // 4. Filter emails that mention any book title (first 25 chars, case-insensitive)
   const titleKeys = cards.map(c => ({ id: c.id, key: c.title.toLowerCase().slice(0, 25) }));
