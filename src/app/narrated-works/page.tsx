@@ -281,15 +281,14 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
 
   const bookSlug = makeSlug(book.title);
   return (
-    <Link
-      href={`/narrated-works/${bookSlug}`}
-      className="group relative rounded-2xl overflow-visible cursor-pointer block"
+    <div
+      className="group relative rounded-2xl overflow-visible cursor-pointer"
       itemScope
       itemType="https://schema.org/Book"
       style={{ aspectRatio: "2/3" }}
     >
-      {/* Cover wrapper — clip to card shape */}
-      <div className="absolute inset-0 rounded-2xl overflow-hidden">
+      {/* Cover wrapper — also the primary navigation link for the card */}
+      <Link href={`/narrated-works/${bookSlug}`} className="absolute inset-0 block rounded-2xl overflow-hidden">
         <Image
           src={book.cover_url}
           alt={`${book.title} audiobook narrated by Dean Miller`}
@@ -307,17 +306,15 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
           className="absolute inset-0 z-20 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col p-3 sm:p-4"
           style={{ background: "linear-gradient(to bottom, rgba(6,8,46,0.85) 0%, rgba(6,8,46,0.1) 40%, transparent 100%)" }}
         >
-          {/* Tags — top, clickable to filter */}
+          {/* Tags — decorative pills */}
           <div className="flex flex-wrap gap-2">
             {book.tags.slice(0, 3).map((tag) => (
-              <button
+              <span
                 key={tag}
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onTagClick(tag); }}
-                className="text-[10px] sm:text-sm font-bold uppercase tracking-wide text-white bg-[#D4AF37]/30 border border-[#D4AF37]/60 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full backdrop-blur-sm hover:bg-[#D4AF37]/50 hover:border-[#D4AF37] transition-colors cursor-pointer"
+                className="text-[10px] sm:text-sm font-bold uppercase tracking-wide text-white bg-[#D4AF37]/30 border border-[#D4AF37]/60 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full backdrop-blur-sm"
               >
                 {tag}
-              </button>
+              </span>
             ))}
           </div>
         </div>
@@ -328,10 +325,12 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
             {statusBadge}
           </div>
         )}
-      </div>
+      </Link>
 
-      {/* Floating pill — compact default, expands on hover */}
-      <div className="absolute bottom-0 inset-x-0 z-30">
+      {/* Floating pill — compact default, expands on hover.
+          pointer-events-none in compact so clicks fall through to the cover Link;
+          pointer-events-auto on hover so expanded buttons work. */}
+      <div className="absolute bottom-0 inset-x-0 z-30 pointer-events-none group-hover:pointer-events-auto">
         {/* Invisible anchor for popup positioning — always present */}
         <button
           ref={authorBtnRef}
@@ -383,9 +382,13 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
           </div>
           {/* Expanded (hover) state */}
           <div className="hidden group-hover:block px-3 py-4 sm:px-5 sm:py-5">
-            <h3 className="font-bold text-base sm:text-xl leading-snug text-white" itemProp="name">
+            <Link
+              href={`/narrated-works/${bookSlug}`}
+              className="font-bold text-base sm:text-xl leading-snug text-white hover:text-[#D4AF37] transition-colors block"
+              itemProp="name"
+            >
               {book.title}
-            </h3>
+            </Link>
             {book.subtitle && (
               <p className="text-xs sm:text-sm text-white mt-1 sm:mt-1.5 leading-snug font-medium">{book.subtitle}</p>
             )}
@@ -464,6 +467,16 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
                 Listen on Audible
               </button>
             )}
+            {/* Explicit "View details" CTA */}
+            <Link
+              href={`/narrated-works/${bookSlug}`}
+              className="mt-3 inline-flex items-center gap-1 text-xs text-white/40 hover:text-white/70 transition-colors"
+            >
+              View details
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
+              </svg>
+            </Link>
           </div>
         </div>
       </div>
@@ -486,7 +499,7 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
           label="Co-narrator"
         />
       )}
-    </Link>
+    </div>
   );
 }
 
