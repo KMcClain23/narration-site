@@ -819,6 +819,7 @@ export default function BoardPage() {
   const [tagInput, setTagInput] = useState("");
   const [syncing, setSyncing] = useState<string|null>(null);
   const [error, setError] = useState<string|null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{id:string;title:string}|null>(null);
   const [coNarratorNames, setCoNarratorNames] = useState<string[]>([]);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -922,8 +923,14 @@ export default function BoardPage() {
     setSaving(false);
   };
 
-  const del = async (id: string) => {
-    if (!confirm("Delete this card?")) return;
+  const del = (id: string, title = "this project") => {
+    setDeleteConfirm({ id, title });
+  };
+
+  const confirmDel = async () => {
+    if (!deleteConfirm) return;
+    const { id } = deleteConfirm;
+    setDeleteConfirm(null);
     await fetch("/api/board",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
     setCards(p=>p.filter(c=>c.id!==id));
   };
@@ -1059,6 +1066,31 @@ export default function BoardPage() {
       </div>
 
       {/* Import modal */}
+      {/* ── Delete confirmation dialog ── */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center px-4"
+          style={{background:"rgba(0,0,0,0.65)",backdropFilter:"blur(4px)"}}
+          onClick={e=>{if(e.target===e.currentTarget) setDeleteConfirm(null);}}>
+          <div className="w-full max-w-sm bg-[#0A0D3A] border border-white/15 rounded-2xl p-6 shadow-2xl">
+            <h3 className="font-bold text-white text-base mb-2">Delete project?</h3>
+            <p className="text-sm text-white/55 mb-6 leading-relaxed">
+              <span className="text-white font-semibold">&ldquo;{deleteConfirm.title}&rdquo;</span>{" "}
+              will be permanently removed. This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-2.5 rounded-full border border-white/15 text-sm text-white/70 hover:text-white transition-colors">
+                Cancel
+              </button>
+              <button type="button" onClick={confirmDel}
+                className="flex-1 py-2.5 rounded-full bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showImport && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
           onClick={e=>{if(e.target===e.currentTarget) setShowImport(false);}}>
@@ -1378,7 +1410,19 @@ export default function BoardPage() {
               </div>
 
               <div className="px-3 pb-3 space-y-3">
-                {loading ? <div className="h-24 rounded-xl bg-white/5 animate-pulse"/> :
+                {loading ? (
+                  <div className="space-y-3">
+                    {[0,1,2].map(k => (
+                      <div key={k} className="animate-pulse rounded-xl border border-white/5 overflow-hidden">
+                        <div className="h-28 bg-white/[0.06]" />
+                        <div className="p-3 space-y-2">
+                          <div className="h-3 w-3/4 rounded bg-white/8" />
+                          <div className="h-2.5 w-1/2 rounded bg-white/5" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) :
                 cards.filter(c=>c.status===column.id).sort(sortCards).map(card=>(
                   <div key={card.id} draggable onDragStart={()=>setDragId(card.id)}
                     className={`rounded-xl bg-[#06082E]/80 border border-white/8 hover:border-white/15 transition-all cursor-grab active:cursor-grabbing shadow-md group ${dragId===card.id?"opacity-30 scale-95":""} ${syncing===card.id?"opacity-60":""}`}>
@@ -1531,7 +1575,7 @@ export default function BoardPage() {
                           <button type="button" onClick={()=>startEdit(card)} className="text-white/40 hover:text-white transition-colors">
                             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                           </button>
-                          <button type="button" onClick={()=>del(card.id)} className="text-white/40 hover:text-red-400 transition-colors">
+                          <button type="button" onClick={()=>del(card.id, card.title)} className="text-white/40 hover:text-red-400 transition-colors">
                             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                           </button>
                         </div>

@@ -1,7 +1,1 @@
-{
-  "functions": {
-    "src/app/api/board-pdf-chapters/route.ts": {
-      "maxDuration": 10
-    }
-  }
-}
+{"crons":[{"path":"/api/send-status-emails","schedule":"0 14,22 * * *"}]}

@@ -39,3 +39,17 @@ create table if not exists admin_integrations (
 
 create unique index if not exists admin_integrations_service_idx
   on admin_integrations(service);
+
+-- status_change_log: audit trail for batched author status-update emails
+create table if not exists status_change_log (
+  id         uuid        primary key default gen_random_uuid(),
+  card_id    uuid        references board_cards(id) on delete cascade,
+  old_status text,
+  new_status text,
+  emailed    boolean     default false,
+  created_at timestamptz default now()
+);
+
+create index if not exists status_change_log_unemailed
+  on status_change_log(emailed, created_at)
+  where emailed = false;

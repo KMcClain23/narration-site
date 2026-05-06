@@ -704,8 +704,23 @@ export default function NarratedWorks() {
         </div>{/* end sticky */}
 
         {isLoading ? (
-          <div className="py-32 text-center">
-            <div className="inline-block h-6 w-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
+          <div className="space-y-10">
+            {[6, 4].map((count, si) => (
+              <div key={si}>
+                <div className="flex items-center gap-4 mb-5">
+                  <div className="h-2.5 w-20 bg-white/8 rounded animate-pulse" />
+                  <div className="flex-1 h-px bg-white/5" />
+                  <div className="h-2.5 w-4 bg-white/6 rounded animate-pulse" />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                  {Array.from({ length: count }).map((_, i) => (
+                    <div key={i} className="animate-pulse" style={{ aspectRatio: "2/3" }}>
+                      <div className="w-full h-full rounded-2xl bg-white/[0.07]" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : fetchError ? (
           <div className="py-32 text-center">

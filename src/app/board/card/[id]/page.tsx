@@ -62,6 +62,8 @@ export default function CardDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [chapterDeleteConfirm, setChapterDeleteConfirm] = useState<{idx:number;title:string}|null>(null);
   const [pdfProgress, setPdfProgress] = useState("");
   const [coverDragOver, setCoverDragOver] = useState(false);
   const [first15Complete, setFirst15Complete] = useState(false);
@@ -242,19 +244,28 @@ export default function CardDetailPage() {
   const triggerAutoSave = (updated: Chapter[]) => {
     chaptersToSave.current = updated;
     if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSaveFailed(false);
     saveTimer.current = setTimeout(async () => {
       setSaving(true);
       try {
-        await fetch("/api/board", {
+        const r = await fetch("/api/board", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id, chapters: chaptersToSave.current }),
         });
+        if (!r.ok) throw new Error("non-ok");
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
-      } catch { setError("Save failed."); }
+      } catch {
+        setSaveFailed(true);
+      }
       setSaving(false);
-    }, 800);
+    }, 2000);
+  };
+
+  const retrySave = () => {
+    setSaveFailed(false);
+    triggerAutoSave(chaptersToSave.current);
   };
 
   const updateChapter = (idx: number, field: keyof Chapter, value: string | number) => {
@@ -366,15 +377,32 @@ export default function CardDetailPage() {
             </span>
           )}
         </div>
-        <button
-          onClick={saveChapters}
-          disabled={saving}
-          className={`inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-full transition-colors shrink-0 ${
-            saved ? "bg-emerald-500 text-white" : "bg-[#D4AF37] text-black hover:bg-[#E0C15A]"
-          }`}
-        >
-          {saved ? "✓ Saved" : saving ? "Saving…" : "Save chapters"}
-        </button>
+        {/* Auto-save status indicator */}
+        <div className="shrink-0 flex items-center gap-2 text-xs">
+          {saving && (
+            <span className="text-white/35 animate-pulse flex items-center gap-1.5">
+              <span className="h-3 w-3 border border-white/30 border-t-white/60 rounded-full animate-spin" />
+              Saving…
+            </span>
+          )}
+          {saved && !saving && (
+            <span className="text-emerald-400 flex items-center gap-1">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+              </svg>
+              Saved
+            </span>
+          )}
+          {saveFailed && !saving && (
+            <span className="flex items-center gap-2">
+              <span className="text-red-400">Save failed</span>
+              <button type="button" onClick={retrySave}
+                className="text-[#D4AF37] hover:underline underline-offset-2">
+                Retry
+              </button>
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 grid lg:grid-cols-[300px_1fr] gap-8">
@@ -669,7 +697,8 @@ export default function CardDetailPage() {
                           className={`text-xs p-1 rounded transition-colors ${isEditing ? "text-[#D4AF37]" : "text-white/25 hover:text-white"}`}>
                           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         </button>
-                        <button type="button" onClick={() => removeChapter(i)}
+                        <button type="button"
+                          onClick={() => setChapterDeleteConfirm({ idx: i, title: ch.title || (ch.number != null ? `Chapter ${ch.number}` : "this chapter") })}
                           className="text-white/20 hover:text-red-400 text-xs p-1 rounded transition-colors">
                           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
@@ -776,6 +805,36 @@ export default function CardDetailPage() {
           </div>
         </div>
       </div>
+      {/* ── Chapter delete confirmation ── */}
+      {chapterDeleteConfirm && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center px-4"
+          style={{background:"rgba(0,0,0,0.65)",backdropFilter:"blur(4px)"}}
+          onClick={e=>{if(e.target===e.currentTarget) setChapterDeleteConfirm(null);}}>
+          <div className="w-full max-w-sm bg-[#0A0D3A] border border-white/15 rounded-2xl p-6 shadow-2xl">
+            <h3 className="font-bold text-white text-base mb-2">Remove chapter?</h3>
+            <p className="text-sm text-white/55 mb-6 leading-relaxed">
+              <span className="text-white font-semibold">&ldquo;{chapterDeleteConfirm.title}&rdquo;</span>{" "}
+              will be removed from the chapter list.
+            </p>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setChapterDeleteConfirm(null)}
+                className="flex-1 py-2.5 rounded-full border border-white/15 text-sm text-white/70 hover:text-white transition-colors">
+                Cancel
+              </button>
+              <button type="button" onClick={() => {
+                const {idx} = chapterDeleteConfirm;
+                setChapterDeleteConfirm(null);
+                const updated = chapters.filter((_, i) => i !== idx);
+                setChapters(updated);
+                triggerAutoSave(updated);
+              }}
+                className="flex-1 py-2.5 rounded-full bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors">
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

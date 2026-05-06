@@ -106,9 +106,28 @@ export async function PUT(req: Request) {
     if ("title" in fields && fields.title && !("slug" in fields)) {
       update.slug = makeSlug(String(fields.title).trim());
     }
+
+    // Snapshot old status before update so we can log the change
+    let oldStatus: string | null = null;
+    if ("status" in fields) {
+      const { data: cur } = await supabaseAdmin
+        .from("board_cards").select("status").eq("id", id).single();
+      oldStatus = cur?.status ?? null;
+    }
+
     const { data, error } = await supabaseAdmin
       .from("board_cards").update(update).eq("id", id).select().single();
     if (error) throw error;
+
+    // Log status change for batched author emails (fire-and-forget)
+    if (oldStatus && fields.status && oldStatus !== fields.status) {
+      void supabaseAdmin.from("status_change_log").insert({
+        card_id: id,
+        old_status: oldStatus,
+        new_status: String(fields.status),
+      });
+    }
+
     return NextResponse.json({ success: true, card: data });
   } catch (e) {
     return NextResponse.json({ error: "Failed to update card." }, { status: 500 });
