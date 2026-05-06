@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRef, useEffect, useState, useTransition } from "react";
 import { sendEmail } from "@/app/actions/sendEmail";
 import { sendGAEvent } from "@next/third-parties/google";
+import { HomeSearch } from "./HomeSearch";
 
 const BOOKINGS_URL =
   "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
@@ -526,6 +527,12 @@ function HomeContent() {
 
       <div className="max-w-5xl mx-auto px-5 sm:px-6">
 
+        {/* ── SEARCH ── */}
+        <div className="pt-10 pb-6 flex flex-col items-center gap-3">
+          <p className="text-[10px] uppercase tracking-[0.28em] text-white/25">Find what you need</p>
+          <HomeSearch />
+        </div>
+
         {/* ── DEMOS ── */}
         <section id="demos" className="pt-4 scroll-mt-24" aria-label="Audio demos">
           {/* Section label */}
@@ -594,7 +601,7 @@ function HomeContent() {
             </div>
 
             {/* What to expect sidebar */}
-            <aside className="md:col-span-5">
+            <aside id="process" className="md:col-span-5 scroll-mt-24">
               <div className="rounded-2xl overflow-hidden border border-white/8">
                 <div className="px-5 py-4 border-b border-white/8">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37]">What to expect</p>
