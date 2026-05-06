@@ -61,10 +61,54 @@ const IP_STYLE: Record<string, { bg: string; dot: string; label: string }> = {
   editing:    { bg: "bg-orange-500", dot: "bg-orange-400", label: "Editing"    },
 };
 
+type DescResult = { id: string; title: string; desc: string | null; error?: boolean };
+type DescBulkState = {
+  phase: "idle" | "fetching" | "review" | "saving" | "done";
+  results: DescResult[];
+};
+
 function DashboardView({ cards }: { cards: BoardCard[] }) {
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const [descBulk, setDescBulk] = useState<DescBulkState>({ phase: "idle", results: [] });
+
+  const cardsNeedingDesc = cards.filter(c => !c.description?.trim() && c.status !== "released");
+
+  const fetchAllDescriptions = async () => {
+    if (!cardsNeedingDesc.length) return;
+    setDescBulk({ phase: "fetching", results: [] });
+    const results: DescResult[] = [];
+    for (const card of cardsNeedingDesc) {
+      try {
+        const res = await fetch(
+          `/api/fetch-description?title=${encodeURIComponent(card.title)}&author=${encodeURIComponent(card.author || "")}`
+        );
+        const d = await res.json();
+        results.push({ id: card.id, title: card.title, desc: d.description ?? null });
+      } catch {
+        results.push({ id: card.id, title: card.title, desc: null, error: true });
+      }
+      // Yield to avoid blocking the UI between requests
+      setDescBulk({ phase: "fetching", results: [...results] });
+    }
+    setDescBulk({ phase: "review", results });
+  };
+
+  const saveAllDescriptions = async () => {
+    const toSave = descBulk.results.filter(r => r.desc);
+    if (!toSave.length) { setDescBulk({ phase: "idle", results: [] }); return; }
+    setDescBulk(p => ({ ...p, phase: "saving" }));
+    for (const item of toSave) {
+      await fetch("/api/board", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, description: item.desc }),
+      });
+    }
+    setDescBulk({ phase: "done", results: descBulk.results });
+    setTimeout(() => setDescBulk({ phase: "idle", results: [] }), 3000);
+  };
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -342,6 +386,104 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
           )}
         </section>
       </div>
+
+      {/* ── Fetch missing descriptions ── */}
+      {(cardsNeedingDesc.length > 0 || descBulk.phase !== "idle") && (
+        <section className="rounded-2xl border border-white/8 bg-[#0A0D3A] p-5">
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <svg className="h-4 w-4 text-[#D4AF37] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">
+                Missing Descriptions
+              </h2>
+              {descBulk.phase === "idle" && (
+                <span className="text-[10px] text-white/30 border border-white/10 px-1.5 py-0.5 rounded-full">
+                  {cardsNeedingDesc.length} book{cardsNeedingDesc.length !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+            {descBulk.phase === "idle" && (
+              <button
+                type="button"
+                onClick={fetchAllDescriptions}
+                disabled={descBulk.phase !== "idle"}
+                className="text-xs font-semibold text-white/70 border border-white/15 hover:border-white/35 hover:text-white px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Fetch all descriptions
+              </button>
+            )}
+            {descBulk.phase === "done" && (
+              <span className="text-xs text-emerald-400 font-semibold">✓ All saved</span>
+            )}
+          </div>
+
+          {/* Fetching progress */}
+          {descBulk.phase === "fetching" && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-white/35 animate-pulse">
+                Fetching {descBulk.results.length} / {cardsNeedingDesc.length}…
+              </p>
+              <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-[#D4AF37] transition-all duration-300"
+                  style={{ width: `${Math.round((descBulk.results.length / cardsNeedingDesc.length) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Review results */}
+          {(descBulk.phase === "review" || descBulk.phase === "saving") && (
+            <div className="space-y-3">
+              <div className="text-xs text-white/40">
+                Found descriptions for{" "}
+                <span className="text-white font-semibold">
+                  {descBulk.results.filter(r => r.desc).length}
+                </span>{" "}
+                of {descBulk.results.length} books
+                {descBulk.results.some(r => !r.desc) && (
+                  <> · <span className="text-white/30">{descBulk.results.filter(r => !r.desc).length} not found</span></>
+                )}
+              </div>
+              <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                {descBulk.results.map(r => (
+                  <div key={r.id}
+                    className={`rounded-xl px-3 py-2.5 border text-xs ${r.desc ? "border-white/8 bg-white/[0.03]" : "border-white/5 opacity-50"}`}>
+                    <p className="font-semibold text-white/70 truncate mb-0.5">{r.title}</p>
+                    {r.desc
+                      ? <p className="text-white/40 leading-relaxed line-clamp-2">{r.desc}</p>
+                      : <p className="text-white/25 italic">{r.error ? "Fetch error" : "No description found"}</p>
+                    }
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={saveAllDescriptions}
+                  disabled={descBulk.phase === "saving" || !descBulk.results.some(r => r.desc)}
+                  className="text-xs font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-4 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+                >
+                  {descBulk.phase === "saving"
+                    ? "Saving…"
+                    : `Save ${descBulk.results.filter(r => r.desc).length} description${descBulk.results.filter(r => r.desc).length !== 1 ? "s" : ""}`
+                  }
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDescBulk({ phase: "idle", results: [] })}
+                  disabled={descBulk.phase === "saving"}
+                  className="text-xs text-white/35 hover:text-white/60 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Email scan */}
       <EmailScanSection />

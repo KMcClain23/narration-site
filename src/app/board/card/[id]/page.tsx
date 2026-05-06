@@ -64,6 +64,10 @@ export default function CardDetailPage() {
   const [saved, setSaved] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [chapterDeleteConfirm, setChapterDeleteConfirm] = useState<{idx:number;title:string}|null>(null);
+  const [description, setDescription] = useState("");
+  const [fetchingDesc, setFetchingDesc] = useState(false);
+  const [savingDesc, setSavingDesc] = useState(false);
+  const [descSaved, setDescSaved] = useState(false);
   const [pdfProgress, setPdfProgress] = useState("");
   const [coverDragOver, setCoverDragOver] = useState(false);
   const [first15Complete, setFirst15Complete] = useState(false);
@@ -91,6 +95,7 @@ export default function CardDetailPage() {
         setFirst15Complete(data.card.first_15_complete ?? false);
         setDeanMsg(data.card.dean_message || "");
         setAuthorEmail(data.card.author_email || "");
+        setDescription(data.card.description || "");
         setSearchQuery(`${data.card.title || ""}${data.card.author ? " by " + data.card.author : ""}`);
       }
     } catch { setError("Failed to load card."); }
@@ -266,6 +271,35 @@ export default function CardDetailPage() {
   const retrySave = () => {
     setSaveFailed(false);
     triggerAutoSave(chaptersToSave.current);
+  };
+
+  const fetchDescription = async () => {
+    if (!card) return;
+    setFetchingDesc(true);
+    try {
+      const res = await fetch(
+        `/api/fetch-description?title=${encodeURIComponent(card.title)}&author=${encodeURIComponent(card.author || "")}`
+      );
+      const d = await res.json();
+      if (d.description) setDescription(d.description);
+      else setError("No description found for this title.");
+    } catch { setError("Failed to fetch description."); }
+    setFetchingDesc(false);
+  };
+
+  const saveDescription = async () => {
+    setSavingDesc(true);
+    try {
+      await fetch("/api/board", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, description }),
+      });
+      setDescSaved(true);
+      setCard(prev => prev ? { ...prev, description } : prev);
+      setTimeout(() => setDescSaved(false), 2000);
+    } catch { setError("Failed to save description."); }
+    setSavingDesc(false);
   };
 
   const updateChapter = (idx: number, field: keyof Chapter, value: string | number) => {
@@ -490,6 +524,47 @@ export default function CardDetailPage() {
                   First 15
                 </button>
               </div>
+            )}
+          </div>
+
+          {/* Description */}
+          <div className="rounded-2xl border border-white/8 bg-[#0A0D3A] p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-white/40 font-medium">Description</p>
+              <button
+                type="button"
+                onClick={fetchDescription}
+                disabled={fetchingDesc}
+                className="text-[11px] font-bold text-[#D4AF37] border border-[#D4AF37]/30 px-2.5 py-1 rounded-full hover:bg-[#D4AF37]/10 transition-colors disabled:opacity-40 shrink-0"
+              >
+                {fetchingDesc ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 border border-[#D4AF37]/50 border-t-[#D4AF37] rounded-full animate-spin" />
+                    Fetching…
+                  </span>
+                ) : "Fetch description"}
+              </button>
+            </div>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={5}
+              placeholder="Book description (shown on public book page)…"
+              className="w-full bg-black/30 border border-white/8 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 resize-none leading-relaxed"
+            />
+            {description !== (card?.description ?? "") && (
+              <button
+                type="button"
+                onClick={saveDescription}
+                disabled={savingDesc}
+                className={`w-full text-xs font-bold py-2 rounded-lg transition-colors disabled:opacity-40 ${
+                  descSaved
+                    ? "bg-emerald-500 text-white"
+                    : "bg-[#D4AF37] text-black hover:bg-[#E0C15A]"
+                }`}
+              >
+                {savingDesc ? "Saving…" : descSaved ? "✓ Saved" : "Save description"}
+              </button>
             )}
           </div>
 
