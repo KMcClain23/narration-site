@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FaTiktok, FaInstagram, FaDiscord } from "react-icons/fa";
 import { HiMenu, HiX } from "react-icons/hi";
 import { usePathname, useRouter } from "next/navigation";
+import { SiteSearch } from "./SiteSearch";
 
 const BOOKINGS_URL =
   "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
@@ -174,7 +175,8 @@ export default function Header() {
             })}
           </nav>
 
-          {/* Desktop CTA removed — contact is in nav */}
+          {/* Search */}
+          <SiteSearch />
 
           {/* Social Links */}
           <div className="flex items-center gap-4 text-xl">
