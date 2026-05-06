@@ -94,8 +94,22 @@ export default function CardDetailPage() {
         setChapters(data.card.chapters || []);
         setFirst15Complete(data.card.first_15_complete ?? false);
         setDeanMsg(data.card.dean_message || "");
-        setAuthorEmail(data.card.author_email || "");
         setDescription(data.card.description || "");
+        // Look up author email from the authors table by name
+        if (data.card.author) {
+          fetch("/api/authors")
+            .then(r => r.json())
+            .then(d => {
+              const match = (d.authors || []).find(
+                (a: { name: string; email?: string }) =>
+                  a.name.trim().toLowerCase() === data.card.author.trim().toLowerCase()
+              );
+              setAuthorEmail(match?.email || data.card.author_email || "");
+            })
+            .catch(() => setAuthorEmail(data.card.author_email || ""));
+        } else {
+          setAuthorEmail(data.card.author_email || "");
+        }
         setSearchQuery(`${data.card.title || ""}${data.card.author ? " by " + data.card.author : ""}`);
       }
     } catch { setError("Failed to load card."); }
@@ -649,10 +663,20 @@ export default function CardDetailPage() {
           <div className="rounded-2xl border border-white/8 bg-[#0A0D3A] p-4 space-y-3">
             <p className="text-[11px] uppercase tracking-[0.2em] text-white/40 font-medium">Author contact</p>
             <div>
-              <label className="text-[10px] text-white/35 uppercase tracking-wide">Author email</label>
-              <input value={authorEmail} onChange={e => setAuthorEmail(e.target.value)} onBlur={saveDeanMsg}
-                placeholder="author@example.com"
-                className="mt-1 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40"/>
+              <label className="text-[10px] text-white/35 uppercase tracking-wide">Notification email</label>
+              {authorEmail ? (
+                <p className="mt-1 text-xs text-white/70 px-3 py-2 rounded-lg bg-black/30 border border-white/8 flex items-center gap-2">
+                  <svg className="h-3.5 w-3.5 text-white/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                  </svg>
+                  {authorEmail}
+                </p>
+              ) : (
+                <p className="mt-1 text-[11px] text-white/30 px-3 py-2 rounded-lg bg-black/20 border border-white/5">
+                  No email — set one in{" "}
+                  <a href="/admin/stats" className="text-[#D4AF37] hover:underline">Author Profiles</a>
+                </p>
+              )}
             </div>
             <div>
               <label className="text-[10px] text-white/35 uppercase tracking-wide">Message from Dean (shown to author)</label>

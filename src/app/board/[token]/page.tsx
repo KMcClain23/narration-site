@@ -49,6 +49,13 @@ export default async function AuthorBoardView({ params }: { params: Promise<{ to
   const card = cardFull ?? (cardBase as typeof cardFull);
   if (!card) notFound();
 
+  // Track author portal view (fire-and-forget, don't await)
+  void supabaseAdmin.from("analytics_events").insert({
+    event: "author_token_viewed",
+    page: `/board/${token}`,
+    metadata: { card_id: card.id, title: card.title },
+  });
+
   // Parse co-narrator (stored as JSON string or plain string)
   let coNarrators: string[] = [];
   if (card.co_narrator) {

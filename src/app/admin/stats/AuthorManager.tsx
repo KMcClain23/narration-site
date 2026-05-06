@@ -6,6 +6,7 @@ interface Author {
   id: string;
   name: string;
   bio: string;
+  email?: string;
   website: string;
   amazon: string;
   instagram: string;
@@ -17,6 +18,7 @@ interface Author {
 const EMPTY_FORM: Omit<Author, "id"> = {
   name: "",
   bio: "",
+  email: "",
   website: "",
   amazon: "",
   instagram: "",
@@ -99,10 +101,11 @@ function AuthorForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <Field label="Author name" value={form.name} onChange={set("name")} placeholder="e.g. Lillian Minx Monroe" required />
+      <Field label="Email (for status notifications)" value={form.email ?? ""} onChange={set("email")} placeholder="author@example.com" />
       <Field label="Short bio" value={form.bio} onChange={set("bio")} placeholder="One or two sentences about the author…" textarea />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {FIELDS.map((f) => (
-          <Field key={f.key} label={f.label} value={form[f.key]} onChange={set(f.key)} placeholder={f.placeholder} />
+          <Field key={f.key} label={f.label} value={form[f.key] ?? ""} onChange={set(f.key)} placeholder={f.placeholder} />
         ))}
       </div>
       <div className="flex gap-3 pt-2">
@@ -339,8 +342,8 @@ export default function AuthorManager() {
                             <div key={f.key} className="flex items-center gap-2 text-xs">
                               <span className="text-white/30 w-28 shrink-0">{f.label}</span>
                               {author[f.key] ? (
-                                <a href={author[f.key]} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] hover:underline truncate max-w-[200px]">
-                                  {author[f.key].replace(/^https?:\/\/(www\.)?/, "")}
+                                <a href={author[f.key] ?? ""} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] hover:underline truncate max-w-[200px]">
+                                  {(author[f.key] ?? "").replace(/^https?:\/\/(www\.)?/, "")}
                                 </a>
                               ) : (
                                 <span className="text-white/15 italic">—</span>

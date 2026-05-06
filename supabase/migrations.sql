@@ -64,3 +64,18 @@ create table if not exists site_settings (
 insert into site_settings (key, value)
   values ('accepting_projects', 'true')
   on conflict do nothing;
+
+-- email column on authors table for status notification emails
+alter table authors add column if not exists email text;
+
+-- analytics events
+create table if not exists analytics_events (
+  id         uuid        primary key default gen_random_uuid(),
+  event      text        not null,
+  page       text,
+  metadata   jsonb,
+  created_at timestamptz default now()
+);
+
+create index if not exists analytics_events_event_created
+  on analytics_events(event, created_at desc);

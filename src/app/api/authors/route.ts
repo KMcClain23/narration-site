@@ -23,7 +23,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, bio = "", website = "", amazon = "", instagram = "", tiktok = "", facebook = "", goodreads = "" } = body;
+    const { name, bio = "", website = "", amazon = "", instagram = "", tiktok = "", facebook = "", goodreads = "", email = "" } = body;
 
     if (!name?.trim()) {
       return NextResponse.json({ error: "Author name is required." }, { status: 400 });
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 
     const { data, error } = await supabaseAdmin
       .from("authors")
-      .insert({ name: name.trim(), bio, website, amazon, instagram, tiktok, facebook, goodreads })
+      .insert({ name: name.trim(), bio, website, amazon, instagram, tiktok, facebook, goodreads, email })
       .select()
       .single();
 
@@ -57,7 +57,7 @@ export async function PUT(req: Request) {
     }
 
     const payload: Record<string, string> = {};
-    for (const key of ["name", "bio", "website", "amazon", "instagram", "tiktok", "facebook", "goodreads"]) {
+    for (const key of ["name", "bio", "website", "amazon", "instagram", "tiktok", "facebook", "goodreads", "email"]) {
       if (key in fields) payload[key] = (fields[key] ?? "").trim();
     }
 

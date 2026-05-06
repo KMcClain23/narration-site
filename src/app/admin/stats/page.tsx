@@ -89,6 +89,10 @@ export default async function AdminStatsPage() {
     <main className="min-h-screen bg-[#06082E] text-white p-6 pt-24 md:p-12 md:pt-24">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
+          <a href="/admin/analytics"
+            className="inline-flex items-center gap-2 text-sm font-bold text-white/60 border border-white/15 px-4 py-2 rounded-full hover:bg-white/5 transition-colors">
+            Analytics
+          </a>
           <a href="/board"
             className="inline-flex items-center gap-2 text-sm font-bold text-[#D4AF37] border border-[#D4AF37]/30 px-4 py-2 rounded-full hover:bg-[#D4AF37]/10 transition-colors">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

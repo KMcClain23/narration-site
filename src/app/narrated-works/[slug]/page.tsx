@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { AuthorHoverName, NarratedBySection } from "./NarratedBySection";
 import type { CoNarratorDetail } from "./NarratedBySection";
+import { TrackPageView } from "./TrackPageView";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -82,18 +83,21 @@ export async function generateMetadata(
     : `${book.title} narrated by Dean Miller. ${STATUS_TO_LABEL[book.status] ?? ""}`;
 
   return {
-    title: `${book.title} — Dean Miller Narration`,
+    title: `${book.title} by ${book.author} | Narrated by Dean Miller`,
     description,
     openGraph: {
-      title: book.title,
+      title: `${book.title} by ${book.author}`,
       description,
-      images: book.cover_url ? [{ url: book.cover_url, width: 600, height: 900 }] : [],
+      type: "book",
+      images: book.cover_url
+        ? [{ url: book.cover_url, width: 600, height: 900, alt: `${book.title} cover` }]
+        : [{ url: "/opengraph-image.png", width: 1200, height: 630 }],
     },
     twitter: {
       card: "summary_large_image",
-      title: book.title,
+      title: `${book.title} by ${book.author} | Narrated by Dean Miller`,
       description,
-      images: book.cover_url ? [book.cover_url] : [],
+      images: book.cover_url ? [book.cover_url] : ["/opengraph-image.png"],
     },
   };
 }
@@ -125,6 +129,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
 
   return (
     <main className="min-h-screen bg-[#06082E] text-white">
+      <TrackPageView slug={slug} title={book.title} author={book.author} />
 
       {/* Back link */}
       <div className="max-w-5xl mx-auto px-5 sm:px-8 pt-20 sm:pt-24 pb-4">

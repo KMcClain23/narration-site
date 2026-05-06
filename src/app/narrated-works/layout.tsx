@@ -1,22 +1,26 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-  title: "Narrated Works | Dean Miller — Audiobook Narrator Portfolio",
+  title: "Narrated Works | Dean Miller Audiobook Narrator",
   description:
-    "Browse the full audiobook portfolio of Dean Miller: dark romance, romantasy, LGBTQ+ fiction, thriller, and drama. Available on Audible and Amazon.",
-  alternates: {
-    canonical: "https://www.dmnarration.com/narrated-works",
-  },
+    "Browse Dean Miller's complete audiobook portfolio — dark romance, romantasy, thriller and more. Available on Audible and ACX.",
   openGraph: {
-    title: "Narrated Works | Dean Miller — Audiobook Narrator Portfolio",
+    title: "Narrated Works | Dean Miller Audiobook Narrator",
     description:
-      "Character-driven audiobook narration across dark romance, romantasy, thriller, and more. Listen on Audible and Amazon.",
+      "Browse Dean Miller's complete audiobook portfolio — dark romance, romantasy, thriller and more.",
     url: "https://www.dmnarration.com/narrated-works",
+    siteName: "Dean Miller Narration",
+    images: [{ url: "/opengraph-image.png", width: 1200, height: 630 }],
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Narrated Works | Dean Miller Audiobook Narrator",
+    description: "Browse Dean Miller's complete audiobook portfolio.",
+    images: ["/opengraph-image.png"],
   },
 };
 
-export default function NarratedWorksLayout({ children }: { children: ReactNode }) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }

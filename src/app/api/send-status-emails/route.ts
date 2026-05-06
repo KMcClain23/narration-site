@@ -29,15 +29,19 @@ function fmtDate(iso: string) {
 }
 
 export async function POST() {
-  // Fetch all unemailed changes with their card data
+  // Fetch all unemailed changes with their card data + author email from authors table
   const { data: rows, error } = await supabaseAdmin
     .from("status_change_log")
     .select(`
       id, card_id, old_status, new_status, created_at,
-      board_cards ( title, author_email, author_token )
+      board_cards ( title, author, author_email, author_token )
     `)
     .eq("emailed", false)
     .order("created_at", { ascending: true });
+
+  // Pre-fetch all authors with emails for lookup
+  const { data: authorsData } = await supabaseAdmin
+    .from("authors").select("name, email").not("email", "is", null);
 
   if (error) {
     console.error("send-status-emails: query failed:", error.message);
@@ -64,18 +68,26 @@ export async function POST() {
     const rawCard = changes[0].board_cards;
     const card = (Array.isArray(rawCard) ? rawCard[0] : rawCard) as {
       title: string;
+      author: string | null;
       author_email: string | null;
       author_token: string | null;
     } | null;
 
-    // Skip cards with no author email — log entries still get collected
-    // so we mark them emailed to avoid reprocessing on the next run.
-    if (!card?.author_email) {
+    // Resolve email: prefer authors table lookup, fall back to card.author_email
+    const authorRecord = (authorsData ?? []).find(
+      (a: { name: string; email?: string | null }) =>
+        a.email && a.name?.trim().toLowerCase() === (card?.author ?? "").trim().toLowerCase()
+    );
+    const resolvedEmail = authorRecord?.email || card?.author_email || null;
+
+    if (!resolvedEmail) {
+      // No email found — mark as processed so we don't retry forever
       sentIds.push(...changes.map(c => c.id));
       continue;
     }
 
-    const { title, author_email, author_token } = card;
+    const { title, author_token } = card!;
+    const author_email = resolvedEmail;
     const progressUrl = author_token
       ? `https://www.dmnarration.com/board/${author_token}`
       : null;
