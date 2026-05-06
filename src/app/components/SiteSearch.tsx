@@ -2,13 +2,22 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Image from "next/image";
 
-// ─── search index ─────────────────────────────────────────────────────────────
+// ─── types ────────────────────────────────────────────────────────────────────
 
-type Entry = { url: string; page: string; title: string; keywords: string[] };
+type Entry = {
+  url:      string;
+  page:     string;
+  title:    string;
+  keywords: string[];
+  meta?:    string;     // "by Author" or category label shown under title
+  cover?:   string;     // book cover_url for thumbnail
+};
 
-const INDEX: Entry[] = [
-  // ── Homepage ──────────────────────────────────────────────────────────────
+// ─── static site index ────────────────────────────────────────────────────────
+
+const STATIC_INDEX: Entry[] = [
   {
     url: "/#demos", page: "Homepage", title: "Audio Demos",
     keywords: ["demo","audio","listen","sample","play","hear","voice","narration",
@@ -36,7 +45,7 @@ const INDEX: Entry[] = [
     url: "/#about", page: "Homepage", title: "Services & Genres",
     keywords: ["service","genre","dark romance","romantasy","thriller","drama",
       "lgbtq","fantasy","fiction","solo","duet","co-narrator","multicast",
-      "british","accent","what do you narrate","speciali"],
+      "british","accent","what do you narrate"],
   },
   {
     url: "/#process", page: "Homepage", title: "What to Expect / Process",
@@ -46,9 +55,8 @@ const INDEX: Entry[] = [
   },
   {
     url: "/#process", page: "Homepage", title: "Cover Art Requirements",
-    keywords: ["cover","cover art","artwork","image","jpeg","png","size",
-      "resolution","thumbnail","audible cover","acx cover","guidelines",
-      "requirements","spec","specifications"],
+    keywords: ["cover art","artwork","image","jpeg","png","size","resolution",
+      "thumbnail","audible cover","acx cover","guidelines","requirements","spec"],
   },
   {
     url: "/#contact", page: "Homepage", title: "Contact & Get a Quote",
@@ -68,16 +76,12 @@ const INDEX: Entry[] = [
   },
   {
     url: "/#contact", page: "Homepage", title: "Social Media",
-    keywords: ["social","tiktok","instagram","acx","audible","find me",
-      "profile","follow","links"],
+    keywords: ["social","tiktok","instagram","acx","audible","find me","profile","follow"],
   },
-
-  // ── Other pages ───────────────────────────────────────────────────────────
   {
-    url: "/narrated-works", page: "Portfolio", title: "Narrated Works",
+    url: "/narrated-works", page: "Portfolio", title: "Narrated Works — Full Catalog",
     keywords: ["narrated","books","portfolio","titles","audiobook","catalog",
-      "completed","in progress","coming soon","browse","all books",
-      "published","audible","released"],
+      "completed","in progress","coming soon","browse","all books","published","released"],
   },
   {
     url: "/welcome", page: "Info", title: "Working Together / Author Guide",
@@ -92,7 +96,19 @@ const INDEX: Entry[] = [
   },
 ];
 
-// ─── same-page pulse animation (injected once) ────────────────────────────────
+// ─── slug helper (mirrors what the narrated-works pages use) ─────────────────
+
+function makeSlug(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+const CATEGORY_LABEL: Record<string, string> = {
+  "completed":   "Completed",
+  "in-progress": "Currently narrating",
+  "coming-soon": "Coming soon",
+};
+
+// ─── pulse animation (injected once) ─────────────────────────────────────────
 
 let pulseStyled = false;
 function ensurePulseStyle() {
@@ -118,34 +134,108 @@ function ensurePulseStyle() {
 // ─── component ────────────────────────────────────────────────────────────────
 
 export function SiteSearch() {
-  const [open, setOpen]             = useState(false);
-  const [query, setQuery]           = useState("");
+  const [open, setOpen]               = useState(false);
+  const [query, setQuery]             = useState("");
   const [highlighted, setHighlighted] = useState(-1);
-  const inputRef  = useRef<HTMLInputElement>(null);
-  const router    = useRouter();
-  const pathname  = usePathname();
+  const [bookEntries, setBookEntries] = useState<Entry[]>([]);
+  const [booksLoaded, setBooksLoaded] = useState(false);
+
+  const inputRef   = useRef<HTMLInputElement>(null);
+  const router     = useRouter();
+  const pathname   = usePathname();
 
   useEffect(() => { ensurePulseStyle(); }, []);
 
-  // Filter + deduplicate
-  const results: Entry[] = (() => {
+  // Fetch books once on mount and build dynamic entries
+  useEffect(() => {
+    fetch("/api/books")
+      .then(r => r.json())
+      .then(data => {
+        if (!data.books) return;
+        const entries: Entry[] = (data.books as Array<{
+          title: string; author?: string; subtitle?: string; tags?: string[];
+          description?: string; co_narrator?: string[]; category?: string;
+          cover_url?: string; slug?: string;
+        }>).map(book => {
+          const slug = book.slug || makeSlug(book.title);
+          const coNarrators = Array.isArray(book.co_narrator)
+            ? book.co_narrator.filter(Boolean)
+            : [];
+          return {
+            url:   `/narrated-works/${slug}`,
+            page:  "Portfolio",
+            title: book.title,
+            meta:  book.author ? `by ${book.author}` : (CATEGORY_LABEL[book.category ?? ""] ?? ""),
+            cover: book.cover_url,
+            keywords: [
+              book.title,
+              book.author   ?? "",
+              book.subtitle ?? "",
+              ...(book.tags ?? []),
+              ...(coNarrators as string[]),
+              CATEGORY_LABEL[book.category ?? ""] ?? "",
+              book.description?.slice(0, 200) ?? "",
+            ]
+              .filter(Boolean)
+              .map(s => s.toLowerCase()),
+          };
+        });
+        setBookEntries(entries);
+        setBooksLoaded(true);
+      })
+      .catch(() => setBooksLoaded(true));
+  }, []);
+
+  // ── filtering ───────────────────────────────────────────────────────────────
+
+  const allEntries = [...STATIC_INDEX, ...bookEntries];
+
+  const { pageResults, bookResults } = (() => {
     const q = query.trim().toLowerCase();
-    if (!q) return [];
-    const seen = new Set<string>();
-    return INDEX.filter(e => {
+    if (!q) return { pageResults: [], bookResults: [] };
+
+    const seenStatic = new Set<string>();
+    const seenBooks  = new Set<string>();
+
+    const pages: Entry[] = [];
+    const books: Entry[] = [];
+
+    for (const e of STATIC_INDEX) {
       const key = `${e.url}::${e.title}`;
-      if (seen.has(key)) return false;
+      if (seenStatic.has(key)) continue;
       const hit = e.title.toLowerCase().includes(q) ||
-                  e.keywords.some(k => k.toLowerCase().includes(q));
-      if (hit) seen.add(key);
-      return hit;
+                  e.keywords.some(k => k.includes(q));
+      if (hit) { seenStatic.add(key); pages.push(e); }
+    }
+
+    for (const e of bookEntries) {
+      const key = e.url;
+      if (seenBooks.has(key)) continue;
+      // Boost exact title match
+      const hit = e.title.toLowerCase().includes(q) ||
+                  e.keywords.some(k => k.includes(q));
+      if (hit) { seenBooks.add(key); books.push(e); }
+    }
+
+    // Sort books: exact title match first
+    books.sort((a, b) => {
+      const aExact = a.title.toLowerCase().startsWith(q) ? -1 : 0;
+      const bExact = b.title.toLowerCase().startsWith(q) ? -1 : 0;
+      return aExact - bExact;
     });
+
+    return { pageResults: pages, bookResults: books.slice(0, 8) };
   })();
+
+  const totalResults = pageResults.length + bookResults.length;
+  const flatResults  = [...pageResults, ...bookResults];
+  const noResults    = query.trim().length >= 2 && totalResults === 0 && booksLoaded;
+
+  // ── open / close ────────────────────────────────────────────────────────────
 
   const openModal  = useCallback(() => { setOpen(true);  setQuery(""); setHighlighted(-1); }, []);
   const closeModal = useCallback(() => { setOpen(false); setQuery(""); setHighlighted(-1); }, []);
 
-  // Auto-focus input
   useEffect(() => {
     if (open) {
       const t = setTimeout(() => inputRef.current?.focus(), 40);
@@ -153,7 +243,6 @@ export function SiteSearch() {
     }
   }, [open]);
 
-  // Cmd K / Ctrl K  +  Escape
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -166,12 +255,11 @@ export function SiteSearch() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, openModal, closeModal]);
 
-  // Navigate to result
+  // ── navigation ──────────────────────────────────────────────────────────────
+
   const navigate = useCallback((url: string) => {
     closeModal();
-    const isHashOnly = url.startsWith("/#");
-    if (isHashOnly && pathname === "/") {
-      // Same page — scroll + pulse
+    if (url.startsWith("/#") && pathname === "/") {
       const id = url.slice(2);
       requestAnimationFrame(() => {
         const el = document.getElementById(id);
@@ -190,22 +278,70 @@ export function SiteSearch() {
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlighted(h => results.length ? Math.min(h + 1, results.length - 1) : -1);
+      setHighlighted(h => flatResults.length ? Math.min(h + 1, flatResults.length - 1) : -1);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setHighlighted(h => Math.max(h - 1, -1));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const target = highlighted >= 0 ? results[highlighted] : results[0];
+      const target = highlighted >= 0 ? flatResults[highlighted] : flatResults[0];
       if (target) navigate(target.url);
     }
   };
 
-  const noResults = query.trim().length >= 2 && results.length === 0;
+  // ── render ──────────────────────────────────────────────────────────────────
+
+  const ResultRow = ({ entry, idx }: { entry: Entry; idx: number }) => {
+    const isHighlighted = highlighted === idx;
+    const isBook = !!entry.cover || entry.url.startsWith("/narrated-works/") && entry.url !== "/narrated-works";
+    return (
+      <button
+        type="button"
+        onClick={() => navigate(entry.url)}
+        onMouseEnter={() => setHighlighted(idx)}
+        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-b border-white/[0.05] last:border-0 transition-colors ${
+          isHighlighted
+            ? "bg-[#D4AF37]/10 text-white"
+            : "text-white/65 hover:bg-white/[0.04] hover:text-white/90"
+        }`}
+      >
+        {/* Cover thumbnail for books */}
+        {isBook ? (
+          <div className="h-9 w-6 rounded shrink-0 overflow-hidden bg-white/5 border border-white/8">
+            {entry.cover ? (
+              <Image src={entry.cover} alt={entry.title} width={24} height={36}
+                className="object-cover w-full h-full" />
+            ) : (
+              <div className="w-full h-full bg-white/5" />
+            )}
+          </div>
+        ) : (
+          <svg
+            className={`h-3.5 w-3.5 shrink-0 transition-colors ${isHighlighted ? "text-[#D4AF37]" : "text-white/20"}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
+          </svg>
+        )}
+
+        {/* Text */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2 min-w-0">
+            <span className="text-sm font-medium truncate">{entry.title}</span>
+            <span className="text-[10px] text-white/30 shrink-0">{entry.page}</span>
+          </div>
+          {entry.meta && (
+            <p className="text-[11px] text-white/35 truncate leading-tight mt-0.5">{entry.meta}</p>
+          )}
+        </div>
+
+        <span className="text-[10px] text-white/20 shrink-0">↵</span>
+      </button>
+    );
+  };
 
   return (
     <>
-      {/* ── Trigger button in header ── */}
+      {/* ── Trigger ── */}
       <button
         type="button"
         onClick={openModal}
@@ -222,10 +358,10 @@ export function SiteSearch() {
         </kbd>
       </button>
 
-      {/* ── Modal overlay ── */}
+      {/* ── Modal ── */}
       {open && (
         <div
-          className="fixed inset-0 z-[200] flex items-start justify-center pt-[12vh] px-4"
+          className="fixed inset-0 z-[200] flex items-start justify-center pt-[10vh] px-4"
           style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
           onClick={e => { if (e.target === e.currentTarget) closeModal(); }}
         >
@@ -236,7 +372,7 @@ export function SiteSearch() {
               boxShadow: "0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04)",
             }}
           >
-            {/* Input row */}
+            {/* Input */}
             <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/8">
               <svg className="h-4 w-4 text-white/35 shrink-0" fill="none" viewBox="0 0 24 24"
                 stroke="currentColor" strokeWidth={2}>
@@ -249,19 +385,18 @@ export function SiteSearch() {
                 value={query}
                 onChange={e => { setQuery(e.target.value); setHighlighted(-1); }}
                 onKeyDown={onKeyDown}
-                placeholder="Search pages and sections…"
+                placeholder="Search pages, books, authors, tags…"
                 className="flex-1 bg-transparent text-sm text-white placeholder:text-white/25 focus:outline-none"
                 aria-label="Search"
                 role="combobox"
-                aria-expanded={results.length > 0}
+                aria-expanded={totalResults > 0}
                 aria-haspopup="listbox"
               />
-              <button
-                type="button"
-                onClick={closeModal}
-                aria-label="Close search"
-                className="text-white/25 hover:text-white/60 transition-colors shrink-0"
-              >
+              {!booksLoaded && (
+                <span className="h-3.5 w-3.5 border border-white/20 border-t-white/50 rounded-full animate-spin shrink-0" />
+              )}
+              <button type="button" onClick={closeModal} aria-label="Close"
+                className="text-white/25 hover:text-white/60 transition-colors shrink-0">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24"
                   stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -270,58 +405,66 @@ export function SiteSearch() {
             </div>
 
             {/* Results */}
-            {query.trim().length > 0 && (
-              <ul role="listbox" className="max-h-72 overflow-y-auto">
+            {query.trim().length > 0 ? (
+              <ul role="listbox" className="max-h-80 overflow-y-auto">
                 {noResults ? (
                   <li className="px-4 py-5 text-sm text-white/40">
                     No results —{" "}
-                    <button type="button"
-                      onClick={() => navigate("/#contact")}
+                    <button type="button" onClick={() => navigate("/#contact")}
                       className="text-[#D4AF37] hover:underline underline-offset-2">
                       Contact Dean
                     </button>
                     {" "}for anything else
                   </li>
                 ) : (
-                  results.map((entry, i) => (
-                    <li key={`${entry.url}::${entry.title}`} role="option" aria-selected={highlighted === i}>
-                      <button
-                        type="button"
-                        onClick={() => navigate(entry.url)}
-                        onMouseEnter={() => setHighlighted(i)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 text-left border-b border-white/[0.05] last:border-0 transition-colors ${
-                          highlighted === i
-                            ? "bg-[#D4AF37]/10 text-white"
-                            : "text-white/65 hover:bg-white/[0.04] hover:text-white/90"
-                        }`}
-                      >
-                        <svg
-                          className={`h-3.5 w-3.5 shrink-0 transition-colors ${highlighted === i ? "text-[#D4AF37]" : "text-white/20"}`}
-                          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
-                        </svg>
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm font-medium">{entry.title}</span>
-                          <span className="ml-2 text-[10px] text-white/30">{entry.page}</span>
-                        </div>
-                        <span className="text-[10px] text-white/20 shrink-0">↵</span>
-                      </button>
-                    </li>
-                  ))
+                  <>
+                    {/* Page / section results */}
+                    {pageResults.length > 0 && (
+                      <>
+                        {bookResults.length > 0 && (
+                          <li className="px-4 pt-3 pb-1">
+                            <span className="text-[10px] uppercase tracking-[0.18em] text-white/25 font-semibold">Pages</span>
+                          </li>
+                        )}
+                        {pageResults.map((e, i) => (
+                          <li key={`${e.url}::${e.title}`} role="option" aria-selected={highlighted === i}>
+                            <ResultRow entry={e} idx={i} />
+                          </li>
+                        ))}
+                      </>
+                    )}
+
+                    {/* Book results */}
+                    {bookResults.length > 0 && (
+                      <>
+                        <li className="px-4 pt-3 pb-1">
+                          <span className="text-[10px] uppercase tracking-[0.18em] text-white/25 font-semibold">Books</span>
+                        </li>
+                        {bookResults.map((e, i) => {
+                          const flatIdx = pageResults.length + i;
+                          return (
+                            <li key={e.url} role="option" aria-selected={highlighted === flatIdx}>
+                              <ResultRow entry={e} idx={flatIdx} />
+                            </li>
+                          );
+                        })}
+                      </>
+                    )}
+                  </>
                 )}
               </ul>
-            )}
-
-            {/* Empty state / hint */}
-            {query.trim().length === 0 && (
-              <div className="px-4 py-5 grid grid-cols-2 gap-2">
-                {["Audio Demos", "Narrated Works", "Contact", "Working Together"].map(hint => (
-                  <button key={hint} type="button"
-                    onClick={() => setQuery(hint)}
-                    className="text-left text-xs text-white/35 hover:text-white/60 px-3 py-2 rounded-lg border border-white/6 hover:border-white/15 transition-colors">
-                    {hint}
-                  </button>
-                ))}
+            ) : (
+              /* Empty state — suggestion chips */
+              <div className="px-4 py-4">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-white/20 mb-3">Quick links</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {["Audio Demos", "Narrated Works", "Contact", "Working Together"].map(hint => (
+                    <button key={hint} type="button" onClick={() => setQuery(hint)}
+                      className="text-left text-xs text-white/40 hover:text-white/70 px-3 py-2 rounded-lg border border-white/6 hover:border-white/20 transition-colors">
+                      {hint}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -330,6 +473,9 @@ export function SiteSearch() {
               <span>↑↓ navigate</span>
               <span>↵ select</span>
               <span>Esc close</span>
+              {booksLoaded && bookEntries.length > 0 && (
+                <span className="ml-auto">{bookEntries.length} books indexed</span>
+              )}
             </div>
           </div>
         </div>
