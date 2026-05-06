@@ -71,7 +71,9 @@ export async function POST(req: Request) {
     if (error) throw error;
     return NextResponse.json({ success: true, card: data });
   } catch (e) {
-    return NextResponse.json({ error: "Failed to create card." }, { status: 500 });
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("POST /api/board failed:", msg);
+    return NextResponse.json({ error: msg || "Failed to create card." }, { status: 500 });
   }
 }
 

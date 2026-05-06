@@ -31,7 +31,7 @@ interface BoardCard {
 }
 
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
-  title:"", author:"", cover_url:"", status:"audition", deadline:"",
+  title:"", author:"", cover_url:"", status:"contracted", deadline:"",
   notes:"", author_notes:"", links:[], co_narrator:"",
   subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"",
 };
@@ -906,18 +906,19 @@ export default function BoardPage() {
       if (editCard) {
         const r = await fetch("/api/board",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:editCard.id,...cleanForm(form)})});
         const d = await r.json();
-        // Use returned card if available, otherwise merge form data into existing card
+        if (!r.ok) { setError(d.error || "Failed to save changes."); setSaving(false); return; }
         const updatedCard = d.card || {...editCard, ...cleanForm(form)};
         setCards(p=>p.map(c=>c.id===editCard.id ? updatedCard : c));
         setEditCard(null);
       } else {
         const r = await fetch("/api/board",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...cleanForm(form),sort_order:col(form.status).length})});
         const d = await r.json();
+        if (!r.ok) { setError(d.error || "Failed to create project."); setSaving(false); return; }
         if (d.card) setCards(p=>[...p,d.card]);
         setShowForm(false);
       }
       setForm({...EMPTY}); setTagInput("");
-    } catch { setError("Save failed."); }
+    } catch (err) { setError(err instanceof Error ? err.message : "Save failed — check connection."); }
     setSaving(false);
   };
 
