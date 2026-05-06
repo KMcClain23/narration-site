@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Book } from "@/types/book";
 
@@ -528,8 +528,6 @@ function SectionGrid({
 }
 
 export default function NarratedWorks() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
   const [books, setBooks] = useState<Book[]>([]);
   const [authors, setAuthors] = useState<Record<string, Author>>({});
   const [coNarrators, setCoNarrators] = useState<Record<string, CoNarrator>>({});
@@ -576,41 +574,19 @@ export default function NarratedWorks() {
     loadData();
   }, []);
 
-  const completed = useMemo(() => books.filter((b) => b.category === "completed"), [books]);
+  const completed  = useMemo(() => books.filter((b) => b.category === "completed"),   [books]);
   const inProgress = useMemo(() => books.filter((b) => b.category === "in-progress"), [books]);
   const comingSoon = useMemo(() => books.filter((b) => b.category === "coming-soon"), [books]);
-
-  const filterBooks = useCallback(
-    (items: Book[]) => {
-      if (!searchQuery.trim()) return items;
-      const q = searchQuery.toLowerCase();
-      return items.filter(
-        (b) =>
-          b.title.toLowerCase().includes(q) ||
-          (b.subtitle?.toLowerCase().includes(q) ?? false) ||
-          b.author.toLowerCase().includes(q) ||
-          b.tags.some((t) => t.toLowerCase().includes(q))
-      );
-    },
-    [searchQuery]
-  );
-
-  const filteredCompleted = useMemo(() => filterBooks(completed), [completed, filterBooks]);
-  const filteredInProgress = useMemo(() => filterBooks(inProgress), [inProgress, filterBooks]);
-  const filteredComingSoon = useMemo(() => filterBooks(comingSoon), [comingSoon, filterBooks]);
-  const hasResults = filteredCompleted.length > 0 || filteredInProgress.length > 0 || filteredComingSoon.length > 0;
   const totalBooks = completed.length + inProgress.length + comingSoon.length;
 
   return (
     <main className="min-h-screen bg-[#06082E] text-white overflow-x-clip">
       <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-0 pb-12">
 
-        {/* Page title + search — sticky */}
+        {/* Page title — sticky */}
         <div className="sticky top-14 sm:top-16 z-40 -mx-5 sm:-mx-8 px-5 sm:px-8 py-2 sm:py-3 mb-4 sm:mb-6"
           style={{ background: "rgba(6,8,46,0.94)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-
-          {/* Title + search row */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-white/40 mb-1">Portfolio</p>
               <h1 className="text-lg sm:text-2xl font-bold text-white leading-none">Narrated works</h1>
@@ -618,89 +594,13 @@ export default function NarratedWorks() {
                 <p className="mt-1 text-xs text-white/35 hidden sm:block">{totalBooks} titles across dark romance, romantasy, thriller & more</p>
               )}
             </div>
-            {/* Desktop: CTA + search */}
-            <div className="hidden sm:flex items-center gap-3">
-              <Link
-                href="/#contact"
-                className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-4 py-2 text-xs font-bold uppercase tracking-wider hover:bg-[#E0C15A] transition whitespace-nowrap"
-              >
-                Request a quote
-              </Link>
-            </div>
-            <div className="hidden sm:block relative w-72">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-3.5 w-3.5 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                placeholder="Title, author, or genre…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 pl-9 pr-9 text-sm focus:outline-none focus:border-[#D4AF37]/40 transition-all placeholder:text-white/20 text-white/80"
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery("")} className="absolute inset-y-0 right-0 pr-3 flex items-center text-white/25 hover:text-white/60 transition" type="button" aria-label="Clear search">
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-              )}
-            </div>
-            {/* Mobile: CTA + search icon */}
-            <div className="sm:hidden flex items-center gap-2">
-              <Link
-                href="/#contact"
-                className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-3 py-1.5 text-xs font-bold uppercase tracking-wider hover:bg-[#E0C15A] transition whitespace-nowrap"
-              >
-                Quote
-              </Link>
-              {searchOpen ? (
-                <div className="relative w-40">
-                  <input
-                    type="text"
-                    autoFocus
-                    placeholder="Search…"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg py-1.5 pl-3 pr-8 text-sm focus:outline-none focus:border-[#D4AF37]/40 text-white/80 placeholder:text-white/20"
-                  />
-                  <button type="button" onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
-                    className="absolute inset-y-0 right-0 pr-2 flex items-center text-white/30 hover:text-white">
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
-              ) : (
-                <button type="button" onClick={() => setSearchOpen(true)}
-                  className="p-1.5 text-white/50 hover:text-white transition rounded-lg hover:bg-white/8"
-                  aria-label="Search">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </button>
-              )}
-            </div>
+            <Link
+              href="/#contact"
+              className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-4 py-2 text-xs font-bold uppercase tracking-wider hover:bg-[#E0C15A] transition whitespace-nowrap shrink-0"
+            >
+              Request a quote
+            </Link>
           </div>
-
-          {/* Active tag filter indicator */}
-          {searchQuery && (
-            <div className="flex items-center gap-3 pt-3">
-              <span className="text-sm text-white/40">Filtering by:</span>
-              <span className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-white bg-[#D4AF37]/20 border border-[#D4AF37]/40 px-3 py-1.5 rounded-full">
-                {searchQuery}
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="text-white/50 hover:text-white transition-colors ml-1"
-                  aria-label="Clear filter"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </span>
-            </div>
-          )}
-
         </div>{/* end sticky */}
 
         {isLoading ? (
@@ -727,16 +627,11 @@ export default function NarratedWorks() {
             <p className="text-white/40 text-sm mb-2">Failed to load books</p>
             <p className="text-white/20 text-xs font-mono">{fetchError}</p>
           </div>
-        ) : searchQuery.trim() && !hasResults ? (
-          <div className="py-32 text-center">
-            <p className="text-white/30">No results for &ldquo;{searchQuery}&rdquo;</p>
-            <button onClick={() => setSearchQuery("")} className="mt-3 text-[#D4AF37] text-sm hover:underline" type="button">Clear search</button>
-          </div>
         ) : (
           <>
-            <SectionGrid title="Completed" books={filteredCompleted} authors={authors} onTagClick={setSearchQuery} coNarrators={coNarrators} />
-            <SectionGrid title="Currently narrating" books={filteredInProgress} statusBadge="In Progress" authors={authors} onTagClick={setSearchQuery} coNarrators={coNarrators} />
-            <SectionGrid title="Coming soon" books={filteredComingSoon} statusBadge="Soon" authors={authors} onTagClick={setSearchQuery} coNarrators={coNarrators} />
+            <SectionGrid title="Completed" books={completed} authors={authors} onTagClick={() => {}} coNarrators={coNarrators} />
+            <SectionGrid title="Currently narrating" books={inProgress} statusBadge="In Progress" authors={authors} onTagClick={() => {}} coNarrators={coNarrators} />
+            <SectionGrid title="Coming soon" books={comingSoon} statusBadge="Soon" authors={authors} onTagClick={() => {}} coNarrators={coNarrators} />
           </>
         )}
 

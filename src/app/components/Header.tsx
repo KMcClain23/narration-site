@@ -223,7 +223,7 @@ export default function Header() {
 
           {/* Hamburger Menu Toggle */}
           <button
-            className="md:hidden text-2xl text-white/80 hover:text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06082E] rounded"
+            className="md:hidden text-2xl text-white bg-black/40 backdrop-blur-sm rounded-lg p-2 hover:bg-black/60 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06082E]"
             onClick={toggleMenu}
             aria-label="Toggle Menu"
             aria-expanded={isOpen}
@@ -235,7 +235,7 @@ export default function Header() {
 
       {/* Mobile Menu Overlay */}
       {isOpen ? (
-        <div className="md:hidden border-t border-white/10 bg-[#06082E]/75 backdrop-blur-xl">
+        <div className="md:hidden border-t border-white/15 bg-[#06082E] shadow-2xl">
           <nav className="max-w-6xl mx-auto px-5 sm:px-6 py-4">
             <div className="grid gap-2">
               {navLinks.map((link) => (
