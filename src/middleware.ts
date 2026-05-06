@@ -17,6 +17,13 @@ export function middleware(req: NextRequest) {
       url.pathname = "/admin/login";
       return NextResponse.redirect(url);
     }
+
+    // /admin root has no page — redirect authenticated users straight to /board
+    if (pathname === "/admin") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/board";
+      return NextResponse.redirect(url);
+    }
   }
 
   return NextResponse.next();
