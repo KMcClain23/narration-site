@@ -7,6 +7,8 @@ import QuickLinks from "./QuickLinks";
 import AuthorManager from "./AuthorManager";
 import CoNarratorManager from "./CoNarratorManager";
 import TestimonialQueue from "./TestimonialQueue";
+import AvailabilityToggle from "./AvailabilityToggle";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,10 @@ export default async function AdminStatsPage() {
   if (!cookieKey || cookieKey !== secret) return notFound();
 
   // --- FETCH DATA ---
+  const { data: settingRow } = await supabaseAdmin
+    .from("site_settings").select("value").eq("key", "accepting_projects").single();
+  const acceptingProjects = settingRow?.value !== "false";
+
   const totalPlays = (await redis.get<number>("total_demo_plays")) ?? 0;
   const rawInquiries = await redis.lrange(INQUIRY_KEY, 0, -1);
   const inquiries = rawInquiries.map((i: any) => (typeof i === 'string' ? JSON.parse(i) : i));
@@ -94,6 +100,11 @@ export default async function AdminStatsPage() {
         </div>
         <div className="flex items-center justify-between border-b border-[#1A2550] pb-8">
           <h1 className="text-4xl font-bold text-[#D4AF37]">Dean Miller Admin</h1>
+        </div>
+
+        {/* Availability toggle */}
+        <div className="mt-6">
+          <AvailabilityToggle initial={acceptingProjects} />
         </div>
 
         {/* 1. INBOX: NARRATION REQUESTS */}

@@ -387,7 +387,7 @@ function TestimonialsCarousel() {
   );
 }
 
-function HomeContent() {
+function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean }) {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -464,6 +464,19 @@ function HomeContent() {
             <div className="fade-up flex items-center gap-3 mb-6">
               <div className="h-px w-8 bg-[#D4AF37]" />
               <p className="text-[11px] uppercase tracking-[0.3em] text-[#D4AF37]">Audiobook narrator</p>
+            </div>
+
+            {/* Availability badge */}
+            <div className="fade-up flex items-center gap-2 mb-5">
+              <span className={`relative flex h-2 w-2`}>
+                {acceptingProjects && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
+                )}
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${acceptingProjects ? "bg-emerald-400" : "bg-red-400"}`} />
+              </span>
+              <span className={`text-xs font-medium ${acceptingProjects ? "text-emerald-400" : "text-red-400"}`}>
+                {acceptingProjects ? "Currently accepting new projects" : "Not currently accepting new projects"}
+              </span>
             </div>
 
             {/* Name */}
@@ -770,6 +783,6 @@ function HomeContent() {
   );
 }
 
-export default function HomeClient() {
-  return <HomeContent />;
+export default function HomeClient({ acceptingProjects = true }: { acceptingProjects?: boolean }) {
+  return <HomeContent acceptingProjects={acceptingProjects} />;
 }

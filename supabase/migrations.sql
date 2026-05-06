@@ -53,3 +53,14 @@ create table if not exists status_change_log (
 create index if not exists status_change_log_unemailed
   on status_change_log(emailed, created_at)
   where emailed = false;
+
+-- site_settings: simple key/value store for admin-controlled site flags
+create table if not exists site_settings (
+  key        text        primary key,
+  value      text        not null,
+  updated_at timestamptz default now()
+);
+
+insert into site_settings (key, value)
+  values ('accepting_projects', 'true')
+  on conflict do nothing;

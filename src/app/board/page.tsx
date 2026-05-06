@@ -1178,31 +1178,34 @@ export default function BoardPage() {
           <div className="flex items-center bg-white/5 border border-white/10 rounded-full p-0.5">
             <button
               onClick={() => switchView("dashboard")}
-              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${view==="dashboard" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}
+              className={`flex items-center gap-1.5 text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-full transition-colors ${view==="dashboard" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}
+              title="Dashboard"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-              Dashboard
+              <span className="hidden sm:inline">Dashboard</span>
             </button>
             <button
               onClick={() => switchView("board")}
-              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${view==="board" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}
+              className={`flex items-center gap-1.5 text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-full transition-colors ${view==="board" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}
+              title="Board"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
-              Board
+              <span className="hidden sm:inline">Board</span>
             </button>
             <button
               onClick={() => switchView("timeline")}
-              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${view==="timeline" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}
+              className={`flex items-center gap-1.5 text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-full transition-colors ${view==="timeline" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}
+              title="Timeline"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-              Timeline
+              <span className="hidden sm:inline">Timeline</span>
             </button>
           </div>
 
           <button onClick={()=>{setShowForm(true);setEditCard(null);setForm({...EMPTY});setTagInput("");}}
-            className="inline-flex items-center gap-1.5 bg-[#D4AF37] text-black text-xs font-bold px-4 py-2 rounded-full hover:bg-[#E0C15A] transition-colors">
+            className="inline-flex items-center gap-1.5 bg-[#D4AF37] text-black text-xs font-bold px-3 sm:px-4 py-2 rounded-full hover:bg-[#E0C15A] transition-colors">
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-            New project
+            <span className="hidden sm:inline">New project</span>
           </button>
         </div>
       </div>
@@ -1523,25 +1526,62 @@ export default function BoardPage() {
       {view === "dashboard" ? (
         <DashboardView cards={cards} />
       ) : view === "timeline" ? (
-        <TimelineView
-          cards={cards}
-          onStatusChange={async (id, status) => {
-            setCards(p => p.map(c => c.id === id ? { ...c, status } : c));
-            await fetch("/api/board", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
-          }}
-          onCardUpdate={(id, updates) => {
-            setCards(p => p.map(c => c.id === id ? { ...c, ...updates } : c));
-          }}
-        />
+        <>
+          {/* Mobile: simple sorted list (Gantt too wide for small screens) */}
+          <div className="md:hidden px-4 py-6 space-y-2">
+            {cards
+              .filter(c => c.status !== "released")
+              .sort(sortCards)
+              .map(card => {
+                const col = COLUMNS.find(c => c.id === card.status);
+                return (
+                  <Link key={card.id} href={`/board/card/${card.id}`}
+                    className="flex items-center gap-3 rounded-xl border border-white/8 bg-[#0A0D3A] px-4 py-3 hover:border-white/20 transition-colors">
+                    {card.cover_url
+                      ? <img src={card.cover_url} alt={card.title} className="h-12 w-8 object-cover rounded shrink-0"/>
+                      : <div className="h-12 w-8 bg-white/5 rounded shrink-0"/>}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white truncate">{card.title}</p>
+                      {card.author && <p className="text-xs text-[#D4AF37]/70 truncate">{card.author}</p>}
+                      <div className="flex gap-3 mt-0.5 text-[10px] text-white/30">
+                        {card.deadline    && <span>Deadline: {card.deadline}</span>}
+                        {card.first15_due && <span>First 15: {card.first15_due}</span>}
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-bold uppercase shrink-0 ${col?.text ?? "text-white/30"}`}>
+                      {card.status}
+                    </span>
+                  </Link>
+                );
+              })}
+            {cards.filter(c => c.status !== "released").length === 0 && (
+              <p className="text-sm text-white/25 text-center py-16">No active projects</p>
+            )}
+          </div>
+          {/* Desktop: full Gantt chart */}
+          <div className="hidden md:block">
+            <TimelineView
+              cards={cards}
+              onStatusChange={async (id, status) => {
+                setCards(p => p.map(c => c.id === id ? { ...c, status } : c));
+                await fetch("/api/board", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
+              }}
+              onCardUpdate={(id, updates) => {
+                setCards(p => p.map(c => c.id === id ? { ...c, ...updates } : c));
+              }}
+            />
+          </div>
+        </>
+
       ) : (
-      <div className="px-4 sm:px-6 py-6 overflow-x-auto">
-        <div className="flex gap-4 min-w-max pb-6">
+      <div className="px-4 sm:px-6 py-6 sm:overflow-x-auto">
+        <div className="flex flex-col gap-4 sm:flex-row sm:min-w-max pb-6">
           {COLUMNS.map(column => (
             <div key={column.id}
               onDragOver={e=>{e.preventDefault();setDragOver(column.id);}}
               onDrop={e=>drop(e,column.id)}
               onDragLeave={()=>setDragOver(null)}
-              className={`w-72 flex-shrink-0 rounded-2xl border ${column.color} transition-all duration-200 ${dragOver===column.id?"ring-2 ring-[#D4AF37]/40 scale-[1.01]":""}`}>
+              className={`w-full sm:w-72 sm:flex-shrink-0 rounded-2xl border ${column.color} transition-all duration-200 ${dragOver===column.id?"ring-2 ring-[#D4AF37]/40 scale-[1.01]":""}`}>
 
               <div className="px-4 pt-4 pb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
