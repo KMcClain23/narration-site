@@ -318,6 +318,61 @@ function assignNumbers(
 
 // ─── Claude fallback ─────────────────────────────────────────────────────────
 
+/** Sanitise common Claude output issues that break JSON.parse(). */
+function sanitiseJson(text: string): string {
+  return text
+    // curly/smart quotes → straight
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    // em dash / en dash → hyphen
+    .replace(/[—–]/g, "-")
+    // remove control characters (except tab/newline/CR which are valid in JSON)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+}
+
+/** Three-tier resilient JSON parser for Claude responses. */
+function parseClaudeJson(raw: string): Array<{ number: number; title: string; startPage: number }> {
+  const cleaned = raw.replace(/```json|```/g, "").trim();
+
+  // Tier 1 — direct parse
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (Array.isArray(parsed) && parsed.length) return parsed;
+  } catch {
+    // fall through
+  }
+
+  // Tier 2 — sanitise then parse
+  const sanitised = sanitiseJson(cleaned);
+  try {
+    const parsed = JSON.parse(sanitised);
+    if (Array.isArray(parsed) && parsed.length) return parsed;
+  } catch {
+    // fall through
+  }
+
+  // Tier 3 — extract individual objects with regex and parse each one
+  console.warn("[askClaude] JSON.parse failed after sanitise — falling back to object-level regex");
+  console.error("[askClaude] raw Claude response:\n", raw);
+  const results: Array<{ number: number; title: string; startPage: number }> = [];
+  const objRe = /\{[^{}]+\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = objRe.exec(sanitised)) !== null) {
+    try {
+      const obj = JSON.parse(m[0]);
+      if (obj && typeof obj.startPage === "number" && typeof obj.title === "string") {
+        results.push(obj);
+      }
+    } catch {
+      // skip unparseable fragment
+    }
+  }
+  if (results.length) return results;
+
+  console.error("[askClaude] all parse tiers failed. Raw response was:\n", raw);
+  throw new Error(`Failed to parse Claude response as JSON. Raw: ${raw.slice(0, 200)}`);
+}
+
 async function askClaude(pageMap: string): Promise<Array<{ title: string; startPage: number }>> {
   const msg = await anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",
@@ -331,17 +386,23 @@ async function askClaude(pageMap: string): Promise<Array<{ title: string; startP
           `- Front matter: Dedication, Preface, Acknowledgments, Content & Trigger Warnings\n` +
           `- Body chapters: Prologue, Chapter One, Chapter Two, … (all numbered chapters)\n` +
           `- Back matter: Epilogue, Afterword\n` +
-          `Return ONLY a JSON array: [{"number":1,"title":"Section Title","startPage":11}]\n` +
-          `Use clean titles. No markdown. No explanation. Only the JSON array.`,
+          `Return ONLY valid JSON. Use straight double quotes only — no curly quotes, no smart quotes, no em dashes inside JSON strings. Escape any apostrophes in titles as \\u0027 or use a regular hyphen instead.\n` +
+          `Format: [{"number":1,"title":"Section Title","startPage":11}]\n` +
+          `No markdown fences. No explanation. Only the JSON array.`,
       },
     ],
   });
+
   const raw = msg.content[0].type === "text" ? msg.content[0].text : "";
-  const parsed: { number: number; title: string; startPage: number }[] = JSON.parse(
-    raw.replace(/```json|```/g, "").trim()
-  );
-  if (!Array.isArray(parsed) || !parsed.length) throw new Error("No chapters found");
-  return parsed.map(ch => ({ ...ch, title: cleanTocTitle(ch.title) }));
+
+  try {
+    const parsed = parseClaudeJson(raw);
+    if (!Array.isArray(parsed) || !parsed.length) throw new Error("No chapters found");
+    return parsed.map(ch => ({ ...ch, title: cleanTocTitle(ch.title) }));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`Claude chapter parse failed: ${msg}`);
+  }
 }
 
 // ─── Route handler ────────────────────────────────────────────────────────────
