@@ -147,19 +147,25 @@ export async function PUT(req: Request) {
         .eq("id", id)
         .eq("co_narrator", token)
         .select().single();
-      if (error) throw error;
+      if (error) {
+        console.error("PUT /api/board (token) Supabase error:", JSON.stringify(error));
+        return NextResponse.json({ error: error.message || JSON.stringify(error) }, { status: 500 });
+      }
       return NextResponse.json({ success: true, card: data });
     }
 
-    // Admin full update
-    const allowed = ["title", "author", "cover_url", "status", "deadline", "notes", "author_notes", "links", "co_narrator", "sort_order", "chapters", "subtitle", "tags", "description", "audible_link", "ar_link", "word_count", "first15_due", "pfh_rate", "payment_type", "first_15_complete", "dean_message", "author_email", "slug"];
+    // Admin full update — only columns that actually exist on board_cards.
+    // Keep this list in sync with the DB schema; do NOT add speculative columns.
+    const allowed = [
+      "title", "author", "cover_url", "status", "deadline", "notes",
+      "author_notes", "links", "co_narrator", "sort_order", "chapters",
+      "subtitle", "tags", "description", "audible_link", "ar_link",
+      "word_count", "first15_due", "pfh_rate", "payment_type",
+      "first_15_complete", "dean_message", "author_email", "author_token",
+    ];
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
       if (key in fields) update[key] = fields[key];
-    }
-    // Auto-generate slug from title if title changed but slug wasn't explicitly provided
-    if ("title" in fields && fields.title && !("slug" in fields)) {
-      update.slug = makeSlug(String(fields.title).trim());
     }
 
     // Snapshot old status before update so we can log the change
@@ -172,7 +178,10 @@ export async function PUT(req: Request) {
 
     const { data, error } = await supabaseAdmin
       .from("board_cards").update(update).eq("id", id).select().single();
-    if (error) throw error;
+    if (error) {
+      console.error("PUT /api/board Supabase error:", JSON.stringify(error), "update keys:", Object.keys(update));
+      return NextResponse.json({ error: error.message || JSON.stringify(error) }, { status: 500 });
+    }
 
     // Log status change for batched author emails (fire-and-forget)
     if (oldStatus && fields.status && oldStatus !== fields.status) {
@@ -185,7 +194,9 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ success: true, card: data });
   } catch (e) {
-    return NextResponse.json({ error: "Failed to update card." }, { status: 500 });
+    const msg = e instanceof Error ? e.message : JSON.stringify(e);
+    console.error("PUT /api/board exception:", msg);
+    return NextResponse.json({ error: msg || "Failed to update card." }, { status: 500 });
   }
 }
 
@@ -195,9 +206,14 @@ export async function DELETE(req: Request) {
     const { id } = await req.json();
     if (!id) return NextResponse.json({ error: "ID required." }, { status: 400 });
     const { error } = await supabaseAdmin.from("board_cards").delete().eq("id", id);
-    if (error) throw error;
+    if (error) {
+      console.error("DELETE /api/board Supabase error:", JSON.stringify(error));
+      return NextResponse.json({ error: error.message || JSON.stringify(error) }, { status: 500 });
+    }
     return NextResponse.json({ success: true });
   } catch (e) {
-    return NextResponse.json({ error: "Failed to delete." }, { status: 500 });
+    const msg = e instanceof Error ? e.message : JSON.stringify(e);
+    console.error("DELETE /api/board exception:", msg);
+    return NextResponse.json({ error: msg || "Failed to delete." }, { status: 500 });
   }
 }
