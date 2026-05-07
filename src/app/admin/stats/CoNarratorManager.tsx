@@ -53,6 +53,7 @@ export default function CoNarratorManager() {
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [gatherStates, setGatherStates] = useState<Record<string, GatherState>>({});
+  const [gatherPending, setGatherPending] = useState<Record<string, string>>({});
   const [gatherAll, setGatherAll] = useState<{ phase: "idle" | "running" | "done"; found: number; total: number }>({ phase: "idle", found: 0, total: 0 });
   const gatherAllRunning = useRef(false);
 
@@ -90,6 +91,7 @@ export default function CoNarratorManager() {
         setCoNarrators(prev => [...prev, data.co_narrator]);
       }
       setForm(EMPTY_FORM);
+      setGatherPending(prev => { const n = { ...prev }; if (editingId) delete n[editingId]; return n; });
       setEditingId(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
@@ -113,13 +115,17 @@ export default function CoNarratorManager() {
     }
   };
 
-  const startEdit = (n: CoNarrator) => {
+  const startEdit = (n: CoNarrator, prefillEmail?: string) => {
     setEditingId(n.id);
-    setForm({ name: n.name, bio: n.bio, email: n.email ?? "", website: n.website, amazon: n.amazon, instagram: n.instagram, tiktok: n.tiktok, facebook: n.facebook, goodreads: n.goodreads });
-    setExpandedId(n.id);
+    setForm({ name: n.name, bio: n.bio, email: prefillEmail ?? n.email ?? "", website: n.website, amazon: n.amazon, instagram: n.instagram, tiktok: n.tiktok, facebook: n.facebook, goodreads: n.goodreads });
+    setExpandedId(null);
   };
 
-  const cancelEdit = () => { setEditingId(null); setForm(EMPTY_FORM); };
+  const cancelEdit = () => {
+    setGatherPending(prev => { const n = { ...prev }; if (editingId) delete n[editingId]; return n; });
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+  };
 
   // ── email gather ─────────────────────────────────────────────────────────────
 
@@ -138,7 +144,7 @@ export default function CoNarratorManager() {
     }
   };
 
-  const gatherEmailFor = async (narrator: CoNarrator): Promise<boolean> => {
+  const gatherEmailFor = async (narrator: CoNarrator, bulkMode = false): Promise<boolean> => {
     setGs(narrator.id, { status: "loading" });
     try {
       const res = await fetch("/api/email-gather-author", {
@@ -156,12 +162,24 @@ export default function CoNarratorManager() {
         setGs(narrator.id, { status: "none" });
         return false;
       }
-      if (emails.length === 1) {
-        await saveEmail(narrator, emails[0]);
-        setGs(narrator.id, { status: "saved", email: emails[0] });
+
+      const chosen = emails[0];
+
+      if (bulkMode) {
+        await saveEmail(narrator, chosen);
+        setGs(narrator.id, { status: "saved", email: chosen });
         setTimeout(() => setGs(narrator.id, { status: "idle" }), 3000);
         return true;
       }
+
+      // Single mode: open edit form with email pre-filled
+      if (emails.length === 1) {
+        setGatherPending(prev => ({ ...prev, [narrator.id]: chosen }));
+        startEdit(narrator, chosen);
+        setGs(narrator.id, { status: "idle" });
+        return false;
+      }
+
       setGs(narrator.id, { status: "pick", emails });
       return false;
     } catch {
@@ -178,7 +196,7 @@ export default function CoNarratorManager() {
     setGatherAll({ phase: "running", found: 0, total: missing.length });
     let found = 0;
     for (const narrator of missing) {
-      const ok = await gatherEmailFor(narrator);
+      const ok = await gatherEmailFor(narrator, true); // bulk → auto-save
       if (ok) found++;
       setGatherAll(prev => ({ ...prev, found }));
     }
@@ -255,6 +273,14 @@ export default function CoNarratorManager() {
               placeholder="narrator@example.com"
               className="w-full rounded-lg bg-[#06082E] border border-[#1A2070] p-3 text-sm outline-none focus:border-[#D4AF37]/60 text-white"
             />
+            {editingId && gatherPending[editingId] && (
+              <p className="mt-1.5 text-[11px] text-emerald-400 flex items-center gap-1.5">
+                <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                </svg>
+                Email found in inbox — review and click Save to confirm
+              </p>
+            )}
           </div>
           <div className="sm:col-span-2">
             <label className="text-xs text-white/40 uppercase tracking-wider block mb-1">Bio</label>
@@ -367,16 +393,16 @@ export default function CoNarratorManager() {
                       </svg>
                     </div>
 
-                    {/* Multi-email picker */}
+                    {/* Multi-email picker — opens edit form for confirmation */}
                     {gs.status === "pick" && (
                       <div className="flex flex-col gap-1 items-end">
-                        <p className="text-[10px] text-white/40">Pick email:</p>
+                        <p className="text-[10px] text-white/40">Pick email to review:</p>
                         {gs.emails.map(email => (
                           <button key={email} type="button"
-                            onClick={async () => {
-                              await saveEmail(n, email);
-                              setGs(n.id, { status: "saved", email });
-                              setTimeout(() => setGs(n.id, { status: "idle" }), 3000);
+                            onClick={() => {
+                              setGatherPending(prev => ({ ...prev, [n.id]: email }));
+                              startEdit(n, email);
+                              setGs(n.id, { status: "idle" });
                             }}
                             className="text-[11px] text-[#D4AF37] hover:underline text-right">
                             {email}

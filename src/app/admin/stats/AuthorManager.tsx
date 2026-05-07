@@ -93,11 +93,13 @@ function AuthorForm({
   onSave,
   onCancel,
   saving,
+  emailHint,
 }: {
   initial: Omit<Author, "id">;
   onSave: (data: Omit<Author, "id">) => Promise<void>;
   onCancel: () => void;
   saving: boolean;
+  emailHint?: string;
 }) {
   const [form, setForm] = useState(initial);
   const set = (key: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [key]: v }));
@@ -110,7 +112,17 @@ function AuthorForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <Field label="Author name" value={form.name} onChange={set("name")} placeholder="e.g. Lillian Minx Monroe" required />
-      <Field label="Email (for status notifications)" value={form.email ?? ""} onChange={set("email")} placeholder="author@example.com" />
+      <div>
+        <Field label="Email (for status notifications)" value={form.email ?? ""} onChange={set("email")} placeholder="author@example.com" />
+        {emailHint && (
+          <p className="mt-1.5 text-[11px] text-emerald-400 flex items-center gap-1.5">
+            <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+            </svg>
+            {emailHint}
+          </p>
+        )}
+      </div>
       <Field label="Short bio" value={form.bio} onChange={set("bio")} placeholder="One or two sentences about the author…" textarea />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {FIELDS.map((f) => (
@@ -147,6 +159,7 @@ export default function AuthorManager() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [gatherStates, setGatherStates] = useState<Record<string, GatherState>>({});
+  const [gatherPending, setGatherPending] = useState<Record<string, string>>({}); // authorId → found email awaiting confirmation
   const [gatherAll, setGatherAll] = useState<{ phase: "idle" | "running" | "done"; found: number; total: number }>({ phase: "idle", found: 0, total: 0 });
   const gatherAllRunning = useRef(false);
 
@@ -199,6 +212,8 @@ export default function AuthorManager() {
       setAuthors((prev) =>
         prev.map((a) => (a.id === id ? data.author : a)).sort((a, b) => a.name.localeCompare(b.name))
       );
+      // Clear any pending gathered email for this author
+      setGatherPending(prev => { const n = { ...prev }; delete n[id]; return n; });
       setEditingId(null);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to update author");
@@ -242,7 +257,8 @@ export default function AuthorManager() {
     }
   };
 
-  const gatherEmailFor = async (author: Author): Promise<boolean> => {
+  // bulkMode=false → populate edit form for review; bulkMode=true → auto-save directly
+  const gatherEmailFor = async (author: Author, bulkMode = false): Promise<boolean> => {
     setGs(author.id, { status: "loading" });
     try {
       const res = await fetch("/api/email-gather-author", {
@@ -260,13 +276,28 @@ export default function AuthorManager() {
         setGs(author.id, { status: "none" });
         return false;
       }
-      if (emails.length === 1) {
-        await saveEmail(author, emails[0]);
-        setGs(author.id, { status: "saved", email: emails[0] });
+
+      const chosen = emails[0]; // use first email for both paths
+
+      if (bulkMode) {
+        // Bulk: auto-save, no form interaction needed
+        await saveEmail(author, chosen);
+        setGs(author.id, { status: "saved", email: chosen });
         setTimeout(() => setGs(author.id, { status: "idle" }), 3000);
         return true;
       }
-      // Multiple — let Dean pick
+
+      // Single: pre-populate edit form for Dean to review
+      if (emails.length === 1) {
+        setGatherPending(prev => ({ ...prev, [author.id]: chosen }));
+        setEditingId(author.id);
+        setExpandedId(null);
+        setAdding(false);
+        setGs(author.id, { status: "idle" });
+        return false; // not yet saved — Dean must click Save
+      }
+
+      // Multiple options — show picker in the row
       setGs(author.id, { status: "pick", emails });
       return false;
     } catch {
@@ -283,7 +314,7 @@ export default function AuthorManager() {
     setGatherAll({ phase: "running", found: 0, total: missing.length });
     let found = 0;
     for (const author of missing) {
-      const ok = await gatherEmailFor(author);
+      const ok = await gatherEmailFor(author, true); // bulk mode → auto-save
       if (ok) found++;
       setGatherAll(prev => ({ ...prev, found }));
     }
@@ -392,9 +423,25 @@ export default function AuthorManager() {
                   <div className="p-6">
                     <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-bold mb-4">Editing — {author.name}</p>
                     <AuthorForm
-                      initial={{ name: author.name, bio: author.bio, website: author.website, amazon: author.amazon, instagram: author.instagram, tiktok: author.tiktok, facebook: author.facebook, goodreads: author.goodreads }}
+                      initial={{
+                        name: author.name,
+                        bio: author.bio ?? "",
+                        // Use gathered email if pending, otherwise existing email
+                        email: gatherPending[author.id] ?? author.email ?? "",
+                        website: author.website ?? "",
+                        amazon: author.amazon ?? "",
+                        instagram: author.instagram ?? "",
+                        tiktok: author.tiktok ?? "",
+                        facebook: author.facebook ?? "",
+                        goodreads: author.goodreads ?? "",
+                      }}
+                      emailHint={
+                        gatherPending[author.id]
+                          ? "Email found in inbox — review and click Save author to confirm"
+                          : undefined
+                      }
                       onSave={(form) => handleEdit(author.id, form)}
-                      onCancel={() => setEditingId(null)}
+                      onCancel={() => { setEditingId(null); setGatherPending(prev => { const n = { ...prev }; delete n[author.id]; return n; }); }}
                       saving={saving}
                     />
                   </div>
@@ -451,13 +498,16 @@ export default function AuthorManager() {
                           if (gs.status === "pick") {
                             return (
                               <div className="flex flex-col gap-1 items-end">
-                                <p className="text-[10px] text-white/40">Pick email:</p>
+                                <p className="text-[10px] text-white/40">Pick email to review:</p>
                                 {gs.emails.map(email => (
                                   <button key={email} type="button"
-                                    onClick={async () => {
-                                      await saveEmail(author, email);
-                                      setGs(author.id, { status: "saved", email });
-                                      setTimeout(() => setGs(author.id, { status: "idle" }), 3000);
+                                    onClick={() => {
+                                      // Populate edit form for confirmation — don't auto-save
+                                      setGatherPending(prev => ({ ...prev, [author.id]: email }));
+                                      setEditingId(author.id);
+                                      setExpandedId(null);
+                                      setAdding(false);
+                                      setGs(author.id, { status: "idle" });
                                     }}
                                     className="text-[11px] text-[#D4AF37] hover:underline text-right">
                                     {email}
