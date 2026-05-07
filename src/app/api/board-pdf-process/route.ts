@@ -215,23 +215,67 @@ const KNOWN_SECTION =
 // Page numbers: integer or lowercase roman numeral (i, ii, iii, iv … x …)
 const PAGE_NUM = "\\d{1,4}|[ivxlcdm]{1,6}";
 
+// Unnumbered section keywords (no "Chapter N" prefix, no number suffix needed)
+const UNNUMBERED_KW =
+  /^(prologue|epilogue|dedication|preface|afterword|foreword|appendix|introduction|acknowledgements?|acknowledgments?|author'?s?\s+note|content\s*(?:&|and)\s*trigger\s*warnings?|trigger\s*warnings?|content\s*warnings?)$/i;
+
 /**
- * Attempt to pull TOC entries out of one page's text using two strategies.
+ * Attempt to pull TOC entries out of one page's text using three strategies.
+ *
+ * Strategy C — pipe-delimited compact TOC  "Prologue 1 | 1. Brooke 9 | 2. Seth 21"
+ *   pdf-parse extracts multi-column/compact TOCs with | separators on the same line.
+ *   Each segment is matched individually with simple per-entry regexes.
+ *   If ≥3 segments parse successfully this is confirmed as a TOC page.
  *
  * Strategy A — numbered list  "N. Title  pageNum"
- *   Non-greedy title capture + lookahead at the next "M." entry (or end-of-string)
- *   resolves the digit ambiguity in "Chapter 1  7": the engine extends the
- *   non-greedy match until "7" is the only remaining candidate.
+ *   Non-greedy title capture + lookahead at the next "M." entry (or end-of-string).
  *
  * Strategy B — keyword / number-word entries  "One  1", "Preface  iii"
- *   Only fires if Strategy A found nothing on this page (avoids prose false
- *   positives). Restricted to known section keywords and number words.
+ *   Only fires if A found nothing. Restricted to known section keywords and number words.
  */
 function extractTocEntries(text: string, out: TocEntry[], seen: Set<string>): void {
   let found = 0;
   let m: RegExpExecArray | null;
 
-  // Strategy A
+  // ── Strategy C: pipe-delimited compact TOC ───────────────────────────────
+  // Fires when the page text has 3+ pipe separators — a strong signal that
+  // this is a compact TOC row rather than prose.
+  const pipeCount = (text.match(/\|/g) ?? []).length;
+  if (pipeCount >= 3) {
+    const segments = text.split(/\s*\|\s*/).map(s => s.trim()).filter(Boolean);
+    let cFound = 0;
+    for (const seg of segments) {
+      // Numbered entry: "N. Title PageNum"  (title = 1–6 words, page = 1–4 digits)
+      const numM = seg.match(/^(\d+)\.\s+([A-Za-z][A-Za-z '\-]{0,60}?)\s+(\d{1,4})$/);
+      if (numM) {
+        const title = cleanTocTitle(numM[2].trim());
+        const page  = parseInt(numM[3], 10);
+        const key   = title.toLowerCase();
+        if (title && page > 0 && !seen.has(key)) {
+          out.push({ title, startPage: page });
+          seen.add(key);
+          cFound++;
+        }
+        continue;
+      }
+      // Unnumbered keyword: "Prologue PageNum", "Epilogue PageNum", etc.
+      const kwM = seg.match(/^([A-Za-z][A-Za-z '\-]{0,60}?)\s+(\d{1,4})$/);
+      if (kwM && UNNUMBERED_KW.test(kwM[1].trim())) {
+        const title = cleanTocTitle(kwM[1].trim());
+        const page  = parseInt(kwM[2], 10);
+        const key   = title.toLowerCase();
+        if (title && page > 0 && !seen.has(key)) {
+          out.push({ title, startPage: page });
+          seen.add(key);
+          cFound++;
+        }
+      }
+    }
+    if (cFound >= 3) return; // confirmed a pipe-delimited TOC page; skip A & B
+    // <3 matches → pipes were prose punctuation, fall through to A & B
+  }
+
+  // ── Strategy A: numbered list "N. Title  pageNum" ────────────────────────
   const reA = new RegExp(
     `(?:^|\\s)\\d+\\.\\s+([\\s\\S]+?)\\s+(${PAGE_NUM})(?=\\s+\\d+\\.\\s+|\\s*$)`,
     "g"
@@ -248,7 +292,7 @@ function extractTocEntries(text: string, out: TocEntry[], seen: Set<string>): vo
   }
   if (found > 0) return;
 
-  // Strategy B
+  // ── Strategy B: keyword / number-word entries ─────────────────────────────
   const reB = new RegExp(
     `\\b(${COMPOUND_NUM}|${KNOWN_SECTION}|${SINGLE_NUM})\\s+(${PAGE_NUM})(?=\\s|$)`,
     "gi"
@@ -277,19 +321,30 @@ function parseTocFromPages(pageTexts: string[]): TocEntry[] | null {
   const seen = new Set<string>();
 
   for (let i = 0; i < Math.min(15, pageTexts.length); i++) {
-    if (!pageTexts[i].trim()) continue; // blank page
+    const before = entries.length;
+    if (!pageTexts[i].trim()) continue;
     extractTocEntries(pageTexts[i], entries, seen);
+    const added = entries.length - before;
+    if (added > 0) console.log(`[toc] page ${i + 1}: +${added} entries (total ${entries.length})`);
   }
 
-  if (entries.length < 3) return null;
+  if (entries.length < 3) {
+    console.log(`[toc] only ${entries.length} entries found — no TOC detected`);
+    return null;
+  }
 
   // Require the majority of consecutive pairs to be ascending
   let asc = 0;
   for (let i = 1; i < entries.length; i++) {
     if (entries[i].startPage > entries[i - 1].startPage) asc++;
   }
-  if (asc < Math.ceil((entries.length - 1) * 0.75)) return null;
+  const ascRatio = asc / (entries.length - 1);
+  if (ascRatio < 0.75) {
+    console.log(`[toc] ascending ratio ${ascRatio.toFixed(2)} < 0.75 — rejecting as TOC`);
+    return null;
+  }
 
+  console.log(`[toc] accepted: ${entries.length} entries, ascending ratio ${ascRatio.toFixed(2)}`);
   return entries;
 }
 
