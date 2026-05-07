@@ -220,62 +220,89 @@ const UNNUMBERED_KW =
   /^(prologue|epilogue|dedication|preface|afterword|foreword|appendix|introduction|acknowledgements?|acknowledgments?|author'?s?\s+note|content\s*(?:&|and)\s*trigger\s*warnings?|trigger\s*warnings?|content\s*warnings?)$/i;
 
 /**
+ * Try to extract TOC entries from an array of text segments (split on | or \n).
+ * Uses title:page as the dedup key so repeated character names with different
+ * page numbers are all captured (e.g. "Brooke" as chapter 1, 18, 29, 41...).
+ * Returns the matched entries if count >= threshold, otherwise null (no side-effects).
+ */
+function trySegmentedExtract(
+  segments: string[],
+  seen: Set<string>,
+  threshold: number
+): TocEntry[] | null {
+  const entries: TocEntry[] = [];
+  const addedKeys: string[] = [];
+
+  for (const seg of segments) {
+    // Numbered: "N. Title PageNum"
+    const numM = seg.match(/^(\d+)\.\s+([A-Za-z][A-Za-z '\-]{0,60}?)\s+(\d{1,4})$/);
+    if (numM) {
+      const chapNum = parseInt(numM[1], 10);
+      const rawTitle = numM[2].trim();
+      const page = parseInt(numM[3], 10);
+      // Store as "Chapter N: Name" so the list is human-readable without needing
+      // the separate number field — assignNumbers still assigns its own number.
+      const title = `Chapter ${chapNum}: ${rawTitle}`;
+      const key = `${title.toLowerCase()}:${page}`;
+      if (page > 0 && !seen.has(key) && !addedKeys.includes(key)) {
+        entries.push({ title, startPage: page });
+        addedKeys.push(key);
+      }
+      continue;
+    }
+    // Unnumbered keyword: "Prologue PageNum", "Epilogue PageNum", etc.
+    const kwM = seg.match(/^([A-Za-z][A-Za-z '\-]{0,60}?)\s+(\d{1,4})$/);
+    if (kwM && UNNUMBERED_KW.test(kwM[1].trim())) {
+      const title = cleanTocTitle(kwM[1].trim());
+      const page = parseInt(kwM[2], 10);
+      const key = `${title.toLowerCase()}:${page}`;
+      if (page > 0 && !seen.has(key) && !addedKeys.includes(key)) {
+        entries.push({ title, startPage: page });
+        addedKeys.push(key);
+      }
+    }
+  }
+
+  if (entries.length >= threshold) {
+    addedKeys.forEach(k => seen.add(k));
+    return entries;
+  }
+  return null; // not enough — caller falls through to Strategy A/B
+}
+
+/**
  * Attempt to pull TOC entries out of one page's text using three strategies.
  *
- * Strategy C — pipe-delimited compact TOC  "Prologue 1 | 1. Brooke 9 | 2. Seth 21"
- *   pdf-parse extracts multi-column/compact TOCs with | separators on the same line.
- *   Each segment is matched individually with simple per-entry regexes.
- *   If ≥3 segments parse successfully this is confirmed as a TOC page.
+ * Strategy C — compact TOC with | or \n separators
+ *   "Prologue 1 | 1. Brooke 9 | 2. Seth 21"  or newline-separated equivalent.
+ *   Uses title:page dedup key so repeated character-name POV chapters are all kept.
+ *   Threshold: 3 for pipe-separated pages, 5 for newline-separated (avoids prose).
  *
- * Strategy A — numbered list  "N. Title  pageNum"
- *   Non-greedy title capture + lookahead at the next "M." entry (or end-of-string).
+ * Strategy A — numbered list "N. Title  pageNum" (multi-line prose TOC)
  *
- * Strategy B — keyword / number-word entries  "One  1", "Preface  iii"
- *   Only fires if A found nothing. Restricted to known section keywords and number words.
+ * Strategy B — keyword / number-word entries "One  1", "Preface  iii"
+ *   Only fires if A found nothing.
  */
 function extractTocEntries(text: string, out: TocEntry[], seen: Set<string>): void {
   let found = 0;
   let m: RegExpExecArray | null;
 
-  // ── Strategy C: pipe-delimited compact TOC ───────────────────────────────
-  // Fires when the page text has 3+ pipe separators — a strong signal that
-  // this is a compact TOC row rather than prose.
+  // ── Strategy C: explicit-separator compact TOC (| or \n) ─────────────────
   const pipeCount = (text.match(/\|/g) ?? []).length;
   if (pipeCount >= 3) {
-    const segments = text.split(/\s*\|\s*/).map(s => s.trim()).filter(Boolean);
-    let cFound = 0;
-    for (const seg of segments) {
-      // Numbered entry: "N. Title PageNum"  (title = 1–6 words, page = 1–4 digits)
-      const numM = seg.match(/^(\d+)\.\s+([A-Za-z][A-Za-z '\-]{0,60}?)\s+(\d{1,4})$/);
-      if (numM) {
-        const title = cleanTocTitle(numM[2].trim());
-        const page  = parseInt(numM[3], 10);
-        const key   = title.toLowerCase();
-        if (title && page > 0 && !seen.has(key)) {
-          out.push({ title, startPage: page });
-          seen.add(key);
-          cFound++;
-        }
-        continue;
-      }
-      // Unnumbered keyword: "Prologue PageNum", "Epilogue PageNum", etc.
-      const kwM = seg.match(/^([A-Za-z][A-Za-z '\-]{0,60}?)\s+(\d{1,4})$/);
-      if (kwM && UNNUMBERED_KW.test(kwM[1].trim())) {
-        const title = cleanTocTitle(kwM[1].trim());
-        const page  = parseInt(kwM[2], 10);
-        const key   = title.toLowerCase();
-        if (title && page > 0 && !seen.has(key)) {
-          out.push({ title, startPage: page });
-          seen.add(key);
-          cFound++;
-        }
-      }
-    }
-    if (cFound >= 3) return; // confirmed a pipe-delimited TOC page; skip A & B
-    // <3 matches → pipes were prose punctuation, fall through to A & B
+    const segs = text.split(/\s*\|\s*/).map(s => s.trim()).filter(Boolean);
+    const result = trySegmentedExtract(segs, seen, 3);
+    if (result) { out.push(...result); return; }
+  }
+  // Always try newline split too — pages 4+ of a multi-page TOC may lose the |
+  {
+    const segs = text.split(/\n/).map(s => s.trim()).filter(Boolean);
+    const result = trySegmentedExtract(segs, seen, 5);
+    if (result) { out.push(...result); return; }
   }
 
   // ── Strategy A: numbered list "N. Title  pageNum" ────────────────────────
+  // Dedup key is title:page so repeated short titles don't collide.
   const reA = new RegExp(
     `(?:^|\\s)\\d+\\.\\s+([\\s\\S]+?)\\s+(${PAGE_NUM})(?=\\s+\\d+\\.\\s+|\\s*$)`,
     "g"
@@ -283,7 +310,7 @@ function extractTocEntries(text: string, out: TocEntry[], seen: Set<string>): vo
   while ((m = reA.exec(text)) !== null) {
     const title = cleanTocTitle(m[1]);
     const page = parsePageNum(m[2]);
-    const key = title.toLowerCase();
+    const key = `${title.toLowerCase()}:${page}`;
     if (title && page > 0 && !seen.has(key)) {
       out.push({ title, startPage: page });
       seen.add(key);
@@ -300,7 +327,7 @@ function extractTocEntries(text: string, out: TocEntry[], seen: Set<string>): vo
   while ((m = reB.exec(text)) !== null) {
     const title = cleanTocTitle(m[1]);
     const page = parsePageNum(m[2]);
-    const key = title.toLowerCase();
+    const key = `${title.toLowerCase()}:${page}`;
     if (title && page > 0 && !seen.has(key)) {
       out.push({ title, startPage: page });
       seen.add(key);
