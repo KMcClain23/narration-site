@@ -99,8 +99,9 @@ export async function POST(req: Request) {
       first_15_complete: first_15_complete ?? false,
       slug:              slug || makeSlug(title.trim()),
     };
-    if (deadline)     insertData.deadline     = deadline;
-    if (first15_due)  insertData.first15_due  = first15_due;
+    // Date columns must be null (not "") when empty — Supabase rejects empty strings for date/timestamptz
+    insertData.deadline    = deadline    || null;
+    insertData.first15_due = first15_due || null;
     if (dean_message) insertData.dean_message = dean_message;
     if (author_email) insertData.author_email = author_email;
 
@@ -163,9 +164,13 @@ export async function PUT(req: Request) {
       "word_count", "first15_due", "pfh_rate", "payment_type",
       "first_15_complete", "dean_message", "author_email", "author_token",
     ];
+    const DATE_FIELDS = new Set(["deadline", "first15_due", "first_15_due"]);
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
-      if (key in fields) update[key] = fields[key];
+      if (key in fields) {
+        // Date columns must be null (not "") — Supabase rejects empty strings for date/timestamptz
+        update[key] = DATE_FIELDS.has(key) ? (fields[key] || null) : fields[key];
+      }
     }
 
     // Snapshot old status before update so we can log the change
