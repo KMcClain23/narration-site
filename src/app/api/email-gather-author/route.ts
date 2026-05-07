@@ -52,6 +52,13 @@ async function getValidAccessToken(): Promise<string | null> {
 type GraphMessage = {
   from?:    { emailAddress: { name: string; address: string } };
   replyTo?: { emailAddress: { name: string; address: string } }[];
+  subject?: string;
+};
+
+export type EmailCandidate = {
+  email:      string;
+  senderName: string;
+  subject:    string;
 };
 
 // Common automated/noreply addresses to exclude
@@ -66,9 +73,9 @@ function isHuman(email: string): boolean {
 }
 
 async function searchMessages(token: string, query: string): Promise<GraphMessage[]> {
-  // $search can't be combined with $filter for date — fetch top results and filter by relevance
   const searchParam = encodeURIComponent(`"${query}"`);
-  const url = `https://graph.microsoft.com/v1.0/me/messages?$search=${searchParam}&$select=from,replyTo&$top=50`;
+  // Include subject in select so we can show context in the picker
+  const url = `https://graph.microsoft.com/v1.0/me/messages?$search=${searchParam}&$select=from,replyTo,subject&$top=50`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) {
     console.error("Graph search failed:", await res.text());
@@ -105,26 +112,32 @@ export async function POST(req: Request) {
       allMessages.push(...msgs);
     }
 
-    // Collect unique human email addresses from From and Reply-To fields
-    const seen = new Set<string>();
-    const emails: string[] = [];
+    // Build deduplicated candidate list — each unique email keeps the subject of
+    // the first message it appeared in, giving Dean context for which email to pick.
+    const seen  = new Map<string, EmailCandidate>();
 
     for (const msg of allMessages) {
-      const candidates: string[] = [
-        msg.from?.emailAddress?.address,
-        ...(msg.replyTo ?? []).map(r => r.emailAddress?.address),
-      ].filter((e): e is string => Boolean(e));
+      const subject = (msg.subject ?? "").trim();
 
-      for (const addr of candidates) {
-        const normalized = addr.trim().toLowerCase();
-        if (!seen.has(normalized) && isHuman(normalized)) {
-          seen.add(normalized);
-          emails.push(addr.trim());
+      const pairs: { addr: string; name: string }[] = [
+        msg.from?.emailAddress
+          ? { addr: msg.from.emailAddress.address, name: msg.from.emailAddress.name ?? "" }
+          : null,
+        ...(msg.replyTo ?? []).map(r => r.emailAddress
+          ? { addr: r.emailAddress.address, name: r.emailAddress.name ?? "" }
+          : null),
+      ].filter((p): p is { addr: string; name: string } => Boolean(p?.addr));
+
+      for (const { addr, name } of pairs) {
+        const key = addr.trim().toLowerCase();
+        if (!seen.has(key) && isHuman(key)) {
+          seen.set(key, { email: addr.trim(), senderName: name, subject });
         }
       }
     }
 
-    return NextResponse.json({ emails, searched: allMessages.length });
+    const candidates = Array.from(seen.values());
+    return NextResponse.json({ candidates, searched: allMessages.length });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("email-gather-author failed:", msg);

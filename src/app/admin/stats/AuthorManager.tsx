@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
-// ── per-author gather state ───────────────────────────────────────────────────
+// ── types ─────────────────────────────────────────────────────────────────────
+type EmailCandidate = { email: string; senderName: string; subject: string };
+
 type GatherState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "saved"; email: string }
-  | { status: "pick"; emails: string[] }
   | { status: "none" }
   | { status: "error"; message: string };
 
@@ -93,13 +93,15 @@ function AuthorForm({
   onSave,
   onCancel,
   saving,
-  emailHint,
+  gatherCandidates,
+  currentSavedEmail,
 }: {
   initial: Omit<Author, "id">;
   onSave: (data: Omit<Author, "id">) => Promise<void>;
   onCancel: () => void;
   saving: boolean;
-  emailHint?: string;
+  gatherCandidates?: EmailCandidate[];
+  currentSavedEmail?: string;
 }) {
   const [form, setForm] = useState(initial);
   const set = (key: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [key]: v }));
@@ -109,18 +111,64 @@ function AuthorForm({
     await onSave(form);
   };
 
+  const isSingleMatch = gatherCandidates?.length === 1 && !currentSavedEmail;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <Field label="Author name" value={form.name} onChange={set("name")} placeholder="e.g. Lillian Minx Monroe" required />
-      <div>
+      <div className="space-y-2">
         <Field label="Email (for status notifications)" value={form.email ?? ""} onChange={set("email")} placeholder="author@example.com" />
-        {emailHint && (
-          <p className="mt-1.5 text-[11px] text-emerald-400 flex items-center gap-1.5">
+
+        {/* Single match, no existing email — brief confirmation hint */}
+        {isSingleMatch && (
+          <p className="text-[11px] text-emerald-400 flex items-center gap-1.5">
             <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
             </svg>
-            {emailHint}
+            Found 1 match — confirm or change below
           </p>
+        )}
+
+        {/* Candidate picker — shows when multiple found OR when changing existing email */}
+        {gatherCandidates && gatherCandidates.length > 0 && !isSingleMatch && (
+          <div className="rounded-xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 p-3 space-y-1">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[#D4AF37]/70 font-semibold mb-2">
+              {gatherCandidates.length} candidate{gatherCandidates.length !== 1 ? "s" : ""} found — click to select
+            </p>
+            {gatherCandidates.map(c => {
+              const isCurrent = c.email.toLowerCase() === (currentSavedEmail ?? "").toLowerCase();
+              const isSelected = c.email.toLowerCase() === (form.email ?? "").toLowerCase();
+              return (
+                <button
+                  key={c.email}
+                  type="button"
+                  onClick={() => set("email")(c.email)}
+                  className={`w-full text-left rounded-lg px-3 py-2 transition-colors border ${
+                    isSelected
+                      ? "border-[#D4AF37]/50 bg-[#D4AF37]/15"
+                      : "border-white/6 bg-black/20 hover:border-white/15 hover:bg-black/30"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-white">{c.email}</span>
+                    {isCurrent && (
+                      <span className="text-[9px] font-bold uppercase tracking-wide text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">saved</span>
+                    )}
+                    {isSelected && !isCurrent && (
+                      <svg className="h-3 w-3 text-[#D4AF37] shrink-0 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                      </svg>
+                    )}
+                  </div>
+                  {c.subject && (
+                    <p className="text-[10px] text-white/35 mt-0.5 truncate">
+                      from: &ldquo;{c.subject}&rdquo;
+                    </p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
       <Field label="Short bio" value={form.bio} onChange={set("bio")} placeholder="One or two sentences about the author…" textarea />
@@ -159,7 +207,7 @@ export default function AuthorManager() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [gatherStates, setGatherStates] = useState<Record<string, GatherState>>({});
-  const [gatherPending, setGatherPending] = useState<Record<string, string>>({}); // authorId → found email awaiting confirmation
+  const [gatherPending, setGatherPending] = useState<Record<string, EmailCandidate[]>>({}); // authorId → candidates for picker
   const [gatherAll, setGatherAll] = useState<{ phase: "idle" | "running" | "done"; found: number; total: number }>({ phase: "idle", found: 0, total: 0 });
   const gatherAllRunning = useRef(false);
 
@@ -257,7 +305,7 @@ export default function AuthorManager() {
     }
   };
 
-  // bulkMode=false → populate edit form for review; bulkMode=true → auto-save directly
+  // bulkMode=false → open edit form with candidate picker; bulkMode=true → auto-save first result
   const gatherEmailFor = async (author: Author, bulkMode = false): Promise<boolean> => {
     setGs(author.id, { status: "loading" });
     try {
@@ -271,34 +319,24 @@ export default function AuthorManager() {
         setGs(author.id, { status: "error", message: d.error ?? "Failed" });
         return false;
       }
-      const emails: string[] = d.emails ?? [];
-      if (emails.length === 0) {
+      const candidates: EmailCandidate[] = d.candidates ?? [];
+      if (candidates.length === 0) {
         setGs(author.id, { status: "none" });
         return false;
       }
 
-      const chosen = emails[0]; // use first email for both paths
-
       if (bulkMode) {
-        // Bulk: auto-save, no form interaction needed
-        await saveEmail(author, chosen);
-        setGs(author.id, { status: "saved", email: chosen });
-        setTimeout(() => setGs(author.id, { status: "idle" }), 3000);
+        await saveEmail(author, candidates[0].email);
+        setGs(author.id, { status: "idle" });
         return true;
       }
 
-      // Single: pre-populate edit form for Dean to review
-      if (emails.length === 1) {
-        setGatherPending(prev => ({ ...prev, [author.id]: chosen }));
-        setEditingId(author.id);
-        setExpandedId(null);
-        setAdding(false);
-        setGs(author.id, { status: "idle" });
-        return false; // not yet saved — Dean must click Save
-      }
-
-      // Multiple options — show picker in the row
-      setGs(author.id, { status: "pick", emails });
+      // Single mode: open edit form with all candidates shown for review
+      setGatherPending(prev => ({ ...prev, [author.id]: candidates }));
+      setEditingId(author.id);
+      setExpandedId(null);
+      setAdding(false);
+      setGs(author.id, { status: "idle" });
       return false;
     } catch {
       setGs(author.id, { status: "error", message: "Network error" });
@@ -422,28 +460,36 @@ export default function AuthorManager() {
                 {isEditing ? (
                   <div className="p-6">
                     <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-bold mb-4">Editing — {author.name}</p>
-                    <AuthorForm
-                      initial={{
-                        name: author.name,
-                        bio: author.bio ?? "",
-                        // Use gathered email if pending, otherwise existing email
-                        email: gatherPending[author.id] ?? author.email ?? "",
-                        website: author.website ?? "",
-                        amazon: author.amazon ?? "",
-                        instagram: author.instagram ?? "",
-                        tiktok: author.tiktok ?? "",
-                        facebook: author.facebook ?? "",
-                        goodreads: author.goodreads ?? "",
-                      }}
-                      emailHint={
-                        gatherPending[author.id]
-                          ? "Email found in inbox — review and click Save author to confirm"
-                          : undefined
-                      }
-                      onSave={(form) => handleEdit(author.id, form)}
-                      onCancel={() => { setEditingId(null); setGatherPending(prev => { const n = { ...prev }; delete n[author.id]; return n; }); }}
-                      saving={saving}
-                    />
+                    {(() => {
+                      const pending = gatherPending[author.id];
+                      // Pre-fill email: use first candidate only when single match + no existing email
+                      const prefillEmail = (pending?.length === 1 && !author.email)
+                        ? pending[0].email
+                        : author.email ?? "";
+                      return (
+                        <AuthorForm
+                          initial={{
+                            name:      author.name,
+                            bio:       author.bio      ?? "",
+                            email:     prefillEmail,
+                            website:   author.website  ?? "",
+                            amazon:    author.amazon   ?? "",
+                            instagram: author.instagram ?? "",
+                            tiktok:    author.tiktok   ?? "",
+                            facebook:  author.facebook ?? "",
+                            goodreads: author.goodreads ?? "",
+                          }}
+                          gatherCandidates={pending}
+                          currentSavedEmail={author.email ?? ""}
+                          onSave={(form) => handleEdit(author.id, form)}
+                          onCancel={() => {
+                            setEditingId(null);
+                            setGatherPending(prev => { const n = { ...prev }; delete n[author.id]; return n; });
+                          }}
+                          saving={saving}
+                        />
+                      );
+                    })()}
                   </div>
                 ) : (
                   <>
@@ -475,7 +521,7 @@ export default function AuthorManager() {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                        {/* Gather email button */}
+                        {/* Gather / Change email button */}
                         {(() => {
                           const gs: GatherState = gatherStates[author.id] ?? { status: "idle" };
                           if (gs.status === "loading") {
@@ -486,49 +532,50 @@ export default function AuthorManager() {
                               </span>
                             );
                           }
-                          if (gs.status === "saved") {
-                            return <span className="text-[11px] text-emerald-400">✓ {gs.email}</span>;
-                          }
                           if (gs.status === "none") {
-                            return <span className="text-[11px] text-white/30">No emails found</span>;
-                          }
-                          if (gs.status === "error") {
-                            return <span className="text-[11px] text-red-400/70">{gs.message}</span>;
-                          }
-                          if (gs.status === "pick") {
                             return (
-                              <div className="flex flex-col gap-1 items-end">
-                                <p className="text-[10px] text-white/40">Pick email to review:</p>
-                                {gs.emails.map(email => (
-                                  <button key={email} type="button"
-                                    onClick={() => {
-                                      // Populate edit form for confirmation — don't auto-save
-                                      setGatherPending(prev => ({ ...prev, [author.id]: email }));
-                                      setEditingId(author.id);
-                                      setExpandedId(null);
-                                      setAdding(false);
-                                      setGs(author.id, { status: "idle" });
-                                    }}
-                                    className="text-[11px] text-[#D4AF37] hover:underline text-right">
-                                    {email}
-                                  </button>
-                                ))}
-                                <button type="button" onClick={() => setGs(author.id, { status: "idle" })}
-                                  className="text-[10px] text-white/30 hover:text-white/60 mt-0.5">Cancel</button>
-                              </div>
+                              <span className="text-[11px] text-white/30 cursor-default"
+                                onClick={() => setGs(author.id, { status: "idle" })}>
+                                No emails found
+                              </span>
                             );
                           }
-                          // idle — show gather button
+                          if (gs.status === "error") {
+                            return (
+                              <span className="text-[11px] text-red-400/70 cursor-pointer hover:text-red-300"
+                                onClick={() => setGs(author.id, { status: "idle" })}>
+                                {gs.message} ✕
+                              </span>
+                            );
+                          }
                           return (
                             <button
                               type="button"
                               onClick={() => gatherEmailFor(author)}
                               className="rounded-md px-2.5 py-1.5 text-[11px] font-semibold text-white/50 hover:text-[#D4AF37] border border-white/8 hover:border-[#D4AF37]/30 transition"
                             >
-                              Gather email →
+                              {author.email ? "Change email →" : "Gather email →"}
                             </button>
                           );
                         })()}
+
+                        {/* Clear email X */}
+                        {author.email && gatherStates[author.id]?.status !== "loading" && (
+                          <button type="button"
+                            title="Clear email and edit manually"
+                            onClick={() => {
+                              setGatherPending(prev => { const n = { ...prev }; delete n[author.id]; return n; });
+                              setEditingId(author.id);
+                              setExpandedId(null);
+                              setAdding(false);
+                            }}
+                            className="text-white/20 hover:text-red-400 transition text-xs p-1 rounded"
+                            aria-label="Clear saved email">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                          </button>
+                        )}
 
                         <button
                           onClick={() => setExpandedId(isExpanded ? null : author.id)}

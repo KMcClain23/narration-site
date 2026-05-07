@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
+type EmailCandidate = { email: string; senderName: string; subject: string };
+
 type GatherState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "saved"; email: string }
-  | { status: "pick"; emails: string[] }
   | { status: "none" }
   | { status: "error"; message: string };
 
@@ -53,7 +53,7 @@ export default function CoNarratorManager() {
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [gatherStates, setGatherStates] = useState<Record<string, GatherState>>({});
-  const [gatherPending, setGatherPending] = useState<Record<string, string>>({});
+  const [gatherPending, setGatherPending] = useState<Record<string, EmailCandidate[]>>({});
   const [gatherAll, setGatherAll] = useState<{ phase: "idle" | "running" | "done"; found: number; total: number }>({ phase: "idle", found: 0, total: 0 });
   const gatherAllRunning = useRef(false);
 
@@ -157,30 +157,23 @@ export default function CoNarratorManager() {
         setGs(narrator.id, { status: "error", message: d.error ?? "Failed" });
         return false;
       }
-      const emails: string[] = d.emails ?? [];
-      if (emails.length === 0) {
+      const candidates: EmailCandidate[] = d.candidates ?? [];
+      if (candidates.length === 0) {
         setGs(narrator.id, { status: "none" });
         return false;
       }
 
-      const chosen = emails[0];
-
       if (bulkMode) {
-        await saveEmail(narrator, chosen);
-        setGs(narrator.id, { status: "saved", email: chosen });
-        setTimeout(() => setGs(narrator.id, { status: "idle" }), 3000);
+        await saveEmail(narrator, candidates[0].email);
+        setGs(narrator.id, { status: "idle" });
         return true;
       }
 
-      // Single mode: open edit form with email pre-filled
-      if (emails.length === 1) {
-        setGatherPending(prev => ({ ...prev, [narrator.id]: chosen }));
-        startEdit(narrator, chosen);
-        setGs(narrator.id, { status: "idle" });
-        return false;
-      }
-
-      setGs(narrator.id, { status: "pick", emails });
+      // Single mode: open edit form with candidates for review
+      const prefill = (candidates.length === 1 && !narrator.email) ? candidates[0].email : narrator.email ?? "";
+      setGatherPending(prev => ({ ...prev, [narrator.id]: candidates }));
+      startEdit(narrator, prefill);
+      setGs(narrator.id, { status: "idle" });
       return false;
     } catch {
       setGs(narrator.id, { status: "error", message: "Network error" });
@@ -273,14 +266,43 @@ export default function CoNarratorManager() {
               placeholder="narrator@example.com"
               className="w-full rounded-lg bg-[#06082E] border border-[#1A2070] p-3 text-sm outline-none focus:border-[#D4AF37]/60 text-white"
             />
-            {editingId && gatherPending[editingId] && (
-              <p className="mt-1.5 text-[11px] text-emerald-400 flex items-center gap-1.5">
-                <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
-                </svg>
-                Email found in inbox — review and click Save to confirm
-              </p>
-            )}
+            {editingId && gatherPending[editingId] && (() => {
+              const pending = gatherPending[editingId];
+              const currentSaved = coNarrators.find(n => n.id === editingId)?.email ?? "";
+              const isSingle = pending.length === 1 && !currentSaved;
+              return isSingle ? (
+                <p className="mt-1.5 text-[11px] text-emerald-400 flex items-center gap-1.5">
+                  <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                  </svg>
+                  Found 1 match — confirm or change below
+                </p>
+              ) : (
+                <div className="rounded-xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 p-3 space-y-1 mt-2">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-[#D4AF37]/70 font-semibold mb-2">
+                    {pending.length} candidate{pending.length !== 1 ? "s" : ""} found — click to select
+                  </p>
+                  {pending.map(c => {
+                    const isCurrent = c.email.toLowerCase() === currentSaved.toLowerCase();
+                    const isSelected = c.email.toLowerCase() === (form.email ?? "").toLowerCase();
+                    return (
+                      <button key={c.email} type="button"
+                        onClick={() => setForm(f => ({ ...f, email: c.email }))}
+                        className={`w-full text-left rounded-lg px-3 py-2 transition-colors border ${
+                          isSelected ? "border-[#D4AF37]/50 bg-[#D4AF37]/15" : "border-white/6 bg-black/20 hover:border-white/15 hover:bg-black/30"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-white">{c.email}</span>
+                          {isCurrent && <span className="text-[9px] font-bold uppercase tracking-wide text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">saved</span>}
+                        </div>
+                        {c.subject && <p className="text-[10px] text-white/35 mt-0.5 truncate">from: &ldquo;{c.subject}&rdquo;</p>}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
           <div className="sm:col-span-2">
             <label className="text-xs text-white/40 uppercase tracking-wider block mb-1">Bio</label>
@@ -362,19 +384,30 @@ export default function CoNarratorManager() {
                           Searching…
                         </span>
                       )}
-                      {gs.status === "saved" && (
-                        <span className="text-[11px] text-emerald-400">✓ {gs.email}</span>
-                      )}
                       {gs.status === "none" && (
-                        <span className="text-[11px] text-white/30">No emails found</span>
+                        <span className="text-[11px] text-white/30 cursor-pointer" onClick={() => setGs(n.id, { status: "idle" })}>No emails found</span>
                       )}
                       {gs.status === "error" && (
-                        <span className="text-[11px] text-red-400/70">{gs.message}</span>
+                        <span className="text-[11px] text-red-400/70 cursor-pointer hover:text-red-300" onClick={() => setGs(n.id, { status: "idle" })}>{gs.message} ✕</span>
                       )}
                       {gs.status === "idle" && (
                         <button type="button" onClick={() => gatherEmailFor(n)}
                           className="rounded-md px-2.5 py-1.5 text-[11px] font-semibold text-white/50 hover:text-[#D4AF37] border border-white/8 hover:border-[#D4AF37]/30 transition">
-                          Gather email →
+                          {n.email ? "Change email →" : "Gather email →"}
+                        </button>
+                      )}
+                      {n.email && gs.status !== "loading" && (
+                        <button type="button"
+                          title="Clear email"
+                          onClick={() => {
+                            setGatherPending(prev => { const p = { ...prev }; delete p[n.id]; return p; });
+                            startEdit(n, "");
+                          }}
+                          className="text-white/20 hover:text-red-400 transition text-xs p-1 rounded"
+                          aria-label="Clear saved email">
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
                         </button>
                       )}
 
@@ -393,25 +426,6 @@ export default function CoNarratorManager() {
                       </svg>
                     </div>
 
-                    {/* Multi-email picker — opens edit form for confirmation */}
-                    {gs.status === "pick" && (
-                      <div className="flex flex-col gap-1 items-end">
-                        <p className="text-[10px] text-white/40">Pick email to review:</p>
-                        {gs.emails.map(email => (
-                          <button key={email} type="button"
-                            onClick={() => {
-                              setGatherPending(prev => ({ ...prev, [n.id]: email }));
-                              startEdit(n, email);
-                              setGs(n.id, { status: "idle" });
-                            }}
-                            className="text-[11px] text-[#D4AF37] hover:underline text-right">
-                            {email}
-                          </button>
-                        ))}
-                        <button type="button" onClick={() => setGs(n.id, { status: "idle" })}
-                          className="text-[10px] text-white/30 hover:text-white/60 mt-0.5">Cancel</button>
-                      </div>
-                    )}
                   </div>
                 </div>
 
