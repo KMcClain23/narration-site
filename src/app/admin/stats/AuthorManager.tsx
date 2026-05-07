@@ -1,6 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+
+// ── per-author gather state ───────────────────────────────────────────────────
+type GatherState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "saved"; email: string }
+  | { status: "pick"; emails: string[] }
+  | { status: "none" }
+  | { status: "error"; message: string };
 
 interface Author {
   id: string;
@@ -137,6 +146,9 @@ export default function AuthorManager() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [gatherStates, setGatherStates] = useState<Record<string, GatherState>>({});
+  const [gatherAll, setGatherAll] = useState<{ phase: "idle" | "running" | "done"; found: number; total: number }>({ phase: "idle", found: 0, total: 0 });
+  const gatherAllRunning = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -213,27 +225,125 @@ export default function AuthorManager() {
     }
   };
 
+  // ── email gather helpers ────────────────────────────────────────────────────
+
+  const setGs = (id: string, state: GatherState) =>
+    setGatherStates(prev => ({ ...prev, [id]: state }));
+
+  const saveEmail = async (author: Author, email: string) => {
+    const res = await fetch("/api/authors", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: author.id, name: author.name, bio: author.bio, email, website: author.website, amazon: author.amazon, instagram: author.instagram, tiktok: author.tiktok, facebook: author.facebook, goodreads: author.goodreads }),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      setAuthors(prev => prev.map(a => a.id === author.id ? d.author : a));
+    }
+  };
+
+  const gatherEmailFor = async (author: Author): Promise<boolean> => {
+    setGs(author.id, { status: "loading" });
+    try {
+      const res = await fetch("/api/email-gather-author", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ authorName: author.name }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setGs(author.id, { status: "error", message: d.error ?? "Failed" });
+        return false;
+      }
+      const emails: string[] = d.emails ?? [];
+      if (emails.length === 0) {
+        setGs(author.id, { status: "none" });
+        return false;
+      }
+      if (emails.length === 1) {
+        await saveEmail(author, emails[0]);
+        setGs(author.id, { status: "saved", email: emails[0] });
+        setTimeout(() => setGs(author.id, { status: "idle" }), 3000);
+        return true;
+      }
+      // Multiple — let Dean pick
+      setGs(author.id, { status: "pick", emails });
+      return false;
+    } catch {
+      setGs(author.id, { status: "error", message: "Network error" });
+      return false;
+    }
+  };
+
+  const gatherAllMissing = async () => {
+    if (gatherAllRunning.current) return;
+    const missing = authors.filter(a => !a.email);
+    if (!missing.length) return;
+    gatherAllRunning.current = true;
+    setGatherAll({ phase: "running", found: 0, total: missing.length });
+    let found = 0;
+    for (const author of missing) {
+      const ok = await gatherEmailFor(author);
+      if (ok) found++;
+      setGatherAll(prev => ({ ...prev, found }));
+    }
+    setGatherAll({ phase: "done", found, total: missing.length });
+    gatherAllRunning.current = false;
+  };
+
   const filledLinkCount = (a: Author) =>
     [a.website, a.amazon, a.instagram, a.tiktok, a.facebook, a.goodreads].filter(Boolean).length;
 
   return (
     <section className="mt-12 pt-12 border-t border-[#1A2070]">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-semibold text-white">Author profiles</h2>
           <p className="mt-1 text-sm text-white/40">Manage links and bios shown in the author popup on Narrated Works.</p>
         </div>
-        {!adding && (
-          <button
-            onClick={() => { setAdding(true); setEditingId(null); }}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#D4AF37] px-4 py-2 text-sm font-bold text-black hover:bg-[#E0C15A] transition"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            Add author
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Gather all missing emails */}
+          {authors.some(a => !a.email) && (
+            <div className="flex flex-col items-end gap-1">
+              <button
+                onClick={gatherAllMissing}
+                disabled={gatherAll.phase === "running"}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-2 text-xs font-semibold text-white/70 hover:text-white hover:border-white/30 transition disabled:opacity-40"
+              >
+                {gatherAll.phase === "running" ? (
+                  <>
+                    <span className="h-3 w-3 border border-white/30 border-t-white/70 rounded-full animate-spin" />
+                    Gathering {gatherAll.found}/{gatherAll.total}…
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    Gather all missing
+                  </>
+                )}
+              </button>
+              {gatherAll.phase === "done" && (
+                <p className="text-[11px] text-white/40">
+                  Found emails for {gatherAll.found} of {gatherAll.total} authors
+                </p>
+              )}
+            </div>
+          )}
+
+          {!adding && (
+            <button
+              onClick={() => { setAdding(true); setEditingId(null); }}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#D4AF37] px-4 py-2 text-sm font-bold text-black hover:bg-[#E0C15A] transition"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Add author
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -299,7 +409,7 @@ export default function AuthorManager() {
                         <p className="font-semibold text-white text-sm">{author.name}</p>
                         <div className="flex items-center gap-3 mt-0.5">
                           {author.bio ? (
-                            <p className="text-xs text-white/40 truncate max-w-sm">{author.bio}</p>
+                            <p className="text-xs text-white/40 truncate max-w-xs">{author.bio}</p>
                           ) : (
                             <p className="text-xs text-white/20 italic">No bio</p>
                           )}
@@ -307,8 +417,69 @@ export default function AuthorManager() {
                             {linkCount} link{linkCount !== 1 ? "s" : ""}
                           </span>
                         </div>
+                        {/* Email display */}
+                        <div className="mt-1 flex items-center gap-1.5 text-[11px]">
+                          {author.email ? (
+                            <span className="text-emerald-400/70">{author.email}</span>
+                          ) : (
+                            <span className="text-white/20 italic">No email</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                        {/* Gather email button */}
+                        {(() => {
+                          const gs: GatherState = gatherStates[author.id] ?? { status: "idle" };
+                          if (gs.status === "loading") {
+                            return (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-white/40">
+                                <span className="h-3 w-3 border border-white/30 border-t-white/60 rounded-full animate-spin" />
+                                Searching…
+                              </span>
+                            );
+                          }
+                          if (gs.status === "saved") {
+                            return <span className="text-[11px] text-emerald-400">✓ {gs.email}</span>;
+                          }
+                          if (gs.status === "none") {
+                            return <span className="text-[11px] text-white/30">No emails found</span>;
+                          }
+                          if (gs.status === "error") {
+                            return <span className="text-[11px] text-red-400/70">{gs.message}</span>;
+                          }
+                          if (gs.status === "pick") {
+                            return (
+                              <div className="flex flex-col gap-1 items-end">
+                                <p className="text-[10px] text-white/40">Pick email:</p>
+                                {gs.emails.map(email => (
+                                  <button key={email} type="button"
+                                    onClick={async () => {
+                                      await saveEmail(author, email);
+                                      setGs(author.id, { status: "saved", email });
+                                      setTimeout(() => setGs(author.id, { status: "idle" }), 3000);
+                                    }}
+                                    className="text-[11px] text-[#D4AF37] hover:underline text-right">
+                                    {email}
+                                  </button>
+                                ))}
+                                <button type="button" onClick={() => setGs(author.id, { status: "idle" })}
+                                  className="text-[10px] text-white/30 hover:text-white/60 mt-0.5">Cancel</button>
+                              </div>
+                            );
+                          }
+                          // idle — show gather button
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => gatherEmailFor(author)}
+                              className="rounded-md px-2.5 py-1.5 text-[11px] font-semibold text-white/50 hover:text-[#D4AF37] border border-white/8 hover:border-[#D4AF37]/30 transition"
+                            >
+                              Gather email →
+                            </button>
+                          );
+                        })()}
+
                         <button
                           onClick={() => setExpandedId(isExpanded ? null : author.id)}
                           className="rounded-md p-1.5 text-white/25 hover:text-white/70 hover:bg-white/5 transition"
