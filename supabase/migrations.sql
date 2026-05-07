@@ -68,6 +68,9 @@ insert into site_settings (key, value)
 -- email column on authors table for status notification emails
 alter table authors add column if not exists email text;
 
+-- email column on co_narrators table
+alter table co_narrators add column if not exists email text;
+
 -- analytics events
 create table if not exists analytics_events (
   id         uuid        primary key default gen_random_uuid(),

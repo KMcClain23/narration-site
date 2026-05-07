@@ -1,11 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+
+type GatherState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "saved"; email: string }
+  | { status: "pick"; emails: string[] }
+  | { status: "none" }
+  | { status: "error"; message: string };
 
 interface CoNarrator {
   id: string;
   name: string;
   bio: string;
+  email?: string;
   website: string;
   amazon: string;
   instagram: string;
@@ -17,6 +26,7 @@ interface CoNarrator {
 const EMPTY_FORM: Omit<CoNarrator, "id"> = {
   name: "",
   bio: "",
+  email: "",
   website: "",
   amazon: "",
   instagram: "",
@@ -42,6 +52,9 @@ export default function CoNarratorManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [gatherStates, setGatherStates] = useState<Record<string, GatherState>>({});
+  const [gatherAll, setGatherAll] = useState<{ phase: "idle" | "running" | "done"; found: number; total: number }>({ phase: "idle", found: 0, total: 0 });
+  const gatherAllRunning = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -102,11 +115,76 @@ export default function CoNarratorManager() {
 
   const startEdit = (n: CoNarrator) => {
     setEditingId(n.id);
-    setForm({ name: n.name, bio: n.bio, website: n.website, amazon: n.amazon, instagram: n.instagram, tiktok: n.tiktok, facebook: n.facebook, goodreads: n.goodreads });
+    setForm({ name: n.name, bio: n.bio, email: n.email ?? "", website: n.website, amazon: n.amazon, instagram: n.instagram, tiktok: n.tiktok, facebook: n.facebook, goodreads: n.goodreads });
     setExpandedId(n.id);
   };
 
   const cancelEdit = () => { setEditingId(null); setForm(EMPTY_FORM); };
+
+  // ── email gather ─────────────────────────────────────────────────────────────
+
+  const setGs = (id: string, state: GatherState) =>
+    setGatherStates(prev => ({ ...prev, [id]: state }));
+
+  const saveEmail = async (narrator: CoNarrator, email: string) => {
+    const res = await fetch("/api/co-narrators", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: narrator.id, name: narrator.name, bio: narrator.bio, email, website: narrator.website, amazon: narrator.amazon, instagram: narrator.instagram, tiktok: narrator.tiktok, facebook: narrator.facebook, goodreads: narrator.goodreads }),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      setCoNarrators(prev => prev.map(n => n.id === narrator.id ? d.co_narrator : n));
+    }
+  };
+
+  const gatherEmailFor = async (narrator: CoNarrator): Promise<boolean> => {
+    setGs(narrator.id, { status: "loading" });
+    try {
+      const res = await fetch("/api/email-gather-author", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ authorName: narrator.name }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setGs(narrator.id, { status: "error", message: d.error ?? "Failed" });
+        return false;
+      }
+      const emails: string[] = d.emails ?? [];
+      if (emails.length === 0) {
+        setGs(narrator.id, { status: "none" });
+        return false;
+      }
+      if (emails.length === 1) {
+        await saveEmail(narrator, emails[0]);
+        setGs(narrator.id, { status: "saved", email: emails[0] });
+        setTimeout(() => setGs(narrator.id, { status: "idle" }), 3000);
+        return true;
+      }
+      setGs(narrator.id, { status: "pick", emails });
+      return false;
+    } catch {
+      setGs(narrator.id, { status: "error", message: "Network error" });
+      return false;
+    }
+  };
+
+  const gatherAllMissing = async () => {
+    if (gatherAllRunning.current) return;
+    const missing = coNarrators.filter(n => !n.email);
+    if (!missing.length) return;
+    gatherAllRunning.current = true;
+    setGatherAll({ phase: "running", found: 0, total: missing.length });
+    let found = 0;
+    for (const narrator of missing) {
+      const ok = await gatherEmailFor(narrator);
+      if (ok) found++;
+      setGatherAll(prev => ({ ...prev, found }));
+    }
+    setGatherAll({ phase: "done", found, total: missing.length });
+    gatherAllRunning.current = false;
+  };
 
   return (
     <section className="mt-12 pt-12 border-t border-[#1A2070]">
@@ -115,6 +193,36 @@ export default function CoNarratorManager() {
           <h2 className="text-2xl font-semibold text-white">Co-narrator profiles</h2>
           <p className="mt-1 text-sm text-white/40">Manage links and bios shown in the co-narrator popup on Narrated Works.</p>
         </div>
+
+        {/* Gather all missing emails */}
+        {coNarrators.some(n => !n.email) && (
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={gatherAllMissing}
+              disabled={gatherAll.phase === "running"}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-2 text-xs font-semibold text-white/70 hover:text-white hover:border-white/30 transition disabled:opacity-40"
+            >
+              {gatherAll.phase === "running" ? (
+                <>
+                  <span className="h-3 w-3 border border-white/30 border-t-white/70 rounded-full animate-spin" />
+                  Gathering {gatherAll.found}/{gatherAll.total}…
+                </>
+              ) : (
+                <>
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                  </svg>
+                  Gather all missing
+                </>
+              )}
+            </button>
+            {gatherAll.phase === "done" && (
+              <p className="text-[11px] text-white/40">
+                Found emails for {gatherAll.found} of {gatherAll.total} co-narrators
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {error && (
@@ -135,6 +243,16 @@ export default function CoNarratorManager() {
               value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
               placeholder="e.g. Ann Dahlia"
+              className="w-full rounded-lg bg-[#06082E] border border-[#1A2070] p-3 text-sm outline-none focus:border-[#D4AF37]/60 text-white"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-xs text-white/40 uppercase tracking-wider block mb-1">Email (for status notifications)</label>
+            <input
+              type="email"
+              value={form.email ?? ""}
+              onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+              placeholder="narrator@example.com"
               className="w-full rounded-lg bg-[#06082E] border border-[#1A2070] p-3 text-sm outline-none focus:border-[#D4AF37]/60 text-white"
             />
           </div>
@@ -192,30 +310,85 @@ export default function CoNarratorManager() {
           {coNarrators.map(n => {
             const isExpanded = expandedId === n.id;
             const links = LINK_FIELDS.filter(f => (n as unknown as Record<string, string>)[f.key]);
+            const gs: GatherState = gatherStates[n.id] ?? { status: "idle" };
             return (
               <div key={n.id} className="rounded-2xl border border-[#1A2070] bg-[#0A0D3A] overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-4 cursor-pointer"
-                  onClick={() => setExpandedId(isExpanded ? null : n.id)}>
-                  <div>
+                <div className="flex items-start justify-between px-5 py-4 gap-3">
+                  {/* Left: name, bio, email */}
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : n.id)}>
                     <p className="font-semibold text-white">{n.name}</p>
                     {n.bio && <p className="text-xs text-white/40 mt-0.5 line-clamp-1">{n.bio}</p>}
                     {!n.bio && !links.length && <p className="text-xs text-yellow-400/60 mt-0.5">No bio or links yet — click Edit to add</p>}
+                    <div className="mt-1 text-[11px]">
+                      {n.email
+                        ? <span className="text-emerald-400/70">{n.email}</span>
+                        : <span className="text-white/20 italic">No email</span>}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button type="button" onClick={e => { e.stopPropagation(); startEdit(n); }}
-                      className="text-xs font-bold text-[#D4AF37] border border-[#D4AF37]/30 px-3 py-1.5 rounded-full hover:bg-[#D4AF37]/10 transition">
-                      Edit
-                    </button>
-                    <button type="button" onClick={e => { e.stopPropagation(); handleDelete(n.id, n.name); }}
-                      className="text-xs font-bold text-red-400/60 hover:text-red-400 border border-red-400/20 px-3 py-1.5 rounded-full hover:bg-red-400/10 transition">
-                      Delete
-                    </button>
-                    <svg className={`h-4 w-4 text-white/30 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                    </svg>
+
+                  {/* Right: gather + edit + delete */}
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <div className="flex items-center gap-2">
+                      {/* Gather email state */}
+                      {gs.status === "loading" && (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-white/40">
+                          <span className="h-3 w-3 border border-white/30 border-t-white/60 rounded-full animate-spin" />
+                          Searching…
+                        </span>
+                      )}
+                      {gs.status === "saved" && (
+                        <span className="text-[11px] text-emerald-400">✓ {gs.email}</span>
+                      )}
+                      {gs.status === "none" && (
+                        <span className="text-[11px] text-white/30">No emails found</span>
+                      )}
+                      {gs.status === "error" && (
+                        <span className="text-[11px] text-red-400/70">{gs.message}</span>
+                      )}
+                      {gs.status === "idle" && (
+                        <button type="button" onClick={() => gatherEmailFor(n)}
+                          className="rounded-md px-2.5 py-1.5 text-[11px] font-semibold text-white/50 hover:text-[#D4AF37] border border-white/8 hover:border-[#D4AF37]/30 transition">
+                          Gather email →
+                        </button>
+                      )}
+
+                      <button type="button" onClick={e => { e.stopPropagation(); startEdit(n); }}
+                        className="text-xs font-bold text-[#D4AF37] border border-[#D4AF37]/30 px-3 py-1.5 rounded-full hover:bg-[#D4AF37]/10 transition">
+                        Edit
+                      </button>
+                      <button type="button" onClick={e => { e.stopPropagation(); handleDelete(n.id, n.name); }}
+                        className="text-xs font-bold text-red-400/60 hover:text-red-400 border border-red-400/20 px-3 py-1.5 rounded-full hover:bg-red-400/10 transition">
+                        Delete
+                      </button>
+                      <svg className={`h-4 w-4 text-white/30 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                        onClick={() => setExpandedId(isExpanded ? null : n.id)}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+
+                    {/* Multi-email picker */}
+                    {gs.status === "pick" && (
+                      <div className="flex flex-col gap-1 items-end">
+                        <p className="text-[10px] text-white/40">Pick email:</p>
+                        {gs.emails.map(email => (
+                          <button key={email} type="button"
+                            onClick={async () => {
+                              await saveEmail(n, email);
+                              setGs(n.id, { status: "saved", email });
+                              setTimeout(() => setGs(n.id, { status: "idle" }), 3000);
+                            }}
+                            className="text-[11px] text-[#D4AF37] hover:underline text-right">
+                            {email}
+                          </button>
+                        ))}
+                        <button type="button" onClick={() => setGs(n.id, { status: "idle" })}
+                          className="text-[10px] text-white/30 hover:text-white/60 mt-0.5">Cancel</button>
+                      </div>
+                    )}
                   </div>
                 </div>
+
                 {isExpanded && (
                   <div className="px-5 pb-4 border-t border-white/6 pt-3">
                     {links.length > 0 ? (

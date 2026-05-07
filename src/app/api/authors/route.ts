@@ -35,15 +35,16 @@ export async function POST(req: Request) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("POST /api/authors Supabase error:", JSON.stringify(error));
+      return NextResponse.json({ error: error.message || JSON.stringify(error) }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true, author: data });
-  } catch (error) {
-    console.error("POST /api/authors failed:", error);
-    return NextResponse.json(
-      { error: "Failed to create author.", details: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
-    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : JSON.stringify(e);
+    console.error("POST /api/authors exception:", msg);
+    return NextResponse.json({ error: msg || "Failed to create author." }, { status: 500 });
   }
 }
 
@@ -72,15 +73,22 @@ export async function PUT(req: Request) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("PUT /api/authors Supabase error:", JSON.stringify(error));
+      return NextResponse.json(
+        { error: error.message || JSON.stringify(error) },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ success: true, author: data });
-  } catch (error) {
-    console.error("PUT /api/authors failed:", error);
-    return NextResponse.json(
-      { error: "Failed to update author.", details: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
-    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message
+      : typeof e === "object" && e !== null && "message" in e
+        ? String((e as { message: unknown }).message)
+        : JSON.stringify(e);
+    console.error("PUT /api/authors exception:", msg);
+    return NextResponse.json({ error: msg || "Failed to update author." }, { status: 500 });
   }
 }
 

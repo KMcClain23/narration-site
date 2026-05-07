@@ -29,19 +29,21 @@ function fmtDate(iso: string) {
 }
 
 export async function POST() {
-  // Fetch all unemailed changes with their card data + author email from authors table
+  // Fetch all unemailed changes with their card data
   const { data: rows, error } = await supabaseAdmin
     .from("status_change_log")
     .select(`
       id, card_id, old_status, new_status, created_at,
-      board_cards ( title, author, author_email, author_token )
+      board_cards ( title, author, author_email, author_token, co_narrator )
     `)
     .eq("emailed", false)
     .order("created_at", { ascending: true });
 
-  // Pre-fetch all authors with emails for lookup
+  // Pre-fetch all authors and co-narrators with emails for lookup
   const { data: authorsData } = await supabaseAdmin
     .from("authors").select("name, email").not("email", "is", null);
+  const { data: coNarratorsData } = await supabaseAdmin
+    .from("co_narrators").select("name, email").not("email", "is", null);
 
   if (error) {
     console.error("send-status-emails: query failed:", error.message);
@@ -71,17 +73,33 @@ export async function POST() {
       author: string | null;
       author_email: string | null;
       author_token: string | null;
+      co_narrator: string | null;
     } | null;
 
-    // Resolve email: prefer authors table lookup, fall back to card.author_email
+    // Resolve author email: prefer authors table lookup, fall back to card.author_email
     const authorRecord = (authorsData ?? []).find(
       (a: { name: string; email?: string | null }) =>
         a.email && a.name?.trim().toLowerCase() === (card?.author ?? "").trim().toLowerCase()
     );
     const resolvedEmail = authorRecord?.email || card?.author_email || null;
 
-    if (!resolvedEmail) {
-      // No email found — mark as processed so we don't retry forever
+    // Resolve co-narrator emails (card.co_narrator may be JSON or plain string)
+    let coNarratorNames: string[] = [];
+    if (card?.co_narrator) {
+      try {
+        const p = JSON.parse(card.co_narrator);
+        coNarratorNames = Array.isArray(p) ? p.filter(Boolean) : p ? [String(p)] : [];
+      } catch { coNarratorNames = [String(card.co_narrator)]; }
+    }
+    const coNarratorEmails = coNarratorNames
+      .map(name => (coNarratorsData ?? []).find(
+        (cn: { name: string; email?: string | null }) =>
+          cn.email && cn.name?.trim().toLowerCase() === name.trim().toLowerCase()
+      )?.email)
+      .filter((e): e is string => Boolean(e));
+
+    if (!resolvedEmail && coNarratorEmails.length === 0) {
+      // No emails found — mark as processed so we don't retry forever
       sentIds.push(...changes.map(c => c.id));
       continue;
     }
@@ -110,17 +128,26 @@ export async function POST() {
       "— Dean Miller Narration",
     ].join("\n");
 
+    // Build recipient list: author + co-narrator notifications
+    const emailPayload: Record<string, unknown> = {
+      from:    FROM_EMAIL,
+      subject: `Production update for ${title}`,
+      text:    body,
+    };
+    if (author_email) {
+      emailPayload.to = author_email;
+      if (coNarratorEmails.length > 0) emailPayload.cc = coNarratorEmails;
+    } else {
+      // No author email — send directly to co-narrators
+      emailPayload.to = coNarratorEmails;
+    }
+
     try {
-      await resend.emails.send({
-        from: FROM_EMAIL,
-        to:   author_email,
-        subject: `Production update for ${title}`,
-        text:    body,
-      });
+      await resend.emails.send(emailPayload as unknown as Parameters<typeof resend.emails.send>[0]);
       sent++;
       sentIds.push(...changes.map(c => c.id));
     } catch (e) {
-      console.error(`send-status-emails: failed to email ${author_email}:`, e);
+      console.error(`send-status-emails: failed to email ${author_email ?? coNarratorEmails.join(",")}:`, e);
       failedIds.push(...changes.map(c => c.id));
     }
   }
