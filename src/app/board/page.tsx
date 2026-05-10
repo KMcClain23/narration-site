@@ -973,8 +973,18 @@ export default function BoardPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [r, cnr] = await Promise.all([fetch("/api/board"), fetch("/api/co-narrators")]);
-      const d = await r.json(); setCards(d.cards||[]);
+      const [r, cnr, ar] = await Promise.all([fetch("/api/board"), fetch("/api/co-narrators"), fetch("/api/authors")]);
+      const d = await r.json();
+      const authorsData = await ar.json();
+      const emailByName = new Map<string, string>(
+        (authorsData.authors || [])
+          .filter((a: { name: string; email?: string }) => a.email)
+          .map((a: { name: string; email: string }) => [a.name.trim().toLowerCase(), a.email])
+      );
+      setCards((d.cards || []).map((c: BoardCard) => ({
+        ...c,
+        author_email: c.author_email || (c.author ? emailByName.get(c.author.trim().toLowerCase()) || "" : ""),
+      })));
       const cn = await cnr.json(); setCoNarratorNames((cn.co_narrators||[]).map((n:{name:string})=>n.name).sort());
     } catch { setError("Failed to load."); } finally { setLoading(false); }
   }, []);
@@ -1745,13 +1755,13 @@ export default function BoardPage() {
                             <button type="button"
                               onClick={async e=>{
                                 e.preventDefault(); e.stopPropagation();
-                                const v = !(card.email_updates_enabled ?? true);
+                                const v = !(card.email_updates_enabled ?? false);
                                 setCards(p=>p.map(c=>c.id===card.id?{...c,email_updates_enabled:v}:c));
-                                await fetch("/api/board",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:card.id,email_updates_enabled:v})});
+                                await fetch("/api/board",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:card.id,email_updates_enabled:v,...(card.author_email?{author_email:card.author_email}:{})})});
                               }}
-                              title={(card.email_updates_enabled ?? true) ? "Emails enabled — click to disable" : "Emails disabled — click to enable"}
+                              title={(card.email_updates_enabled ?? false) ? "Emails enabled — click to disable" : "Emails disabled — click to enable"}
                               className={`relative p-1 rounded transition-colors ${
-                                (card.email_updates_enabled ?? true)
+                                (card.email_updates_enabled ?? false)
                                   ? "text-emerald-400 hover:text-emerald-300"
                                   : "text-red-400/70 hover:text-red-300"
                               }`}
@@ -1759,7 +1769,7 @@ export default function BoardPage() {
                               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                               </svg>
-                              {(card.email_updates_enabled ?? true) ? (
+                              {(card.email_updates_enabled ?? false) ? (
                                 <svg className="h-2 w-2 absolute -bottom-0.5 -right-0.5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                                 </svg>

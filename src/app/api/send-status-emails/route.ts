@@ -77,8 +77,8 @@ export async function POST() {
       email_updates_enabled: boolean | null;
     } | null;
 
-    // Skip cards where author has opted out of email updates
-    if (card?.email_updates_enabled === false) {
+    // Skip unless author has explicitly opted in (null/undefined/false all skip)
+    if (!card?.email_updates_enabled) {
       sentIds.push(...changes.map(c => c.id));
       continue;
     }

@@ -80,7 +80,7 @@ export default function CardDetailPage() {
   const [emailNote, setEmailNote] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
-  const [emailUpdatesEnabled, setEmailUpdatesEnabled] = useState(true);
+  const [emailUpdatesEnabled, setEmailUpdatesEnabled] = useState(false);
   const msgEndRef = useRef<HTMLDivElement>(null);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -95,7 +95,7 @@ export default function CardDetailPage() {
         setCard(data.card);
         setChapters(data.card.chapters || []);
         setFirst15Complete(data.card.first_15_complete ?? false);
-        setEmailUpdatesEnabled(data.card.email_updates_enabled ?? true);
+        setEmailUpdatesEnabled(data.card.email_updates_enabled ?? false);
         setDeanMsg(data.card.dean_message || "");
         setDescription(data.card.description || "");
         // Look up author email from the authors table by name
@@ -687,7 +687,11 @@ export default function CardDetailPage() {
                         await fetch("/api/board", {
                           method: "PUT",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ id, email_updates_enabled: v }),
+                          body: JSON.stringify({
+                            id,
+                            email_updates_enabled: v,
+                            ...(authorEmail ? { author_email: authorEmail } : {}),
+                          }),
                         });
                       }}
                       className={`relative inline-flex h-5 w-9 items-center rounded-full border transition-colors ${
