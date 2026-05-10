@@ -5,11 +5,11 @@ import Link from "next/link";
 import { EmailScanSection } from "./EmailScanSection";
 
 const COLUMNS = [
-  { id: "audition",   label: "Audition",   color: "border-purple-500/30 bg-purple-500/5",  dot: "bg-purple-400",  text: "text-purple-300" },
-  { id: "contracted", label: "Contracted", color: "border-blue-500/30 bg-blue-500/5",      dot: "bg-blue-400",    text: "text-blue-300" },
-  { id: "recording",  label: "Recording",  color: "border-yellow-500/30 bg-yellow-500/5",  dot: "bg-yellow-400",  text: "text-yellow-300" },
-  { id: "editing",    label: "Editing",    color: "border-orange-500/30 bg-orange-500/5",  dot: "bg-orange-400",  text: "text-orange-300" },
-  { id: "released",   label: "Released",   color: "border-emerald-500/30 bg-emerald-500/5",dot: "bg-emerald-400", text: "text-emerald-300" },
+  { id: "audition",   label: "Audition",   color: "border-purple-500/30 bg-purple-900/20",  dot: "bg-purple-400",  text: "text-purple-300" },
+  { id: "contracted", label: "Contracted", color: "border-blue-500/30 bg-blue-900/20",      dot: "bg-blue-400",    text: "text-blue-300" },
+  { id: "recording",  label: "Recording",  color: "border-yellow-500/30 bg-yellow-900/15",  dot: "bg-yellow-400",  text: "text-yellow-300" },
+  { id: "editing",    label: "Editing",    color: "border-orange-500/30 bg-orange-900/15",  dot: "bg-orange-400",  text: "text-orange-300" },
+  { id: "released",   label: "Released",   color: "border-emerald-500/30 bg-emerald-900/20",dot: "bg-emerald-400", text: "text-emerald-300" },
 ];
 
 interface Link { label: string; url: string; }
@@ -1618,7 +1618,7 @@ export default function BoardPage() {
                 ) :
                 cards.filter(c=>c.status===column.id).sort(sortCards).map(card=>(
                   <div key={card.id} draggable onDragStart={()=>setDragId(card.id)}
-                    className={`rounded-xl bg-[#06082E]/80 border border-white/8 hover:border-white/15 transition-all cursor-grab active:cursor-grabbing shadow-md group ${dragId===card.id?"opacity-30 scale-95":""} ${syncing===card.id?"opacity-60":""}`}>
+                    className={`rounded-xl bg-[#0E1247] border border-white/12 hover:border-white/20 transition-all cursor-grab active:cursor-grabbing shadow-md group ${dragId===card.id?"opacity-30 scale-95":""} ${syncing===card.id?"opacity-60":""}`}>
 
                     <Link href={`/board/card/${card.id}`} onClick={e=>e.stopPropagation()}>
                       {card.cover_url ? (
@@ -1650,10 +1650,10 @@ export default function BoardPage() {
                     </Link>
 
                     <div className="p-3">
-                      <p className="font-semibold text-sm text-white leading-snug">{card.title}</p>
-                      {card.subtitle && <p className="text-[11px] text-white/40 mt-0.5">{card.subtitle}</p>}
-                      {card.author && <p className="text-xs text-[#D4AF37]/80 mt-1 font-medium">{card.author}</p>}
-                      {card.co_narrator && <p className="text-[10px] text-white/30 mt-0.5">with {(() => { try { const p = JSON.parse(card.co_narrator); return Array.isArray(p) ? p.join(", ") : card.co_narrator; } catch { return card.co_narrator; } })()}</p>}
+                      <p className="text-sm font-bold text-white leading-snug">{card.title}</p>
+                      {card.subtitle && <p className="text-[11px] text-white/35 mt-0.5">{card.subtitle}</p>}
+                      {card.author && <p className="text-xs text-[#D4AF37] mt-1 font-medium">{card.author}</p>}
+                      {card.co_narrator && <p className="text-[10px] text-white/35 mt-0.5">with {(() => { try { const p = JSON.parse(card.co_narrator); return Array.isArray(p) ? p.join(", ") : card.co_narrator; } catch { return card.co_narrator; } })()}</p>}
                       <Link href={`/board/card/${card.id}`}
                         className="mt-2 inline-flex items-center gap-1 text-[10px] text-[#D4AF37]/60 hover:text-[#D4AF37] transition-colors font-semibold"
                         onClick={e => e.stopPropagation()}>
@@ -1665,7 +1665,7 @@ export default function BoardPage() {
                       {card.tags?.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
                           {card.tags.slice(0,3).map(t=>(
-                            <span key={t} className="text-[9px] uppercase tracking-wide font-bold text-white/40 bg-white/5 border border-white/8 px-1.5 py-0.5 rounded-full">{t}</span>
+                            <span key={t} className="text-[9px] uppercase tracking-wide font-bold text-white/35 bg-white/5 border border-white/8 px-1.5 py-0.5 rounded-full">{t}</span>
                           ))}
                         </div>
                       )}
@@ -1673,23 +1673,23 @@ export default function BoardPage() {
                       {/* Deadline */}
                       {card.deadline && (
                         <div className="flex items-center gap-1 mt-2">
-                          <svg className="h-3 w-3 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                          <span className={`text-[10px] ${(() => { const [y,m,d] = card.deadline.split("-"); return new Date(+y,+m-1,+d) < new Date() && column.id !== "released"; })() ? "text-red-400" : "text-white/30"}`}>
+                          <svg className="h-3 w-3 text-white/35" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                          <span className={`text-[10px] ${(() => { const [y,m,d] = card.deadline.split("-"); return new Date(+y,+m-1,+d) < new Date() && column.id !== "released"; })() ? "text-red-400" : "text-white/35"}`}>
                             Due: {(() => { const [y,m,d] = card.deadline.split("-"); return new Date(+y, +m-1, +d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); })()}
                           </span>
                         </div>
                       )}
                       {card.first15_due && (
                         <div className="flex items-center gap-1 mt-1">
-                          <svg className="h-3 w-3 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.868V15.131a1 1 0 01-1.447.894L15 14M3 8h12a1 1 0 011 1v6a1 1 0 01-1 1H3a1 1 0 01-1-1V9a1 1 0 011-1z"/></svg>
-                          <span className={`text-[10px] ${(() => { const [y,m,d] = card.first15_due.split("-"); return new Date(+y,+m-1,+d) < new Date() && column.id === "contracted"; })() ? "text-orange-400" : "text-white/30"}`}>
+                          <svg className="h-3 w-3 text-white/35" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.868V15.131a1 1 0 01-1.447.894L15 14M3 8h12a1 1 0 011 1v6a1 1 0 01-1 1H3a1 1 0 01-1-1V9a1 1 0 011-1z"/></svg>
+                          <span className={`text-[10px] ${(() => { const [y,m,d] = card.first15_due.split("-"); return new Date(+y,+m-1,+d) < new Date() && column.id === "contracted"; })() ? "text-orange-400" : "text-white/35"}`}>
                             First 15: {(() => { const [y,m,d] = card.first15_due.split("-"); return new Date(+y, +m-1, +d).toLocaleDateString("en-US",{month:"short",day:"numeric"}); })()}
                           </span>
                         </div>
                       )}
                       {card.word_count > 0 && (
                         <div className="flex items-center gap-1 mt-1">
-                          <span className="text-[10px] text-white/25">{card.word_count.toLocaleString()} words</span>
+                          <span className="text-[10px] text-white/35">{card.word_count.toLocaleString()} words</span>
                           {card.pfh_rate > 0 && <span className="text-[10px] text-[#D4AF37]/50">· ${((card.word_count/9400)*card.pfh_rate).toFixed(0)} est.</span>}
                         </div>
                       )}
