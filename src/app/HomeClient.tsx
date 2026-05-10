@@ -179,6 +179,7 @@ interface Testimonial {
   author: string;
   title: string;
   book?: string;
+  cover_url?: string;
 }
 
 // Hardcoded seed testimonials — always shown even if API is down
@@ -188,12 +189,14 @@ const SEED_TESTIMONIALS: Testimonial[] = [
     author: "River Fox",
     title: "Author",
     book: "Blood on the Asphalt",
+    cover_url: "/covers/blood-on-the-asphalt.png",
   },
   {
     quote: "Dean Miller, what a guy! When I started narrating duets, I was so nervous about depending on others. Well, Dean has set the bar pretty high for dream co-narrators! He's a hidden gem of talent and one of the most honest, genuine people I've had the pleasure to know and work with. I'm so blessed to have him in my corner as a peer and to continue working with him on more projects to come! Highly recommend!!!!!",
     author: "Stephanie Betschart/Ann Dahlia",
     title: "Narrator",
     book: "Blood on the Asphalt",
+    cover_url: "/covers/blood-on-the-asphalt.png",
   },
   {
     paragraphs: [
@@ -208,6 +211,7 @@ const SEED_TESTIMONIALS: Testimonial[] = [
     author: "E.A. Harper",
     title: "Author",
     book: "Whiskey & Lies",
+    cover_url: "/covers/whiskey-and-lies.jpg",
   },
 ];
 
@@ -259,11 +263,20 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
           </>
         )}
       </div>
-      <div className="border-t border-white/6 pt-4">
-        <p className="font-semibold text-white text-sm">{testimonial.author}</p>
-        <p className="text-xs text-white/40 mt-0.5">
-          {testimonial.title}{testimonial.book ? ` · ${testimonial.book}` : ""}
-        </p>
+      <div className="border-t border-white/6 pt-4 flex items-center gap-3">
+        {testimonial.cover_url && (
+          <img
+            src={testimonial.cover_url}
+            alt={testimonial.book || ""}
+            className="h-14 w-9 object-cover rounded-md shrink-0 shadow-lg"
+          />
+        )}
+        <div>
+          <p className="font-semibold text-white text-sm">{testimonial.author}</p>
+          <p className="text-xs text-white/40 mt-0.5">
+            {testimonial.title}{testimonial.book ? ` · ${testimonial.book}` : ""}
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -350,8 +363,8 @@ function TestimonialsCarousel() {
             {testimonials.map((_, i) => (
               <button key={i} type="button" onClick={() => go(i)}
                 aria-label={`Go to testimonial ${i + 1}`}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  i === current ? "bg-[#D4AF37] w-6" : "bg-white/20 w-1.5 hover:bg-white/40"
+                className={`h-2.5 rounded-full transition-all duration-300 ${
+                  i === current ? "bg-[#D4AF37] w-7" : "bg-[#D4AF37]/30 w-2.5 hover:bg-[#D4AF37]/60"
                 }`} />
             ))}
           </div>
