@@ -34,7 +34,7 @@ export async function POST() {
     .from("status_change_log")
     .select(`
       id, card_id, old_status, new_status, created_at,
-      board_cards ( title, author, author_email, author_token, co_narrator )
+      board_cards ( title, author, author_email, author_token, co_narrator, email_updates_enabled )
     `)
     .eq("emailed", false)
     .order("created_at", { ascending: true });
@@ -74,7 +74,14 @@ export async function POST() {
       author_email: string | null;
       author_token: string | null;
       co_narrator: string | null;
+      email_updates_enabled: boolean | null;
     } | null;
+
+    // Skip cards where author has opted out of email updates
+    if (card?.email_updates_enabled === false) {
+      sentIds.push(...changes.map(c => c.id));
+      continue;
+    }
 
     // Resolve author email: prefer authors table lookup, fall back to card.author_email
     const authorRecord = (authorsData ?? []).find(

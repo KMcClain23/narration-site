@@ -163,6 +163,7 @@ export async function PUT(req: Request) {
       "subtitle", "tags", "description", "audible_link", "ar_link",
       "word_count", "first15_due", "pfh_rate", "payment_type",
       "first_15_complete", "dean_message", "author_email", "author_token",
+      "email_updates_enabled",
     ];
     const DATE_FIELDS = new Set(["deadline", "first15_due", "first_15_due"]);
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };

@@ -33,6 +33,7 @@ interface BoardCard {
   audible_link: string; co_narrator: string; chapters: Chapter[];
   first15_due?: string; first_15_complete?: boolean;
   author_email?: string; dean_message?: string; author_token?: string;
+  email_updates_enabled?: boolean;
 }
 
 interface Msg {
@@ -79,6 +80,7 @@ export default function CardDetailPage() {
   const [emailNote, setEmailNote] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [emailUpdatesEnabled, setEmailUpdatesEnabled] = useState(true);
   const msgEndRef = useRef<HTMLDivElement>(null);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,6 +95,7 @@ export default function CardDetailPage() {
         setCard(data.card);
         setChapters(data.card.chapters || []);
         setFirst15Complete(data.card.first_15_complete ?? false);
+        setEmailUpdatesEnabled(data.card.email_updates_enabled ?? true);
         setDeanMsg(data.card.dean_message || "");
         setDescription(data.card.description || "");
         // Look up author email from the authors table by name
@@ -665,16 +668,46 @@ export default function CardDetailPage() {
             <div>
               <label className="text-[10px] text-white/35 uppercase tracking-wide">Notification email</label>
               {authorEmail ? (
-                <p className="mt-1 text-xs text-white/70 px-3 py-2 rounded-lg bg-black/30 border border-white/8 flex items-center gap-2">
-                  <svg className="h-3.5 w-3.5 text-white/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                  </svg>
-                  {authorEmail}
-                </p>
+                <>
+                  <p className="mt-1 text-xs text-white/70 px-3 py-2 rounded-lg bg-black/30 border border-white/8 flex items-center gap-2">
+                    <svg className="h-3.5 w-3.5 text-white/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    {authorEmail}
+                  </p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <label className="text-[10px] text-white/35 uppercase tracking-wide">Author email updates</label>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={emailUpdatesEnabled}
+                      onClick={async () => {
+                        const v = !emailUpdatesEnabled;
+                        setEmailUpdatesEnabled(v);
+                        await fetch("/api/board", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ id, email_updates_enabled: v }),
+                        });
+                      }}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full border transition-colors ${
+                        emailUpdatesEnabled
+                          ? "bg-emerald-500/80 border-emerald-500/50"
+                          : "bg-white/10 border-white/15"
+                      }`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${
+                        emailUpdatesEnabled ? "translate-x-4" : "translate-x-0.5"
+                      }`}/>
+                    </button>
+                  </div>
+                  {!emailUpdatesEnabled && (
+                    <p className="mt-1 text-[10px] text-white/30 italic">Author will not receive status emails</p>
+                  )}
+                </>
               ) : (
                 <p className="mt-1 text-[11px] text-white/30 px-3 py-2 rounded-lg bg-black/20 border border-white/5">
-                  No email — set one in{" "}
-                  <a href="/admin/stats" className="text-[#D4AF37] hover:underline">Author Profiles</a>
+                  No author email set
                 </p>
               )}
             </div>
