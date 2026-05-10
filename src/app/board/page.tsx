@@ -5,11 +5,11 @@ import Link from "next/link";
 import { EmailScanSection } from "./EmailScanSection";
 
 const COLUMNS = [
-  { id: "audition",   label: "Audition",   color: "border-purple-500/30 bg-purple-900/20",  dot: "bg-purple-400",  text: "text-purple-300" },
-  { id: "contracted", label: "Contracted", color: "border-blue-500/30 bg-blue-900/20",      dot: "bg-blue-400",    text: "text-blue-300" },
-  { id: "recording",  label: "Recording",  color: "border-yellow-500/30 bg-yellow-900/15",  dot: "bg-yellow-400",  text: "text-yellow-300" },
-  { id: "editing",    label: "Editing",    color: "border-orange-500/30 bg-orange-900/15",  dot: "bg-orange-400",  text: "text-orange-300" },
-  { id: "released",   label: "Released",   color: "border-emerald-500/30 bg-emerald-900/20",dot: "bg-emerald-400", text: "text-emerald-300" },
+  { id: "audition",   label: "Audition",   color: "border-purple-500/40 bg-purple-900/35",  dot: "bg-purple-300",  text: "text-purple-200" },
+  { id: "contracted", label: "Contracted", color: "border-blue-500/40 bg-blue-900/35",      dot: "bg-blue-300",    text: "text-blue-200" },
+  { id: "recording",  label: "Recording",  color: "border-yellow-500/40 bg-yellow-900/25",  dot: "bg-yellow-300",  text: "text-yellow-200" },
+  { id: "editing",    label: "Editing",    color: "border-orange-500/40 bg-orange-900/25",  dot: "bg-orange-300",  text: "text-orange-200" },
+  { id: "released",   label: "Released",   color: "border-emerald-500/40 bg-emerald-900/35",dot: "bg-emerald-300", text: "text-emerald-200" },
 ];
 
 interface Link { label: string; url: string; }
@@ -1098,6 +1098,25 @@ export default function BoardPage() {
     setCards(p=>p.filter(c=>c.id!==id));
   };
 
+  const handleDragStart = (e: React.DragEvent, card: BoardCard) => {
+    setDragId(card.id);
+    const ghost = document.createElement("div");
+    ghost.style.cssText = "width:120px;border-radius:8px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.5);position:fixed;top:-1000px;";
+    if (card.cover_url) {
+      const img = document.createElement("img");
+      img.src = card.cover_url;
+      img.style.cssText = "width:100%;display:block;";
+      ghost.appendChild(img);
+    }
+    const label = document.createElement("div");
+    label.textContent = card.title;
+    label.style.cssText = "background:#0A0D3A;color:white;font-size:10px;font-weight:bold;padding:4px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+    ghost.appendChild(label);
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 60, 20);
+    setTimeout(() => document.body.removeChild(ghost), 0);
+  };
+
   const saveInline = async () => {
     if (!inlineEdit) return;
     const { cardId, field, strVal, numVal } = inlineEdit;
@@ -1640,7 +1659,7 @@ export default function BoardPage() {
                   </div>
                 ) :
                 cards.filter(c=>c.status===column.id).sort(sortCards).map(card=>(
-                  <div key={card.id} draggable onDragStart={()=>setDragId(card.id)}
+                  <div key={card.id} draggable onDragStart={e=>handleDragStart(e,card)}
                     className={`relative rounded-xl bg-[#0E1247] border border-white/12 hover:border-white/20 transition-all cursor-grab active:cursor-grabbing shadow-md group ${dragId===card.id?"opacity-30 scale-95":""} ${syncing===card.id?"opacity-60":""}`}>
 
                     {/* Cover — full-width, 2:3 aspect ratio */}
