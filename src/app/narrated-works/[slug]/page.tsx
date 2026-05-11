@@ -193,10 +193,10 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
 
             {/* Tags */}
             {tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-6">
+              <div className="flex flex-nowrap overflow-x-auto scrollbar-hide gap-2 mb-6 pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
                 {tags.map(tag => (
                   <span key={tag}
-                    className="text-xs font-bold uppercase tracking-wide text-white/50 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
+                    className="shrink-0 text-xs font-bold uppercase tracking-wide text-white/50 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
                     {tag}
                   </span>
                 ))}
@@ -243,7 +243,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
         </div>
 
         {/* Bottom CTA */}
-        <div className="mt-16 border-t border-white/8 pt-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="mt-16 border-t border-white/8 pt-8 sm:pt-10 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-white/35 text-sm">Interested in having your book narrated?</p>
           <Link href="/contact"
             className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-6 py-2.5 text-sm font-semibold hover:bg-[#E0C15A] transition">
