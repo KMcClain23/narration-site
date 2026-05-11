@@ -40,11 +40,11 @@ const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
 // ─── Timeline view ────────────────────────────────────────────────────────────
 
 const STATUS_BAR: Record<string, { bg: string; border: string; text: string }> = {
-  audition:   { bg: "bg-purple-500/60", border: "border-purple-400/40",  text: "text-purple-100"  },
-  contracted: { bg: "bg-blue-500/60",   border: "border-blue-400/40",    text: "text-blue-100"    },
-  recording:  { bg: "bg-yellow-500/60", border: "border-yellow-400/40",  text: "text-yellow-100"  },
-  editing:    { bg: "bg-orange-500/60", border: "border-orange-400/40",  text: "text-orange-100"  },
-  released:   { bg: "bg-emerald-500/60",border: "border-emerald-400/40", text: "text-emerald-100" },
+  audition:   { bg: "bg-purple-500", border: "border-purple-400/60",  text: "text-white" },
+  contracted: { bg: "bg-blue-500",   border: "border-blue-400/60",    text: "text-white" },
+  recording:  { bg: "bg-yellow-500", border: "border-yellow-400/60",  text: "text-white" },
+  editing:    { bg: "bg-orange-500", border: "border-orange-400/60",  text: "text-white" },
+  released:   { bg: "bg-emerald-500",border: "border-emerald-400/60", text: "text-white" },
 };
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
@@ -592,9 +592,11 @@ function TimelineView({
 }) {
   const [offset, setOffset] = useState(0);
   const [completedOpen, setCompletedOpen] = useState(false);
+  const [noDatesOpen, setNoDatesOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [inlineDates, setInlineDates] = useState({ deadline: "", first15_due: "" });
   const [savingInline, setSavingInline] = useState(false);
+  const [hoveredBar, setHoveredBar] = useState<string | null>(null);
 
   const openInline = (card: BoardCard) => {
     setInlineDates({ deadline: card.deadline ?? "", first15_due: card.first15_due ?? "" });
@@ -636,29 +638,12 @@ function TimelineView({
       .sort((a, b) => (a.deadline || "").localeCompare(b.deadline || "")),
     [cards]);
 
-  // ── Window ──────────────────────────────────────────────────────────────────
-  // numMonths is fixed to the data span (not affected by nav offset) so that
-  // ← / → truly slide the window by exactly one month.
-  const baseNumMonths = useMemo(() => {
-    const now = new Date();
-    const fixedStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const deadlines = barCards.map(c => c.deadline).filter(Boolean) as string[];
-    let endDate: Date;
-    if (deadlines.length) {
-      const latest = [...deadlines].sort().pop()!;
-      const [y, m, d] = latest.split("-").map(Number);
-      endDate = new Date(y, m - 1, d + 14);
-    } else {
-      endDate = new Date(fixedStart.getFullYear(), fixedStart.getMonth() + 3, 0);
-    }
-    const diff =
-      (endDate.getFullYear() - fixedStart.getFullYear()) * 12 +
-      (endDate.getMonth() - fixedStart.getMonth()) + 1;
-    return Math.max(3, diff);
-  }, [barCards]);
+  // ── Window — fixed 3-month view centered on today, navigable with offset ───
+  const baseNumMonths = 3;
 
   const windowStart = useMemo(() => {
     const now = new Date();
+    // Start one month before today so today sits in the middle of the 3-month view
     return new Date(now.getFullYear(), now.getMonth() - 1 + offset, 1);
   }, [offset]);
 
@@ -733,7 +718,7 @@ function TimelineView({
 
             {/* Half-month sub-header */}
             <div className="flex mb-1">
-              <div className="shrink-0 text-right pr-3 text-[10px] text-white/20 flex items-end pb-1" style={{ width: LABEL_W }}>
+              <div className="shrink-0 text-left pl-4 text-[10px] text-white/20 flex items-end pb-1" style={{ width: LABEL_W }}>
                 Project
               </div>
               <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))` }}>
@@ -755,13 +740,14 @@ function TimelineView({
               {/* Today line — one element spanning the full grid height */}
               {todayPos >= 0 && todayPos <= totalCols && (
                 <div
-                  className="absolute top-0 bottom-0 z-30 pointer-events-none"
+                  className="absolute top-0 bottom-0 z-30 pointer-events-none bg-red-400 opacity-80"
                   style={{
                     left: `calc(${LABEL_W}px + (100% - ${LABEL_W}px) * ${todayPos / totalCols})`,
                     width: 2,
-                    background: "rgba(239,68,68,0.75)",
                   }}
-                />
+                >
+                  <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-red-400 whitespace-nowrap">Today</span>
+                </div>
               )}
 
               {barCards.map((card, rowIdx) => {
@@ -787,9 +773,9 @@ function TimelineView({
                     style={{ height: ROW_H }}
                   >
                     {/* Label */}
-                    <div className="shrink-0 pr-4 text-right" style={{ width: LABEL_W }}>
-                      <p className="text-xs font-semibold text-white/70 truncate group-hover/row:text-white transition-colors leading-tight">{card.title}</p>
-                      {card.author && <p className="text-[10px] text-white/30 truncate leading-tight">{card.author}</p>}
+                    <div className="shrink-0 pl-4 pr-3" style={{ width: LABEL_W }}>
+                      <p className="text-sm font-semibold text-white truncate leading-tight">{card.title}</p>
+                      {card.author && <p className="text-xs text-white/40 truncate leading-tight">{card.author}</p>}
                     </div>
 
                     {/* Grid area */}
@@ -804,7 +790,7 @@ function TimelineView({
 
                       {/* Bar — 80px minimum width, 6px border-radius */}
                       <div
-                        className={`absolute z-10 flex items-center overflow-hidden hover:brightness-125 transition-all group/bar border ${bar.bg} ${bar.border}`}
+                        className={`absolute z-10 flex items-center overflow-visible hover:brightness-125 transition-all group/bar border ${bar.bg} ${bar.border}`}
                         style={{
                           top: BAR_INSET,
                           bottom: BAR_INSET,
@@ -813,8 +799,34 @@ function TimelineView({
                           minWidth: "80px",
                           borderRadius: "6px",
                         }}
-                        title={card.title}
+                        onMouseEnter={() => setHoveredBar(card.id)}
+                        onMouseLeave={() => setHoveredBar(null)}
                       >
+                        {/* Tooltip */}
+                        {hoveredBar === card.id && (() => {
+                          const daysLeft = card.deadline
+                            ? Math.round((new Date(card.deadline + "T12:00:00").getTime() - Date.now()) / 86400000)
+                            : null;
+                          return (
+                            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 bg-[#0D1050] border border-white/15 rounded-xl px-3 py-2.5 shadow-2xl pointer-events-none min-w-[160px] max-w-[220px]">
+                              <p className="text-xs font-bold text-white truncate">{card.title}</p>
+                              {card.author && <p className="text-[10px] text-[#D4AF37]/80 mt-0.5 truncate">{card.author}</p>}
+                              {card.deadline && (
+                                <p className="text-[10px] text-white/50 mt-1">
+                                  Due {new Date(card.deadline + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                </p>
+                              )}
+                              {card.word_count > 0 && (
+                                <p className="text-[10px] text-white/40">{card.word_count.toLocaleString()} words</p>
+                              )}
+                              {daysLeft !== null && (
+                                <p className={`text-[10px] font-semibold mt-1 ${daysLeft < 0 ? "text-red-400" : daysLeft <= 14 ? "text-orange-300" : "text-emerald-400"}`}>
+                                  {daysLeft === 0 ? "Due today" : daysLeft > 0 ? `${daysLeft} days left` : `${-daysLeft} days overdue`}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
                         <Link
                           href={`/board/card/${card.id}`}
                           className={`flex-1 min-w-0 flex items-center justify-center h-full px-2 ${bar.text}`}
@@ -876,8 +888,17 @@ function TimelineView({
       {/* ── No dates section ── */}
       {noDates.length > 0 && (
         <div className="mt-8 border-t border-white/6 pt-6">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-white/25 font-medium mb-3">No dates set</p>
-          <div className="space-y-1">
+          <button type="button" onClick={() => setNoDatesOpen(v => !v)}
+            className="flex items-center gap-2 w-full text-left mb-3 group/nd-toggle">
+            <svg className={`h-3 w-3 text-white/25 transition-transform ${noDatesOpen ? "rotate-90" : ""}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>
+            <span className="text-[11px] uppercase tracking-[0.18em] text-white/25 font-medium group-hover/nd-toggle:text-white/45 transition-colors">
+              No dates set ({noDates.length})
+            </span>
+          </button>
+          {noDatesOpen && <div className="space-y-1">
             {noDates.map(card => (
               editingId === card.id ? (
                 /* ── Inline date picker ── */
@@ -971,7 +992,7 @@ function TimelineView({
                 </div>
               )
             ))}
-          </div>
+          </div>}
         </div>
       )}
 
