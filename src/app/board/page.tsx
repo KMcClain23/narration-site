@@ -1737,48 +1737,43 @@ export default function BoardPage() {
                 ) :
                 cards.filter(c=>c.status===column.id).sort(sortCards).map(card=>(
                   <div key={card.id} draggable onDragStart={e=>handleDragStart(e,card)}
-                    className={`relative rounded-xl bg-[#0E1247] border border-white/12 hover:border-white/20 transition-all cursor-grab active:cursor-grabbing shadow-md group ${dragId===card.id?"opacity-30 scale-95":""} ${syncing===card.id?"opacity-60":""}`}>
+                    className={`relative rounded-xl bg-[#0E1247] border border-white/12 hover:border-white/20 transition-all cursor-grab active:cursor-grabbing shadow-md group flex flex-row ${dragId===card.id?"opacity-30 scale-95":""} ${syncing===card.id?"opacity-60":""}`}>
 
-                    {/* Cover — full-width, 2:3 aspect ratio */}
-                    <Link href={`/board/card/${card.id}`} onClick={e=>e.stopPropagation()}>
+                    {/* Cover — left column, fixed width, full card height */}
+                    <Link href={`/board/card/${card.id}`} onClick={e=>e.stopPropagation()}
+                      className="w-24 shrink-0 relative block rounded-l-xl overflow-hidden">
                       {card.cover_url ? (
-                        <div className="rounded-t-xl overflow-hidden relative" style={{aspectRatio:"2/3"}}>
-                          <img src={card.cover_url} alt={card.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"/>
+                        <>
+                          <img src={card.cover_url} alt={card.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"/>
                           {unreadCounts[card.id] > 0 && (
-                            <div className="absolute top-2 left-2 bg-[#D4AF37] text-black text-[9px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow">
+                            <div className="absolute top-1.5 left-1.5 bg-[#D4AF37] text-black text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow z-10">
                               {unreadCounts[card.id]}
                             </div>
                           )}
-                          {card.first_15_complete && (
-                            <div className="absolute top-2 right-2 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shadow">
-                              <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                              15
-                            </div>
-                          )}
-                        </div>
+                        </>
                       ) : (
-                        <div className="rounded-t-xl h-14 bg-[#080A2C] border-b border-white/5 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-[#080A2C] border-r border-white/5 flex items-center justify-center">
                           <svg className="h-5 w-5 text-white/10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                         </div>
                       )}
                     </Link>
 
-                    {/* Body */}
-                    <div className="p-3 space-y-1.5">
+                    {/* Details column */}
+                    <div className="flex-1 flex flex-col min-w-0 p-3 gap-1">
                       <Link href={`/board/card/${card.id}`} onClick={e=>e.stopPropagation()}>
-                        <p className="text-sm font-bold text-white leading-snug hover:text-[#D4AF37]/90 transition-colors">{card.title}</p>
+                        <p className="text-sm font-bold text-white leading-snug hover:text-[#D4AF37]/90 transition-colors truncate">{card.title}</p>
                       </Link>
-                      {card.author && <p className="text-xs text-[#D4AF37] font-medium">{card.author}</p>}
+                      {card.author && <p className="text-xs text-[#D4AF37] font-medium truncate">{card.author}</p>}
                       {card.co_narrator && (
                         <button type="button"
                           onClick={e=>{ e.preventDefault(); e.stopPropagation(); setInlineEdit({cardId:card.id,field:"co_narrator",strVal:card.co_narrator}); }}
-                          className="block text-[10px] text-white/40 hover:text-white/60 text-left transition-colors leading-snug w-full truncate">
+                          className="text-[10px] text-white/40 hover:text-white/60 text-left transition-colors truncate w-full">
                           with {(() => { try { const p = JSON.parse(card.co_narrator); return Array.isArray(p) ? p.join(", ") : card.co_narrator; } catch { return card.co_narrator; } })()}
                         </button>
                       )}
 
                       {/* Deadline pills */}
-                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      <div className="flex flex-wrap gap-1 pt-0.5">
                         <button type="button"
                           onClick={e=>{ e.preventDefault(); e.stopPropagation(); setInlineEdit({cardId:card.id,field:"deadline",strVal:card.deadline||""}); }}
                           className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
@@ -1824,64 +1819,56 @@ export default function BoardPage() {
                         </div>
                       )}
 
-                      {/* Unread indicator for no-cover cards */}
-                      {!card.cover_url && unreadCounts[card.id] > 0 && (
-                        <div className="flex items-center gap-1 text-[10px] text-[#D4AF37]/70">
-                          <div className="h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0"/>
-                          {unreadCounts[card.id]} unread
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Footer */}
-                    <div className="px-3 pb-3 pt-2 border-t border-white/6 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5">
-                        <button type="button"
-                          onClick={async e=>{ e.preventDefault(); e.stopPropagation(); const v=!card.first_15_complete; setCards(p=>p.map(c=>c.id===card.id?{...c,first_15_complete:v}:c)); await fetch("/api/board",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:card.id,first_15_complete:v})}); }}
-                          title={card.first_15_complete?"First 15 complete":"Mark First 15 done"}
-                          className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-full border transition-colors ${card.first_15_complete?"bg-emerald-500/20 text-emerald-300 border-emerald-500/40":"text-white/60 border-white/20 hover:border-white/40 hover:text-white/80"}`}>
-                          {card.first_15_complete?<svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>:<span className="h-3 w-3 rounded-sm border border-current inline-block"/>}
-                          15
-                        </button>
-                        {card.author_email && (
+                      {/* Footer — pinned to bottom of details column */}
+                      <div className="mt-auto pt-2 border-t border-white/6 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
                           <button type="button"
-                            onClick={async e=>{ e.preventDefault(); e.stopPropagation(); const v=!(card.email_updates_enabled??false); setCards(p=>p.map(c=>c.id===card.id?{...c,email_updates_enabled:v}:c)); await fetch("/api/board",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:card.id,email_updates_enabled:v,...(card.author_email?{author_email:card.author_email}:{})})}); }}
-                            title={(card.email_updates_enabled??false)?"Emails enabled — click to disable":"Emails disabled — click to enable"}
-                            className={`relative p-1 rounded transition-colors ${(card.email_updates_enabled??false)?"text-emerald-300 hover:text-emerald-200":"text-red-400 hover:text-red-300"}`}>
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                            {(card.email_updates_enabled??false)
-                              ?<svg className="h-2 w-2 absolute -bottom-0.5 -right-0.5 text-emerald-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
-                              :<svg className="h-2 w-2 absolute -bottom-0.5 -right-0.5 text-red-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/></svg>
-                            }
+                            onClick={async e=>{ e.preventDefault(); e.stopPropagation(); const v=!card.first_15_complete; setCards(p=>p.map(c=>c.id===card.id?{...c,first_15_complete:v}:c)); await fetch("/api/board",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:card.id,first_15_complete:v})}); }}
+                            title={card.first_15_complete?"First 15 complete":"Mark First 15 done"}
+                            className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-full border transition-colors ${card.first_15_complete?"bg-emerald-500/20 text-emerald-300 border-emerald-500/40":"text-white/60 border-white/20 hover:border-white/40 hover:text-white/80"}`}>
+                            {card.first_15_complete?<svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>:<span className="h-3 w-3 rounded-sm border border-current inline-block"/>}
+                            15
                           </button>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button type="button" onClick={()=>copyLink(card.author_token)} title="Copy author link"
-                          className="text-white/40 hover:text-[#D4AF37] transition-colors">
-                          {copied===card.author_token
-                            ?<svg className="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                            :<svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>}
-                        </button>
-                        {card.status==="released" && (
-                          <button type="button" onClick={()=>syncToBooks(card)} title="Sync to public Narrated Works"
-                            className="text-white/40 hover:text-emerald-400 transition-colors">
-                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                          {card.author_email && (
+                            <button type="button"
+                              onClick={async e=>{ e.preventDefault(); e.stopPropagation(); const v=!(card.email_updates_enabled??false); setCards(p=>p.map(c=>c.id===card.id?{...c,email_updates_enabled:v}:c)); await fetch("/api/board",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:card.id,email_updates_enabled:v,...(card.author_email?{author_email:card.author_email}:{})})}); }}
+                              title={(card.email_updates_enabled??false)?"Emails enabled — click to disable":"Emails disabled — click to enable"}
+                              className={`relative p-1 rounded transition-colors ${(card.email_updates_enabled??false)?"text-emerald-300 hover:text-emerald-200":"text-red-400 hover:text-red-300"}`}>
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                              {(card.email_updates_enabled??false)
+                                ?<svg className="h-2 w-2 absolute -bottom-0.5 -right-0.5 text-emerald-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+                                :<svg className="h-2 w-2 absolute -bottom-0.5 -right-0.5 text-red-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/></svg>
+                              }
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button type="button" onClick={()=>copyLink(card.author_token)} title="Copy author link"
+                            className="text-white/40 hover:text-[#D4AF37] transition-colors">
+                            {copied===card.author_token
+                              ?<svg className="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                              :<svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>}
                           </button>
-                        )}
-                        <button type="button" onClick={()=>startEdit(card)} className="text-white/40 hover:text-white transition-colors">
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                        </button>
-                        <button type="button" onClick={()=>del(card.id, card.title)} className="text-white/40 hover:text-red-400 transition-colors">
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                        </button>
+                          {card.status==="released" && (
+                            <button type="button" onClick={()=>syncToBooks(card)} title="Sync to public Narrated Works"
+                              className="text-white/40 hover:text-emerald-400 transition-colors">
+                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            </button>
+                          )}
+                          <button type="button" onClick={()=>startEdit(card)} className="text-white/40 hover:text-white transition-colors">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                          </button>
+                          <button type="button" onClick={()=>del(card.id, card.title)} className="text-white/40 hover:text-red-400 transition-colors">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Inline edit popover */}
+                    {/* Inline edit popover — below the card */}
                     {inlineEdit?.cardId === card.id && (
                       <div ref={inlineRef}
-                        className="absolute inset-x-2 bottom-14 z-50 bg-[#0D1040] border border-[#D4AF37]/25 rounded-xl p-3 shadow-2xl"
+                        className="absolute left-0 right-0 top-full mt-0.5 z-50 bg-[#0D1040] border border-[#D4AF37]/25 rounded-xl p-3 shadow-2xl"
                         onClick={e=>e.stopPropagation()}>
                         {(inlineEdit.field==="deadline"||inlineEdit.field==="first15_due") && (
                           <div className="space-y-2">
