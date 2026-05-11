@@ -173,6 +173,36 @@ function DemoPlayer({
 }
 
 
+function StatsBar() {
+  const [stats, setStats] = useState<{ titles: number; authors: number; genres: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/stats")
+      .then(r => r.json())
+      .then(d => { if (d.titles !== undefined) setStats(d); })
+      .catch(() => {});
+  }, []);
+
+  if (!stats) return null;
+
+  const items = [
+    { value: stats.titles, label: "titles narrated" },
+    { value: stats.authors, label: "authors worked with" },
+    { value: stats.genres, label: "genres" },
+  ];
+
+  return (
+    <div className="fade-up-3 mt-8 inline-flex items-center gap-0 rounded-full border border-white/10 bg-white/[0.04] divide-x divide-white/10 overflow-hidden">
+      {items.map(({ value, label }) => (
+        <div key={label} className="flex items-baseline gap-1.5 px-5 py-2.5">
+          <span className="text-lg font-bold text-[#D4AF37] leading-none">{value}</span>
+          <span className="text-[11px] text-white/45 leading-none whitespace-nowrap">{label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface Testimonial {
   quote?: string;
   paragraphs?: string[];
@@ -516,8 +546,11 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
               </a>
             </div>
 
+            {/* Stats bar */}
+            <StatsBar />
+
             {/* Quick credential strip */}
-            <div className="fade-up-4 mt-14 flex flex-wrap items-center gap-6">
+            <div className="fade-up-4 mt-10 flex flex-wrap items-center gap-6">
               {[
                 { label: "Turnaround", value: "24–48h" },
                 { label: "Platform", value: "ACX-ready" },
