@@ -558,7 +558,7 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
           <div className="flex items-center gap-4 mb-10">
             <div className="h-px w-6 bg-[#D4AF37]" />
             <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Featured demos</p>
-            <div className="flex-1 h-px bg-white/6" />
+            <div className="flex-1 h-px bg-[#D4AF37]/20" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -585,7 +585,7 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
           <div className="flex items-center gap-4 mb-10">
             <div className="h-px w-6 bg-[#D4AF37]" />
             <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Author testimonials</p>
-            <div className="flex-1 h-px bg-white/6" />
+            <div className="flex-1 h-px bg-[#D4AF37]/20" />
           </div>
           <TestimonialsCarousel />
         </section>
@@ -595,7 +595,7 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
           <div className="flex items-center gap-4 mb-12">
             <div className="h-px w-6 bg-[#D4AF37]" />
             <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">About</p>
-            <div className="flex-1 h-px bg-white/6" />
+            <div className="flex-1 h-px bg-[#D4AF37]/20" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-10 lg:gap-16 items-start">
@@ -658,7 +658,7 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
           <div className="flex items-center gap-4 mb-12">
             <div className="h-px w-6 bg-[#D4AF37]" />
             <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Get in touch</p>
-            <div className="flex-1 h-px bg-white/6" />
+            <div className="flex-1 h-px bg-[#D4AF37]/20" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
