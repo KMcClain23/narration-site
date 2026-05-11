@@ -581,7 +581,7 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
 
 
         {/* ── TESTIMONIALS ── */}
-        <section id="testimonials" className="mt-16 scroll-mt-24" aria-label="Author testimonials">
+        <section id="testimonials" className="mt-16 scroll-mt-24 -mx-5 sm:-mx-6 px-5 sm:px-6 bg-white/[0.02]" aria-label="Author testimonials">
           <div className="flex items-center gap-4 mb-10">
             <div className="h-px w-6 bg-[#D4AF37]" />
             <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Author testimonials</p>
@@ -654,7 +654,7 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
         </section>
 
         {/* ── CONTACT ── */}
-        <section id="contact" className="mt-16 mb-16 scroll-mt-24" aria-label="Contact and booking">
+        <section id="contact" className="mt-16 mb-16 scroll-mt-24 -mx-5 sm:-mx-6 px-5 sm:px-6 bg-white/[0.02]" aria-label="Contact and booking">
           <div className="flex items-center gap-4 mb-12">
             <div className="h-px w-6 bg-[#D4AF37]" />
             <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Get in touch</p>
