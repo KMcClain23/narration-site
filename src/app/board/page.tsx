@@ -1706,7 +1706,7 @@ export default function BoardPage() {
       ) : (
       <div className="px-4 sm:px-6 py-6 sm:overflow-x-auto">
         <div className="flex flex-col gap-4 sm:flex-row sm:min-w-max pb-6">
-          {COLUMNS.map(column => (
+          {COLUMNS.filter(c => c.id !== "audition").map(column => (
             <div key={column.id}
               onDragOver={e=>{e.preventDefault();setDragOver(column.id);}}
               onDrop={e=>drop(e,column.id)}
