@@ -30,7 +30,7 @@ interface BoardCard {
   id: string; title: string; author: string; cover_url: string;
   status: string; deadline?: string; notes: string; author_notes: string;
   subtitle: string; tags: string[]; description: string;
-  audible_link: string; co_narrator: string; chapters: Chapter[];
+  audible_link: string; spotify_link?: string; co_narrator: string; chapters: Chapter[];
   first15_due?: string; first_15_complete?: boolean;
   author_email?: string; dean_message?: string; author_token?: string;
   email_updates_enabled?: boolean;
@@ -583,6 +583,32 @@ export default function CardDetailPage() {
                 {savingDesc ? "Saving…" : descSaved ? "✓ Saved" : "Save description"}
               </button>
             )}
+          </div>
+
+          {/* Platform links */}
+          <div className="rounded-2xl border border-white/8 bg-[#0A0D3A] p-4 space-y-2">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-white/40 font-medium">Platform links</p>
+            <div>
+              <label className="text-[10px] text-white/35 uppercase tracking-wide">Audible / Amazon</label>
+              <input type="text" value={card.audible_link || ""}
+                readOnly
+                placeholder="Not set"
+                className="mt-1 w-full bg-black/20 border border-white/5 rounded-lg px-3 py-1.5 text-xs text-white/50 placeholder:text-white/20 focus:outline-none cursor-default"/>
+            </div>
+            <div>
+              <label className="text-[10px] text-white/35 uppercase tracking-wide">Spotify</label>
+              <input type="url" defaultValue={card.spotify_link || ""}
+                onBlur={async e => {
+                  const val = e.target.value.trim();
+                  await fetch("/api/board", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id, spotify_link: val }),
+                  });
+                }}
+                placeholder="https://open.spotify.com/show/…"
+                className="mt-1 w-full bg-black/30 border border-white/8 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[#1DB954]/50 transition"/>
+            </div>
           </div>
 
           {/* Progress stats */}

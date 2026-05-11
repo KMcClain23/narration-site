@@ -18,7 +18,7 @@ interface BoardCard {
   id: string; title: string; author: string; cover_url: string;
   status: string; deadline?: string; notes: string; author_notes: string;
   links: Link[]; co_narrator: string; author_token: string; sort_order: number;
-  subtitle: string; tags: string[]; description: string; audible_link: string; ar_link: string;
+  subtitle: string; tags: string[]; description: string; audible_link: string; ar_link: string; spotify_link: string;
   chapters: { status: string }[];
   word_count: number;
   first15_due: string;
@@ -35,7 +35,7 @@ interface BoardCard {
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
   title:"", author:"", cover_url:"", status:"contracted", deadline:"",
   notes:"", author_notes:"", links:[], co_narrator:"",
-  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"",
+  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"",
 };
 
 // ─── Timeline view ────────────────────────────────────────────────────────────
@@ -1288,7 +1288,7 @@ export default function BoardPage() {
       deadline:card.deadline||"",notes:card.notes,author_notes:card.author_notes,
       links:card.links,co_narrator:card.co_narrator,subtitle:card.subtitle||"",
       tags:card.tags||[],description:card.description||"",
-      audible_link:card.audible_link||"",ar_link:card.ar_link||"",chapters:card.chapters||[],
+      audible_link:card.audible_link||"",ar_link:card.ar_link||"",spotify_link:card.spotify_link||"",chapters:card.chapters||[],
       word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||""});
     setShowForm(false);
   };
@@ -1542,6 +1542,7 @@ export default function BoardPage() {
                 </label>
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Audible / Amazon link</span><input type="text" value={form.audible_link} onChange={e=>setForm(p=>({...p,audible_link:e.target.value}))} placeholder="https://..." className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Authors Republic link</span><input type="text" value={form.ar_link} onChange={e=>setForm(p=>({...p,ar_link:e.target.value}))} placeholder="https://..." className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
+                <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Spotify link</span><input type="text" value={form.spotify_link} onChange={e=>setForm(p=>({...p,spotify_link:e.target.value}))} placeholder="https://open.spotify.com/show/..." className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Stage</span>
                   <select value={form.status} onChange={e=>setForm(p=>({...p,status:e.target.value}))}

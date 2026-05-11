@@ -6,6 +6,7 @@ import Image from "next/image";
 import { AuthorHoverName, NarratedBySection } from "./NarratedBySection";
 import type { CoNarratorDetail } from "./NarratedBySection";
 import { TrackPageView } from "./TrackPageView";
+import { PlatformButtons } from "@/app/components/PlatformButtons";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ function titleToSlug(title: string): string {
 async function getBook(slug: string) {
   const { data } = await supabaseAdmin
     .from("board_cards")
-    .select("id, title, subtitle, author, author_notes, cover_url, audible_link, ar_link, co_narrator, tags, description, status")
+    .select("id, title, subtitle, author, author_notes, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status")
     .in("status", ["contracted", "recording", "editing", "released"]);
   if (!data) return null;
   return data.find((card) => titleToSlug(card.title ?? "") === slug) ?? null;
@@ -218,20 +219,12 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
 
             {/* CTAs */}
             <div className="flex flex-wrap gap-3">
-              {isReleased && book.audible_link && (
-                <a href={book.audible_link} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-[#D4AF37] text-black font-bold px-6 py-3 rounded-full hover:bg-[#E0C15A] transition-colors text-sm">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5.14v13.72l11-6.86L8 5.14z"/>
-                  </svg>
-                  Listen on Audible
-                </a>
-              )}
-              {isReleased && book.ar_link && (
-                <a href={book.ar_link} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 border border-white/20 text-white/70 hover:text-white hover:border-white/40 font-semibold px-6 py-3 rounded-full transition-colors text-sm">
-                  Authors Republic
-                </a>
+              {isReleased && (
+                <PlatformButtons
+                  audibleUrl={book.audible_link}
+                  spotifyUrl={(book as Record<string, unknown>).spotify_link as string | undefined}
+                  arUrl={book.ar_link}
+                />
               )}
               <Link href="/contact"
                 className="inline-flex items-center gap-2 border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 font-semibold px-6 py-3 rounded-full transition-colors text-sm">

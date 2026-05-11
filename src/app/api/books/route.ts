@@ -37,7 +37,7 @@ const STATUS_TO_CATEGORY: Record<string, BookCategory> = {
   released:   "completed",
 };
 
-type MappedCard = { id: unknown; title: unknown; subtitle: unknown; author: unknown; link: string; ar_link: string; cover_url: string; tags: unknown[]; description: string; category: string; co_narrator: unknown[]; sort_order: number; slug: string | null };
+type MappedCard = { id: unknown; title: unknown; subtitle: unknown; author: unknown; link: string; ar_link: string; spotify_link: string; cover_url: string; tags: unknown[]; description: string; category: string; co_narrator: unknown[]; sort_order: number; slug: string | null };
 
 function mapCards(data: Record<string, unknown>[]): MappedCard[] {
   return data
@@ -55,8 +55,9 @@ function mapCards(data: Record<string, unknown>[]): MappedCard[] {
         title:       card.title,
         subtitle:    card.subtitle || null,
         author:      card.author,
-        link:        (card.audible_link as string) || "",
-        ar_link:     (card.ar_link     as string) || "",
+        link:         (card.audible_link  as string) || "",
+        ar_link:      (card.ar_link      as string) || "",
+        spotify_link: (card.spotify_link as string) || "",
         cover_url:   (card.cover_url   as string),
         tags:        Array.isArray(card.tags) ? card.tags : [],
         description: (card.description as string) || "",
@@ -76,7 +77,7 @@ export async function GET() {
 
     const primary = await supabaseAdmin
       .from("board_cards")
-      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, co_narrator, tags, description, sort_order, status, slug")
+      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, slug")
       .in("status", STATUS_FILTER)
       .order("sort_order", { ascending: true })
       .order("title",      { ascending: true });
@@ -88,7 +89,7 @@ export async function GET() {
       // Retry without slug
       const fallback = await supabaseAdmin
         .from("board_cards")
-        .select("id, title, subtitle, author, cover_url, audible_link, ar_link, co_narrator, tags, description, sort_order, status")
+        .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status")
         .in("status", STATUS_FILTER)
         .order("sort_order", { ascending: true })
         .order("title",      { ascending: true });

@@ -5,6 +5,7 @@ import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Book } from "@/types/book";
+import { PlatformButtons, PlatformDots } from "@/app/components/PlatformButtons";
 
 function makeSlug(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -385,6 +386,7 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
                 Multicast
               </span>
             )}
+            <PlatformDots audibleUrl={book.link} spotifyUrl={book.spotify_link} />
           </div>
           {/* Expanded (hover) state */}
           <div className="hidden group-hover:block px-3 py-4 sm:px-5 sm:py-5">
@@ -449,29 +451,13 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
                     ))}
                   </div>
                 )}
-                {/* Audible after multicast */}
-                {hasLink && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); window.open(book.link, "_blank", "noopener,noreferrer"); }}
-                    className="mt-3 self-start inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-3 py-2 sm:px-4 sm:py-2 rounded-full transition-colors shadow-lg"
-                  >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
-                    Listen on Audible
-                  </button>
-                )}
+                {/* Platform buttons after multicast */}
+                <PlatformButtons audibleUrl={book.link} spotifyUrl={book.spotify_link} arUrl={book.ar_link} size="sm" className="mt-3" />
               </div>
             )}
-            {/* Audible for no co-narrator or single co-narrator */}
-            {coNarratorList.length <= 1 && hasLink && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); window.open(book.link, "_blank", "noopener,noreferrer"); }}
-                className="mt-3 self-start inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-black bg-[#D4AF37] hover:bg-[#E0C15A] px-3 py-2 sm:px-4 sm:py-2 rounded-full transition-colors shadow-lg"
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
-                Listen on Audible
-              </button>
+            {/* Platform buttons for no co-narrator or single co-narrator */}
+            {coNarratorList.length <= 1 && (
+              <PlatformButtons audibleUrl={book.link} spotifyUrl={book.spotify_link} arUrl={book.ar_link} size="sm" className="mt-3" />
             )}
             {/* Explicit "View details" CTA */}
             <Link

@@ -67,7 +67,7 @@ export async function POST(req: Request) {
       deadline, notes = "", author_notes = "",
       links = [], co_narrator = "", sort_order = 0, chapters = [],
       subtitle = "", tags = [], description = "",
-      audible_link = "", ar_link = "",
+      audible_link = "", ar_link = "", spotify_link = "",
       word_count = 0, first15_due,
       pfh_rate = 0, payment_type = "pfh", first_15_complete = false,
       dean_message = "", author_email = "", slug = "",
@@ -91,8 +91,9 @@ export async function POST(req: Request) {
       subtitle:          subtitle    || "",
       tags:              Array.isArray(tags)     ? tags     : [],
       description:       description || "",
-      audible_link:      audible_link || "",
-      ar_link:           ar_link      || "",
+      audible_link:      audible_link  || "",
+      ar_link:           ar_link       || "",
+      spotify_link:      spotify_link  || "",
       word_count:        word_count   ?? 0,
       pfh_rate:          pfh_rate     ?? 0,
       payment_type:      payment_type || "pfh",
@@ -157,10 +158,11 @@ export async function PUT(req: Request) {
 
     // Admin full update — only columns that actually exist on board_cards.
     // Keep this list in sync with the DB schema; do NOT add speculative columns.
+    // Migration needed: ALTER TABLE board_cards ADD COLUMN spotify_link text;
     const allowed = [
       "title", "author", "cover_url", "status", "deadline", "notes",
       "author_notes", "links", "co_narrator", "sort_order", "chapters",
-      "subtitle", "tags", "description", "audible_link", "ar_link",
+      "subtitle", "tags", "description", "audible_link", "ar_link", "spotify_link",
       "word_count", "first15_due", "pfh_rate", "payment_type",
       "first_15_complete", "dean_message", "author_email", "author_token",
       "email_updates_enabled",
