@@ -767,6 +767,17 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
 
         {/* ── FOOTER ── */}
         <footer className="relative border-t border-white/6 pt-12 pb-8 text-sm text-white/25">
+          {/* Wordmark */}
+          <div className="flex flex-col items-center gap-2 mb-10">
+            <div className="h-10 w-10 rounded-full border border-white/15 bg-white/5 overflow-hidden">
+              <Image src="/dean-profile.png" alt="Dean Miller" width={40} height={40} className="object-cover"/>
+            </div>
+            <div className="text-center leading-tight">
+              <p className="text-sm font-semibold text-white/80">Dean Miller</p>
+              <p className="text-xs text-white/35">Audiobook Narrator</p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mb-10">
             {[
               { heading: "Navigation", links: [
