@@ -1705,6 +1705,7 @@ export default function BoardPage() {
 
       ) : (
       <div className="px-4 sm:px-6 py-6 w-full">
+        <div className="max-w-7xl mx-auto w-full">
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 w-full pb-6">
           {COLUMNS.filter(c => c.id !== "audition").map(column => (
             <div key={column.id}
@@ -1820,12 +1821,12 @@ export default function BoardPage() {
                       )}
 
                       {/* Footer — pinned to bottom of details column */}
-                      <div className="mt-auto pt-2 border-t border-white/6 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5">
+                      <div className="mt-3 pt-3 border-t border-white/6 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
                           <button type="button"
                             onClick={async e=>{ e.preventDefault(); e.stopPropagation(); const v=!card.first_15_complete; setCards(p=>p.map(c=>c.id===card.id?{...c,first_15_complete:v}:c)); await fetch("/api/board",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:card.id,first_15_complete:v})}); }}
                             title={card.first_15_complete?"First 15 complete":"Mark First 15 done"}
-                            className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-full border transition-colors ${card.first_15_complete?"bg-emerald-500/20 text-emerald-300 border-emerald-500/40":"text-white/60 border-white/20 hover:border-white/40 hover:text-white/80"}`}>
+                            className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ${card.first_15_complete?"bg-emerald-500/20 text-emerald-300 border-emerald-500/40":"text-white/60 border-white/25 hover:border-white/50 hover:text-white/90"}`}>
                             {card.first_15_complete?<svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>:<span className="h-3 w-3 rounded-sm border border-current inline-block"/>}
                             15
                           </button>
@@ -1833,7 +1834,7 @@ export default function BoardPage() {
                             <button type="button"
                               onClick={async e=>{ e.preventDefault(); e.stopPropagation(); const v=!(card.email_updates_enabled??false); setCards(p=>p.map(c=>c.id===card.id?{...c,email_updates_enabled:v}:c)); await fetch("/api/board",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:card.id,email_updates_enabled:v,...(card.author_email?{author_email:card.author_email}:{})})}); }}
                               title={(card.email_updates_enabled??false)?"Emails enabled — click to disable":"Emails disabled — click to enable"}
-                              className={`relative p-1 rounded transition-colors ${(card.email_updates_enabled??false)?"text-emerald-300 hover:text-emerald-200":"text-red-400 hover:text-red-300"}`}>
+                              className={`relative p-2 rounded transition-colors ${(card.email_updates_enabled??false)?"text-emerald-300 hover:text-emerald-200":"text-red-400 hover:text-red-300"}`}>
                               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                               {(card.email_updates_enabled??false)
                                 ?<svg className="h-2 w-2 absolute -bottom-0.5 -right-0.5 text-emerald-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
@@ -1934,6 +1935,7 @@ export default function BoardPage() {
               </div>
             </div>
           ))}
+        </div>
         </div>
       </div>
       )}
