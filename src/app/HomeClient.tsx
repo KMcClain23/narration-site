@@ -548,23 +548,6 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
 
             {/* Stats bar */}
             <StatsBar />
-
-            {/* Quick credential strip */}
-            <div className="fade-up-4 mt-10 flex flex-wrap items-center gap-6">
-              {[
-                { label: "Turnaround", value: "24–48h" },
-                { label: "Platform", value: "ACX-ready" },
-                { label: "Specialties", value: "Dark romance · romantasy · drama" },
-              ].map(s => (
-                <div key={s.label} className="flex items-center gap-2.5">
-                  <div className="h-3.5 w-px bg-[#D4AF37]/40" />
-                  <div>
-                    <p className="text-[9px] uppercase tracking-[0.2em] text-white/30">{s.label}</p>
-                    <p className="text-xs text-white/70 mt-0.5">{s.value}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Profile image — floats right on desktop */}
