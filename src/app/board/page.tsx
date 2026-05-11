@@ -87,6 +87,24 @@ function DashboardView({ cards, onSwitchToBoard }: { cards: BoardCard[]; onSwitc
   };
 
   const cardsNeedingDesc = cards.filter(c => !c.description?.trim() && c.status !== "released");
+  const cardsNeedingEnrich = cards.filter(c => c.status !== "released" && (!c.description?.trim() || !c.tags?.length));
+  const [enriching, setEnriching] = useState(false);
+  const [enrichProgress, setEnrichProgress] = useState({ done: 0, total: 0 });
+
+  const enrichAll = async () => {
+    if (!cardsNeedingEnrich.length || enriching) return;
+    setEnriching(true);
+    setEnrichProgress({ done: 0, total: cardsNeedingEnrich.length });
+    for (const card of cardsNeedingEnrich) {
+      await fetch("/api/enrich-book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: card.id, title: card.title, author: card.author }),
+      }).catch(() => {});
+      setEnrichProgress(p => ({ ...p, done: p.done + 1 }));
+    }
+    setEnriching(false);
+  };
 
   const fetchAllDescriptions = async () => {
     if (!cardsNeedingDesc.length) return;
@@ -484,14 +502,28 @@ function DashboardView({ cards, onSwitchToBoard }: { cards: BoardCard[]; onSwitc
               )}
             </div>
             {descBulk.phase === "idle" && (
-              <button
-                type="button"
-                onClick={fetchAllDescriptions}
-                disabled={descBulk.phase !== "idle"}
-                className="text-xs font-semibold text-white/70 border border-white/15 hover:border-white/35 hover:text-white px-3 py-1.5 rounded-lg transition-colors"
-              >
-                Fetch all descriptions
-              </button>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={fetchAllDescriptions}
+                  disabled={descBulk.phase !== "idle"}
+                  className="text-xs font-semibold text-white/70 border border-white/15 hover:border-white/35 hover:text-white px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  Fetch all descriptions
+                </button>
+                {cardsNeedingEnrich.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={enrichAll}
+                    disabled={enriching}
+                    className="text-xs font-semibold text-[#D4AF37]/70 border border-[#D4AF37]/20 hover:border-[#D4AF37]/50 hover:text-[#D4AF37] px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+                  >
+                    {enriching
+                      ? `Enriching ${enrichProgress.done}/${enrichProgress.total}…`
+                      : `Enrich metadata (${cardsNeedingEnrich.length})`}
+                  </button>
+                )}
+              </div>
             )}
             {descBulk.phase === "done" && (
               <span className="text-xs text-emerald-400 font-semibold">✓ All saved</span>
@@ -1188,7 +1220,17 @@ export default function BoardPage() {
         const r = await fetch("/api/board",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...cleanForm(form),sort_order:col(form.status).length})});
         const d = await r.json();
         if (!r.ok) { setError(d.error || "Failed to create project."); setSaving(false); return; }
-        if (d.card) setCards(p=>[...p,d.card]);
+        if (d.card) {
+          setCards(p=>[...p,d.card]);
+          // Fire-and-forget enrichment for new cards missing description/tags
+          if (!d.card.description || !d.card.tags?.length) {
+            fetch("/api/enrich-book", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id: d.card.id, title: d.card.title, author: d.card.author }),
+            }).catch(() => {});
+          }
+        }
         setShowForm(false);
       }
       setForm({...EMPTY}); setTagInput("");

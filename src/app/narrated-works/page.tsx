@@ -311,7 +311,7 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
             {book.tags.slice(0, 3).map((tag) => (
               <span
                 key={tag}
-                className="text-[10px] sm:text-sm font-bold uppercase tracking-wide text-white bg-[#D4AF37]/30 border border-[#D4AF37]/60 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full backdrop-blur-sm"
+                className="text-[10px] font-bold uppercase tracking-wide text-white bg-[#D4AF37]/30 border border-[#D4AF37]/60 px-2 py-0.5 rounded-full backdrop-blur-sm"
               >
                 {tag}
               </span>
@@ -319,10 +319,13 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
           </div>
         </div>
 
-        {/* Status badge */}
+        {/* Status badge — sits in a bottom gradient overlay */}
         {statusBadge && (
-          <div className="absolute top-3 right-3 z-30 bg-[#D4AF37] text-black text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
-            {statusBadge}
+          <div className="absolute inset-x-0 bottom-0 z-30 flex items-end justify-end pb-2.5 px-2.5"
+            style={{ background: "linear-gradient(to top, rgba(6,8,46,0.85) 0%, rgba(6,8,46,0) 55%)" }}>
+            <span className="bg-[#D4AF37] text-black text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+              {statusBadge}
+            </span>
           </div>
         )}
       </Link>
@@ -470,7 +473,7 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
             {/* Explicit "View details" CTA */}
             <Link
               href={`/narrated-works/${bookSlug}`}
-              className="mt-3 inline-flex items-center gap-1 text-xs text-white/40 hover:text-white/70 transition-colors"
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-white/60 border border-white/20 px-3 py-1.5 rounded-full hover:border-white/50 hover:text-white transition-colors"
             >
               View details
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -504,16 +507,17 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
 }
 
 function SectionGrid({
-  title, books, statusBadge, authors, onTagClick, coNarrators,
+  title, books, statusBadge, authors, onTagClick, coNarrators, dotClass,
 }: {
   title: string; books: Book[]; statusBadge?: React.ReactNode;
   authors: Record<string, Author>; onTagClick: (tag: string) => void;
-  coNarrators: Record<string, CoNarrator>;
+  coNarrators: Record<string, CoNarrator>; dotClass?: string;
 }) {
   if (books.length === 0) return null;
   return (
     <section className="mb-10">
-      <div className="flex items-center gap-4 mb-5 scroll-mt-28 sm:scroll-mt-36">
+      <div className="flex items-center gap-3 mb-5 scroll-mt-28 sm:scroll-mt-36">
+        {dotClass && <div className={`h-2 w-2 rounded-full shrink-0 ${dotClass}`}/>}
         <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/60">{title}</h2>
         <div className="flex-1 h-px bg-white/8" />
         <span className="text-xs text-white/40">{books.length}</span>
@@ -629,9 +633,9 @@ export default function NarratedWorks() {
           </div>
         ) : (
           <>
-            <SectionGrid title="Completed" books={completed} authors={authors} onTagClick={() => {}} coNarrators={coNarrators} />
-            <SectionGrid title="Currently narrating" books={inProgress} statusBadge="In Progress" authors={authors} onTagClick={() => {}} coNarrators={coNarrators} />
-            <SectionGrid title="Coming soon" books={comingSoon} statusBadge="Soon" authors={authors} onTagClick={() => {}} coNarrators={coNarrators} />
+            <SectionGrid title="Completed" books={completed} authors={authors} onTagClick={() => {}} coNarrators={coNarrators} dotClass="bg-emerald-400" />
+            <SectionGrid title="Currently narrating" books={inProgress} statusBadge="In Progress" authors={authors} onTagClick={() => {}} coNarrators={coNarrators} dotClass="bg-yellow-400" />
+            <SectionGrid title="Coming soon" books={comingSoon} statusBadge="Soon" authors={authors} onTagClick={() => {}} coNarrators={coNarrators} dotClass="bg-blue-400" />
           </>
         )}
 
