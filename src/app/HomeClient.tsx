@@ -704,7 +704,12 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
             <div className="flex flex-col gap-4">
               {/* Book a call */}
               <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6">
-                <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] mb-3">Book a call</p>
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="h-4 w-4 text-[#D4AF37] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                  </svg>
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37]">Book a call</p>
+                </div>
                 <p className="text-sm text-white/55 leading-relaxed mb-5">
                   Prefer to talk through your project first? Check availability and book a free 15-minute call.
                 </p>
@@ -715,8 +720,13 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
               </div>
 
               {/* Direct email */}
-              <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6">
-                <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] mb-3">Direct email</p>
+              <div className="rounded-2xl border border-[#D4AF37]/30 bg-[#0A0D3A]/60 p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="h-4 w-4 text-[#D4AF37] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                  </svg>
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37]">Direct email</p>
+                </div>
                 <button
                   onClick={() => { if (!showEmail) setShowEmail(true); else window.location.href = "mailto:Dean@DMNarration.com"; }}
                   className="text-base font-semibold text-white hover:text-[#D4AF37] transition-colors">
@@ -727,7 +737,12 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
 
               {/* Find me on */}
               <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6">
-                <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] mb-4">Find me on</p>
+                <div className="flex items-center gap-2 mb-4">
+                  <svg className="h-4 w-4 text-[#D4AF37] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                  </svg>
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37]">Find me on</p>
+                </div>
                 <ul className="space-y-2.5">
                   {[
                     { label: "ACX narrator profile", href: "https://www.acx.com/narrator?p=A3DYAXR7JFPXPE" },
