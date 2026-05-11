@@ -634,15 +634,14 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
                     "Fast pickups and clear communication",
                     "Option to livestream sessions for promo content",
                   ].map((item) => (
-                    <li key={item} className="flex items-start gap-3 px-5 py-3.5 text-sm text-white/65 hover:bg-white/[0.02] transition-colors">
-                      <span className="mt-1.5 h-1 w-1 rounded-full bg-[#D4AF37] shrink-0" />
-                      {item}
+                    <li key={item} className="px-5 py-3.5 text-sm text-white/65 hover:bg-white/[0.02] transition-colors">
+                      <span className="block border-l-2 border-[#D4AF37] pl-3">{item}</span>
                     </li>
                   ))}
                 </ul>
                 <div className="px-5 py-4 border-t border-white/8">
                   <Link href="/welcome"
-                    className="text-sm text-[#D4AF37] hover:text-[#E0C15A] transition-colors inline-flex items-center gap-1.5">
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#D4AF37] border border-[#D4AF37]/40 px-4 py-2 rounded-full hover:bg-[#D4AF37]/10 hover:border-[#D4AF37]/70 transition-colors">
                     Full process & welcome packet
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
