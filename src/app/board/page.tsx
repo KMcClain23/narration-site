@@ -701,8 +701,8 @@ function TimelineView({
       {barCards.length === 0 ? (
         <div className="py-16 text-center text-white/20 text-sm">No active projects with scheduled dates</div>
       ) : (
-        <div className="overflow-hidden">
-          <div style={{ minWidth: `${LABEL_W + 560}px` }}>
+        <div>
+          <div className="pt-16 pb-40" style={{ minWidth: `${LABEL_W + 560}px` }}>
 
             {/* Month header */}
             <div className="flex">
