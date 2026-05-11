@@ -68,11 +68,22 @@ type DescBulkState = {
   results: DescResult[];
 };
 
-function DashboardView({ cards }: { cards: BoardCard[] }) {
+function DashboardView({ cards, onSwitchToBoard }: { cards: BoardCard[]; onSwitchToBoard: () => void }) {
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const [descBulk, setDescBulk] = useState<DescBulkState>({ phase: "idle", results: [] });
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem("dashCollapsed") ?? "{}"); } catch { return {}; }
+  });
+
+  const toggleCollapse = (key: string) => {
+    setCollapsed(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      try { localStorage.setItem("dashCollapsed", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   const cardsNeedingDesc = cards.filter(c => !c.description?.trim() && c.status !== "released");
 
@@ -90,7 +101,6 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
       } catch {
         results.push({ id: card.id, title: card.title, desc: null, error: true });
       }
-      // Yield to avoid blocking the UI between requests
       setDescBulk({ phase: "fetching", results: [...results] });
     }
     setDescBulk({ phase: "review", results });
@@ -122,10 +132,25 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
 
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
   const in7Days   = useMemo(() => new Date(today.getTime() + 7  * 86400000), [today]);
+  const in30Days  = useMemo(() => new Date(today.getTime() + 30 * 86400000), [today]);
   const ago30Days = useMemo(() => new Date(today.getTime() - 30 * 86400000), [today]);
 
+  const activeCards = useMemo(() => cards.filter(c => c.status !== "audition"), [cards]);
+
+  const relDays = (dateStr: string): string => {
+    const diff = Math.round((parseDate(dateStr).getTime() - today.getTime()) / 86400000);
+    if (diff === 0) return "today";
+    return diff > 0 ? `in ${diff} day${diff === 1 ? "" : "s"}` : `overdue ${-diff} day${-diff === 1 ? "" : "s"}`;
+  };
+
+  const fmtWords = (n: number): string =>
+    n >= 1000 ? `${Math.round(n / 1000)}k words` : `${n} words`;
+
+  const fmtDate = (iso: string): string =>
+    new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
   const dueThisWeek = useMemo(() =>
-    cards
+    activeCards
       .filter(c => {
         if (c.status === "released") return false;
         return [c.deadline, c.first15_due].filter(Boolean).some(d => {
@@ -139,14 +164,14 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
         );
         return earliest(a) - earliest(b);
       }),
-    [cards, today, in7Days]
+    [activeCards, today, in7Days]
   );
 
   const overdueFirst15 = useMemo(() =>
-    cards
+    activeCards
       .filter(c => c.first15_due && !c.first_15_complete && c.status !== "released" && parseDate(c.first15_due) < today)
       .sort((a, b) => parseDate(a.first15_due).getTime() - parseDate(b.first15_due).getTime()),
-    [cards, today]
+    [activeCards, today]
   );
 
   const recentlyCompleted = useMemo(() =>
@@ -156,18 +181,31 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
     [cards, ago30Days]
   );
 
-  const contracted = useMemo(() =>
-    cards.filter(c => c.status === "contracted")
-      .sort((a, b) => a.sort_order - b.sort_order),
-    [cards]
+  const upcomingDeadlines = useMemo(() =>
+    activeCards
+      .filter(c => c.status !== "released" && c.deadline && (() => { const dt = parseDate(c.deadline!); return dt >= today && dt <= in30Days; })())
+      .sort((a, b) => parseDate(a.deadline!).getTime() - parseDate(b.deadline!).getTime()),
+    [activeCards, today, in30Days]
   );
 
   const inProgress = useMemo(() => {
     const counts = Object.fromEntries(
-      (["contracted", "recording", "editing"] as const).map(s => [s, cards.filter(c => c.status === s).length])
+      (["contracted", "recording", "editing"] as const).map(s => [s, activeCards.filter(c => c.status === s).length])
     );
     return { counts, total: Object.values(counts).reduce((a, b) => a + b, 0) };
-  }, [cards]);
+  }, [activeCards]);
+
+  const statusSections = useMemo(() =>
+    (["contracted", "recording", "editing"] as const)
+      .map(s => ({
+        status: s,
+        label: s.charAt(0).toUpperCase() + s.slice(1),
+        col: COLUMNS.find(c => c.id === s)!,
+        cards: activeCards.filter(c => c.status === s).sort((a, b) => a.sort_order - b.sort_order),
+      }))
+      .filter(sec => sec.cards.length > 0),
+    [activeCards]
+  );
 
   const searchResults = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -188,13 +226,9 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
           <svg className="h-4 w-4 text-white/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            onFocus={() => setSearchFocused(true)}
+          <input value={search} onChange={e => setSearch(e.target.value)} onFocus={() => setSearchFocused(true)}
             placeholder="Search by title, author, or co-narrator…"
-            className="flex-1 bg-transparent text-sm text-white placeholder:text-white/20 focus:outline-none"
-          />
+            className="flex-1 bg-transparent text-sm text-white placeholder:text-white/20 focus:outline-none"/>
           {search && (
             <button onClick={() => setSearch("")} className="text-white/25 hover:text-white/60 transition-colors">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -208,15 +242,13 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
                 onClick={() => { setSearchFocused(false); setSearch(""); }}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
                 {card.cover_url
-                  ? <img src={card.cover_url} alt={card.title} className="h-10 w-7 object-cover rounded shrink-0"/>
-                  : <div className="h-10 w-7 bg-white/5 rounded shrink-0"/>}
+                  ? <img src={card.cover_url} alt={card.title} className="h-12 w-8 object-cover rounded shrink-0"/>
+                  : <div className="h-12 w-8 bg-white/5 rounded shrink-0"/>}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-white truncate">{card.title}</p>
                   {card.author && <p className="text-xs text-[#D4AF37]/70 truncate">{card.author}</p>}
                 </div>
-                <span className={`text-[10px] font-bold uppercase shrink-0 ${COLUMNS.find(c => c.id === card.status)?.text ?? "text-white/30"}`}>
-                  {card.status}
-                </span>
+                <span className={`text-[10px] font-bold uppercase shrink-0 ${COLUMNS.find(c => c.id === card.status)?.text ?? "text-white/30"}`}>{card.status}</span>
               </Link>
             ))}
           </div>
@@ -246,11 +278,7 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-white truncate">{card.title}</p>
                     {card.author && <p className="text-xs text-[#D4AF37]/70 truncate">{card.author}</p>}
-                    {soonest && (
-                      <p className="text-[10px] text-white/35 mt-0.5">
-                        {soonest.label}: {soonest.date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                      </p>
-                    )}
+                    {soonest && <p className="text-[10px] text-white/35 mt-0.5">{soonest.label}: {soonest.date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p>}
                   </div>
                   <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${isToday ? "bg-red-500/20 text-red-300" : daysLeft === 1 ? "bg-orange-500/20 text-orange-300" : "bg-[#D4AF37]/15 text-[#D4AF37]"}`}>
                     {isToday ? "Today" : daysLeft === 1 ? "Tomorrow" : `${daysLeft}d`}
@@ -266,9 +294,7 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
       {overdueFirst15.length > 0 && (
         <section>
           <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-red-400/80 mb-3 flex items-center gap-2">
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-            </svg>
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
             Overdue First 15
           </h2>
           <div className="space-y-2">
@@ -284,13 +310,9 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-white truncate">{card.title}</p>
                     {card.author && <p className="text-xs text-[#D4AF37]/70 truncate">{card.author}</p>}
-                    <p className="text-[10px] text-red-400/60 mt-0.5">
-                      First 15 was due {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                    </p>
+                    <p className="text-[10px] text-red-400/60 mt-0.5">First 15 was due {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p>
                   </div>
-                  <span className="text-xs font-bold text-red-300 bg-red-500/15 px-2.5 py-1 rounded-full shrink-0">
-                    {daysOver}d overdue
-                  </span>
+                  <span className="text-xs font-bold text-red-300 bg-red-500/15 px-2.5 py-1 rounded-full shrink-0">{daysOver}d overdue</span>
                 </Link>
               );
             })}
@@ -298,39 +320,63 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
         </section>
       )}
 
-      {/* ── Contracted books ── */}
-      {contracted.length > 0 && (
-        <section>
-          <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-400/80 mb-3">Contracted</h2>
-          <div className="space-y-2">
-            {contracted.map(card => (
-              <Link key={card.id} href={`/board/card/${card.id}`}
-                className="flex items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 hover:border-blue-500/40 hover:bg-blue-500/10 transition-all">
-                {card.cover_url
-                  ? <img src={card.cover_url} alt={card.title} className="h-12 w-8 object-cover rounded shrink-0"/>
-                  : <div className="h-12 w-8 bg-white/5 rounded shrink-0"/>}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">{card.title}</p>
-                  {card.author && <p className="text-xs text-[#D4AF37]/70 truncate">{card.author}</p>}
-                  {(card.deadline || card.first15_due) && (
-                    <p className="text-[10px] text-white/35 mt-0.5">
-                      {card.deadline    && `Deadline: ${card.deadline}`}
-                      {card.deadline && card.first15_due && " · "}
-                      {card.first15_due && `First 15: ${card.first15_due}`}
-                    </p>
-                  )}
-                </div>
-                <span className="text-xs font-bold text-blue-300 bg-blue-500/15 px-2.5 py-1 rounded-full shrink-0 whitespace-nowrap">
-                  Contracted
-                </span>
-              </Link>
-            ))}
-          </div>
+      {/* ── Status sections: Contracted / Recording / Editing ── */}
+      {statusSections.map(({ status, label, col, cards: secCards }) => (
+        <section key={status}>
+          <button type="button" onClick={() => toggleCollapse(status)}
+            className="w-full flex items-center gap-2 mb-3 group">
+            <div className={`h-2 w-2 rounded-full ${col.dot} shrink-0`}/>
+            <h2 className={`text-[11px] font-bold uppercase tracking-[0.2em] ${col.text}`}>{label}</h2>
+            <span className="text-[10px] text-white/30 ml-1">({secCards.length})</span>
+            <svg className={`h-3 w-3 text-white/30 ml-auto transition-transform ${collapsed[status] ? "-rotate-90" : ""}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          {!collapsed[status] && (
+            <div className="space-y-2">
+              {secCards.map(card => {
+                const isOverdue = card.deadline && parseDate(card.deadline) < today;
+                return (
+                  <Link key={card.id} href={`/board/card/${card.id}`}
+                    className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-all hover:border-[#D4AF37]/30 hover:bg-[#D4AF37]/5 ${
+                      status === "contracted" ? "border-blue-500/20 bg-blue-500/5" :
+                      status === "recording"  ? "border-yellow-500/20 bg-yellow-500/5" :
+                                               "border-orange-500/20 bg-orange-500/5"
+                    }`}>
+                    {card.cover_url
+                      ? <img src={card.cover_url} alt={card.title} className="h-12 w-8 object-cover rounded shrink-0"/>
+                      : <div className="h-12 w-8 bg-white/5 rounded shrink-0"/>}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white truncate">{card.title}</p>
+                      {card.author && <p className="text-xs text-[#D4AF37]/70 truncate">{card.author}</p>}
+                      <div className="flex flex-wrap items-center gap-x-2 mt-0.5">
+                        {card.deadline && (
+                          <p className={`text-[10px] ${isOverdue ? "text-red-400/80" : "text-white/35"}`}>{relDays(card.deadline)}</p>
+                        )}
+                        {card.word_count > 0 && (
+                          <p className="text-[10px] text-white/25">{fmtWords(card.word_count)}</p>
+                        )}
+                      </div>
+                    </div>
+                    {card.first15_due && (
+                      <div className="shrink-0" title={card.first_15_complete ? "First 15 complete" : "First 15 pending"}>
+                        {card.first_15_complete
+                          ? <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                          : <div className="h-2 w-2 rounded-full bg-white/20"/>
+                        }
+                      </div>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </section>
-      )}
+      ))}
 
-      {/* ── Lower two-col grid ── */}
-      <div className="grid sm:grid-cols-2 gap-6">
+      {/* ── Lower three-col grid ── */}
+      <div className="grid sm:grid-cols-3 gap-6">
 
         {/* In Progress summary */}
         <section className="rounded-2xl border border-white/8 bg-[#0A0D3A] p-5">
@@ -344,7 +390,8 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
                 if (!count) return null;
                 const st = IP_STYLE[s];
                 return (
-                  <div key={s}>
+                  <button key={s} type="button" onClick={onSwitchToBoard}
+                    className="w-full text-left hover:opacity-80 transition-opacity">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-1.5">
                         <div className={`h-2 w-2 rounded-full ${st.dot}`}/>
@@ -355,7 +402,7 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
                     <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
                       <div className={`h-full rounded-full ${st.bg}/60`} style={{ width: `${(count / inProgress.total) * 100}%` }}/>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
               <p className="text-[10px] text-white/25 pt-1">{inProgress.total} total active</p>
@@ -374,15 +421,45 @@ function DashboardView({ cards }: { cards: BoardCard[] }) {
                 <Link key={card.id} href={`/board/card/${card.id}`}
                   className="flex items-center gap-3 -mx-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors">
                   {card.cover_url
-                    ? <img src={card.cover_url} alt={card.title} className="h-9 w-6 object-cover rounded shrink-0"/>
-                    : <div className="h-9 w-6 bg-white/5 rounded shrink-0"/>}
+                    ? <img src={card.cover_url} alt={card.title} className="h-12 w-8 object-cover rounded shrink-0"/>
+                    : <div className="h-12 w-8 bg-white/5 rounded shrink-0"/>}
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-emerald-300/80 truncate">{card.title}</p>
                     {card.author && <p className="text-[10px] text-white/30 truncate">{card.author}</p>}
+                    {card.updated_at && <p className="text-[10px] text-white/25">{fmtDate(card.updated_at)}</p>}
                   </div>
                   <svg className="h-3.5 w-3.5 text-emerald-500/60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
                 </Link>
               ))}
+            </div>
+          )}
+        </section>
+
+        {/* Upcoming Deadlines */}
+        <section className="rounded-2xl border border-white/8 bg-[#0A0D3A] p-5">
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50 mb-4">Upcoming Deadlines</h2>
+          {upcomingDeadlines.length === 0 ? (
+            <p className="text-sm text-white/25">None in the next 30 days</p>
+          ) : (
+            <div className="space-y-2">
+              {upcomingDeadlines.slice(0, 5).map(card => {
+                const diff = Math.round((parseDate(card.deadline!).getTime() - today.getTime()) / 86400000);
+                return (
+                  <Link key={card.id} href={`/board/card/${card.id}`}
+                    className="flex items-center gap-3 -mx-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors">
+                    {card.cover_url
+                      ? <img src={card.cover_url} alt={card.title} className="h-12 w-8 object-cover rounded shrink-0"/>
+                      : <div className="h-12 w-8 bg-white/5 rounded shrink-0"/>}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-white truncate">{card.title}</p>
+                      {card.author && <p className="text-[10px] text-white/30 truncate">{card.author}</p>}
+                    </div>
+                    <span className={`text-[10px] font-bold shrink-0 whitespace-nowrap ${diff <= 7 ? "text-orange-300" : "text-[#D4AF37]/70"}`}>
+                      {diff === 0 ? "today" : `${diff}d`}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </section>
@@ -1577,7 +1654,7 @@ export default function BoardPage() {
 
       {/* Views */}
       {view === "dashboard" ? (
-        <DashboardView cards={cards} />
+        <DashboardView cards={cards} onSwitchToBoard={() => { setView("board"); localStorage.setItem("boardView", "board"); }} />
       ) : view === "timeline" ? (
         <>
           {/* Mobile: simple sorted list (Gantt too wide for small screens) */}
