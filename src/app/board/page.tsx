@@ -769,7 +769,7 @@ function TimelineView({
                 return (
                   <div
                     key={card.id}
-                    className={`flex items-center group/row mb-px ${rowIdx % 2 === 1 ? "bg-white/[0.025]" : ""}`}
+                    className={`flex items-center group/row mb-px ${rowIdx % 2 === 1 ? "bg-white/[0.025]" : ""} ${hoveredBar === card.id ? "relative z-[100]" : ""}`}
                     style={{ height: ROW_H }}
                   >
                     {/* Label */}
@@ -808,7 +808,7 @@ function TimelineView({
                             ? Math.round((new Date(card.deadline + "T12:00:00").getTime() - Date.now()) / 86400000)
                             : null;
                           return (
-                            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 bg-[#0D1050] border border-white/15 rounded-xl px-3 py-2.5 shadow-2xl pointer-events-none min-w-[160px] max-w-[220px]">
+                            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-[100] bg-[#0D1050] border border-white/15 rounded-xl px-3 py-2.5 shadow-2xl pointer-events-none min-w-[160px] max-w-[220px]">
                               <p className="text-xs font-bold text-white truncate">{card.title}</p>
                               {card.author && <p className="text-[10px] text-[#D4AF37]/80 mt-0.5 truncate">{card.author}</p>}
                               {card.deadline && (
