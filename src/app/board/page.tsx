@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import ReactDOM from "react-dom";
 import Link from "next/link";
 import { EmailScanSection } from "./EmailScanSection";
 
@@ -596,7 +597,7 @@ function TimelineView({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [inlineDates, setInlineDates] = useState({ deadline: "", first15_due: "" });
   const [savingInline, setSavingInline] = useState(false);
-  const [hoveredBar, setHoveredBar] = useState<string | null>(null);
+  const [tooltipState, setTooltipState] = useState<{ card: BoardCard; x: number; y: number } | null>(null);
 
   const openInline = (card: BoardCard) => {
     setInlineDates({ deadline: card.deadline ?? "", first15_due: card.first15_due ?? "" });
@@ -700,7 +701,7 @@ function TimelineView({
       {barCards.length === 0 ? (
         <div className="py-16 text-center text-white/20 text-sm">No active projects with scheduled dates</div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-hidden">
           <div style={{ minWidth: `${LABEL_W + 560}px` }}>
 
             {/* Month header */}
@@ -769,7 +770,7 @@ function TimelineView({
                 return (
                   <div
                     key={card.id}
-                    className={`flex items-center group/row mb-px ${rowIdx % 2 === 1 ? "bg-white/[0.025]" : ""} ${hoveredBar === card.id ? "relative z-[100]" : ""}`}
+                    className={`flex items-center group/row mb-px ${rowIdx % 2 === 1 ? "bg-white/[0.025]" : ""} ${tooltipState?.card.id === card.id ? "relative z-[100]" : ""}`}
                     style={{ height: ROW_H }}
                   >
                     {/* Label */}
@@ -799,34 +800,12 @@ function TimelineView({
                           minWidth: "80px",
                           borderRadius: "6px",
                         }}
-                        onMouseEnter={() => setHoveredBar(card.id)}
-                        onMouseLeave={() => setHoveredBar(null)}
+                        onMouseEnter={e => {
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          setTooltipState({ card, x: rect.left + rect.width / 2, y: rect.bottom + 8 });
+                        }}
+                        onMouseLeave={() => setTooltipState(null)}
                       >
-                        {/* Tooltip */}
-                        {hoveredBar === card.id && (() => {
-                          const daysLeft = card.deadline
-                            ? Math.round((new Date(card.deadline + "T12:00:00").getTime() - Date.now()) / 86400000)
-                            : null;
-                          return (
-                            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-[100] bg-[#0D1050] border border-white/15 rounded-xl px-3 py-2.5 shadow-2xl pointer-events-none min-w-[160px] max-w-[220px]">
-                              <p className="text-xs font-bold text-white truncate">{card.title}</p>
-                              {card.author && <p className="text-[10px] text-[#D4AF37]/80 mt-0.5 truncate">{card.author}</p>}
-                              {card.deadline && (
-                                <p className="text-[10px] text-white/50 mt-1">
-                                  Due {new Date(card.deadline + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                                </p>
-                              )}
-                              {card.word_count > 0 && (
-                                <p className="text-[10px] text-white/40">{card.word_count.toLocaleString()} words</p>
-                              )}
-                              {daysLeft !== null && (
-                                <p className={`text-[10px] font-semibold mt-1 ${daysLeft < 0 ? "text-red-400" : daysLeft <= 14 ? "text-orange-300" : "text-emerald-400"}`}>
-                                  {daysLeft === 0 ? "Due today" : daysLeft > 0 ? `${daysLeft} days left` : `${-daysLeft} days overdue`}
-                                </p>
-                              )}
-                            </div>
-                          );
-                        })()}
                         <Link
                           href={`/board/card/${card.id}`}
                           className={`flex-1 min-w-0 flex items-center justify-center h-full px-2 ${bar.text}`}
@@ -1038,6 +1017,39 @@ function TimelineView({
             </div>
           )}
         </div>
+      )}
+
+      {/* Portal tooltip — escapes all overflow constraints */}
+      {tooltipState && typeof document !== "undefined" && ReactDOM.createPortal(
+        (() => {
+          const { card: tc, x, y } = tooltipState;
+          const daysLeft = tc.deadline
+            ? Math.round((new Date(tc.deadline + "T12:00:00").getTime() - Date.now()) / 86400000)
+            : null;
+          return (
+            <div
+              className="z-[9999] fixed bg-[#0D1050] border border-white/15 rounded-xl px-3 py-2.5 shadow-2xl pointer-events-none min-w-[160px] max-w-[220px]"
+              style={{ top: y, left: x, transform: "translateX(-50%)" }}
+            >
+              <p className="text-xs font-bold text-white truncate">{tc.title}</p>
+              {tc.author && <p className="text-[10px] text-[#D4AF37]/80 mt-0.5 truncate">{tc.author}</p>}
+              {tc.deadline && (
+                <p className="text-[10px] text-white/50 mt-1">
+                  Due {new Date(tc.deadline + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </p>
+              )}
+              {tc.word_count > 0 && (
+                <p className="text-[10px] text-white/40">{tc.word_count.toLocaleString()} words</p>
+              )}
+              {daysLeft !== null && (
+                <p className={`text-[10px] font-semibold mt-1 ${daysLeft < 0 ? "text-red-400" : daysLeft <= 14 ? "text-orange-300" : "text-emerald-400"}`}>
+                  {daysLeft === 0 ? "Due today" : daysLeft > 0 ? `${daysLeft} days left` : `${-daysLeft} days overdue`}
+                </p>
+              )}
+            </div>
+          );
+        })(),
+        document.body
       )}
     </div>
   );
