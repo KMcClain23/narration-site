@@ -1369,7 +1369,8 @@ export default function BoardPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#06082E] text-white pt-14 sm:pt-16">
+    <main className="min-h-screen bg-[#06082E] text-white pt-14 sm:pt-16"
+      style={{ "--board-max-w": "144rem" } as React.CSSProperties}>
       {/* Sticky header */}
       <div className="sticky top-14 sm:top-16 z-40 bg-[#06082E]/95 backdrop-blur border-b border-white/8 px-5 sm:px-8 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -1780,7 +1781,8 @@ export default function BoardPage() {
 
       ) : (
       <div className="py-6 w-full">
-        <div className="max-w-5xl mx-auto px-4">
+        {/* ↓ Adjust --board-max-w to change the kanban board width */}
+        <div className="mx-auto px-4 w-full" style={{ maxWidth: "var(--board-max-w, 90rem)" }}>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-5 w-full pb-6">
           {COLUMNS.filter(c => c.id !== "audition").map(column => (
             <div key={column.id}
