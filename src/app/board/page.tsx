@@ -1780,8 +1780,8 @@ export default function BoardPage() {
 
       ) : (
       <div className="px-4 sm:px-6 py-6 w-full">
-        <div className="max-w-7xl mx-auto w-full">
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 w-full pb-6">
+        <div className="w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-5 w-full pb-6">
           {COLUMNS.filter(c => c.id !== "audition").map(column => (
             <div key={column.id}
               onDragOver={e=>{e.preventDefault();setDragOver(column.id);}}
@@ -1817,7 +1817,7 @@ export default function BoardPage() {
 
                     {/* Cover — left column, fixed width, full card height */}
                     <Link href={`/board/card/${card.id}`} onClick={e=>e.stopPropagation()}
-                      className="w-24 shrink-0 relative block rounded-l-xl overflow-hidden">
+                      className="w-28 shrink-0 relative block rounded-l-xl overflow-hidden">
                       {card.cover_url ? (
                         <>
                           <img src={card.cover_url} alt={card.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"/>
