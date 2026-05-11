@@ -1704,14 +1704,14 @@ export default function BoardPage() {
         </>
 
       ) : (
-      <div className="px-4 sm:px-6 py-6 sm:overflow-x-auto">
-        <div className="flex flex-col gap-4 sm:flex-row sm:min-w-max pb-6">
+      <div className="px-4 sm:px-6 py-6 w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 w-full pb-6">
           {COLUMNS.filter(c => c.id !== "audition").map(column => (
             <div key={column.id}
               onDragOver={e=>{e.preventDefault();setDragOver(column.id);}}
               onDrop={e=>drop(e,column.id)}
               onDragLeave={()=>setDragOver(null)}
-              className={`w-full sm:w-72 sm:flex-shrink-0 rounded-2xl border ${column.color} transition-all duration-200 ${dragOver===column.id?"ring-2 ring-[#D4AF37]/40 scale-[1.01]":""}`}>
+              className={`w-full min-w-0 rounded-2xl border ${column.color} transition-all duration-200 ${dragOver===column.id?"ring-2 ring-[#D4AF37]/40 scale-[1.01]":""}`}>
 
               <div className="px-4 pt-4 pb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
