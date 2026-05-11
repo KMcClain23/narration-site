@@ -684,14 +684,14 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
                     <span className="text-[11px] uppercase tracking-[0.18em] text-white/30 font-medium">{f.label}</span>
                     <input name={f.name} type={f.type} required disabled={isPending}
                       placeholder={f.placeholder}
-                      className="mt-2 w-full rounded-lg bg-black/30 border border-white/8 px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition disabled:opacity-50" />
+                      className="mt-2 w-full rounded-lg bg-white/5 border border-white/25 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#D4AF37]/60 transition disabled:opacity-50" />
                   </label>
                 ))}
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-[0.18em] text-white/30 font-medium">Project details</span>
                   <textarea name="message" required rows={4} disabled={isPending}
                     placeholder="Genre, word count, deadline, etc."
-                    className="mt-2 w-full rounded-lg bg-black/30 border border-white/8 px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition disabled:opacity-50 resize-none" />
+                    className="mt-2 w-full rounded-lg bg-white/5 border border-white/25 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#D4AF37]/60 transition disabled:opacity-50 resize-none" />
                 </label>
                 <button type="submit" disabled={isPending}
                   className="w-full rounded-full bg-[#D4AF37] text-black px-6 py-3.5 text-sm font-bold tracking-wide transition hover:bg-[#E0C15A] hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 mt-2">
