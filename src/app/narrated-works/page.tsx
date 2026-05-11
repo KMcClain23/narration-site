@@ -319,11 +319,14 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
           </div>
         </div>
 
-        {/* Status badge — sits in a bottom gradient overlay */}
+        {/* Status badge */}
         {statusBadge && (
-          <div className="absolute inset-x-0 bottom-0 z-30 flex items-end justify-end pb-2.5 px-2.5"
-            style={{ background: "linear-gradient(to top, rgba(6,8,46,0.85) 0%, rgba(6,8,46,0) 55%)" }}>
-            <span className="bg-[#D4AF37] text-black text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+          <div className="absolute top-3 right-3 z-30">
+            <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
+              String(statusBadge).toLowerCase().includes("progress")
+                ? "bg-yellow-500 text-black"
+                : "bg-[#D4AF37] text-black"
+            }`}>
               {statusBadge}
             </span>
           </div>
@@ -518,7 +521,7 @@ function SectionGrid({
     <section className="mb-10">
       <div className="flex items-center gap-3 mb-5 scroll-mt-28 sm:scroll-mt-36">
         {dotClass && <div className={`h-2 w-2 rounded-full shrink-0 ${dotClass}`}/>}
-        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/60">{title}</h2>
+        <h2 className="text-xs uppercase tracking-widest text-white/60">{title}</h2>
         <div className="flex-1 h-px bg-white/8" />
         <span className="text-xs text-white/40">{books.length}</span>
       </div>
