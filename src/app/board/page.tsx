@@ -1779,8 +1779,8 @@ export default function BoardPage() {
         </>
 
       ) : (
-      <div className="px-4 sm:px-6 py-6 w-full">
-        <div className="w-full">
+      <div className="py-6 w-full">
+        <div className="max-w-5xl mx-auto px-4">
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-5 w-full pb-6">
           {COLUMNS.filter(c => c.id !== "audition").map(column => (
             <div key={column.id}
