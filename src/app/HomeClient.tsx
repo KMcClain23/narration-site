@@ -537,7 +537,7 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
       <section className="relative min-h-[60vh] flex items-center" aria-label="Introduction">
         {/* Full bleed background */}
         <div className="absolute inset-0">
-          <Image src={BANNER_URL} alt="Dean Miller recording studio" fill priority
+          <Image src={BANNER_URL} alt="Dean Miller recording studio" fill
             sizes="(max-width: 768px) 100vw, 100vw"
             className="object-cover opacity-20" style={{ objectPosition: "center center" }} />
           <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(6,8,46,0.6) 0%, rgba(6,8,46,0.3) 40%, rgba(6,8,46,1) 100%)" }} />
