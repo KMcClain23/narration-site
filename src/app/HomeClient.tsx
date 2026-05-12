@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useRef, useEffect, useState, useTransition } from "react";
+import { useRef, useEffect, useState, useTransition, useCallback, useMemo } from "react";
 import { sendEmail } from "@/app/actions/sendEmail";
 import { sendGAEvent } from "@next/third-parties/google";
 
