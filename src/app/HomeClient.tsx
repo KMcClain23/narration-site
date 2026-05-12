@@ -126,13 +126,15 @@ function DemoPlayer({
     const a = audioElRef.current;
     if (!a) return;
     if (a.paused) {
+      console.log("[DemoPlayer] play clicked:", { title, src: a.src, readyState: a.readyState, networkState: a.networkState });
+      a.load(); // force reload in case src changed without reloading
       initWebAudio();
       const ctx = audioCtxRef.current;
-      // AudioContexts start suspended — must resume before play or audio is silent
+      const doPlay = () => a.play().then(() => console.log("[DemoPlayer] play() resolved")).catch(err => console.error("[DemoPlayer] play() rejected:", err));
       if (ctx && ctx.state === "suspended") {
-        ctx.resume().then(() => a.play().catch(() => {})).catch(() => a.play().catch(() => {}));
+        ctx.resume().then(doPlay).catch(() => doPlay());
       } else {
-        a.play().catch(() => {});
+        doPlay();
       }
     } else {
       a.pause();
@@ -168,6 +170,8 @@ function DemoPlayer({
       setProgress(dur > 0 ? (a.currentTime / dur) * 100 : 0);
     };
     const onDurationChange = () => setDuration(a.duration || 0);
+    const onError = () => console.error("[DemoPlayer] audio error:", { title, src: a.src, error: a.error, code: a.error?.code, message: a.error?.message });
+    const onLoadedMetadata = () => console.log("[DemoPlayer] metadata loaded:", { title, duration: a.duration, src: a.src });
     const onPlay = () => {
       setPlaying(true); isPlayingRef.current = true; setBuffering(false); setActiveIndex(index);
       startDraw();
@@ -188,6 +192,8 @@ function DemoPlayer({
     a.addEventListener("waiting", onWaiting);
     a.addEventListener("playing", onPlaying);
     a.addEventListener("ended", onEnded);
+    a.addEventListener("error", onError);
+    a.addEventListener("loadedmetadata", onLoadedMetadata);
     return () => {
       a.removeEventListener("timeupdate", onTimeUpdate);
       a.removeEventListener("durationchange", onDurationChange);
@@ -196,6 +202,8 @@ function DemoPlayer({
       a.removeEventListener("waiting", onWaiting);
       a.removeEventListener("playing", onPlaying);
       a.removeEventListener("ended", onEnded);
+      a.removeEventListener("error", onError);
+      a.removeEventListener("loadedmetadata", onLoadedMetadata);
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
   }, [index, title, setActiveIndex, startDraw, stopDraw]);
