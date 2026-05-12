@@ -263,6 +263,19 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
   const [showCoNarratorPopup, setShowCoNarratorPopup] = useState(false);
   const [activeCoNarrator, setActiveCoNarrator] = useState<string>("");
   const [showMulticast, setShowMulticast] = useState(false);
+  const multicastRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showMulticast) return;
+    const onMouse = (e: MouseEvent) => {
+      if (multicastRef.current && !multicastRef.current.contains(e.target as Node)) setShowMulticast(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShowMulticast(false); };
+    document.addEventListener("mousedown", onMouse);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onMouse); document.removeEventListener("keydown", onKey); };
+  }, [showMulticast]);
+
   const coNarratorList = (() => {
     const raw = book.co_narrator;
     if (!raw) return [];
@@ -423,7 +436,7 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
               </div>
             )}
             {coNarratorList.length > 1 && (
-              <div className="mt-2 relative">
+              <div ref={multicastRef} className="mt-2 relative">
                 <button
                   ref={coNarratorBtnRef}
                   type="button"
