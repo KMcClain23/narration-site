@@ -360,13 +360,16 @@ export function SiteSearch() {
 
       {/* ── Modal ── */}
       {open && (
-        <div
-          className="fixed inset-0 z-[200] flex items-start justify-center pt-[10vh] px-4"
-          style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
-          onClick={e => { if (e.target === e.currentTarget) closeModal(); }}
-        >
+        <>
+          {/* Overlay — closes on any click outside the panel */}
           <div
-            className="w-full max-w-xl rounded-2xl border border-white/12 overflow-hidden"
+            className="fixed inset-0 z-[199]"
+            style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
+            onClick={closeModal}
+          />
+          <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[10vh] px-4 pointer-events-none">
+          <div
+            className="pointer-events-auto w-full max-w-xl rounded-2xl border border-white/12 overflow-hidden"
             style={{
               background: "rgba(7,10,46,0.98)",
               boxShadow: "0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04)",
@@ -478,7 +481,8 @@ export function SiteSearch() {
               )}
             </div>
           </div>
-        </div>
+          </div>
+        </>
       )}
     </>
   );
