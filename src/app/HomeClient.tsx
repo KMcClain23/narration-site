@@ -50,9 +50,10 @@ function DemoPlayer({
 
   // ── Web Audio init (called once on first user gesture) ──────────────────────
   const initWebAudio = useCallback(() => {
-    if (audioCtxRef.current || !audioElRef.current) return;
+    if (analyserRef.current || !audioElRef.current) return; // already done or no element
+    let ctx: AudioContext | null = null;
     try {
-      const ctx = new AudioContext();
+      ctx = new AudioContext();
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 64;
       analyser.smoothingTimeConstant = 0.75;
@@ -61,7 +62,11 @@ function DemoPlayer({
       analyser.connect(ctx.destination);
       audioCtxRef.current = ctx;
       analyserRef.current = analyser;
-    } catch { /* restricted environment */ }
+    } catch {
+      // Web Audio unavailable or element already claimed — close the dangling
+      // context so it doesn't intercept audio routing, then let audio play raw
+      ctx?.close().catch(() => {});
+    }
   }, []);
 
   // ── Canvas draw loop ────────────────────────────────────────────────────────
@@ -122,8 +127,13 @@ function DemoPlayer({
     if (!a) return;
     if (a.paused) {
       initWebAudio();
-      if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume().catch(() => {});
-      a.play().catch(() => {});
+      const ctx = audioCtxRef.current;
+      // AudioContexts start suspended — must resume before play or audio is silent
+      if (ctx && ctx.state === "suspended") {
+        ctx.resume().then(() => a.play().catch(() => {})).catch(() => a.play().catch(() => {}));
+      } else {
+        a.play().catch(() => {});
+      }
     } else {
       a.pause();
     }
