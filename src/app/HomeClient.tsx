@@ -286,13 +286,19 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
         )}
       </div>
       <div className="border-t border-white/6 pt-4 flex items-center gap-3">
-        {testimonial.cover_url && (
+        {testimonial.cover_url ? (
           <img
             src={testimonial.cover_url}
             alt={testimonial.book || ""}
             className="h-14 w-9 object-cover rounded-md shrink-0 shadow-lg"
           />
-        )}
+        ) : testimonial.book ? (
+          <div className="h-14 w-9 rounded-md shrink-0 bg-white/5 border border-white/10 flex items-center justify-center">
+            <span className="text-[8px] font-bold text-white/30 text-center leading-tight px-0.5">
+              {testimonial.book.split(/\s+/).slice(0, 3).map(w => w[0]?.toUpperCase() ?? "").join("")}
+            </span>
+          </div>
+        ) : null}
         <div>
           <p className="font-semibold text-white text-sm">{testimonial.author}</p>
           <p className="text-xs text-white/40 mt-0.5">
@@ -311,25 +317,42 @@ function TestimonialsCarousel() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartX = useRef<number>(0);
 
-  // Fetch approved testimonials from API and merge with seeds
+  // Fetch approved testimonials + books (for cover lookup) and merge with seeds
   useEffect(() => {
-    fetch("/api/testimonials")
-      .then(r => r.json())
-      .then(data => {
-        if (!data.testimonials?.length) return;
-        // Convert API format to Testimonial shape, exclude any already in seeds
-        const seedAuthors = new Set(SEED_TESTIMONIALS.map(t => t.author.toLowerCase()));
-        const apiOnes: Testimonial[] = data.testimonials
-          .filter((t: { reviewer_name: string }) => !seedAuthors.has(t.reviewer_name.toLowerCase()))
-          .map((t: { reviewer_name: string; reviewer_role: string; book_title: string; quote: string }) => ({
+    const toSlug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    Promise.all([
+      fetch("/api/testimonials").then(r => r.json()),
+      fetch("/api/books").then(r => r.json()).catch(() => ({ books: [] })),
+    ]).then(([testimonialData, booksData]) => {
+      if (!testimonialData.testimonials?.length) return;
+      // Build slug→cover and lowercase-title→cover maps for fast lookup
+      const slugMap = new Map<string, string>();
+      const titleMap = new Map<string, string>();
+      for (const b of (booksData.books ?? []) as Array<{ title: string; cover_url?: string; slug?: string }>) {
+        if (!b.cover_url) continue;
+        if (b.slug) slugMap.set(b.slug, b.cover_url);
+        slugMap.set(toSlug(b.title), b.cover_url);
+        titleMap.set(b.title.trim().toLowerCase(), b.cover_url);
+      }
+      const seedAuthors = new Set(SEED_TESTIMONIALS.map(t => t.author.toLowerCase()));
+      const apiOnes: Testimonial[] = testimonialData.testimonials
+        .filter((t: { reviewer_name: string }) => !seedAuthors.has(t.reviewer_name.toLowerCase()))
+        .map((t: { reviewer_name: string; reviewer_role: string; book_title: string; quote: string }) => {
+          const bookKey = (t.book_title || "").trim();
+          const cover_url = bookKey
+            ? (slugMap.get(toSlug(bookKey)) ?? titleMap.get(bookKey.toLowerCase()))
+            : undefined;
+          const role = t.reviewer_role?.trim();
+          return {
             quote: t.quote,
             author: t.reviewer_name,
-            title: t.reviewer_role === "author" ? "Author" : "Narrator",
-            book: t.book_title || undefined,
-          }));
-        if (apiOnes.length) setTestimonials([...SEED_TESTIMONIALS, ...apiOnes]);
-      })
-      .catch(() => {});
+            title: role ? (role.charAt(0).toUpperCase() + role.slice(1)) : "Author",
+            book: bookKey || undefined,
+            cover_url,
+          };
+        });
+      if (apiOnes.length) setTestimonials([...SEED_TESTIMONIALS, ...apiOnes]);
+    }).catch(() => {});
   }, []);
 
   // Auto-advance every 6 seconds — only if more than 3 testimonials
