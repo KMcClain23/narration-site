@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 
@@ -358,8 +359,8 @@ export function SiteSearch() {
         </kbd>
       </button>
 
-      {/* ── Modal ── */}
-      {open && (
+      {/* ── Modal — rendered via portal to escape header stacking context ── */}
+      {open && typeof document !== "undefined" && createPortal(
         <>
           {/* Overlay — closes on any click outside the panel */}
           <div
@@ -482,7 +483,8 @@ export function SiteSearch() {
             </div>
           </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </>
   );
