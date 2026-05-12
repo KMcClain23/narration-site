@@ -347,16 +347,14 @@ export function SiteSearch() {
         type="button"
         onClick={openModal}
         aria-label="Search site (Cmd K)"
-        className="flex items-center gap-2 text-white/50 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06082E] rounded"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/15 bg-white/5 hover:bg-white/10 transition-colors text-white/50 hover:text-white text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06082E]"
       >
-        <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24"
+        <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24"
           stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round"
             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
         </svg>
-        <kbd className="hidden lg:inline-flex items-center gap-0.5 text-[10px] text-white/25 border border-white/10 rounded px-1.5 py-0.5 font-sans">
-          ⌘K
-        </kbd>
+        Search
       </button>
 
       {/* ── Modal — rendered via portal to escape header stacking context ── */}
