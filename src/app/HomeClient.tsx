@@ -797,53 +797,56 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
         </section>
 
         {/* ── FOOTER ── */}
-        <footer className="relative border-t border-white/6 pt-12 pb-8 text-sm text-white/25">
-          {/* Wordmark */}
-          <div className="flex flex-col items-center gap-2 mb-10">
-            <div className="h-10 w-10 rounded-full border border-white/15 bg-white/5 overflow-hidden">
-              <Image src="/dean-profile.png" alt="Dean Miller" width={40} height={40} className="object-cover"/>
-            </div>
-            <div className="text-center leading-tight">
-              <p className="text-sm font-semibold text-white/80">Dean Miller</p>
-              <p className="text-xs text-white/35">Audiobook Narrator</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mb-10">
-            {[
-              { heading: "Navigation", links: [
-                { label: "Narrated works", href: "/narrated-works" },
-                { label: "Working together", href: "/welcome" },
-                { label: "Audio demos", href: "/#demos" },
-                { label: "Leave a review", href: "/leave-a-review" },
-              ]},
-              { heading: "Profiles", links: [
-                { label: "ACX", href: "https://www.acx.com/narrator?p=A3DYAXR7JFPXPE" },
-                { label: "Audible", href: "https://www.audible.com/search?searchNarrator=Dean+Miller" },
-              ]},
-              { heading: "Social", links: [
-                { label: "TikTok", href: "https://www.tiktok.com/@deanmillernarration" },
-                { label: "Instagram", href: "https://www.instagram.com/deanmillernarrator" },
-              ]},
-            ].map(col => (
-              <div key={col.heading}>
-                <p className="text-[10px] uppercase tracking-[0.22em] text-white/20 mb-4">{col.heading}</p>
-                <ul className="space-y-2.5">
-                  {col.links.map(l => (
-                    <li key={l.href}>
-                      <a href={l.href} target={l.href.startsWith("http") ? "_blank" : undefined}
-                        rel={l.href.startsWith("http") ? "noopener" : undefined}
-                        className="text-white/35 hover:text-[#D4AF37] transition-colors text-sm">
-                        {l.label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+        <footer className="relative border-t border-white/6 pt-12 pb-8">
+          <div className="max-w-4xl mx-auto px-8">
+            {/* Wordmark */}
+            <div className="flex flex-col items-center gap-2 mb-10">
+              <div className="h-10 w-10 rounded-full border border-white/15 bg-white/5 overflow-hidden">
+                <Image src="/dean-profile.png" alt="Dean Miller" width={40} height={40} className="object-cover"/>
               </div>
-            ))}
-          </div>
-          <div className="border-t border-white/5 pt-8 text-center text-xs text-white/20">
-            © {new Date().getFullYear()} Dean Miller Narration. All rights reserved.
+              <div className="text-center leading-tight">
+                <p className="text-sm font-semibold text-white/80">Dean Miller</p>
+                <p className="text-xs text-white/35">Audiobook Narrator</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-8 mb-10">
+              {[
+                { heading: "Navigation", links: [
+                  { label: "Narrated works", href: "/narrated-works" },
+                  { label: "Working together", href: "/welcome" },
+                  { label: "Audio demos", href: "/#demos" },
+                  { label: "Leave a review", href: "/leave-a-review" },
+                ]},
+                { heading: "Profiles", links: [
+                  { label: "ACX", href: "https://www.acx.com/narrator?p=A3DYAXR7JFPXPE" },
+                  { label: "Audible", href: "https://www.audible.com/search?searchNarrator=Dean+Miller" },
+                  { label: "Spotify", href: "https://open.spotify.com/show/" },
+                ]},
+                { heading: "Social", links: [
+                  { label: "TikTok", href: "https://www.tiktok.com/@deanmillernarration" },
+                  { label: "Instagram", href: "https://www.instagram.com/deanmillernarrator" },
+                ]},
+              ].map(col => (
+                <div key={col.heading}>
+                  <p className="text-[10px] uppercase tracking-[0.22em] text-[#D4AF37] mb-4 pb-2 border-b border-white/6">{col.heading}</p>
+                  <ul className="space-y-2.5">
+                    {col.links.map(l => (
+                      <li key={l.href}>
+                        <a href={l.href} target={l.href.startsWith("http") ? "_blank" : undefined}
+                          rel={l.href.startsWith("http") ? "noopener" : undefined}
+                          className="text-white/50 hover:text-white transition-colors text-sm">
+                          {l.label}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-white/5 pt-8 text-center text-xs text-white/20">
+              © {new Date().getFullYear()} Dean Miller Narration. All rights reserved.
+            </div>
           </div>
           <Link href="/admin/login" className="absolute bottom-2 right-2 w-4 h-4 opacity-0" aria-label="Admin login" />
         </footer>
