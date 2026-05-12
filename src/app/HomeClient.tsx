@@ -548,21 +548,26 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
               dark romance, romantasy, and multi-character drama.
             </p>
 
-            {/* CTAs */}
-            <div className="fade-up-3 mt-10 flex flex-wrap gap-4">
-              <a href="/#demos"
-                className="inline-flex items-center gap-2.5 rounded-full bg-[#D4AF37] text-black px-7 py-3.5 text-sm font-bold tracking-wide transition hover:bg-[#E0C15A] hover:scale-[1.02] active:scale-[0.98]">
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
-                Listen to demos
-              </a>
+            {/* CTA + stats in one row */}
+            <div className="fade-up-3 mt-10 flex flex-wrap items-center gap-4">
               <a href="/#contact"
-                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-7 py-3.5 text-sm font-semibold text-white/80 transition hover:border-white/50 hover:text-white hover:scale-[1.02] active:scale-[0.98]">
+                className="inline-flex items-center gap-2 rounded-full bg-[#D4AF37] text-black px-7 py-3.5 text-sm font-bold tracking-wide transition hover:bg-[#E0C15A] hover:scale-[1.02] active:scale-[0.98]">
                 Get in touch
               </a>
+              {stats && stats.titles > 0 && (
+                [
+                  { value: stats.titles,       label: "titles narrated" },
+                  { value: stats.authors,      label: "authors worked with" },
+                  { value: stats.co_narrators, label: "co-narrators" },
+                  { value: stats.genres,       label: "genres" },
+                ].map(({ value, label }) => (
+                  <div key={label} className="flex items-baseline gap-1.5 px-4 py-2 rounded-full border border-white/10 bg-white/[0.04]">
+                    <span className="text-base font-bold text-[#D4AF37] leading-none">{value}</span>
+                    <span className="text-[11px] text-white/45 leading-none whitespace-nowrap">{label}</span>
+                  </div>
+                ))
+              )}
             </div>
-
-            {/* Stats bar */}
-            {stats && <StatsBar stats={stats} />}
           </div>
 
           {/* Profile image — floats right on desktop */}
