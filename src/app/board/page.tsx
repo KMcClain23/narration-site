@@ -55,6 +55,14 @@ function parseDate(s: string): Date {
   return new Date(y, m - 1, d);
 }
 
+function parseCoNarrators(raw: string): string[] {
+  if (!raw) return [];
+  try {
+    const p = JSON.parse(raw);
+    return Array.isArray(p) ? p.filter(Boolean) : p ? [String(p)] : [];
+  } catch { return raw ? [raw] : []; }
+}
+
 // ─── Dashboard view ───────────────────────────────────────────────────────────
 
 const IP_STYLE: Record<string, { bg: string; dot: string; label: string }> = {
@@ -1110,6 +1118,10 @@ export default function BoardPage() {
   const [authorQuery, setAuthorQuery] = useState("");
   const [authorDropOpen, setAuthorDropOpen] = useState(false);
   const authorDropRef = useRef<HTMLDivElement>(null);
+  const [cnQuery, setCnQuery] = useState("");
+  const [cnDropOpen, setCnDropOpen] = useState(false);
+  const cnDropRef = useRef<HTMLDivElement>(null);
+  const cnInputRef = useRef<HTMLInputElement>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importBooks, setImportBooks] = useState<{id:string;title:string;author:string;cover_url:string;link:string;ar_link?:string;subtitle?:string;tags?:string[];description?:string;co_narrator?:string[];category:string}[]>([]);
@@ -1151,6 +1163,14 @@ export default function BoardPage() {
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("mousedown", onMouse); document.removeEventListener("keydown", onKey); };
   }, [authorDropOpen]);
+  useEffect(() => {
+    if (!cnDropOpen) return;
+    const onMouse = (e: MouseEvent) => { if (cnDropRef.current && !cnDropRef.current.contains(e.target as Node)) setCnDropOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setCnDropOpen(false); };
+    document.addEventListener("mousedown", onMouse);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onMouse); document.removeEventListener("keydown", onKey); };
+  }, [cnDropOpen]);
   useEffect(() => {
     if (!inlineEdit) return;
     const onMouse = (e: MouseEvent) => { if (inlineRef.current && !inlineRef.current.contains(e.target as Node)) setInlineEdit(null); };
@@ -1299,6 +1319,7 @@ export default function BoardPage() {
     setEditCard(card);
     setAuthorQuery(card.author || "");
     setAuthorDropOpen(false);
+    setCnQuery(""); setCnDropOpen(false);
     setForm({title:card.title,author:card.author,cover_url:card.cover_url,status:card.status,
       deadline:card.deadline||"",notes:card.notes,author_notes:card.author_notes,
       links:card.links,co_narrator:card.co_narrator,subtitle:card.subtitle||"",
@@ -1423,7 +1444,7 @@ export default function BoardPage() {
             </button>
           </div>
 
-          <button onClick={()=>{setShowForm(true);setEditCard(null);setForm({...EMPTY});setTagInput("");setAuthorQuery("");setAuthorDropOpen(false);}}
+          <button onClick={()=>{setShowForm(true);setEditCard(null);setForm({...EMPTY});setTagInput("");setAuthorQuery("");setAuthorDropOpen(false);setCnQuery("");setCnDropOpen(false);}}
             className="inline-flex items-center gap-1.5 bg-[#D4AF37] text-black text-xs font-bold px-3 sm:px-4 py-2 rounded-full hover:bg-[#E0C15A] transition-colors">
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
             <span className="hidden sm:inline">New project</span>
@@ -1545,14 +1566,54 @@ export default function BoardPage() {
                     })()}
                   </div>
                 </div>
-                <label className="block">
+                <div ref={cnDropRef}>
                   <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Co-narrator</span>
-                  <select value={form.co_narrator} onChange={e=>setForm(p=>({...p,co_narrator:e.target.value}))}
-                    className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 appearance-none">
-                    <option value="">— None —</option>
-                    {coNarratorNames.map(n=><option key={n} value={n}>{n}</option>)}
-                  </select>
-                </label>
+                  <div className="relative mt-1.5">
+                    {/* Pills + text input */}
+                    <div
+                      className="min-h-[42px] w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2 flex flex-wrap gap-1.5 items-center focus-within:border-[#D4AF37]/40 transition cursor-text"
+                      onClick={() => cnInputRef.current?.focus()}>
+                      {parseCoNarrators(form.co_narrator).map(name => (
+                        <span key={name} className="bg-white/10 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                          {name}
+                          <button type="button" onClick={e => { e.stopPropagation(); setForm(p=>({...p,co_narrator:JSON.stringify(parseCoNarrators(p.co_narrator).filter(n=>n!==name))})); }}
+                            className="text-white/50 hover:text-white transition-colors leading-none">×</button>
+                        </span>
+                      ))}
+                      <input ref={cnInputRef} type="text" value={cnQuery}
+                        onChange={e => { setCnQuery(e.target.value); setCnDropOpen(true); }}
+                        onFocus={() => setCnDropOpen(true)}
+                        placeholder={parseCoNarrators(form.co_narrator).length === 0 ? "Add co-narrator…" : ""}
+                        className="flex-1 min-w-[100px] bg-transparent text-sm text-white placeholder:text-white/20 focus:outline-none"/>
+                    </div>
+                    {/* Dropdown */}
+                    {cnDropOpen && (() => {
+                      const selected = parseCoNarrators(form.co_narrator);
+                      const q = cnQuery.trim().toLowerCase();
+                      const matches = (q ? coNarratorNames.filter(n=>n.toLowerCase().includes(q)) : coNarratorNames).filter(n=>!selected.includes(n));
+                      const canAddFree = q && !coNarratorNames.some(n=>n.toLowerCase()===q) && !selected.some(n=>n.toLowerCase()===q);
+                      if (!matches.length && !canAddFree) return null;
+                      return (
+                        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[#0D1050] border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto">
+                          {matches.map(name => (
+                            <button key={name} type="button"
+                              onClick={() => { setForm(p=>({...p,co_narrator:JSON.stringify([...parseCoNarrators(p.co_narrator),name])})); setCnQuery(""); setCnDropOpen(false); }}
+                              className="w-full text-left px-3 py-2.5 text-sm text-white/80 hover:bg-white/8 hover:text-white transition-colors">
+                              {name}
+                            </button>
+                          ))}
+                          {canAddFree && (
+                            <button type="button"
+                              onClick={() => { const t=cnQuery.trim(); setForm(p=>({...p,co_narrator:JSON.stringify([...parseCoNarrators(p.co_narrator),t])})); setCnQuery(""); setCnDropOpen(false); }}
+                              className="w-full text-left px-3 py-2.5 text-sm text-[#D4AF37]/70 hover:bg-white/8 hover:text-[#D4AF37] transition-colors">
+                              Add &ldquo;{cnQuery.trim()}&rdquo;
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Cover image</span>
                   <div className="mt-1.5 space-y-2">
