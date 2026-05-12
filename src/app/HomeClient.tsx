@@ -821,7 +821,7 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
                 { heading: "Profiles", links: [
                   { label: "ACX", href: "https://www.acx.com/narrator?p=A3DYAXR7JFPXPE" },
                   { label: "Audible", href: "https://www.audible.com/search?searchNarrator=Dean+Miller" },
-                  { label: "Spotify", href: "https://open.spotify.com/show/" },
+                  { label: "Spotify", href: "https://open.spotify.com/show/5rGzXvmCjjza1WQGveIavz" },
                 ]},
                 { heading: "Social", links: [
                   { label: "TikTok", href: "https://www.tiktok.com/@deanmillernarration" },
