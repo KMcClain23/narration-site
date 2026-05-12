@@ -27,10 +27,12 @@ const contactSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   message: z.string().min(10),
+  genre: z.string().optional(),
+  word_count: z.string().optional(),
 });
 
 // --- HTML TEMPLATE: INTERNAL INQUIRY (For Dean) ---
-const internalTemplate = (name: string, email: string, message: string) => `
+const internalTemplate = (name: string, email: string, message: string, genre?: string, wordCount?: string) => `
   <div style="background-color: #050814; padding: 40px 20px; font-family: sans-serif;">
     <div style="max-width: 600px; margin: 0 auto; background-color: #0B1224; border: 1px solid #1A2550; border-radius: 16px; overflow: hidden;">
       
@@ -47,6 +49,8 @@ const internalTemplate = (name: string, email: string, message: string) => `
         <p style="color: #D4AF37; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 1px;">Client</p>
         <p style="margin-top: 0; margin-bottom: 24px; font-size: 16px;">${name} (<a href="mailto:${email}" style="color: #ffffff; text-decoration: none;">${email}</a>)</p>
         
+        ${genre ? `<p style="color: #D4AF37; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 1px;">Genre</p><p style="margin-top: 0; margin-bottom: 24px; font-size: 15px; color: rgba(255,255,255,0.9);">${genre}</p>` : ""}
+        ${wordCount ? `<p style="color: #D4AF37; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 1px;">Word Count</p><p style="margin-top: 0; margin-bottom: 24px; font-size: 15px; color: rgba(255,255,255,0.9);">${wordCount}</p>` : ""}
         <p style="color: #D4AF37; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 1px;">Project Details</p>
         <div style="background: #050814; padding: 20px; border-radius: 8px; border: 1px solid #1A2550; line-height: 1.6; white-space: pre-wrap; color: rgba(255,255,255,0.9); font-size: 15px;">${message}</div>
         
@@ -119,7 +123,7 @@ export async function sendEmail(formData: FormData) {
     };
   }
 
-  const { name, email, message } = validatedFields.data;
+  const { name, email, message, genre, word_count } = validatedFields.data;
 
   try {
     // 1. SAVE TO CMS DATABASE (Upstash Redis)
@@ -128,6 +132,8 @@ export async function sendEmail(formData: FormData) {
       name,
       email,
       message,
+      genre: genre || "",
+      word_count: word_count || "",
       createdAt: new Date().toISOString(),
       status: "unread"
     };
@@ -141,7 +147,7 @@ export async function sendEmail(formData: FormData) {
         to: ["Dean@DMNarration.com"],
         subject: `New Project Inquiry: ${name}`,
         replyTo: email,
-        html: internalTemplate(name, email, message),
+        html: internalTemplate(name, email, message, genre, word_count),
       }),
       resend.emails.send({
         from: "Dean Miller Narration <Dean@dmnarration.com>",

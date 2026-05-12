@@ -10,6 +10,9 @@ const BOOKINGS_URL =
   "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
 const BANNER_URL =
   "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerBanner.png";
+
+// ↓ Update this string to change the booking window shown in the hero
+const BOOKING_WINDOW = "Jun–Aug 2026";
 const PROFILE_URL =
   "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile.jpg";
 
@@ -500,12 +503,16 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
   const [formStatus, setFormStatus] = useState<{ success?: boolean; message?: string } | null>(null);
   const [showEmail, setShowEmail] = useState(false);
 
+  const [submittedName, setSubmittedName] = useState("");
+
   const handleNativeSubmit = async (formData: FormData) => {
     setFormStatus(null);
+    const name = (formData.get("name") as string) || "";
     startTransition(async () => {
       const result = await sendEmail(formData);
       if (result.success) {
-        setFormStatus({ success: true, message: "Thanks — I'll be in touch soon." });
+        setSubmittedName(name);
+        setFormStatus({ success: true });
         formRef.current?.reset();
       } else {
         setFormStatus({ success: false, message: typeof result.error === "string" ? result.error : "Something went wrong. Please try again." });
@@ -563,7 +570,7 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
           <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 30%, rgba(6,8,46,0.85) 70%, rgba(6,8,46,1) 100%)" }} />
         </div>
 
-        <div className="relative max-w-5xl mx-auto px-5 sm:px-6 pt-4 sm:pt-10 pb-12 w-full">
+        <div className="relative max-w-5xl mx-auto px-5 sm:px-6 pt-4 sm:pt-10 pb-6 w-full">
           <div className="max-w-2xl">
             {/* Eyebrow */}
             <div className="fade-up flex items-center gap-3 mb-6">
@@ -581,6 +588,9 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
               </span>
               <span className={`text-xs font-medium ${acceptingProjects ? "text-emerald-400" : "text-red-400"}`}>
                 {acceptingProjects ? "Currently accepting new projects" : "Not currently accepting new projects"}
+                {acceptingProjects && BOOKING_WINDOW && (
+                  <span className="text-white/50 font-normal"> · Booking {BOOKING_WINDOW}</span>
+                )}
               </span>
             </div>
 
@@ -620,14 +630,13 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
           {/* Profile image — floats right on desktop */}
           <div className="hidden md:block absolute right-6 top-1/2 -translate-y-1/2 w-56 lg:w-64">
             <div className="relative" style={{ aspectRatio: "3/4" }}>
-              <div className="absolute inset-0 rounded-2xl overflow-hidden">
+              <div className="absolute inset-0 rounded-2xl overflow-hidden border-2 border-[#D4AF37]/40"
+                style={{ boxShadow: "0 0 30px rgba(212,175,55,0.15)" }}>
                 <Image src={PROFILE_URL} alt="Dean Miller, audiobook narrator" fill
                   sizes="(max-width: 1024px) 224px, 288px"
                   className="object-cover" style={{ objectPosition: "center top" }} priority />
                 <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(6,8,46,1) 0%, rgba(6,8,46,0.4) 40%, transparent 70%)" }} />
               </div>
-              {/* Gold accent line */}
-              <div className="absolute left-0 bottom-0 top-0 w-px bg-gradient-to-b from-transparent via-[#D4AF37]/40 to-transparent" />
             </div>
           </div>
         </div>
@@ -636,7 +645,7 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
       <div className="max-w-5xl mx-auto px-5 sm:px-6">
 
         {/* ── DEMOS ── */}
-        <section id="demos" className="pt-4 scroll-mt-24" aria-label="Audio demos">
+        <section id="demos" className="pt-2 scroll-mt-24" aria-label="Audio demos">
           {/* Section label */}
           <div className="flex items-center gap-4 mb-10">
             <div className="h-px w-6 bg-[#D4AF37]" />
@@ -692,6 +701,10 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
                 immersive, character-forward performance — finding the emotional truth in every scene and
                 making each voice distinct enough that the listener never loses the thread.
               </p>
+              <div className="border-l-2 border-[#D4AF37] pl-4 my-6">
+                <p className="text-3xl font-bold text-[#D4AF37] leading-none">500,000+</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-white/40 mt-1">words recorded</p>
+              </div>
               <p className="text-white/60 text-base leading-relaxed">
                 I specialize in dark romance, romantasy, LGBTQ+ fiction, thriller, and drama, with strong
                 accent range including British RP. Every project starts with a full character voice list sent
@@ -746,15 +759,29 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Form */}
+            {/* Form / Success */}
+            {formStatus?.success ? (
+              <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-8 backdrop-blur-sm flex flex-col items-center text-center gap-4">
+                <div className="h-14 w-14 rounded-full bg-[#D4AF37]/15 border border-[#D4AF37]/30 flex items-center justify-center">
+                  <svg className="h-7 w-7 text-[#D4AF37]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-white">Thanks{submittedName ? `, ${submittedName.split(" ")[0]}` : ""}!</p>
+                  <p className="text-sm text-white/60 mt-1">Your inquiry has been received.</p>
+                  <p className="text-sm text-white/50 mt-0.5">I&apos;ll be in touch within 24–48 hours.</p>
+                </div>
+                <button type="button" onClick={() => { setFormStatus(null); setSubmittedName(""); }}
+                  className="text-xs text-[#D4AF37] border border-[#D4AF37]/30 px-4 py-1.5 rounded-full hover:bg-[#D4AF37]/10 transition-colors mt-2">
+                  Send another inquiry
+                </button>
+              </div>
+            ) : (
             <form ref={formRef} action={handleNativeSubmit}
               className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6 backdrop-blur-sm">
-              {formStatus && (
-                <div className={`mb-5 px-4 py-3 rounded-lg text-sm border ${
-                  formStatus.success
-                    ? "bg-emerald-500/8 border-emerald-500/20 text-emerald-300"
-                    : "bg-red-500/8 border-red-500/20 text-red-300"
-                }`}>
+              {formStatus && !formStatus.success && (
+                <div className="mb-5 px-4 py-3 rounded-lg text-sm border bg-red-500/8 border-red-500/20 text-red-300">
                   {formStatus.message}
                 </div>
               )}
@@ -772,9 +799,25 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
                   </label>
                 ))}
                 <label className="block">
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/30 font-medium">Genre</span>
+                  <select name="genre" disabled={isPending}
+                    className="mt-2 w-full rounded-lg bg-white/5 border border-white/25 px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D4AF37]/60 transition disabled:opacity-50 appearance-none">
+                    <option value="" className="bg-[#0A0D3A]">Select a genre…</option>
+                    {["Dark Romance","Romantasy","Thriller","LGBTQ+ Fiction","Drama","Sci-Fi / Fantasy","Contemporary Romance","Horror","Other"].map(g => (
+                      <option key={g} value={g} className="bg-[#0A0D3A]">{g}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/30 font-medium">Word count <span className="normal-case tracking-normal text-white/20">(optional)</span></span>
+                  <input name="word_count" type="text" disabled={isPending}
+                    placeholder="e.g. 90,000"
+                    className="mt-2 w-full rounded-lg bg-white/5 border border-white/25 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#D4AF37]/60 transition disabled:opacity-50" />
+                </label>
+                <label className="block">
                   <span className="text-[11px] uppercase tracking-[0.18em] text-white/30 font-medium">Project details</span>
-                  <textarea name="message" required rows={4} disabled={isPending}
-                    placeholder="Genre, word count, deadline, etc."
+                  <textarea name="message" required rows={3} disabled={isPending}
+                    placeholder="Deadline, series info, tone, anything else…"
                     className="mt-2 w-full rounded-lg bg-white/5 border border-white/25 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#D4AF37]/60 transition disabled:opacity-50 resize-none" />
                 </label>
                 <button type="submit" disabled={isPending}
@@ -783,6 +826,7 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
                 </button>
               </div>
             </form>
+            )}
 
             {/* Right column */}
             <div className="flex flex-col gap-4">
@@ -879,6 +923,7 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
                 { heading: "Social", links: [
                   { label: "TikTok", href: "https://www.tiktok.com/@deanmillernarration" },
                   { label: "Instagram", href: "https://www.instagram.com/deanmillernarrator" },
+                  { label: "Discord", href: "https://discord.com/users/1425271466538045512" },
                 ]},
               ].map(col => (
                 <div key={col.heading}>
