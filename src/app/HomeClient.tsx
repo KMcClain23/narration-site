@@ -173,29 +173,21 @@ function DemoPlayer({
 }
 
 
-function StatsBar() {
-  const [stats, setStats] = useState<{ titles: number; authors: number; genres: number } | null>(null);
-
-  useEffect(() => {
-    fetch("/api/stats")
-      .then(r => r.json())
-      .then(d => { if (d.titles !== undefined) setStats(d); })
-      .catch(() => {});
-  }, []);
-
-  if (!stats) return null;
+function StatsBar({ stats }: { stats: { titles: number; authors: number; co_narrators: number; genres: number } }) {
+  if (!stats.titles) return null;
 
   const items = [
-    { value: stats.titles, label: "titles narrated" },
-    { value: stats.authors, label: "authors worked with" },
-    { value: stats.genres, label: "genres" },
+    { value: stats.titles,       label: "titles narrated" },
+    { value: stats.authors,      label: "authors worked with" },
+    { value: stats.co_narrators, label: "co-narrators" },
+    { value: stats.genres,       label: "genres" },
   ];
 
   return (
-    <div className="fade-up-3 mt-8 inline-flex items-center gap-0 rounded-full border border-white/10 bg-white/[0.04] divide-x divide-white/10 overflow-hidden">
+    <div className="fade-up-3 mt-8 flex flex-wrap gap-2 justify-start">
       {items.map(({ value, label }) => (
-        <div key={label} className="flex items-baseline gap-1.5 px-5 py-2.5">
-          <span className="text-lg font-bold text-[#D4AF37] leading-none">{value}</span>
+        <div key={label} className="flex items-baseline gap-1.5 px-4 py-2 rounded-full border border-white/10 bg-white/[0.04]">
+          <span className="text-base font-bold text-[#D4AF37] leading-none">{value}</span>
           <span className="text-[11px] text-white/45 leading-none whitespace-nowrap">{label}</span>
         </div>
       ))}
@@ -430,7 +422,7 @@ function TestimonialsCarousel() {
   );
 }
 
-function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean }) {
+function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number } }) {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -547,7 +539,7 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
             </div>
 
             {/* Stats bar */}
-            <StatsBar />
+            {stats && <StatsBar stats={stats} />}
           </div>
 
           {/* Profile image — floats right on desktop */}
@@ -837,6 +829,6 @@ function HomeContent({ acceptingProjects = true }: { acceptingProjects?: boolean
   );
 }
 
-export default function HomeClient({ acceptingProjects = true }: { acceptingProjects?: boolean }) {
-  return <HomeContent acceptingProjects={acceptingProjects} />;
+export default function HomeClient({ acceptingProjects = true, stats }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number } }) {
+  return <HomeContent acceptingProjects={acceptingProjects} stats={stats} />;
 }
