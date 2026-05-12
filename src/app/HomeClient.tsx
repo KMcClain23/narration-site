@@ -20,10 +20,12 @@ function formatTime(seconds: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+const WAVEFORM_HEIGHTS = [3,6,12,18,24,20,14,8,3,7,14,20,26,22,16,10,5,9,16,24,28,20,12,6,4,10,18,26,22,14,6,3];
+
 function DemoPlayer({
-  title, desc, src, index, activeIndex, setActiveIndex, audioRefs,
+  title, desc, src, index, activeIndex, setActiveIndex, audioRefs, color, tags,
 }: {
-  title: string; desc: string; src: string; index: number;
+  title: string; desc: string; src: string; index: number; color: string; tags: string[];
   activeIndex: number | null; setActiveIndex: (v: number | null) => void;
   audioRefs: React.MutableRefObject<(HTMLAudioElement | null)[]>;
 }) {
@@ -32,7 +34,7 @@ function DemoPlayer({
   const [buffering, setBuffering] = useState(false);
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
-  const [volume, setVolume] = useState(1);
+  const [muted, setMuted] = useState(false);
 
   const toggle = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -49,11 +51,11 @@ function DemoPlayer({
     a.currentTime = (x / rect.width) * duration;
   };
 
-  const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
-    setVolume(val);
+  const toggleMute = () => {
     const a = audioRefs.current[index];
-    if (a) a.volume = val;
+    if (!a) return;
+    a.muted = !a.muted;
+    setMuted(v => !v);
   };
 
   useEffect(() => {
@@ -91,79 +93,91 @@ function DemoPlayer({
   const pct = duration > 0 ? (current / duration) * 100 : 0;
 
   return (
-    <div className={`group relative rounded-2xl transition-all duration-500 ${isActive ? "ring-1 ring-[#D4AF37]/50" : "hover:ring-1 hover:ring-white/10"}`}
-      style={{ background: isActive ? "linear-gradient(135deg, rgba(212,175,55,0.08) 0%, rgba(11,18,36,1) 60%)" : "rgba(11,18,36,1)" }}>
-
-      {/* Ambient glow when active */}
+    <div
+      className={`group relative rounded-2xl border-t-2 ${color} transition-all duration-500 ${isActive ? "ring-1 ring-[#D4AF37]/50" : "hover:ring-1 hover:ring-white/10"}`}
+      style={{ background: isActive ? "linear-gradient(135deg, rgba(212,175,55,0.08) 0%, rgba(11,18,36,1) 60%)" : "rgba(11,18,36,1)" }}
+    >
       {isActive && (
         <div className="absolute inset-0 opacity-20 pointer-events-none"
           style={{ background: "radial-gradient(ellipse at top left, rgba(212,175,55,0.4), transparent 60%)" }} />
       )}
 
-      <div className="relative p-6 flex flex-col h-full">
+      <div className="relative p-4 flex flex-col h-full">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 mb-auto">
-          <div>
-            <h3 className="font-semibold text-base text-white leading-snug">{title}</h3>
-            <p className="mt-1 text-sm text-white/50">{desc}</p>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-sm text-white leading-snug">{title}</h3>
+            <p className="mt-0.5 text-xs text-white/50 leading-snug">{desc}</p>
           </div>
           {isActive && (
-            <div className="flex items-center gap-1 shrink-0 pt-0.5">
+            <div className="flex items-center gap-0.5 shrink-0 pt-0.5">
               {[0, 1, 2].map(i => (
                 <div key={i} className="w-0.5 rounded-full bg-[#D4AF37]"
-                  style={{ height: 14, animation: `barPulse 0.8s ease-in-out ${i * 0.15}s infinite alternate` }} />
+                  style={{ height: 12, animation: `barPulse 0.8s ease-in-out ${i * 0.15}s infinite alternate` }} />
               ))}
             </div>
           )}
         </div>
 
+        {/* Genre tags */}
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-3">
+            {tags.map(tag => (
+              <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-white/8 text-white/50">{tag}</span>
+            ))}
+          </div>
+        )}
+
         {/* Player */}
-        <div className="mt-6 rounded-xl border border-white/8 bg-black/30 p-4">
-          <div className="flex items-center gap-4">
+        <div className="relative mt-auto rounded-xl bg-black/40 p-3 overflow-hidden">
+          {/* Decorative waveform */}
+          <svg
+            viewBox={`0 0 ${WAVEFORM_HEIGHTS.length * 6} 40`}
+            className="absolute inset-0 w-full h-full opacity-10 pointer-events-none"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {WAVEFORM_HEIGHTS.map((h, i) => (
+              <rect key={i} x={i * 6 + 1} y={20 - h / 2} width={4} height={h} rx={2} fill="white" />
+            ))}
+          </svg>
+
+          {/* Controls row */}
+          <div className="relative flex items-center gap-3">
             <button onClick={toggle} aria-label={playing ? "Pause" : "Play"} type="button"
-              className={`relative h-12 w-12 shrink-0 rounded-full flex items-center justify-center transition-all duration-300 ${
-                isActive
-                  ? "bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20 scale-110"
-                  : "border border-white/15 bg-white/5 text-white hover:border-[#D4AF37]/50 hover:bg-white/10"
-              } ${!src ? "opacity-40 pointer-events-none" : "cursor-pointer"}`}>
+              className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center transition-all duration-300 bg-[#D4AF37] text-black hover:bg-[#E0C15A] shadow-lg shadow-[#D4AF37]/20 ${!src ? "opacity-40 pointer-events-none" : "cursor-pointer"}`}>
               {buffering
-                ? <div className="h-5 w-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ? <div className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
                 : playing
-                  ? <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5h3v14H8zM13 5h3v14h-3z" /></svg>
-                  : <svg className="h-5 w-5 translate-x-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
+                  ? <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5h3v14H8zM13 5h3v14h-3z" /></svg>
+                  : <svg className="h-4 w-4 translate-x-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72l11-6.86L8 5.14z" /></svg>
               }
             </button>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                role="slider"
-                aria-label="Seekbar"
-                aria-valuenow={Math.round(pct)}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                onClick={handleSeek}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  height: "10px",
-                  borderRadius: "9999px",
-                  cursor: "pointer",
-                  background: `linear-gradient(to right, #D4AF37 ${pct}%, rgba(255,255,255,0.2) ${pct}%)`,
-                  transition: "background 100ms linear",
-                }}
-              ></div>
-              <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-white/30">
+
+            <div className="flex-1 min-w-0">
+              {/* Progress bar with scrubber */}
+              <div className="relative flex items-center h-5 cursor-pointer" onClick={handleSeek}
+                role="slider" aria-label="Seekbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
+                <div className="w-full h-1 rounded-full"
+                  style={{ background: `linear-gradient(to right, #D4AF37 ${pct}%, rgba(255,255,255,0.1) ${pct}%)` }}>
+                  <div className="absolute top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-[#D4AF37] border border-black/20 shadow"
+                    style={{ left: `calc(${pct}% - 6px)` }} />
+                </div>
+              </div>
+              <div className="mt-1 flex items-center justify-between text-[10px] font-mono text-white/30">
                 <span>{formatTime(current)}</span>
                 <span>{formatTime(duration)}</span>
               </div>
             </div>
-          </div>
-          <div className="mt-3 flex items-center gap-3 border-t border-white/5 pt-3">
-            <svg className="h-3.5 w-3.5 text-white/20 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-            </svg>
-            <input type="range" min="0" max="1" step="0.01" value={volume} aria-label="Volume"
-              onChange={handleVolume} className="flex-1 h-0.5 bg-white/10 rounded appearance-none cursor-pointer accent-[#D4AF37]" />
+
+            {/* Mute toggle */}
+            <button type="button" onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"}
+              className="shrink-0 text-white/25 hover:text-white/60 transition-colors">
+              {muted
+                ? <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                : <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              }
+            </button>
           </div>
           <audio ref={(el) => { audioRefs.current[index] = el; }} src={src} preload="metadata" />
         </div>
@@ -475,12 +489,12 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
   }, [activeIndex]);
 
   const demos = [
-    { title: "LGBTQ+ Romance", desc: "Bright pacing, playful emotional tone", src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20LGBTQ%2B%20Romance%20-%20Male%20(BrightPlayful)%2C%20Confident%2C%20Sex-PositiveFlirtatious.mp3" },
-    { title: "Romantasy", desc: "Atmospheric delivery, grounded fantasy emotion", src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Romantasy%20-%20Male%20(PossessiveHaunted)%2C%20Harsh%20Control%20to%20Remorse%2C%20Deep%20Loss.mp3" },
-    { title: "Feminine Voice", desc: "Male & Female Dialogue", src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Female%20Voice%202.mp3" },
-    { title: "Romance Duet", desc: "British accent, romantic restraint", src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/British%20-%20Romance%20Duet.mp3" },
-    { title: "Child POV Drama", desc: "Raw emotion, age-appropriate delivery", src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Child%20(5-year-old%20boy)%2C%20Emotional%20TraumaWitness%20-%20Sample.mp3" },
-    { title: "Multi-Character Dialogue", desc: "Clear character separation and vocal range", src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/4%20Characters.mp3" },
+    { title: "LGBTQ+ Romance",         desc: "Bright pacing, playful emotional tone",       color: "border-pink-400",   tags: ["LGBTQ+", "Romance"],      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20LGBTQ%2B%20Romance%20-%20Male%20(BrightPlayful)%2C%20Confident%2C%20Sex-PositiveFlirtatious.mp3" },
+    { title: "Romantasy",              desc: "Atmospheric, grounded fantasy emotion",       color: "border-purple-400", tags: ["Romantasy", "Fantasy"],   src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Romantasy%20-%20Male%20(PossessiveHaunted)%2C%20Harsh%20Control%20to%20Remorse%2C%20Deep%20Loss.mp3" },
+    { title: "Feminine Voice",         desc: "Male & Female Dialogue",                      color: "border-violet-400", tags: ["Feminine Voice", "Duet"], src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Female%20Voice%202.mp3" },
+    { title: "Romance Duet",           desc: "British accent, romantic restraint",           color: "border-rose-300",   tags: ["Romance", "British"],     src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/British%20-%20Romance%20Duet.mp3" },
+    { title: "Child POV Drama",        desc: "Raw emotion, age-appropriate delivery",        color: "border-blue-400",   tags: ["Drama", "Child POV"],     src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Child%20(5-year-old%20boy)%2C%20Emotional%20TraumaWitness%20-%20Sample.mp3" },
+    { title: "Multi-Character Dialogue", desc: "Clear character separation, vocal range",   color: "border-amber-400",  tags: ["Multi-Character"],        src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/4%20Characters.mp3" },
   ];
 
   return (
@@ -600,13 +614,14 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {demos.map((demo, index) => (
               <DemoPlayer key={demo.title} title={demo.title} desc={demo.desc} src={demo.src}
+                color={demo.color} tags={demo.tags}
                 index={index} activeIndex={activeIndex} setActiveIndex={setActiveIndex} audioRefs={audioRefs} />
             ))}
           </div>
 
           <div className="mt-8 text-center">
             <Link href="/narrated-works"
-              className="inline-flex items-center gap-2 text-sm text-white/40 hover:text-[#D4AF37] transition-colors">
+              className="inline-flex items-center gap-2 border border-[#D4AF37]/50 text-[#D4AF37] hover:bg-[#D4AF37]/10 px-5 py-2 rounded-full text-sm transition-colors">
               Browse the full portfolio
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
