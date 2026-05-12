@@ -20,8 +20,6 @@ function formatTime(seconds: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-const WAVEFORM_HEIGHTS = [3,6,12,18,24,20,14,8,3,7,14,20,26,22,16,10,5,9,16,24,28,20,12,6,4,10,18,26,22,14,6,3];
-
 function DemoPlayer({
   title, desc, src, index, activeIndex, setActiveIndex, audioRefs, color, tags,
 }: {
@@ -33,45 +31,146 @@ function DemoPlayer({
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
   const [duration, setDuration] = useState(0);
-  const [current, setCurrent] = useState(0);
+  const [progress, setProgress] = useState(0);     // 0–100 for bar width
+  const [displayTime, setDisplayTime] = useState(0); // seconds for clock
   const [muted, setMuted] = useState(false);
 
+  // Local audio ref — also syncs to shared audioRefs for cross-player pause
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const isPlayingRef = useRef(false); // stable ref for draw loop
+
+  const setAudioEl = useCallback((el: HTMLAudioElement | null) => {
+    audioElRef.current = el;
+    audioRefs.current[index] = el;
+  }, [audioRefs, index]);
+
+  // ── Web Audio init (called once on first user gesture) ──────────────────────
+  const initWebAudio = useCallback(() => {
+    if (audioCtxRef.current || !audioElRef.current) return;
+    try {
+      const ctx = new AudioContext();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 64;
+      analyser.smoothingTimeConstant = 0.75;
+      const source = ctx.createMediaElementSource(audioElRef.current);
+      source.connect(analyser);
+      analyser.connect(ctx.destination);
+      audioCtxRef.current = ctx;
+      analyserRef.current = analyser;
+    } catch { /* restricted environment */ }
+  }, []);
+
+  // ── Canvas draw loop ────────────────────────────────────────────────────────
+  const startDraw = useCallback(() => {
+    const canvas = canvasRef.current;
+    const analyser = analyserRef.current;
+    if (!canvas || !analyser) return;
+    const ctx2d = canvas.getContext("2d");
+    if (!ctx2d) return;
+    const bufLen = analyser.frequencyBinCount;
+    const data = new Uint8Array(bufLen);
+    const BAR_N = 28;
+
+    const frame = () => {
+      rafRef.current = requestAnimationFrame(frame);
+      analyser.getByteFrequencyData(data);
+      const W = canvas.width; const H = canvas.height;
+      ctx2d.clearRect(0, 0, W, H);
+      const slot = W / BAR_N;
+      const barW = slot * 0.55;
+      for (let i = 0; i < BAR_N; i++) {
+        const v = data[Math.floor((i / BAR_N) * bufLen)] / 255;
+        const bh = Math.max(2, v * H * 0.88);
+        ctx2d.globalAlpha = isPlayingRef.current ? 0.65 : 0.12;
+        ctx2d.fillStyle = "#D4AF37";
+        ctx2d.fillRect(i * slot + (slot - barW) / 2, (H - bh) / 2, barW, bh);
+      }
+    };
+    frame();
+  }, []);
+
+  const stopDraw = useCallback(() => {
+    if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    // draw dim static frame
+    const canvas = canvasRef.current;
+    const analyser = analyserRef.current;
+    if (!canvas || !analyser) return;
+    const ctx2d = canvas.getContext("2d");
+    if (!ctx2d) return;
+    const bufLen = analyser.frequencyBinCount;
+    const data = new Uint8Array(bufLen);
+    analyser.getByteFrequencyData(data);
+    const W = canvas.width; const H = canvas.height;
+    ctx2d.clearRect(0, 0, W, H);
+    const BAR_N = 28; const slot = W / BAR_N; const barW = slot * 0.55;
+    ctx2d.globalAlpha = 0.12; ctx2d.fillStyle = "#D4AF37";
+    for (let i = 0; i < BAR_N; i++) {
+      const v = data[Math.floor((i / BAR_N) * bufLen)] / 255;
+      const bh = Math.max(3, v * H * 0.88 + 3);
+      ctx2d.fillRect(i * slot + (slot - barW) / 2, (H - bh) / 2, barW, bh);
+    }
+  }, []);
+
+  // ── Controls ────────────────────────────────────────────────────────────────
   const toggle = (e: React.MouseEvent) => {
     e.preventDefault();
-    const a = audioRefs.current[index];
+    const a = audioElRef.current;
     if (!a) return;
-    a.paused ? a.play().catch(() => {}) : a.pause();
+    if (a.paused) {
+      initWebAudio();
+      if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume().catch(() => {});
+      a.play().catch(() => {});
+    } else {
+      a.pause();
+    }
   };
 
-  const handleSeek = (e: React.MouseEvent<HTMLElement>) => {
-    const a = audioRefs.current[index];
-    if (!a || !duration) return;
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    const a = audioElRef.current;
+    if (!a) return;
+    const dur = a.duration;
+    if (!dur) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = Math.min(Math.max(0, e.clientX - rect.left), rect.width);
-    a.currentTime = (x / rect.width) * duration;
+    const ratio = Math.min(Math.max(0, (e.clientX - rect.left) / rect.width), 1);
+    a.currentTime = ratio * dur;
+    setProgress(ratio * 100);
+    setDisplayTime(ratio * dur);
   };
 
   const toggleMute = () => {
-    const a = audioRefs.current[index];
+    const a = audioElRef.current;
     if (!a) return;
     a.muted = !a.muted;
     setMuted(v => !v);
   };
 
+  // ── Event listeners ─────────────────────────────────────────────────────────
   useEffect(() => {
-    const a = audioRefs.current[index];
+    const a = audioElRef.current;
     if (!a) return;
-    const onTimeUpdate = () => setCurrent(a.currentTime);
-    const onDurationChange = () => setDuration(a.duration);
+    const onTimeUpdate = () => {
+      const dur = a.duration || 0;
+      setDisplayTime(a.currentTime);
+      setProgress(dur > 0 ? (a.currentTime / dur) * 100 : 0);
+    };
+    const onDurationChange = () => setDuration(a.duration || 0);
     const onPlay = () => {
-      setPlaying(true); setBuffering(false); setActiveIndex(index);
+      setPlaying(true); isPlayingRef.current = true; setBuffering(false); setActiveIndex(index);
+      startDraw();
       sendGAEvent("event", "demo_play", { event_category: "Audio", event_label: title, value: index });
       fetch("/api/track-demo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) }).catch(() => {});
     };
-    const onPause = () => setPlaying(false);
+    const onPause = () => { setPlaying(false); isPlayingRef.current = false; stopDraw(); };
     const onWaiting = () => setBuffering(true);
     const onPlaying = () => setBuffering(false);
-    const onEnded = () => { setPlaying(false); setCurrent(0); setActiveIndex(null); };
+    const onEnded = () => {
+      setPlaying(false); isPlayingRef.current = false;
+      setProgress(0); setDisplayTime(0); setActiveIndex(null); stopDraw();
+    };
     a.addEventListener("timeupdate", onTimeUpdate);
     a.addEventListener("durationchange", onDurationChange);
     a.addEventListener("play", onPlay);
@@ -87,11 +186,11 @@ function DemoPlayer({
       a.removeEventListener("waiting", onWaiting);
       a.removeEventListener("playing", onPlaying);
       a.removeEventListener("ended", onEnded);
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [index, title, setActiveIndex, audioRefs]);
+  }, [index, title, setActiveIndex, startDraw, stopDraw]);
 
-  const pct = duration > 0 ? (current / duration) * 100 : 0;
-
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div
       className={`group relative rounded-2xl border-t-2 ${color} transition-all duration-500 ${isActive ? "ring-1 ring-[#D4AF37]/50" : "hover:ring-1 hover:ring-white/10"}`}
@@ -129,23 +228,15 @@ function DemoPlayer({
         )}
 
         {/* Player */}
-        <div className="relative mt-auto rounded-xl bg-black/40 p-3 overflow-hidden">
-          {/* Decorative waveform */}
-          <svg
-            viewBox={`0 0 ${WAVEFORM_HEIGHTS.length * 6} 40`}
-            className="absolute inset-0 w-full h-full opacity-10 pointer-events-none"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            {WAVEFORM_HEIGHTS.map((h, i) => (
-              <rect key={i} x={i * 6 + 1} y={20 - h / 2} width={4} height={h} rx={2} fill="white" />
-            ))}
-          </svg>
+        <div className="relative mt-auto rounded-xl bg-black/40 overflow-hidden px-3 pt-3 pb-2">
+          {/* Live waveform canvas */}
+          <canvas ref={canvasRef} width={320} height={60}
+            className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" />
 
-          {/* Controls row */}
+          {/* Controls */}
           <div className="relative flex items-center gap-3">
             <button onClick={toggle} aria-label={playing ? "Pause" : "Play"} type="button"
-              className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center transition-all duration-300 bg-[#D4AF37] text-black hover:bg-[#E0C15A] shadow-lg shadow-[#D4AF37]/20 ${!src ? "opacity-40 pointer-events-none" : "cursor-pointer"}`}>
+              className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center bg-[#D4AF37] text-black hover:bg-[#E0C15A] transition-colors shadow-lg shadow-[#D4AF37]/20 ${!src ? "opacity-40 pointer-events-none" : "cursor-pointer"}`}>
               {buffering
                 ? <div className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
                 : playing
@@ -155,17 +246,19 @@ function DemoPlayer({
             </button>
 
             <div className="flex-1 min-w-0">
-              {/* Progress bar with scrubber */}
-              <div className="relative flex items-center h-5 cursor-pointer" onClick={handleSeek}
-                role="slider" aria-label="Seekbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
-                <div className="w-full h-1 rounded-full"
-                  style={{ background: `linear-gradient(to right, #D4AF37 ${pct}%, rgba(255,255,255,0.1) ${pct}%)` }}>
-                  <div className="absolute top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-[#D4AF37] border border-black/20 shadow"
-                    style={{ left: `calc(${pct}% - 6px)` }} />
+              {/* Progress track */}
+              <div className="relative w-full h-5 flex items-center cursor-pointer" onClick={handleSeek}
+                role="slider" aria-label="Seekbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}>
+                <div className="relative w-full h-1 rounded-full bg-white/10">
+                  {/* Gold fill */}
+                  <div className="h-full rounded-full bg-[#D4AF37]" style={{ width: `${progress}%` }} />
+                  {/* Scrubber circle */}
+                  <div className="absolute top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-[#D4AF37] border border-black/20 shadow pointer-events-none"
+                    style={{ left: `calc(${progress}% - 6px)` }} />
                 </div>
               </div>
-              <div className="mt-1 flex items-center justify-between text-[10px] font-mono text-white/30">
-                <span>{formatTime(current)}</span>
+              <div className="flex items-center justify-between text-[10px] font-mono text-white/30 mt-1">
+                <span>{formatTime(displayTime)}</span>
                 <span>{formatTime(duration)}</span>
               </div>
             </div>
@@ -179,7 +272,7 @@ function DemoPlayer({
               }
             </button>
           </div>
-          <audio ref={(el) => { audioRefs.current[index] = el; }} src={src} preload="metadata" />
+          <audio ref={setAudioEl} src={src} preload="metadata" />
         </div>
       </div>
     </div>
