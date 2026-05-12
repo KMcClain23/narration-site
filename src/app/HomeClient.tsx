@@ -52,16 +52,31 @@ function DemoPlayer({
     a.paused ? a.play().catch(() => {}) : a.pause();
   };
 
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+  const seekBarRef = useRef<HTMLDivElement | null>(null);
+  const isDragging = useRef(false);
+
+  const seekTo = (clientX: number) => {
     const a = audioElRef.current;
-    if (!a) return;
+    const bar = seekBarRef.current;
+    if (!a || !bar) return;
     const dur = a.duration;
     if (!dur) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.min(Math.max(0, (e.clientX - rect.left) / rect.width), 1);
+    const rect = bar.getBoundingClientRect();
+    const ratio = Math.min(Math.max(0, (clientX - rect.left) / rect.width), 1);
     a.currentTime = ratio * dur;
     setProgress(ratio * 100);
     setDisplayTime(ratio * dur);
+  };
+
+  const handleSeekMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    isDragging.current = true;
+    seekTo(e.clientX);
+
+    const onMove = (ev: MouseEvent) => { if (isDragging.current) seekTo(ev.clientX); };
+    const onUp = () => { isDragging.current = false; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   };
 
   const toggleMute = () => {
@@ -183,7 +198,7 @@ function DemoPlayer({
 
           {/* Row 2: progress bar + timestamps */}
           <div className="mt-3">
-            <div className="relative w-full h-5 flex items-center cursor-pointer" onClick={handleSeek}
+            <div ref={seekBarRef} className="relative w-full h-5 flex items-center cursor-pointer select-none" onMouseDown={handleSeekMouseDown}
               role="slider" aria-label="Seekbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}>
               <div className="relative w-full h-1 rounded-full bg-white/10">
                 <div className="h-full rounded-full bg-[#D4AF37]" style={{ width: `${progress}%` }} />
