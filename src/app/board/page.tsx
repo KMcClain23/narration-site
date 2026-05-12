@@ -1106,6 +1106,10 @@ export default function BoardPage() {
   const [error, setError] = useState<string|null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{id:string;title:string}|null>(null);
   const [coNarratorNames, setCoNarratorNames] = useState<string[]>([]);
+  const [authorNames, setAuthorNames] = useState<string[]>([]);
+  const [authorQuery, setAuthorQuery] = useState("");
+  const [authorDropOpen, setAuthorDropOpen] = useState(false);
+  const authorDropRef = useRef<HTMLDivElement>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importBooks, setImportBooks] = useState<{id:string;title:string;author:string;cover_url:string;link:string;ar_link?:string;subtitle?:string;tags?:string[];description?:string;co_narrator?:string[];category:string}[]>([]);
@@ -1130,6 +1134,7 @@ export default function BoardPage() {
         author_email: c.author_email || (c.author ? emailByName.get(c.author.trim().toLowerCase()) || "" : ""),
       })));
       const cn = await cnr.json(); setCoNarratorNames((cn.co_narrators||[]).map((n:{name:string})=>n.name).sort());
+      setAuthorNames((authorsData.authors||[]).map((a:{name:string})=>a.name).sort());
     } catch { setError("Failed to load."); } finally { setLoading(false); }
   }, []);
 
@@ -1138,6 +1143,14 @@ export default function BoardPage() {
     const saved = localStorage.getItem("boardView");
     if (saved === "board" || saved === "timeline" || saved === "dashboard") setView(saved);
   }, []);
+  useEffect(() => {
+    if (!authorDropOpen) return;
+    const onMouse = (e: MouseEvent) => { if (authorDropRef.current && !authorDropRef.current.contains(e.target as Node)) setAuthorDropOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setAuthorDropOpen(false); };
+    document.addEventListener("mousedown", onMouse);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onMouse); document.removeEventListener("keydown", onKey); };
+  }, [authorDropOpen]);
   useEffect(() => {
     if (!inlineEdit) return;
     const onMouse = (e: MouseEvent) => { if (inlineRef.current && !inlineRef.current.contains(e.target as Node)) setInlineEdit(null); };
@@ -1284,6 +1297,8 @@ export default function BoardPage() {
 
   const startEdit = (card: BoardCard) => {
     setEditCard(card);
+    setAuthorQuery(card.author || "");
+    setAuthorDropOpen(false);
     setForm({title:card.title,author:card.author,cover_url:card.cover_url,status:card.status,
       deadline:card.deadline||"",notes:card.notes,author_notes:card.author_notes,
       links:card.links,co_narrator:card.co_narrator,subtitle:card.subtitle||"",
@@ -1408,7 +1423,7 @@ export default function BoardPage() {
             </button>
           </div>
 
-          <button onClick={()=>{setShowForm(true);setEditCard(null);setForm({...EMPTY});setTagInput("");}}
+          <button onClick={()=>{setShowForm(true);setEditCard(null);setForm({...EMPTY});setTagInput("");setAuthorQuery("");setAuthorDropOpen(false);}}
             className="inline-flex items-center gap-1.5 bg-[#D4AF37] text-black text-xs font-bold px-3 sm:px-4 py-2 rounded-full hover:bg-[#E0C15A] transition-colors">
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
             <span className="hidden sm:inline">New project</span>
@@ -1503,7 +1518,33 @@ export default function BoardPage() {
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Book title *</span><input type="text" value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))} placeholder="e.g. Whiskey &amp; Lies" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Subtitle</span><input type="text" value={form.subtitle} onChange={e=>setForm(p=>({...p,subtitle:e.target.value}))} placeholder="e.g. Sultry Secrets Book 4" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">URL slug</span><input type="text" value={form.slug||""} onChange={e=>setForm(p=>({...p,slug:e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-").replace(/-+/g,"-")}))} placeholder="e.g. whiskey-and-lies" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition font-mono"/></label>
-                <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Author</span><input type="text" value={form.author} onChange={e=>setForm(p=>({...p,author:e.target.value}))} placeholder="e.g. E.A. Harper" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
+                <div className="block" ref={authorDropRef}>
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Author</span>
+                  <div className="relative mt-1.5">
+                    <input type="text"
+                      value={authorQuery}
+                      onChange={e => { setAuthorQuery(e.target.value); setForm(p=>({...p,author:e.target.value})); setAuthorDropOpen(true); }}
+                      onFocus={() => setAuthorDropOpen(true)}
+                      placeholder="e.g. E.A. Harper"
+                      className="w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/>
+                    {authorDropOpen && (() => {
+                      const q = authorQuery.trim().toLowerCase();
+                      const matches = q.length === 0 ? authorNames : authorNames.filter(n => n.toLowerCase().includes(q));
+                      if (!matches.length) return null;
+                      return (
+                        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[#0D1050] border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto">
+                          {matches.map(name => (
+                            <button key={name} type="button"
+                              onClick={() => { setAuthorQuery(name); setForm(p=>({...p,author:name})); setAuthorDropOpen(false); }}
+                              className="w-full text-left px-3 py-2.5 text-sm text-white/80 hover:bg-white/8 hover:text-white transition-colors">
+                              {name}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Co-narrator</span>
                   <select value={form.co_narrator} onChange={e=>setForm(p=>({...p,co_narrator:e.target.value}))}
