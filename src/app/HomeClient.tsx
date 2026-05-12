@@ -144,23 +144,10 @@ function DemoPlayer({
         )}
 
         {/* Player */}
-        <div className="relative mt-auto rounded-xl bg-black/40 overflow-hidden px-3 pt-3 pb-2">
-          {/* Static animated waveform decoration */}
-          <div className="absolute inset-0 flex items-center justify-center gap-px px-2 pointer-events-none" aria-hidden="true">
-            {WAVE_BARS.map((h, i) => (
-              <div key={i}
-                className="rounded-full bg-[#D4AF37] flex-1"
-                style={{
-                  height: `${h}px`,
-                  opacity: playing ? 0.5 : 0.1,
-                  animation: playing ? `barPulse ${0.6 + (i % 4) * 0.1}s ease-in-out ${(i % 5) * 0.08}s infinite alternate` : "none",
-                }}
-              />
-            ))}
-          </div>
+        <div className="relative mt-auto rounded-xl bg-black/40 p-4">
 
-          {/* Controls */}
-          <div className="relative flex items-center gap-3">
+          {/* Row 1: play button + waveform + mute */}
+          <div className="flex items-center gap-3">
             <button onClick={toggle} aria-label={playing ? "Pause" : "Play"} type="button"
               className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center bg-[#D4AF37] text-black hover:bg-[#E0C15A] transition-colors shadow-lg shadow-[#D4AF37]/20 ${!src ? "opacity-40 pointer-events-none" : "cursor-pointer"}`}>
               {buffering
@@ -171,19 +158,18 @@ function DemoPlayer({
               }
             </button>
 
-            <div className="flex-1 min-w-0">
-              <div className="relative w-full h-5 flex items-center cursor-pointer" onClick={handleSeek}
-                role="slider" aria-label="Seekbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}>
-                <div className="relative w-full h-1 rounded-full bg-white/10">
-                  <div className="h-full rounded-full bg-[#D4AF37]" style={{ width: `${progress}%` }} />
-                  <div className="absolute top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-[#D4AF37] border border-black/20 shadow pointer-events-none"
-                    style={{ left: `calc(${progress}% - 6px)` }} />
-                </div>
-              </div>
-              <div className="flex items-center justify-between text-[10px] font-mono text-white/30 mt-1">
-                <span>{formatTime(displayTime)}</span>
-                <span>{formatTime(duration)}</span>
-              </div>
+            {/* Waveform — h-12, fills between play and mute */}
+            <div className="flex-1 h-12 flex items-end justify-between gap-px" aria-hidden="true">
+              {WAVE_BARS.map((h, i) => (
+                <div key={i}
+                  className="rounded-full bg-[#D4AF37] flex-1"
+                  style={{
+                    height: `${Math.round(h * (48 / 24))}px`,
+                    opacity: playing ? 0.5 : 0.1,
+                    animation: playing ? `barPulse ${0.6 + (i % 4) * 0.1}s ease-in-out ${(i % 5) * 0.08}s infinite alternate` : "none",
+                  }}
+                />
+              ))}
             </div>
 
             <button type="button" onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"}
@@ -194,6 +180,23 @@ function DemoPlayer({
               }
             </button>
           </div>
+
+          {/* Row 2: progress bar + timestamps */}
+          <div className="mt-3">
+            <div className="relative w-full h-5 flex items-center cursor-pointer" onClick={handleSeek}
+              role="slider" aria-label="Seekbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}>
+              <div className="relative w-full h-1 rounded-full bg-white/10">
+                <div className="h-full rounded-full bg-[#D4AF37]" style={{ width: `${progress}%` }} />
+                <div className="absolute top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-[#D4AF37] border border-black/20 shadow pointer-events-none"
+                  style={{ left: `calc(${progress}% - 6px)` }} />
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-[10px] font-mono text-white/30 mt-1">
+              <span>{formatTime(displayTime)}</span>
+              <span>{formatTime(duration)}</span>
+            </div>
+          </div>
+
           <audio ref={setAudioEl} src={src} preload="metadata" />
         </div>
       </div>
