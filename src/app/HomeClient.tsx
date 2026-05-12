@@ -223,7 +223,7 @@ function DemoPlayer({
 }
 
 
-function StatsBar({ stats }: { stats: { titles: number; authors: number; co_narrators: number; genres: number } }) {
+function StatsBar({ stats }: { stats: { titles: number; authors: number; co_narrators: number; genres: number; words: number } }) {
   if (!stats.titles) return null;
 
   const items = [
@@ -495,7 +495,7 @@ function TestimonialsCarousel() {
   );
 }
 
-function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number } }) {
+function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number; words: number } }) {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -617,6 +617,7 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
                   { value: stats.authors,      label: "authors worked with" },
                   { value: stats.co_narrators, label: "co-narrators" },
                   { value: stats.genres,       label: "genres" },
+                  ...(stats.words > 0 ? [{ value: `${Math.round(stats.words / 1000)}k`, label: "words recorded" }] : []),
                 ].map(({ value, label }) => (
                   <div key={label} className="flex items-baseline gap-1.5 px-4 py-2 rounded-full border border-white/10 bg-white/[0.04]">
                     <span className="text-base font-bold text-[#D4AF37] leading-none">{value}</span>
@@ -701,11 +702,7 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
                 immersive, character-forward performance — finding the emotional truth in every scene and
                 making each voice distinct enough that the listener never loses the thread.
               </p>
-              <div className="border-l-2 border-[#D4AF37] pl-4 my-6">
-                <p className="text-3xl font-bold text-[#D4AF37] leading-none">500,000+</p>
-                <p className="text-xs uppercase tracking-[0.2em] text-white/40 mt-1">words recorded</p>
-              </div>
-              <p className="text-white/60 text-base leading-relaxed">
+<p className="text-white/60 text-base leading-relaxed">
                 I specialize in dark romance, romantasy, LGBTQ+ fiction, thriller, and drama, with strong
                 accent range including British RP. Every project starts with a full character voice list sent
                 for author approval before a single line is recorded.
@@ -953,6 +950,6 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
   );
 }
 
-export default function HomeClient({ acceptingProjects = true, stats }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number } }) {
+export default function HomeClient({ acceptingProjects = true, stats }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number; words: number } }) {
   return <HomeContent acceptingProjects={acceptingProjects} stats={stats} />;
 }

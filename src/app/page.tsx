@@ -15,11 +15,11 @@ export default async function Page() {
     // Table may not exist yet — default to true
   }
 
-  let stats = { titles: 0, authors: 0, co_narrators: 0, genres: 0 };
+  let stats = { titles: 0, authors: 0, co_narrators: 0, genres: 0, words: 0 };
   try {
     const { data } = await supabaseAdmin
       .from("board_cards")
-      .select("author, tags, co_narrator")
+      .select("author, tags, co_narrator, word_count")
       .eq("status", "released");
     const rows = data ?? [];
     const coNarratorSet = new Set<string>();
@@ -38,6 +38,7 @@ export default async function Page() {
       authors:      new Set(rows.map(r => (r.author ?? "").trim().toLowerCase()).filter(Boolean)).size,
       co_narrators: coNarratorSet.size,
       genres:       new Set(rows.flatMap(r => (Array.isArray(r.tags) ? r.tags : []) as string[])).size,
+      words:        rows.reduce((sum, r) => sum + (Number(r.word_count) || 0), 0),
     };
   } catch {
     // Stats unavailable — StatsBar stays hidden
