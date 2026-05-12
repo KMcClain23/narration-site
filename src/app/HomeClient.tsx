@@ -20,6 +20,9 @@ function formatTime(seconds: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// Static waveform heights for the decorative bar animation
+const WAVE_BARS = [3,5,9,14,20,17,12,7,3,6,11,17,22,18,13,8,4,7,13,20,24,17,10,5,3,8,15,22,18,11,5,3];
+
 function DemoPlayer({
   title, desc, src, index, activeIndex, setActiveIndex, audioRefs, color, tags,
 }: {
@@ -31,114 +34,22 @@ function DemoPlayer({
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
   const [duration, setDuration] = useState(0);
-  const [progress, setProgress] = useState(0);     // 0–100 for bar width
-  const [displayTime, setDisplayTime] = useState(0); // seconds for clock
+  const [progress, setProgress] = useState(0);
+  const [displayTime, setDisplayTime] = useState(0);
   const [muted, setMuted] = useState(false);
 
-  // Local audio ref — also syncs to shared audioRefs for cross-player pause
   const audioElRef = useRef<HTMLAudioElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const isPlayingRef = useRef(false); // stable ref for draw loop
 
   const setAudioEl = useCallback((el: HTMLAudioElement | null) => {
     audioElRef.current = el;
     audioRefs.current[index] = el;
   }, [audioRefs, index]);
 
-  // ── Web Audio init (called once on first user gesture) ──────────────────────
-  const initWebAudio = useCallback(() => {
-    if (analyserRef.current || !audioElRef.current) return; // already done or no element
-    let ctx: AudioContext | null = null;
-    try {
-      ctx = new AudioContext();
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 64;
-      analyser.smoothingTimeConstant = 0.75;
-      const source = ctx.createMediaElementSource(audioElRef.current);
-      source.connect(analyser);
-      analyser.connect(ctx.destination);
-      audioCtxRef.current = ctx;
-      analyserRef.current = analyser;
-    } catch {
-      // Web Audio unavailable or element already claimed — close the dangling
-      // context so it doesn't intercept audio routing, then let audio play raw
-      ctx?.close().catch(() => {});
-    }
-  }, []);
-
-  // ── Canvas draw loop ────────────────────────────────────────────────────────
-  const startDraw = useCallback(() => {
-    const canvas = canvasRef.current;
-    const analyser = analyserRef.current;
-    if (!canvas || !analyser) return;
-    const ctx2d = canvas.getContext("2d");
-    if (!ctx2d) return;
-    const bufLen = analyser.frequencyBinCount;
-    const data = new Uint8Array(bufLen);
-    const BAR_N = 28;
-
-    const frame = () => {
-      rafRef.current = requestAnimationFrame(frame);
-      analyser.getByteFrequencyData(data);
-      const W = canvas.width; const H = canvas.height;
-      ctx2d.clearRect(0, 0, W, H);
-      const slot = W / BAR_N;
-      const barW = slot * 0.55;
-      for (let i = 0; i < BAR_N; i++) {
-        const v = data[Math.floor((i / BAR_N) * bufLen)] / 255;
-        const bh = Math.max(2, v * H * 0.88);
-        ctx2d.globalAlpha = isPlayingRef.current ? 0.65 : 0.12;
-        ctx2d.fillStyle = "#D4AF37";
-        ctx2d.fillRect(i * slot + (slot - barW) / 2, (H - bh) / 2, barW, bh);
-      }
-    };
-    frame();
-  }, []);
-
-  const stopDraw = useCallback(() => {
-    if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-    // draw dim static frame
-    const canvas = canvasRef.current;
-    const analyser = analyserRef.current;
-    if (!canvas || !analyser) return;
-    const ctx2d = canvas.getContext("2d");
-    if (!ctx2d) return;
-    const bufLen = analyser.frequencyBinCount;
-    const data = new Uint8Array(bufLen);
-    analyser.getByteFrequencyData(data);
-    const W = canvas.width; const H = canvas.height;
-    ctx2d.clearRect(0, 0, W, H);
-    const BAR_N = 28; const slot = W / BAR_N; const barW = slot * 0.55;
-    ctx2d.globalAlpha = 0.12; ctx2d.fillStyle = "#D4AF37";
-    for (let i = 0; i < BAR_N; i++) {
-      const v = data[Math.floor((i / BAR_N) * bufLen)] / 255;
-      const bh = Math.max(3, v * H * 0.88 + 3);
-      ctx2d.fillRect(i * slot + (slot - barW) / 2, (H - bh) / 2, barW, bh);
-    }
-  }, []);
-
-  // ── Controls ────────────────────────────────────────────────────────────────
   const toggle = (e: React.MouseEvent) => {
     e.preventDefault();
     const a = audioElRef.current;
     if (!a) return;
-    if (a.paused) {
-      console.log("[DemoPlayer] play clicked:", { title, src: a.src, readyState: a.readyState, networkState: a.networkState });
-      a.load(); // force reload in case src changed without reloading
-      initWebAudio();
-      const ctx = audioCtxRef.current;
-      const doPlay = () => a.play().then(() => console.log("[DemoPlayer] play() resolved")).catch(err => console.error("[DemoPlayer] play() rejected:", err));
-      if (ctx && ctx.state === "suspended") {
-        ctx.resume().then(doPlay).catch(() => doPlay());
-      } else {
-        doPlay();
-      }
-    } else {
-      a.pause();
-    }
+    a.paused ? a.play().catch(() => {}) : a.pause();
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -160,7 +71,6 @@ function DemoPlayer({
     setMuted(v => !v);
   };
 
-  // ── Event listeners ─────────────────────────────────────────────────────────
   useEffect(() => {
     const a = audioElRef.current;
     if (!a) return;
@@ -170,21 +80,15 @@ function DemoPlayer({
       setProgress(dur > 0 ? (a.currentTime / dur) * 100 : 0);
     };
     const onDurationChange = () => setDuration(a.duration || 0);
-    const onError = () => console.error("[DemoPlayer] audio error:", { title, src: a.src, error: a.error, code: a.error?.code, message: a.error?.message });
-    const onLoadedMetadata = () => console.log("[DemoPlayer] metadata loaded:", { title, duration: a.duration, src: a.src });
     const onPlay = () => {
-      setPlaying(true); isPlayingRef.current = true; setBuffering(false); setActiveIndex(index);
-      startDraw();
+      setPlaying(true); setBuffering(false); setActiveIndex(index);
       sendGAEvent("event", "demo_play", { event_category: "Audio", event_label: title, value: index });
       fetch("/api/track-demo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) }).catch(() => {});
     };
-    const onPause = () => { setPlaying(false); isPlayingRef.current = false; stopDraw(); };
+    const onPause = () => setPlaying(false);
     const onWaiting = () => setBuffering(true);
     const onPlaying = () => setBuffering(false);
-    const onEnded = () => {
-      setPlaying(false); isPlayingRef.current = false;
-      setProgress(0); setDisplayTime(0); setActiveIndex(null); stopDraw();
-    };
+    const onEnded = () => { setPlaying(false); setProgress(0); setDisplayTime(0); setActiveIndex(null); };
     a.addEventListener("timeupdate", onTimeUpdate);
     a.addEventListener("durationchange", onDurationChange);
     a.addEventListener("play", onPlay);
@@ -192,8 +96,6 @@ function DemoPlayer({
     a.addEventListener("waiting", onWaiting);
     a.addEventListener("playing", onPlaying);
     a.addEventListener("ended", onEnded);
-    a.addEventListener("error", onError);
-    a.addEventListener("loadedmetadata", onLoadedMetadata);
     return () => {
       a.removeEventListener("timeupdate", onTimeUpdate);
       a.removeEventListener("durationchange", onDurationChange);
@@ -202,13 +104,9 @@ function DemoPlayer({
       a.removeEventListener("waiting", onWaiting);
       a.removeEventListener("playing", onPlaying);
       a.removeEventListener("ended", onEnded);
-      a.removeEventListener("error", onError);
-      a.removeEventListener("loadedmetadata", onLoadedMetadata);
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [index, title, setActiveIndex, startDraw, stopDraw]);
+  }, [index, title, setActiveIndex]);
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div
       className={`group relative rounded-2xl border-t-2 ${color} transition-all duration-500 ${isActive ? "ring-1 ring-[#D4AF37]/50" : "hover:ring-1 hover:ring-white/10"}`}
@@ -247,9 +145,19 @@ function DemoPlayer({
 
         {/* Player */}
         <div className="relative mt-auto rounded-xl bg-black/40 overflow-hidden px-3 pt-3 pb-2">
-          {/* Live waveform canvas */}
-          <canvas ref={canvasRef} width={320} height={60}
-            className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" />
+          {/* Static animated waveform decoration */}
+          <div className="absolute inset-0 flex items-center justify-center gap-px px-2 pointer-events-none" aria-hidden="true">
+            {WAVE_BARS.map((h, i) => (
+              <div key={i}
+                className="rounded-full bg-[#D4AF37] flex-1"
+                style={{
+                  height: `${h}px`,
+                  opacity: playing ? 0.5 : 0.1,
+                  animation: playing ? `barPulse ${0.6 + (i % 4) * 0.1}s ease-in-out ${(i % 5) * 0.08}s infinite alternate` : "none",
+                }}
+              />
+            ))}
+          </div>
 
           {/* Controls */}
           <div className="relative flex items-center gap-3">
@@ -264,13 +172,10 @@ function DemoPlayer({
             </button>
 
             <div className="flex-1 min-w-0">
-              {/* Progress track */}
               <div className="relative w-full h-5 flex items-center cursor-pointer" onClick={handleSeek}
                 role="slider" aria-label="Seekbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}>
                 <div className="relative w-full h-1 rounded-full bg-white/10">
-                  {/* Gold fill */}
                   <div className="h-full rounded-full bg-[#D4AF37]" style={{ width: `${progress}%` }} />
-                  {/* Scrubber circle */}
                   <div className="absolute top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-[#D4AF37] border border-black/20 shadow pointer-events-none"
                     style={{ left: `calc(${progress}% - 6px)` }} />
                 </div>
@@ -281,7 +186,6 @@ function DemoPlayer({
               </div>
             </div>
 
-            {/* Mute toggle */}
             <button type="button" onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"}
               className="shrink-0 text-white/25 hover:text-white/60 transition-colors">
               {muted
