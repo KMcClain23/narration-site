@@ -1095,8 +1095,132 @@ function TimelineView({
   );
 }
 
+// ─── Month view ───────────────────────────────────────────────────────────────
+
+const STATUS_PILL: Record<string, string> = {
+  audition:   "bg-purple-500/80 text-white",
+  contracted: "bg-blue-500/80 text-white",
+  recording:  "bg-yellow-500/80 text-black",
+  editing:    "bg-orange-500/80 text-white",
+  released:   "bg-emerald-500/80 text-white",
+};
+
+function MonthView({ cards }: { cards: BoardCard[] }) {
+  const [monthOffset, setMonthOffset] = useState(0);
+
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const viewDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+
+  const eventsByDay = useMemo(() => {
+    const map: Record<string, { card: BoardCard; type: "deadline" | "first15" }[]> = {};
+    for (const card of cards) {
+      if (card.deadline) (map[card.deadline] ??= []).push({ card, type: "deadline" });
+      if (card.first15_due) (map[card.first15_due] ??= []).push({ card, type: "first15" });
+    }
+    return map;
+  }, [cards]);
+
+  const firstDow = viewDate.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array<null>(firstDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="px-4 sm:px-6 py-6 max-w-7xl mx-auto">
+      {/* Navigation */}
+      <div className="flex items-center gap-2 mb-6">
+        <button onClick={() => setMonthOffset(o => o - 1)}
+          className="p-1.5 text-white/40 hover:text-white hover:bg-white/8 rounded-lg transition-colors">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <span className="text-sm text-white/50 font-medium text-center" style={{ minWidth: "13rem" }}>
+          {viewDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+        </span>
+        <button onClick={() => setMonthOffset(o => o + 1)}
+          className="p-1.5 text-white/40 hover:text-white hover:bg-white/8 rounded-lg transition-colors">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        {monthOffset !== 0 && (
+          <button onClick={() => setMonthOffset(0)}
+            className="text-xs text-[#D4AF37] border border-[#D4AF37]/30 px-3 py-1 rounded-full hover:bg-[#D4AF37]/10 transition-colors ml-1">
+            Today
+          </button>
+        )}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="rounded-xl overflow-hidden border border-white/8">
+        <div className="grid grid-cols-7 bg-[#0A0D3A]">
+          {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+            <div key={d} className="text-center text-[10px] font-bold uppercase tracking-widest text-white/30 py-2 border-b border-white/8">
+              {d}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7">
+          {cells.map((day, i) => {
+            if (day === null) {
+              return <div key={i} className="min-h-[90px] bg-[#06082A]/60 border-b border-r border-white/[0.04]" />;
+            }
+            const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const events = eventsByDay[dateStr] ?? [];
+            const isToday = dateStr === todayStr;
+            const hasEvents = events.length > 0;
+            const visible = events.slice(0, 3);
+            const overflow = events.length - 3;
+            return (
+              <div key={i}
+                className={`min-h-[90px] p-1.5 bg-[#06082A] border-b border-r border-white/[0.04] transition-opacity ${!hasEvents ? "opacity-40" : ""}`}>
+                <div className={`w-5 h-5 flex items-center justify-center mb-1 text-[10px] font-bold rounded-full ${isToday ? "bg-[#D4AF37] text-black" : "text-white/40"}`}>
+                  {day}
+                </div>
+                <div className="space-y-0.5">
+                  {visible.map(({ card, type }, ei) => type === "first15" ? (
+                    <Link key={`${card.id}-f15-${ei}`} href={`/board/card/${card.id}`}
+                      className="flex items-center gap-1 px-1 py-0.5 rounded text-[9px] bg-[#D4AF37]/15 text-[#D4AF37]/80 hover:bg-[#D4AF37]/25 transition-colors truncate">
+                      <span className="shrink-0 inline-block h-1.5 w-1.5 bg-[#D4AF37]/70 rounded-[1px]" style={{ transform: "rotate(45deg)" }} />
+                      <span className="truncate">{card.title}</span>
+                    </Link>
+                  ) : (
+                    <Link key={`${card.id}-dl-${ei}`} href={`/board/card/${card.id}`}
+                      className={`block px-1.5 py-0.5 rounded text-[9px] truncate hover:brightness-125 transition-all ${STATUS_PILL[card.status] ?? "bg-white/20 text-white"}`}>
+                      {card.title}
+                    </Link>
+                  ))}
+                  {overflow > 0 && <div className="text-[9px] text-white/30 pl-1">+{overflow} more</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="mt-4 flex flex-wrap gap-4">
+        {(["contracted","recording","editing"] as const).map(s => (
+          <div key={s} className="flex items-center gap-1.5">
+            <div className={`h-2 w-4 rounded-sm ${STATUS_PILL[s].split(" ")[0]}`} />
+            <span className="text-[10px] text-white/30 capitalize">{s}</span>
+          </div>
+        ))}
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block h-2 w-2 bg-[#D4AF37]/60 rounded-[1px]" style={{ transform: "rotate(45deg)" }} />
+          <span className="text-[10px] text-white/30">First 15 due</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BoardPage() {
   const [view, setView] = useState<"board"|"timeline"|"dashboard">("dashboard");
+  const [tlSubView, setTlSubView] = useState<"gantt"|"month">("gantt");
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [cards, setCards] = useState<BoardCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1835,50 +1959,67 @@ export default function BoardPage() {
         <DashboardView cards={cards} onSwitchToBoard={() => { setView("board"); localStorage.setItem("boardView", "board"); }} />
       ) : view === "timeline" ? (
         <>
-          {/* Mobile: simple sorted list (Gantt too wide for small screens) */}
-          <div className="md:hidden px-4 py-6 space-y-2">
-            {cards
-              .filter(c => c.status !== "released")
-              .sort(sortCards)
-              .map(card => {
-                const col = COLUMNS.find(c => c.id === card.status);
-                return (
-                  <Link key={card.id} href={`/board/card/${card.id}`}
-                    className="flex items-center gap-3 rounded-xl border border-white/8 bg-[#0A0D3A] px-4 py-3 hover:border-white/20 transition-colors">
-                    {card.cover_url
-                      ? <img src={card.cover_url} alt={card.title} className="h-12 w-8 object-cover rounded shrink-0"/>
-                      : <div className="h-12 w-8 bg-white/5 rounded shrink-0"/>}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">{card.title}</p>
-                      {card.author && <p className="text-xs text-[#D4AF37]/70 truncate">{card.author}</p>}
-                      <div className="flex gap-3 mt-0.5 text-[10px] text-white/30">
-                        {card.deadline    && <span>Deadline: {card.deadline}</span>}
-                        {card.first15_due && <span>First 15: {card.first15_due}</span>}
-                      </div>
-                    </div>
-                    <span className={`text-[10px] font-bold uppercase shrink-0 ${col?.text ?? "text-white/30"}`}>
-                      {card.status}
-                    </span>
-                  </Link>
-                );
-              })}
-            {cards.filter(c => c.status !== "released").length === 0 && (
-              <p className="text-sm text-white/25 text-center py-16">No active projects</p>
-            )}
+          {/* Sub-view toggle */}
+          <div className="flex items-center gap-1 px-4 sm:px-6 pt-4 border-b border-white/[0.06]">
+            {(["gantt", "month"] as const).map(sv => (
+              <button key={sv} onClick={() => setTlSubView(sv)}
+                className={`relative text-xs font-semibold px-3 py-2 transition-colors ${tlSubView === sv ? "text-[#D4AF37]" : "text-white/35 hover:text-white/60"}`}>
+                {sv === "gantt" ? "Gantt" : "Month"}
+                {tlSubView === sv && <span className="absolute bottom-0 inset-x-0 h-[2px] bg-[#D4AF37] rounded-full" />}
+              </button>
+            ))}
           </div>
-          {/* Desktop: full Gantt chart */}
-          <div className="hidden md:block">
-            <TimelineView
-              cards={cards}
-              onStatusChange={async (id, status) => {
-                setCards(p => p.map(c => c.id === id ? { ...c, status } : c));
-                await fetch("/api/board", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
-              }}
-              onCardUpdate={(id, updates) => {
-                setCards(p => p.map(c => c.id === id ? { ...c, ...updates } : c));
-              }}
-            />
-          </div>
+
+          {tlSubView === "month" ? (
+            <MonthView cards={cards} />
+          ) : (
+            <>
+              {/* Mobile: simple sorted list (Gantt too wide for small screens) */}
+              <div className="md:hidden px-4 py-6 space-y-2">
+                {cards
+                  .filter(c => c.status !== "released")
+                  .sort(sortCards)
+                  .map(card => {
+                    const col = COLUMNS.find(c => c.id === card.status);
+                    return (
+                      <Link key={card.id} href={`/board/card/${card.id}`}
+                        className="flex items-center gap-3 rounded-xl border border-white/8 bg-[#0A0D3A] px-4 py-3 hover:border-white/20 transition-colors">
+                        {card.cover_url
+                          ? <img src={card.cover_url} alt={card.title} className="h-12 w-8 object-cover rounded shrink-0"/>
+                          : <div className="h-12 w-8 bg-white/5 rounded shrink-0"/>}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-white truncate">{card.title}</p>
+                          {card.author && <p className="text-xs text-[#D4AF37]/70 truncate">{card.author}</p>}
+                          <div className="flex gap-3 mt-0.5 text-[10px] text-white/30">
+                            {card.deadline    && <span>Deadline: {card.deadline}</span>}
+                            {card.first15_due && <span>First 15: {card.first15_due}</span>}
+                          </div>
+                        </div>
+                        <span className={`text-[10px] font-bold uppercase shrink-0 ${col?.text ?? "text-white/30"}`}>
+                          {card.status}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                {cards.filter(c => c.status !== "released").length === 0 && (
+                  <p className="text-sm text-white/25 text-center py-16">No active projects</p>
+                )}
+              </div>
+              {/* Desktop: full Gantt chart */}
+              <div className="hidden md:block">
+                <TimelineView
+                  cards={cards}
+                  onStatusChange={async (id, status) => {
+                    setCards(p => p.map(c => c.id === id ? { ...c, status } : c));
+                    await fetch("/api/board", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
+                  }}
+                  onCardUpdate={(id, updates) => {
+                    setCards(p => p.map(c => c.id === id ? { ...c, ...updates } : c));
+                  }}
+                />
+              </div>
+            </>
+          )}
         </>
 
       ) : (
