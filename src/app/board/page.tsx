@@ -1525,8 +1525,7 @@ export default function BoardPage() {
 
       {/* Modal */}
       {(showForm||editCard) && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
-          onClick={e=>{if(e.target===e.currentTarget){setShowForm(false);setEditCard(null);}}}>
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto">
           <div className="w-full max-w-2xl bg-[#0A0D3A] border border-[#1A2070] rounded-2xl shadow-2xl my-8">
             <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/8">
               <h2 className="font-bold text-white text-lg">{editCard?"Edit project":"New project"}</h2>
