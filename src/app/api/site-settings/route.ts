@@ -15,6 +15,24 @@ export async function GET(req: Request) {
   return NextResponse.json({ value: data?.value ?? null });
 }
 
+export async function PATCH(req: Request) {
+  try {
+    const { key, value } = await req.json();
+    if (!key || value === undefined) {
+      return NextResponse.json({ error: "key and value required" }, { status: 400 });
+    }
+    const stored = typeof value === "string" ? value : JSON.stringify(value);
+    const { error } = await supabaseAdmin
+      .from("site_settings")
+      .upsert({ key, value: stored, updated_at: new Date().toISOString() }, { onConflict: "key" });
+    if (error) throw error;
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Failed to update setting";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const { key, value } = await req.json();

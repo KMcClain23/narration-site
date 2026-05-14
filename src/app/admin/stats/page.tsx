@@ -8,6 +8,7 @@ import AuthorManager from "./AuthorManager";
 import CoNarratorManager from "./CoNarratorManager";
 import TestimonialQueue from "./TestimonialQueue";
 import AvailabilityToggle from "./AvailabilityToggle";
+import BookingAvailability from "./BookingAvailability";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,11 @@ export default async function AdminStatsPage() {
   const { data: settingRow } = await supabaseAdmin
     .from("site_settings").select("value").eq("key", "accepting_projects").single();
   const acceptingProjects = settingRow?.value !== "false";
+
+  const { data: monthsRow } = await supabaseAdmin
+    .from("site_settings").select("value").eq("key", "available_months").single();
+  let availableMonths: number[] = [8, 9, 10, 11];
+  try { if (monthsRow?.value) availableMonths = JSON.parse(monthsRow.value); } catch {}
 
   const totalPlays = (await redis.get<number>("total_demo_plays")) ?? 0;
   const rawInquiries = await redis.lrange(INQUIRY_KEY, 0, -1);
@@ -109,6 +115,7 @@ export default async function AdminStatsPage() {
         {/* Availability toggle */}
         <div className="mt-6">
           <AvailabilityToggle initial={acceptingProjects} />
+          <BookingAvailability initial={availableMonths} />
         </div>
 
         {/* 1. INBOX: NARRATION REQUESTS */}

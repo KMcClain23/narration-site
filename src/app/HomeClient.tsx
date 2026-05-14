@@ -11,8 +11,6 @@ const BOOKINGS_URL =
 const BANNER_URL =
   "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerBanner.png";
 
-// ↓ Update this string to change the booking window shown in the hero
-const BOOKING_WINDOW = "Jun–Aug 2026";
 const PROFILE_URL =
   "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile.jpg";
 
@@ -495,7 +493,7 @@ function TestimonialsCarousel() {
   );
 }
 
-function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number; words: number } }) {
+function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number; words: number }; bookingWindow?: string }) {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -588,8 +586,8 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
               </span>
               <span className={`text-xs font-medium ${acceptingProjects ? "text-emerald-400" : "text-red-400"}`}>
                 {acceptingProjects ? "Currently accepting new projects" : "Not currently accepting new projects"}
-                {acceptingProjects && BOOKING_WINDOW && (
-                  <span className="text-white/50 font-normal"> · Booking {BOOKING_WINDOW}</span>
+                {acceptingProjects && bookingWindow && (
+                  <span className="text-white/50 font-normal"> · Booking {bookingWindow}</span>
                 )}
               </span>
             </div>
@@ -950,6 +948,6 @@ function HomeContent({ acceptingProjects = true, stats }: { acceptingProjects?: 
   );
 }
 
-export default function HomeClient({ acceptingProjects = true, stats }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number; words: number } }) {
-  return <HomeContent acceptingProjects={acceptingProjects} stats={stats} />;
+export default function HomeClient({ acceptingProjects = true, stats, bookingWindow }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number; words: number }; bookingWindow?: string }) {
+  return <HomeContent acceptingProjects={acceptingProjects} stats={stats} bookingWindow={bookingWindow} />;
 }

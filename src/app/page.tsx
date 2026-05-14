@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import HomeClient from "./HomeClient";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { formatBookingWindow } from "@/lib/format-booking-window";
 
 export default async function Page() {
   let acceptingProjects = true;
@@ -14,6 +15,13 @@ export default async function Page() {
   } catch {
     // Table may not exist yet — default to true
   }
+
+  let bookingWindow = formatBookingWindow([8, 9, 10, 11]); // fallback default
+  try {
+    const { data: monthsRow } = await supabaseAdmin
+      .from("site_settings").select("value").eq("key", "available_months").single();
+    if (monthsRow?.value) bookingWindow = formatBookingWindow(JSON.parse(monthsRow.value));
+  } catch {}
 
   let stats = { titles: 0, authors: 0, co_narrators: 0, genres: 0, words: 0 };
   try {
@@ -46,7 +54,7 @@ export default async function Page() {
 
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#050814]" />}>
-      <HomeClient acceptingProjects={acceptingProjects} stats={stats} />
+      <HomeClient acceptingProjects={acceptingProjects} stats={stats} bookingWindow={bookingWindow} />
     </Suspense>
   );
 }
