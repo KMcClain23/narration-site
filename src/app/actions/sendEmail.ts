@@ -114,6 +114,8 @@ export async function sendEmail(formData: FormData) {
     name: formData.get("name"),
     email: formData.get("email"),
     message: formData.get("message"),
+    genre: formData.get("genre") ?? undefined,
+    word_count: formData.get("word_count") ?? undefined,
   });
 
   if (!validatedFields.success) {
@@ -148,12 +150,36 @@ export async function sendEmail(formData: FormData) {
         subject: `New Project Inquiry: ${name}`,
         replyTo: email,
         html: internalTemplate(name, email, message, genre, word_count),
+        text: [
+          `New Project Inquiry from ${name}`,
+          "",
+          `Name:        ${name}`,
+          `Email:       ${email}`,
+          `Genre:       ${genre || "Not provided"}`,
+          `Word Count:  ${word_count || "Not provided"}`,
+          "",
+          "Project Details:",
+          message,
+        ].join("\n"),
       }),
       resend.emails.send({
         from: "Dean Miller Narration <Dean@dmnarration.com>",
         to: [email],
         subject: "Inquiry Received - Dean Miller Narration",
         html: clientTemplate(name),
+        text: [
+          `Hi ${name},`,
+          "",
+          "Thanks for reaching out! I've received your project details and will review them shortly.",
+          "You can typically expect a response within 24–48 hours.",
+          "",
+          `Listen to demos: ${SITE_URL}/#demos`,
+          `Book a 15-min call: ${BOOKINGS_URL}`,
+          "",
+          "Best,",
+          "Dean Miller",
+          "Audiobook Narrator",
+        ].join("\n"),
       })
     ]);
 
