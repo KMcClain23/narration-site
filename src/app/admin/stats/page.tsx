@@ -49,32 +49,20 @@ export default async function AdminStatsPage() {
     (c: CardRow) => c.deadline || c.first15_due
   );
 
-  function parseDateLocal(s: string) {
-    const [y, m, d] = s.split("-").map(Number);
-    return new Date(y, m - 1, d);
-  }
-
   const scheduleNow = new Date();
   const monthSlots = Array.from({ length: 8 }, (_, i) => {
     const monthStart = new Date(scheduleNow.getFullYear(), scheduleNow.getMonth() + i, 1);
-    const monthEnd   = new Date(scheduleNow.getFullYear(), scheduleNow.getMonth() + i + 1, 0);
     const key = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, "0")}`;
     const isDifferentYear = monthStart.getFullYear() !== scheduleNow.getFullYear();
     const label = isDifferentYear
       ? monthStart.toLocaleDateString("en-US", { month: "short", year: "2-digit" })
       : monthStart.toLocaleDateString("en-US", { month: "short" });
 
-    // A project is active in this month if its work window (first15_due → deadline) overlaps.
-    // If only one date exists, the project is active only in that date's month.
     const active = datedCards
-      .filter((c: CardRow) => {
-        const workStart = parseDateLocal(c.first15_due ?? c.deadline!);
-        const workEnd   = parseDateLocal(c.deadline   ?? c.first15_due!);
-        return workStart <= monthEnd && workEnd >= monthStart;
-      })
+      .filter((c: CardRow) => c.deadline?.startsWith(key))
       .map((c: CardRow) => ({
         ...c,
-        deadlineDue: c.deadline?.startsWith(key)   ?? false,
+        deadlineDue: true,
         first15Due:  c.first15_due?.startsWith(key) ?? false,
       }));
 
