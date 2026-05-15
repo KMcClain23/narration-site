@@ -161,62 +161,93 @@ export default async function AdminStatsPage() {
         </div>
 
         {/* Monthly schedule */}
-        <div className="mt-4 rounded-2xl border border-[#1A2550] bg-[#0B1224] p-5">
-          <div className="flex items-center justify-between mb-1">
-            <p className="font-semibold text-white text-sm">Monthly Schedule</p>
-            <p className="text-[10px] text-white/30">Projects actively in progress each month</p>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mt-4">
+        <div className="mt-4 rounded-2xl border border-[#1A2550] bg-[#0B1224] p-6">
+          <p className="font-semibold text-white text-sm mb-5">Monthly Schedule</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {monthSlots.map(({ key, label, active }) => {
               const count = active.length;
               const isCurrent = key === `${scheduleNow.getFullYear()}-${String(scheduleNow.getMonth() + 1).padStart(2, "0")}`;
-              const badgeClass = count >= 5 ? "bg-red-500/25 text-red-400"
-                : count >= 3 ? "bg-orange-500/25 text-orange-400"
-                : count >= 1 ? "bg-[#D4AF37]/20 text-[#D4AF37]"
-                : "";
+              const cardBorder = count === 0 ? "border-white/5"
+                : count <= 2 ? "border-emerald-500/20"
+                : count <= 4 ? "border-orange-500/25"
+                : "border-red-500/30";
+              const cardBg = count === 0 ? "bg-[#0A0D3A]/40"
+                : count <= 2 ? "bg-emerald-950/25"
+                : count <= 4 ? "bg-orange-950/20"
+                : "bg-red-950/20";
+              const countColor = count === 0 ? "text-white/15"
+                : count <= 2 ? "text-emerald-400"
+                : count <= 4 ? "text-orange-400"
+                : "text-red-400";
+              const barColor = count === 0 ? ""
+                : count <= 2 ? "bg-emerald-500/50"
+                : count <= 4 ? "bg-orange-500/50"
+                : "bg-red-500/60";
+              const MAX_BAR = 5;
               return (
-                <div key={key} className={`rounded-xl border p-2.5 min-h-[80px] ${count > 0 ? "border-white/10 bg-[#0A0D3A]" : "border-white/5 bg-[#0A0D3A]/40 opacity-30"}`}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className={`text-[10px] font-bold uppercase tracking-wider ${isCurrent ? "text-[#D4AF37]" : "text-white/50"}`}>{label}</span>
-                    {count > 0 && (
-                      <span className={`text-[10px] font-bold rounded-full px-1.5 leading-4 ${badgeClass}`}>{count}</span>
+                <div key={key} className={`rounded-xl border p-4 ${cardBorder} ${cardBg}`}>
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className={`text-xs font-bold uppercase tracking-widest ${isCurrent ? "text-[#D4AF37]" : "text-white/45"}`}>{label}</p>
+                      <p className={`text-[10px] mt-0.5 ${count === 0 ? "text-emerald-400/60" : count <= 2 ? "text-emerald-400/50" : count <= 4 ? "text-orange-400/50" : "text-red-400/50"}`}>
+                        {count === 0 ? "Open" : count <= 2 ? "Light" : count <= 4 ? "Busy" : "Full"}
+                      </p>
+                    </div>
+                    <span className={`text-3xl font-bold tabular-nums leading-none ${countColor}`}>{count}</span>
+                  </div>
+
+                  {/* Capacity bar */}
+                  <div className="flex gap-0.5 mb-3">
+                    {Array.from({ length: MAX_BAR }).map((_, i) => (
+                      <div key={i} className={`h-1 flex-1 rounded-full ${i < count ? barColor : "bg-white/8"}`} />
+                    ))}
+                    {count > MAX_BAR && (
+                      <div className="h-1 w-1.5 rounded-full bg-red-500/60" />
                     )}
                   </div>
-                  <div className="space-y-0.5">
-                    {active.map(c => (
+
+                  {/* Project list */}
+                  <div className="space-y-1">
+                    {active.slice(0, 5).map(c => (
                       <a key={c.id} href={`/board/card/${c.id}`}
-                        className="flex items-center gap-0.5 text-[9px] hover:text-white transition-colors leading-snug truncate group/card">
+                        className="flex items-center gap-1.5 text-[11px] hover:text-white transition-colors truncate group/card">
                         {c.deadlineDue
-                          ? <span className="shrink-0 h-1.5 w-1.5 rounded-full bg-white/40 group-hover/card:bg-white/70" />
+                          ? <span className="shrink-0 h-1.5 w-1.5 rounded-full bg-white/50 group-hover/card:bg-white" />
                           : c.first15Due
-                          ? <span className="shrink-0 inline-block h-1 w-1 bg-[#D4AF37]/50 rounded-[1px] group-hover/card:bg-[#D4AF37]" style={{ transform: "rotate(45deg)" }} />
-                          : <span className="shrink-0 h-1 w-1 rounded-full bg-white/15" />
+                          ? <span className="shrink-0 inline-block h-1.5 w-1.5 bg-[#D4AF37]/60 rounded-[1px] group-hover/card:bg-[#D4AF37]" style={{ transform: "rotate(45deg)" }} />
+                          : <span className="shrink-0 h-1 w-1 rounded-full bg-white/20" />
                         }
-                        <span className={`truncate ${c.deadlineDue ? "text-white/80" : "text-white/40"}`}>{c.title}</span>
+                        <span className={`truncate ${c.deadlineDue ? "text-white/80" : "text-white/45"}`}>{c.title}</span>
                       </a>
                     ))}
+                    {active.length > 5 && (
+                      <p className="text-[10px] text-white/25 pl-3">+{active.length - 5} more</p>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
-          <div className="mt-3 flex flex-wrap gap-4">
+
+          {/* Legend */}
+          <div className="mt-4 pt-4 border-t border-white/[0.06] flex flex-wrap items-center gap-x-5 gap-y-2">
             <div className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
+              <span className="h-1.5 w-1.5 rounded-full bg-white/50" />
               <span className="text-[10px] text-white/30">Deadline this month</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="inline-block h-1 w-1 bg-[#D4AF37]/50 rounded-[1px]" style={{ transform: "rotate(45deg)" }} />
+              <span className="inline-block h-1.5 w-1.5 bg-[#D4AF37]/60 rounded-[1px]" style={{ transform: "rotate(45deg)" }} />
               <span className="text-[10px] text-white/30">First 15 due this month</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="h-1 w-1 rounded-full bg-white/15" />
-              <span className="text-[10px] text-white/30">In progress (no event this month)</span>
+              <span className="h-1 w-1 rounded-full bg-white/20" />
+              <span className="text-[10px] text-white/30">Active (no event this month)</span>
             </div>
             <div className="flex items-center gap-3 ml-auto">
-              <span className="text-[10px] text-[#D4AF37]/70">1–2 open</span>
-              <span className="text-[10px] text-orange-400/70">3–4 busy</span>
-              <span className="text-[10px] text-red-400/70">5+ full</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500/50" /><span className="text-[10px] text-emerald-400/70">Open</span></span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500/50" /><span className="text-[10px] text-orange-400/70">Busy</span></span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500/60" /><span className="text-[10px] text-red-400/70">Full</span></span>
             </div>
           </div>
         </div>
