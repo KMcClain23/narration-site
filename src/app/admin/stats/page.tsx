@@ -39,6 +39,29 @@ export default async function AdminStatsPage() {
   let availableMonths: number[] = [8, 9, 10, 11];
   try { if (monthsRow?.value) availableMonths = JSON.parse(monthsRow.value); } catch {}
 
+  const { data: cardRows } = await supabaseAdmin
+    .from("board_cards")
+    .select("id, title, deadline, first15_due, status")
+    .neq("status", "released");
+
+  type CardRow = { id: string; title: string; deadline: string | null; first15_due: string | null; status: string };
+  const datedCards: CardRow[] = (cardRows ?? []).filter(
+    (c: CardRow) => c.deadline || c.first15_due
+  );
+
+  const scheduleNow = new Date();
+  const monthSlots = Array.from({ length: 8 }, (_, i) => {
+    const d = new Date(scheduleNow.getFullYear(), scheduleNow.getMonth() + i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const isDifferentYear = d.getFullYear() !== scheduleNow.getFullYear();
+    const label = isDifferentYear
+      ? d.toLocaleDateString("en-US", { month: "short", year: "2-digit" })
+      : d.toLocaleDateString("en-US", { month: "short" });
+    const deadlines = datedCards.filter((c: CardRow) => c.deadline?.startsWith(key));
+    const first15s = datedCards.filter((c: CardRow) => c.first15_due?.startsWith(key) && !c.deadline?.startsWith(key));
+    return { key, label, deadlines, first15s };
+  });
+
   const totalPlays = (await redis.get<number>("total_demo_plays")) ?? 0;
   const rawInquiries = await redis.lrange(INQUIRY_KEY, 0, -1);
   const inquiries = rawInquiries.map((i: any) => (typeof i === 'string' ? JSON.parse(i) : i));
@@ -116,6 +139,52 @@ export default async function AdminStatsPage() {
         <div className="mt-6">
           <AvailabilityToggle initial={acceptingProjects} />
           <BookingAvailability initial={availableMonths} />
+        </div>
+
+        {/* Monthly schedule */}
+        <div className="mt-4 rounded-2xl border border-[#1A2550] bg-[#0B1224] p-5">
+          <p className="font-semibold text-white text-sm mb-4">Monthly Schedule</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+            {monthSlots.map(({ key, label, deadlines, first15s }) => {
+              const total = deadlines.length + first15s.length;
+              const isCurrent = key === `${scheduleNow.getFullYear()}-${String(scheduleNow.getMonth() + 1).padStart(2, "0")}`;
+              return (
+                <div key={key} className={`rounded-xl border p-2.5 min-h-[72px] ${total > 0 ? "border-[#D4AF37]/25 bg-[#0A0D3A]" : "border-white/5 bg-[#0A0D3A]/40 opacity-35"}`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider ${isCurrent ? "text-[#D4AF37]" : "text-white/50"}`}>{label}</span>
+                    {total > 0 && (
+                      <span className="text-[10px] font-bold bg-[#D4AF37]/20 text-[#D4AF37] rounded-full px-1.5 leading-4">{total}</span>
+                    )}
+                  </div>
+                  <div className="space-y-0.5">
+                    {deadlines.map(c => (
+                      <a key={c.id} href={`/board/card/${c.id}`}
+                        className="block text-[9px] text-white/65 truncate hover:text-white transition-colors leading-snug">
+                        {c.title}
+                      </a>
+                    ))}
+                    {first15s.map(c => (
+                      <a key={c.id} href={`/board/card/${c.id}`}
+                        className="flex items-center gap-0.5 text-[9px] text-[#D4AF37]/55 hover:text-[#D4AF37] transition-colors leading-snug truncate">
+                        <span className="shrink-0 inline-block h-1 w-1 bg-current rounded-[1px]" style={{ transform: "rotate(45deg)" }} />
+                        <span className="truncate">{c.title}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-3 flex gap-4">
+            <div className="flex items-center gap-1.5">
+              <div className="h-1.5 w-3 rounded-sm bg-white/35" />
+              <span className="text-[10px] text-white/30">Deadline</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 bg-[#D4AF37]/55 rounded-[1px]" style={{ transform: "rotate(45deg)" }} />
+              <span className="text-[10px] text-white/30">First 15 due</span>
+            </div>
+          </div>
         </div>
 
         {/* 1. INBOX: NARRATION REQUESTS */}
