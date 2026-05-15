@@ -49,17 +49,36 @@ export default async function AdminStatsPage() {
     (c: CardRow) => c.deadline || c.first15_due
   );
 
+  function parseDateLocal(s: string) {
+    const [y, m, d] = s.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+
   const scheduleNow = new Date();
   const monthSlots = Array.from({ length: 8 }, (_, i) => {
-    const d = new Date(scheduleNow.getFullYear(), scheduleNow.getMonth() + i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const isDifferentYear = d.getFullYear() !== scheduleNow.getFullYear();
+    const monthStart = new Date(scheduleNow.getFullYear(), scheduleNow.getMonth() + i, 1);
+    const monthEnd   = new Date(scheduleNow.getFullYear(), scheduleNow.getMonth() + i + 1, 0);
+    const key = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, "0")}`;
+    const isDifferentYear = monthStart.getFullYear() !== scheduleNow.getFullYear();
     const label = isDifferentYear
-      ? d.toLocaleDateString("en-US", { month: "short", year: "2-digit" })
-      : d.toLocaleDateString("en-US", { month: "short" });
-    const deadlines = datedCards.filter((c: CardRow) => c.deadline?.startsWith(key));
-    const first15s = datedCards.filter((c: CardRow) => c.first15_due?.startsWith(key) && !c.deadline?.startsWith(key));
-    return { key, label, deadlines, first15s };
+      ? monthStart.toLocaleDateString("en-US", { month: "short", year: "2-digit" })
+      : monthStart.toLocaleDateString("en-US", { month: "short" });
+
+    // A project is active in this month if its work window (first15_due → deadline) overlaps.
+    // If only one date exists, the project is active only in that date's month.
+    const active = datedCards
+      .filter((c: CardRow) => {
+        const workStart = parseDateLocal(c.first15_due ?? c.deadline!);
+        const workEnd   = parseDateLocal(c.deadline   ?? c.first15_due!);
+        return workStart <= monthEnd && workEnd >= monthStart;
+      })
+      .map((c: CardRow) => ({
+        ...c,
+        deadlineDue: c.deadline?.startsWith(key)   ?? false,
+        first15Due:  c.first15_due?.startsWith(key) ?? false,
+      }));
+
+    return { key, label, active };
   });
 
   const totalPlays = (await redis.get<number>("total_demo_plays")) ?? 0;
@@ -143,31 +162,37 @@ export default async function AdminStatsPage() {
 
         {/* Monthly schedule */}
         <div className="mt-4 rounded-2xl border border-[#1A2550] bg-[#0B1224] p-5">
-          <p className="font-semibold text-white text-sm mb-4">Monthly Schedule</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-            {monthSlots.map(({ key, label, deadlines, first15s }) => {
-              const total = deadlines.length + first15s.length;
+          <div className="flex items-center justify-between mb-1">
+            <p className="font-semibold text-white text-sm">Monthly Schedule</p>
+            <p className="text-[10px] text-white/30">Projects actively in progress each month</p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mt-4">
+            {monthSlots.map(({ key, label, active }) => {
+              const count = active.length;
               const isCurrent = key === `${scheduleNow.getFullYear()}-${String(scheduleNow.getMonth() + 1).padStart(2, "0")}`;
+              const badgeClass = count >= 5 ? "bg-red-500/25 text-red-400"
+                : count >= 3 ? "bg-orange-500/25 text-orange-400"
+                : count >= 1 ? "bg-[#D4AF37]/20 text-[#D4AF37]"
+                : "";
               return (
-                <div key={key} className={`rounded-xl border p-2.5 min-h-[72px] ${total > 0 ? "border-[#D4AF37]/25 bg-[#0A0D3A]" : "border-white/5 bg-[#0A0D3A]/40 opacity-35"}`}>
+                <div key={key} className={`rounded-xl border p-2.5 min-h-[80px] ${count > 0 ? "border-white/10 bg-[#0A0D3A]" : "border-white/5 bg-[#0A0D3A]/40 opacity-30"}`}>
                   <div className="flex items-center justify-between mb-1.5">
                     <span className={`text-[10px] font-bold uppercase tracking-wider ${isCurrent ? "text-[#D4AF37]" : "text-white/50"}`}>{label}</span>
-                    {total > 0 && (
-                      <span className="text-[10px] font-bold bg-[#D4AF37]/20 text-[#D4AF37] rounded-full px-1.5 leading-4">{total}</span>
+                    {count > 0 && (
+                      <span className={`text-[10px] font-bold rounded-full px-1.5 leading-4 ${badgeClass}`}>{count}</span>
                     )}
                   </div>
                   <div className="space-y-0.5">
-                    {deadlines.map(c => (
+                    {active.map(c => (
                       <a key={c.id} href={`/board/card/${c.id}`}
-                        className="block text-[9px] text-white/65 truncate hover:text-white transition-colors leading-snug">
-                        {c.title}
-                      </a>
-                    ))}
-                    {first15s.map(c => (
-                      <a key={c.id} href={`/board/card/${c.id}`}
-                        className="flex items-center gap-0.5 text-[9px] text-[#D4AF37]/55 hover:text-[#D4AF37] transition-colors leading-snug truncate">
-                        <span className="shrink-0 inline-block h-1 w-1 bg-current rounded-[1px]" style={{ transform: "rotate(45deg)" }} />
-                        <span className="truncate">{c.title}</span>
+                        className="flex items-center gap-0.5 text-[9px] hover:text-white transition-colors leading-snug truncate group/card">
+                        {c.deadlineDue
+                          ? <span className="shrink-0 h-1.5 w-1.5 rounded-full bg-white/40 group-hover/card:bg-white/70" />
+                          : c.first15Due
+                          ? <span className="shrink-0 inline-block h-1 w-1 bg-[#D4AF37]/50 rounded-[1px] group-hover/card:bg-[#D4AF37]" style={{ transform: "rotate(45deg)" }} />
+                          : <span className="shrink-0 h-1 w-1 rounded-full bg-white/15" />
+                        }
+                        <span className={`truncate ${c.deadlineDue ? "text-white/80" : "text-white/40"}`}>{c.title}</span>
                       </a>
                     ))}
                   </div>
@@ -175,14 +200,23 @@ export default async function AdminStatsPage() {
               );
             })}
           </div>
-          <div className="mt-3 flex gap-4">
+          <div className="mt-3 flex flex-wrap gap-4">
             <div className="flex items-center gap-1.5">
-              <div className="h-1.5 w-3 rounded-sm bg-white/35" />
-              <span className="text-[10px] text-white/30">Deadline</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
+              <span className="text-[10px] text-white/30">Deadline this month</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="inline-block h-1.5 w-1.5 bg-[#D4AF37]/55 rounded-[1px]" style={{ transform: "rotate(45deg)" }} />
-              <span className="text-[10px] text-white/30">First 15 due</span>
+              <span className="inline-block h-1 w-1 bg-[#D4AF37]/50 rounded-[1px]" style={{ transform: "rotate(45deg)" }} />
+              <span className="text-[10px] text-white/30">First 15 due this month</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-1 w-1 rounded-full bg-white/15" />
+              <span className="text-[10px] text-white/30">In progress (no event this month)</span>
+            </div>
+            <div className="flex items-center gap-3 ml-auto">
+              <span className="text-[10px] text-[#D4AF37]/70">1–2 open</span>
+              <span className="text-[10px] text-orange-400/70">3–4 busy</span>
+              <span className="text-[10px] text-red-400/70">5+ full</span>
             </div>
           </div>
         </div>
