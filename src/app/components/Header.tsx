@@ -14,6 +14,9 @@ const BOOKINGS_URL =
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminKey, setAdminKey] = useState("");
+  const [adminError, setAdminError] = useState("");
   const pathname = usePathname();
   const router = useRouter();
 
@@ -96,23 +99,31 @@ export default function Header() {
       secretClicks.current = 0;
       e.preventDefault();
 
-      const key = window.prompt("Admin key:");
-      if (!key) return;
+      setAdminKey("");
+      setAdminError("");
+      setShowAdminModal(true);
+    }
+  };
 
-      fetch("/api/admin/login", {
+  const submitAdminKey = async () => {
+    if (!adminKey) return;
+    setAdminError("");
+    try {
+      const r = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key }),
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data.success) {
-            router.push("/admin/stats");
-          } else {
-            alert("Invalid key.");
-          }
-        })
-        .catch(() => alert("Login failed."));
+        body: JSON.stringify({ key: adminKey }),
+      });
+      const data = await r.json();
+      if (data.success) {
+        setShowAdminModal(false);
+        router.push("/admin/stats");
+      } else {
+        setAdminError("Invalid key.");
+        setAdminKey("");
+      }
+    } catch {
+      setAdminError("Login failed. Try again.");
     }
   };
 
@@ -264,6 +275,36 @@ export default function Header() {
           </nav>
         </div>
       ) : null}
+
+      {/* Admin key modal */}
+      {showAdminModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onKeyDown={e => { if (e.key === "Escape") setShowAdminModal(false); }}>
+          <div className="bg-[#0A0D3A] border border-[#1A2070] rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+            <h2 className="text-white font-bold text-base mb-4">Admin Access</h2>
+            <input
+              type="password"
+              autoFocus
+              placeholder="Enter admin key"
+              value={adminKey}
+              onChange={e => { setAdminKey(e.target.value); setAdminError(""); }}
+              onKeyDown={e => { if (e.key === "Enter") submitAdminKey(); }}
+              className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+            />
+            {adminError && <p className="text-red-400 text-xs mt-2">{adminError}</p>}
+            <div className="flex gap-3 mt-4">
+              <button onClick={submitAdminKey}
+                className="flex-1 bg-[#D4AF37] text-black text-sm font-bold py-2 rounded-xl hover:bg-[#E0C15A] transition-colors">
+                Login
+              </button>
+              <button onClick={() => setShowAdminModal(false)}
+                className="flex-1 border border-white/15 text-white/60 text-sm py-2 rounded-xl hover:text-white hover:border-white/30 transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
