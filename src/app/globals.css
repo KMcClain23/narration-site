@@ -86,3 +86,37 @@ body {
 html {
   scroll-behavior: smooth;
 }
+
+/* ─── Book page slide transitions (View Transitions API) ─────────────────── */
+@keyframes slide-from-right {
+  from { transform: translateX(6%); opacity: 0; }
+  to   { transform: translateX(0);  opacity: 1; }
+}
+@keyframes slide-from-left {
+  from { transform: translateX(-6%); opacity: 0; }
+  to   { transform: translateX(0);   opacity: 1; }
+}
+@keyframes slide-to-left {
+  from { transform: translateX(0);   opacity: 1; }
+  to   { transform: translateX(-6%); opacity: 0; }
+}
+@keyframes slide-to-right {
+  from { transform: translateX(0);  opacity: 1; }
+  to   { transform: translateX(6%); opacity: 0; }
+}
+
+/* Default (next book): old page slides left, new slides in from right */
+::view-transition-old(root) {
+  animation: 320ms ease both slide-to-left;
+}
+::view-transition-new(root) {
+  animation: 320ms ease both slide-from-right;
+}
+
+/* Prev book: old page slides right, new slides in from left */
+:root[data-nav-dir="prev"]::view-transition-old(root) {
+  animation: 320ms ease both slide-to-right;
+}
+:root[data-nav-dir="prev"]::view-transition-new(root) {
+  animation: 320ms ease both slide-from-left;
+}

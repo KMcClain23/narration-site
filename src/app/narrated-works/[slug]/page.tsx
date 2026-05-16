@@ -8,6 +8,7 @@ import type { CoNarratorDetail } from "./NarratedBySection";
 import { TrackPageView } from "./TrackPageView";
 import { PlatformButtons } from "@/app/components/PlatformButtons";
 import { SwipeNav } from "./SwipeNav";
+import { BookNavArrows } from "./BookNavArrows";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -150,28 +151,10 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
       <SwipeNav prevSlug={prevSlug} nextSlug={nextSlug} />
 
       {/* Book navigation arrows */}
-      {prevSlug && (
-        <Link href={`/narrated-works/${prevSlug}`} title={prevTitle ?? "Previous"}
-          className="hidden sm:flex fixed left-5 top-1/2 -translate-y-1/2 z-40 group flex-col items-center gap-1.5">
-          <div className="p-2.5 sm:p-3 rounded-full bg-[#06082E]/80 backdrop-blur border border-white/10 text-white/30 group-hover:text-[#D4AF37] group-hover:border-[#D4AF37]/40 group-hover:bg-[#D4AF37]/10 transition-all shadow-lg">
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
-            </svg>
-          </div>
-          <span className="hidden sm:block text-[10px] text-white/20 group-hover:text-[#D4AF37]/60 transition-colors max-w-[80px] text-center leading-tight truncate">{prevTitle}</span>
-        </Link>
-      )}
-      {nextSlug && (
-        <Link href={`/narrated-works/${nextSlug}`} title={nextTitle ?? "Next"}
-          className="hidden sm:flex fixed right-5 top-1/2 -translate-y-1/2 z-40 group flex-col items-center gap-1.5">
-          <div className="p-2.5 sm:p-3 rounded-full bg-[#06082E]/80 backdrop-blur border border-white/10 text-white/30 group-hover:text-[#D4AF37] group-hover:border-[#D4AF37]/40 group-hover:bg-[#D4AF37]/10 transition-all shadow-lg">
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
-            </svg>
-          </div>
-          <span className="hidden sm:block text-[10px] text-white/20 group-hover:text-[#D4AF37]/60 transition-colors max-w-[80px] text-center leading-tight truncate">{nextTitle}</span>
-        </Link>
-      )}
+      <BookNavArrows
+        prevSlug={prevSlug} prevTitle={prevTitle}
+        nextSlug={nextSlug} nextTitle={nextTitle}
+      />
 
       {/* Back link */}
       <div className="max-w-5xl mx-auto px-5 sm:px-8 pt-20 sm:pt-24 pb-4">

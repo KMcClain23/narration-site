@@ -3,6 +3,23 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+// Set the direction flag so CSS view-transition knows which way to slide
+function setDir(dir: "next" | "prev") {
+  document.documentElement.dataset.navDir = dir === "prev" ? "prev" : "";
+}
+
+export function navigate(router: ReturnType<typeof useRouter>, slug: string, dir: "next" | "prev") {
+  const url = `/narrated-works/${slug}`;
+  setDir(dir);
+
+  if ("startViewTransition" in document) {
+    (document as Document & { startViewTransition: (cb: () => void) => void })
+      .startViewTransition(() => { router.push(url); });
+  } else {
+    router.push(url);
+  }
+}
+
 export function SwipeNav({
   prevSlug,
   nextSlug,
@@ -24,10 +41,9 @@ export function SwipeNav({
     const onTouchEnd = (e: TouchEvent) => {
       const dx = e.changedTouches[0].clientX - startX;
       const dy = e.changedTouches[0].clientY - startY;
-      // Require a clear horizontal swipe (>60px and more horizontal than vertical)
       if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-      if (dx < 0 && nextSlug) router.push(`/narrated-works/${nextSlug}`);
-      else if (dx > 0 && prevSlug) router.push(`/narrated-works/${prevSlug}`);
+      if (dx < 0 && nextSlug) navigate(router, nextSlug, "next");
+      else if (dx > 0 && prevSlug) navigate(router, prevSlug, "prev");
     };
 
     document.addEventListener("touchstart", onTouchStart, { passive: true });
