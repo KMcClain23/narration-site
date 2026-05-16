@@ -51,7 +51,7 @@ export function PlatformButtons({
     buttons.push(
       <a key="ar" href={arUrl} target="_blank" rel="noopener noreferrer"
         className={`inline-flex items-center gap-2 border border-white/20 text-white/70 hover:text-white hover:border-white/40 font-semibold rounded-full transition-colors ${px}`}>
-        Authors Republic
+        Listen on Authors Republic
       </a>
     );
   }
