@@ -12,10 +12,10 @@ export function BookNavArrows({
 }) {
   const router = useRouter();
 
-  // Pin arrows to the inner padding edge of the max-w-5xl (64rem) content column.
-  // calc(50vw - 30rem) = half viewport − (half content − px-8 padding).
-  // max(1rem, …) keeps them on-screen when the viewport is narrower than the column.
-  const inset = "max(1rem, calc(50vw - 30rem))";
+  // Place arrows just outside the max-w-5xl (64rem) column in the viewport margin.
+  // calc(50vw - 35rem) = half viewport − (half content + ~3rem buffer for the arrow itself).
+  // Falls back to 12px from the edge on viewports narrower than the content column.
+  const inset = "max(12px, calc(50vw - 35rem))";
 
   const arrowClass = "hidden sm:flex fixed top-1/2 -translate-y-1/2 z-40 group flex-col items-center gap-1.5 cursor-pointer";
   const pillClass  = "p-3 rounded-full bg-[#06082E]/80 backdrop-blur border border-white/10 text-white/30 group-hover:text-[#D4AF37] group-hover:border-[#D4AF37]/40 group-hover:bg-[#D4AF37]/10 transition-all shadow-lg";
