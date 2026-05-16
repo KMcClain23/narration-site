@@ -484,7 +484,7 @@ export default function CardDetailPage() {
             }}
           >
             {card.cover_url
-              ? <img src={card.cover_url} alt={card.title} className="w-full aspect-[2/3] object-cover"/>
+              ? <img src={card.cover_url} alt={card.title} className="w-full object-contain rounded-2xl"/>
               : <div className="w-full aspect-[2/3] bg-[#0A0D3A] flex items-center justify-center text-white/20 text-sm">No cover</div>
             }
 
