@@ -147,19 +147,18 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
       <div className="max-w-5xl mx-auto px-5 sm:px-8 pb-16">
         <div className="grid md:grid-cols-[auto_1fr] gap-10 lg:gap-16 items-start">
 
-          {/* Cover — fixed height on desktop, auto width so wider covers expand the column */}
-          <div className="mx-auto md:mx-0 flex justify-center">
-            <div className="rounded-2xl overflow-hidden shadow-2xl border border-white/10
-                            w-full max-w-[280px]
-                            md:w-auto md:h-[420px]">
+          {/* Cover — fixed height, natural width, right-anchored so wider covers expand left */}
+          <div className="flex justify-center md:justify-end">
+            <div className="rounded-2xl overflow-hidden shadow-2xl border border-white/10">
               {book.cover_url ? (
                 <Image
                   src={book.cover_url}
                   alt={`${book.title} audiobook cover`}
                   width={600}
                   height={900}
-                  className="w-full h-auto md:h-full md:w-auto"
-                  sizes="(max-width: 768px) 80vw, 320px"
+                  style={{ height: "420px", width: "auto" }}
+                  className="block max-w-[80vw]"
+                  sizes="320px"
                   priority
                 />
               ) : (
