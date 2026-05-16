@@ -8,6 +8,7 @@ import { TrackPageView } from "./TrackPageView";
 import { PlatformButtons } from "@/app/components/PlatformButtons";
 import { SwipeNav } from "./SwipeNav";
 import { BookNavArrows } from "./BookNavArrows";
+import { PageTransition } from "./PageTransition";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -155,6 +156,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
         nextSlug={nextSlug} nextTitle={nextTitle}
       />
 
+      <PageTransition>
       {/* Back link */}
       <div className="max-w-5xl mx-auto px-5 sm:px-8 pt-20 sm:pt-24 pb-4">
         <Link href="/narrated-works"
@@ -262,6 +264,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
           </Link>
         </div>
       </div>
+      </PageTransition>
     </main>
   );
 }

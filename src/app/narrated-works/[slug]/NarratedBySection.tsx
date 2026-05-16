@@ -51,6 +51,15 @@ function PopupShell({ children }: { children: ReactNode }) {
 function HoverCard({ children, popup }: { children: ReactNode; popup: ReactNode }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const show = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpen(true);
+  };
+  const hide = () => {
+    closeTimer.current = setTimeout(() => setOpen(false), 120);
+  };
 
   const dismiss = useCallback((e: MouseEvent | TouchEvent) => {
     if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -70,16 +79,16 @@ function HoverCard({ children, popup }: { children: ReactNode; popup: ReactNode 
     <div
       ref={ref}
       className="relative"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={show}
+      onMouseLeave={hide}
       onClick={() => setOpen(v => !v)}
     >
       {children}
 
-      {/* Popup — always rendered, toggled via opacity/scale for smooth animation */}
+      {/* pb-3 bridges the visual gap so onMouseLeave doesn't fire between trigger and popup */}
       <div
         aria-hidden={!open}
-        className={`absolute bottom-[calc(100%+10px)] left-0 z-50 transition-all duration-200 ease-out origin-bottom-left ${
+        className={`absolute bottom-full left-0 z-50 pb-3 transition-all duration-200 ease-out origin-bottom-left ${
           open
             ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
             : "opacity-0 scale-95 translate-y-1 pointer-events-none"

@@ -3,21 +3,25 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-// Set the direction flag so CSS view-transition knows which way to slide
-function setDir(dir: "next" | "prev") {
-  document.documentElement.dataset.navDir = dir === "prev" ? "prev" : "";
-}
+const EXIT_MS = 240;
 
-export function navigate(router: ReturnType<typeof useRouter>, slug: string, dir: "next" | "prev") {
-  const url = `/narrated-works/${slug}`;
-  setDir(dir);
+export function navigate(
+  router: ReturnType<typeof useRouter>,
+  slug: string,
+  dir: "next" | "prev",
+) {
+  sessionStorage.setItem("navDir", dir);
 
-  if ("startViewTransition" in document) {
-    (document as Document & { startViewTransition: (cb: () => void) => void })
-      .startViewTransition(() => { router.push(url); });
-  } else {
-    router.push(url);
+  // Animate the current page out before navigating
+  const el = document.querySelector<HTMLElement>("[data-page-content]");
+  if (el) {
+    const tx = dir === "next" ? "-40px" : "40px";
+    el.style.transition = `transform ${EXIT_MS}ms ease, opacity ${EXIT_MS}ms ease`;
+    el.style.transform = `translateX(${tx})`;
+    el.style.opacity = "0";
   }
+
+  setTimeout(() => router.push(`/narrated-works/${slug}`), EXIT_MS);
 }
 
 export function SwipeNav({
