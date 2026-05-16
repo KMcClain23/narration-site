@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import { AuthorHoverName, NarratedBySection } from "./NarratedBySection";
 import type { CoNarratorDetail } from "./NarratedBySection";
 import { TrackPageView } from "./TrackPageView";
@@ -171,19 +170,15 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
       <div className="max-w-5xl mx-auto px-5 sm:px-8 pb-16">
         <div className="grid md:grid-cols-[auto_1fr] gap-10 lg:gap-16 items-start">
 
-          {/* Cover — fixed height, natural width, right-anchored so wider covers expand left */}
+          {/* Cover — wrapper controls height; img fills it at natural width, no cropping */}
           <div className="flex justify-center md:justify-end">
-            <div className="rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+            <div className="h-[300px] sm:h-[360px] md:h-[420px] overflow-hidden rounded-2xl shadow-2xl border border-white/10">
               {book.cover_url ? (
-                <Image
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
                   src={book.cover_url}
                   alt={`${book.title} audiobook cover`}
-                  width={600}
-                  height={900}
-                  style={{ height: "var(--cover-h)", width: "auto" }}
-                  className="block max-w-[85vw] [--cover-h:300px] sm:[--cover-h:360px] md:[--cover-h:420px]"
-                  sizes="(max-width: 768px) 85vw, 320px"
-                  priority
+                  style={{ height: "100%", width: "auto", display: "block" }}
                 />
               ) : (
                 <div className="w-[280px] h-[420px] bg-[#0A0D3A] flex items-center justify-center">
