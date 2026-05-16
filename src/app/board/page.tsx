@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import ReactDOM from "react-dom";
 import Link from "next/link";
 import { EmailScanSection } from "./EmailScanSection";
+import ScriptUploader from "./ScriptUploader";
 
 const COLUMNS = [
   { id: "audition",   label: "Audition",   color: "border-purple-500/40 bg-purple-900/35",  dot: "bg-purple-300",  text: "text-purple-200" },
@@ -18,7 +19,7 @@ interface BoardCard {
   id: string; title: string; author: string; cover_url: string;
   status: string; deadline?: string; notes: string; author_notes: string;
   links: Link[]; co_narrator: string; author_token: string; sort_order: number;
-  subtitle: string; tags: string[]; description: string; audible_link: string; ar_link: string; spotify_link: string;
+  subtitle: string; tags: string[]; description: string; audible_link: string; ar_link: string; spotify_link: string; script_url?: string;
   chapters: { status: string }[];
   word_count: number;
   first15_due: string;
@@ -35,7 +36,7 @@ interface BoardCard {
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
   title:"", author:"", cover_url:"", status:"contracted", deadline:"",
   notes:"", author_notes:"", links:[], co_narrator:"",
-  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"",
+  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", script_url:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"",
 };
 
 // ─── Timeline view ────────────────────────────────────────────────────────────
@@ -1448,7 +1449,7 @@ export default function BoardPage() {
       deadline:card.deadline||"",notes:card.notes,author_notes:card.author_notes,
       links:card.links,co_narrator:card.co_narrator,subtitle:card.subtitle||"",
       tags:card.tags||[],description:card.description||"",
-      audible_link:card.audible_link||"",ar_link:card.ar_link||"",spotify_link:card.spotify_link||"",chapters:card.chapters||[],
+      audible_link:card.audible_link||"",ar_link:card.ar_link||"",spotify_link:card.spotify_link||"",script_url:card.script_url||"",chapters:card.chapters||[],
       word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||""});
     setShowForm(false);
   };
@@ -1768,6 +1769,11 @@ export default function BoardPage() {
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Audible / Amazon link</span><input type="text" value={form.audible_link} onChange={e=>setForm(p=>({...p,audible_link:e.target.value}))} placeholder="https://..." className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Authors Republic link</span><input type="text" value={form.ar_link} onChange={e=>setForm(p=>({...p,ar_link:e.target.value}))} placeholder="https://..." className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Spotify link</span><input type="text" value={form.spotify_link} onChange={e=>setForm(p=>({...p,spotify_link:e.target.value}))} placeholder="https://open.spotify.com/show/..." className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
+                <ScriptUploader
+                  bookTitle={form.title}
+                  currentUrl={form.script_url}
+                  onUpload={url => setForm(p => ({ ...p, script_url: url }))}
+                />
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Stage</span>
                   <select value={form.status} onChange={e=>setForm(p=>({...p,status:e.target.value}))}
@@ -2164,6 +2170,15 @@ export default function BoardPage() {
                           )}
                         </div>
                         <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {card.script_url && (
+                            <a href={card.script_url} target="_blank" rel="noopener noreferrer"
+                              title="View script" onClick={e=>e.stopPropagation()}
+                              className="text-white/40 hover:text-[#D4AF37] transition-colors">
+                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                              </svg>
+                            </a>
+                          )}
                           <button type="button" onClick={()=>copyLink(card.author_token)} title="Copy author link"
                             className="text-white/40 hover:text-[#D4AF37] transition-colors">
                             {copied===card.author_token
