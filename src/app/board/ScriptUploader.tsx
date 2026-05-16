@@ -17,15 +17,25 @@ export default function ScriptUploader({
 
   const handleFile = async (file: File) => {
     setError("");
+
+    if (file.size > 4 * 1024 * 1024) {
+      setError("File must be under 4 MB. Compress or export a smaller PDF first.");
+      return;
+    }
+
     setUploading(true);
     try {
       const body = new FormData();
       body.append("file", file);
       body.append("bookTitle", bookTitle);
       const res = await fetch("/api/onedrive/upload", { method: "POST", body });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
-      onUpload(data.url);
+      const text = await res.text();
+      let data: { error?: string; url?: string } = {};
+      try { data = JSON.parse(text); } catch {
+        throw new Error(res.ok ? "Unexpected server response" : `Upload failed (${res.status}): ${text.slice(0, 120)}`);
+      }
+      if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+      onUpload(data.url!);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
