@@ -152,7 +152,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
       {/* Book navigation arrows */}
       {prevSlug && (
         <Link href={`/narrated-works/${prevSlug}`} title={prevTitle ?? "Previous"}
-          className="fixed left-3 sm:left-5 top-1/2 -translate-y-1/2 z-40 group flex flex-col items-center gap-1.5">
+          className="hidden sm:flex fixed left-5 top-1/2 -translate-y-1/2 z-40 group flex-col items-center gap-1.5">
           <div className="p-2.5 sm:p-3 rounded-full bg-[#06082E]/80 backdrop-blur border border-white/10 text-white/30 group-hover:text-[#D4AF37] group-hover:border-[#D4AF37]/40 group-hover:bg-[#D4AF37]/10 transition-all shadow-lg">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
@@ -163,7 +163,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
       )}
       {nextSlug && (
         <Link href={`/narrated-works/${nextSlug}`} title={nextTitle ?? "Next"}
-          className="fixed right-3 sm:right-5 top-1/2 -translate-y-1/2 z-40 group flex flex-col items-center gap-1.5">
+          className="hidden sm:flex fixed right-5 top-1/2 -translate-y-1/2 z-40 group flex-col items-center gap-1.5">
           <div className="p-2.5 sm:p-3 rounded-full bg-[#06082E]/80 backdrop-blur border border-white/10 text-white/30 group-hover:text-[#D4AF37] group-hover:border-[#D4AF37]/40 group-hover:bg-[#D4AF37]/10 transition-all shadow-lg">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
