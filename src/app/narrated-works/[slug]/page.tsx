@@ -219,13 +219,11 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
 
             {/* CTAs */}
             <div className="flex flex-wrap gap-3">
-              {isReleased && (
-                <PlatformButtons
-                  audibleUrl={book.audible_link}
-                  spotifyUrl={(book as Record<string, unknown>).spotify_link as string | undefined}
-                  arUrl={book.ar_link}
-                />
-              )}
+              <PlatformButtons
+                audibleUrl={book.audible_link}
+                spotifyUrl={(book as Record<string, unknown>).spotify_link as string | undefined}
+                arUrl={book.ar_link}
+              />
               <Link href="/contact"
                 className="inline-flex items-center gap-2 border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 font-semibold px-6 py-3 rounded-full transition-colors text-sm">
                 Request a quote
