@@ -145,7 +145,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   const authorBio = (book.author_notes as string) || null;
 
   return (
-    <main className="min-h-screen bg-[#06082E] text-white">
+    <main className="min-h-screen bg-[#06082E] text-white overflow-x-hidden">
       <TrackPageView slug={slug} title={book.title} author={book.author} />
 
       <SwipeNav prevSlug={prevSlug} nextSlug={nextSlug} />
