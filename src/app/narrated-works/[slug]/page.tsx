@@ -7,6 +7,7 @@ import { AuthorHoverName, NarratedBySection } from "./NarratedBySection";
 import type { CoNarratorDetail } from "./NarratedBySection";
 import { TrackPageView } from "./TrackPageView";
 import { PlatformButtons } from "@/app/components/PlatformButtons";
+import { SwipeNav } from "./SwipeNav";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -146,6 +147,8 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
     <main className="min-h-screen bg-[#06082E] text-white">
       <TrackPageView slug={slug} title={book.title} author={book.author} />
 
+      <SwipeNav prevSlug={prevSlug} nextSlug={nextSlug} />
+
       {/* Book navigation arrows */}
       {prevSlug && (
         <Link href={`/narrated-works/${prevSlug}`} title={prevTitle ?? "Previous"}
@@ -194,9 +197,9 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
                   alt={`${book.title} audiobook cover`}
                   width={600}
                   height={900}
-                  style={{ height: "420px", width: "auto" }}
-                  className="block max-w-[80vw]"
-                  sizes="320px"
+                  style={{ height: "var(--cover-h)", width: "auto" }}
+                  className="block max-w-[85vw] [--cover-h:300px] sm:[--cover-h:360px] md:[--cover-h:420px]"
+                  sizes="(max-width: 768px) 85vw, 320px"
                   priority
                 />
               ) : (
