@@ -149,14 +149,14 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
 
           {/* Cover */}
           <div className="mx-auto w-full max-w-[280px] md:max-w-none">
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-white/10"
-              style={{ aspectRatio: "2/3" }}>
+            <div className="rounded-2xl overflow-hidden shadow-2xl border border-white/10">
               {book.cover_url ? (
                 <Image
                   src={book.cover_url}
                   alt={`${book.title} audiobook cover`}
-                  fill
-                  className="object-cover"
+                  width={600}
+                  height={900}
+                  className="w-full h-auto"
                   sizes="(max-width: 768px) 80vw, 280px"
                   priority
                 />
