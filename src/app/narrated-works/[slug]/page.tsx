@@ -138,11 +138,18 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
 
   const coNarratorDetails = await getCoNarratorDetails(coNarratorNames);
 
+  // Look up the author's bio from the authors table
+  const { data: authorRow } = await supabaseAdmin
+    .from("authors")
+    .select("bio")
+    .eq("name", book.author)
+    .single();
+  const authorBio = (authorRow?.bio as string) || null;
+
   const statusLabel = STATUS_TO_LABEL[book.status] ?? "";
   const statusStyle = STATUS_TO_STYLE[book.status] ?? "bg-white/10 text-white/50 border-white/10";
   const tags: string[] = Array.isArray(book.tags) ? book.tags : [];
   const isReleased = book.status === "released";
-  const authorBio = (book.author_notes as string) || null;
 
   return (
     <main className="min-h-screen bg-[#06082E] text-white overflow-x-hidden">
