@@ -83,6 +83,7 @@ function DashboardView({ cards, onSwitchToBoard }: { cards: BoardCard[]; onSwitc
   const [searchFocused, setSearchFocused] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const [descBulk, setDescBulk] = useState<DescBulkState>({ phase: "idle", results: [] });
+  const [scheduleOffset, setScheduleOffset] = useState(0);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem("dashCollapsed") ?? "{}"); } catch { return {}; }
   });
@@ -162,6 +163,24 @@ function DashboardView({ cards, onSwitchToBoard }: { cards: BoardCard[]; onSwitc
   const in7Days   = useMemo(() => new Date(today.getTime() + 7  * 86400000), [today]);
   const in30Days  = useMemo(() => new Date(today.getTime() + 30 * 86400000), [today]);
   const ago30Days = useMemo(() => new Date(today.getTime() - 30 * 86400000), [today]);
+
+  const todayMonthKey = useMemo(() =>
+    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`,
+    [today]
+  );
+
+  const scheduleMonths = useMemo(() => {
+    const now = today;
+    return Array.from({ length: 8 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() + scheduleOffset + i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = d.getFullYear() !== now.getFullYear()
+        ? d.toLocaleDateString("en-US", { month: "short", year: "2-digit" })
+        : d.toLocaleDateString("en-US", { month: "short" });
+      const active = cards.filter(c => c.status !== "released" && c.deadline?.startsWith(key));
+      return { key, label, active };
+    });
+  }, [today, cards, scheduleOffset]);
 
   const activeCards = useMemo(() => cards.filter(c => c.status !== "audition"), [cards]);
 
@@ -492,6 +511,96 @@ function DashboardView({ cards, onSwitchToBoard }: { cards: BoardCard[]; onSwitc
           )}
         </section>
       </div>
+
+      {/* ── Monthly Schedule ── */}
+      <section className="rounded-2xl border border-white/8 bg-[#0A0D3A] p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">Monthly Schedule</h2>
+          <div className="flex items-center gap-1.5">
+            {scheduleOffset !== 0 && (
+              <button onClick={() => setScheduleOffset(0)}
+                className="text-[10px] text-[#D4AF37] border border-[#D4AF37]/30 px-2 py-0.5 rounded-full hover:bg-[#D4AF37]/10 transition-colors">
+                Today
+              </button>
+            )}
+            <button onClick={() => setScheduleOffset(o => o - 1)} disabled={scheduleOffset <= 0}
+              className="p-1 text-white/40 hover:text-white hover:bg-white/8 rounded-lg transition-colors disabled:opacity-20 disabled:cursor-not-allowed">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
+              </svg>
+            </button>
+            <button onClick={() => setScheduleOffset(o => o + 1)}
+              className="p-1 text-white/40 hover:text-white hover:bg-white/8 rounded-lg transition-colors">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {scheduleMonths.map(({ key, label, active }) => {
+            const count = active.length;
+            const isCurrent = key === todayMonthKey;
+            const cardBorder = count === 0 ? "border-white/5"
+              : count <= 2 ? "border-emerald-500/20"
+              : count <= 4 ? "border-orange-500/25"
+              : "border-red-500/30";
+            const cardBg = count === 0 ? "bg-[#0A0D3A]/40"
+              : count <= 2 ? "bg-emerald-950/25"
+              : count <= 4 ? "bg-orange-950/20"
+              : "bg-red-950/20";
+            const countColor = count === 0 ? "text-white/15"
+              : count <= 2 ? "text-emerald-400"
+              : count <= 4 ? "text-orange-400"
+              : "text-red-400";
+            const barColor = count === 0 ? ""
+              : count <= 2 ? "bg-emerald-500/50"
+              : count <= 4 ? "bg-orange-500/50"
+              : "bg-red-500/60";
+            const workload = count === 0 ? "Open" : count <= 2 ? "Light" : count <= 4 ? "Busy" : "Full";
+            const workloadColor = count === 0 ? "text-emerald-400/60"
+              : count <= 2 ? "text-emerald-400/50"
+              : count <= 4 ? "text-orange-400/50"
+              : "text-red-400/50";
+            return (
+              <div key={key} className={`rounded-xl border p-3.5 ${cardBorder} ${cardBg}`}>
+                <div className="flex items-start justify-between mb-2.5">
+                  <div>
+                    <p className={`text-[10px] font-bold uppercase tracking-widest ${isCurrent ? "text-[#D4AF37]" : "text-white/45"}`}>{label}</p>
+                    <p className={`text-[10px] mt-0.5 ${workloadColor}`}>{workload}</p>
+                  </div>
+                  <span className={`text-2xl font-bold tabular-nums leading-none ${countColor}`}>{count}</span>
+                </div>
+                <div className="flex gap-0.5 mb-2.5">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className={`h-1 flex-1 rounded-full ${i < count ? barColor : "bg-white/8"}`} />
+                  ))}
+                  {count > 5 && <div className="h-1 w-1.5 rounded-full bg-red-500/60" />}
+                </div>
+                <div className="space-y-1">
+                  {active.slice(0, 4).map(c => (
+                    <Link key={c.id} href={`/board/card/${c.id}`}
+                      className="flex items-center gap-1.5 text-[10px] hover:text-white transition-colors truncate group/sched">
+                      <span className="shrink-0 h-1.5 w-1.5 rounded-full bg-white/50 group-hover/sched:bg-white" />
+                      <span className="truncate text-white/70">{c.title}</span>
+                    </Link>
+                  ))}
+                  {active.length > 4 && (
+                    <p className="text-[10px] text-white/25 pl-3">+{active.length - 4} more</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-white/[0.06] flex items-center gap-4 justify-end">
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500/50" /><span className="text-[10px] text-emerald-400/70">Light</span></span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500/50" /><span className="text-[10px] text-orange-400/70">Busy</span></span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500/60" /><span className="text-[10px] text-red-400/70">Full</span></span>
+        </div>
+      </section>
 
       {/* ── Fetch missing descriptions ── */}
       {(cardsNeedingDesc.length > 0 || descBulk.phase !== "idle") && (
