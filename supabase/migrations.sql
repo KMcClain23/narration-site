@@ -82,3 +82,24 @@ create table if not exists analytics_events (
 
 create index if not exists analytics_events_event_created
   on analytics_events(event, created_at desc);
+
+-- production_contacts: outreach CRM for production houses
+create table if not exists production_contacts (
+  id                serial      primary key,
+  company           text        not null default '',
+  label             text        not null default '',
+  status            text        not null default '',
+  job_titles        text[]      not null default '{}',
+  contact_names     text[]      not null default '{}',
+  contact_info      text        not null default '',
+  address           text        not null default '',
+  website           text        not null default '',
+  finding_source    text        not null default '',
+  preferred_contact text        not null default '',
+  date_contacted    text        not null default '',
+  next_contact_date text        not null default '',
+  genres            text[]      not null default '{}',
+  notes             text        not null default '',
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
