@@ -66,8 +66,7 @@ export default async function DemoDownloadPage({ params }: { params: Promise<{ s
 
           {/* Download button */}
           <a
-            href={demo.src}
-            download
+            href={`/api/download-demo?url=${encodeURIComponent(demo.src)}&name=${encodeURIComponent(demo.title)}`}
             className="inline-flex items-center gap-3 bg-[#D4AF37] hover:bg-[#E0C15A] text-black font-bold text-base px-8 py-4 rounded-full transition-colors shadow-lg shadow-[#D4AF37]/20 w-full max-w-sm justify-center"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
