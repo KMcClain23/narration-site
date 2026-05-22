@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRef, useEffect, useState, useTransition, useCallback, useMemo } from "react";
 import { sendEmail } from "@/app/actions/sendEmail";
 import { sendGAEvent } from "@next/third-parties/google";
+import { DEMOS } from "@/app/demos/config";
 
 const BOOKINGS_URL =
   "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
@@ -25,9 +26,9 @@ function formatTime(seconds: number) {
 const WAVE_BARS = [3,5,9,14,20,17,12,7,3,6,11,17,22,18,13,8,4,7,13,20,24,17,10,5,3,8,15,22,18,11,5,3];
 
 function DemoPlayer({
-  title, desc, src, index, activeIndex, setActiveIndex, audioRefs, color, tags,
+  title, desc, src, slug, index, activeIndex, setActiveIndex, audioRefs, color, tags,
 }: {
-  title: string; desc: string; src: string; index: number; color: string; tags: string[];
+  title: string; desc: string; src: string; slug: string; index: number; color: string; tags: string[];
   activeIndex: number | null; setActiveIndex: (v: number | null) => void;
   audioRefs: React.MutableRefObject<(HTMLAudioElement | null)[]>;
 }) {
@@ -196,9 +197,8 @@ function DemoPlayer({
               }
             </button>
             {src && (
-              <a
-                href={src}
-                download
+              <Link
+                href={`/demos/${slug}`}
                 title="Download demo"
                 className="shrink-0 text-white/40 hover:text-white transition-colors p-1"
                 onClick={e => e.stopPropagation()}
@@ -206,7 +206,7 @@ function DemoPlayer({
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                 </svg>
-              </a>
+              </Link>
             )}
           </div>
 
@@ -539,14 +539,7 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { accep
     });
   }, [activeIndex]);
 
-  const demos = [
-    { title: "LGBTQ+ Romance",         desc: "Bright pacing, playful emotional tone",       color: "border-pink-400",   tags: ["LGBTQ+", "Romance"],      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20LGBTQ%2B%20Romance%20-%20Male%20(BrightPlayful)%2C%20Confident%2C%20Sex-PositiveFlirtatious.mp3" },
-    { title: "Romantasy",              desc: "Atmospheric, grounded fantasy emotion",       color: "border-purple-400", tags: ["Romantasy", "Fantasy"],   src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Romantasy%20-%20Male%20(PossessiveHaunted)%2C%20Harsh%20Control%20to%20Remorse%2C%20Deep%20Loss.mp3" },
-    { title: "Feminine Voice",         desc: "Male & Female Dialogue",                      color: "border-violet-400", tags: ["Feminine Voice", "Duet"], src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Female%20Voice%202.mp3" },
-    { title: "Romance Duet",           desc: "British accent, romantic restraint",           color: "border-rose-300",   tags: ["Romance", "British"],     src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/British%20-%20Romance%20Duet.mp3" },
-    { title: "Child POV Drama",        desc: "Raw emotion, age-appropriate delivery",        color: "border-blue-400",   tags: ["Drama", "Child POV"],     src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Child%20(5-year-old%20boy)%2C%20Emotional%20TraumaWitness%20-%20Sample.mp3" },
-    { title: "Multi-Character Dialogue", desc: "Clear character separation, vocal range",   color: "border-amber-400",  tags: ["Multi-Character"],        src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/4%20Characters.mp3" },
-  ];
+  const demos = DEMOS;
 
   return (
     <main className="min-h-screen bg-[#06082E] text-white overflow-x-clip">
@@ -667,7 +660,7 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { accep
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {demos.map((demo, index) => (
-              <DemoPlayer key={demo.title} title={demo.title} desc={demo.desc} src={demo.src}
+              <DemoPlayer key={demo.title} title={demo.title} desc={demo.desc} src={demo.src} slug={demo.slug}
                 color={demo.color} tags={demo.tags}
                 index={index} activeIndex={activeIndex} setActiveIndex={setActiveIndex} audioRefs={audioRefs} />
             ))}
