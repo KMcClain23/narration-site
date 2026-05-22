@@ -64,10 +64,14 @@ export default async function AnalyticsPage() {
   return (
     <main className="min-h-screen bg-[#06082E] text-white p-6 pt-24 md:p-12 md:pt-24">
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
+        <div className="flex items-center gap-3 mb-8 flex-wrap">
           <Link href="/admin/stats"
             className="inline-flex items-center gap-2 text-sm font-bold text-[#D4AF37] border border-[#D4AF37]/30 px-4 py-2 rounded-full hover:bg-[#D4AF37]/10 transition-colors">
             ← Admin
+          </Link>
+          <Link href="/admin/contacts"
+            className="inline-flex items-center gap-2 text-sm font-bold text-white/60 border border-white/15 px-4 py-2 rounded-full hover:bg-white/5 transition-colors">
+            Contacts
           </Link>
         </div>
 
