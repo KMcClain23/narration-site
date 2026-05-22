@@ -20,15 +20,48 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function DemoDownloadPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const demo = DEMOS.find(d => d.slug === slug);
-  if (!demo) notFound();
+  const currentIdx = DEMOS.findIndex(d => d.slug === slug);
+  if (currentIdx === -1) notFound();
 
-  const otherDemos = DEMOS.filter(d => d.slug !== slug);
+  const demo     = DEMOS[currentIdx];
+  const prevDemo = currentIdx > 0                  ? DEMOS[currentIdx - 1] : null;
+  const nextDemo = currentIdx < DEMOS.length - 1   ? DEMOS[currentIdx + 1] : null;
+
+  const arrowBtn   = "p-3 rounded-full bg-[#06082E]/80 backdrop-blur border border-white/10 text-white/30 group-hover:text-[#D4AF37] group-hover:border-[#D4AF37]/40 group-hover:bg-[#D4AF37]/10 transition-all shadow-lg";
+  const arrowLabel = "text-[10px] text-white/20 group-hover:text-[#D4AF37]/60 transition-colors max-w-[80px] text-center leading-tight truncate";
+  const arrowInset = "max(12px, calc(50vw - 19rem))";
 
   return (
     <main className="min-h-screen bg-[#06082E] text-white flex flex-col">
+
+      {/* Prev / next nav arrows */}
+      {prevDemo && (
+        <Link href={`/demos/${prevDemo.slug}`} title={prevDemo.title}
+          className="hidden sm:flex fixed top-1/2 -translate-y-1/2 z-40 group flex-col items-center gap-1.5"
+          style={{ left: arrowInset }}>
+          <div className={arrowBtn}>
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
+            </svg>
+          </div>
+          <span className={arrowLabel}>{prevDemo.title}</span>
+        </Link>
+      )}
+      {nextDemo && (
+        <Link href={`/demos/${nextDemo.slug}`} title={nextDemo.title}
+          className="hidden sm:flex fixed top-1/2 -translate-y-1/2 z-40 group flex-col items-center gap-1.5"
+          style={{ right: arrowInset }}>
+          <div className={arrowBtn}>
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+          <span className={arrowLabel}>{nextDemo.title}</span>
+        </Link>
+      )}
+
       {/* Hero content */}
-      <div className="flex flex-col items-center px-5 pt-16 sm:pt-24 pb-8">
+      <div className="flex-1 flex flex-col items-center justify-center px-5 py-16 sm:py-24">
         <div className="w-full max-w-lg flex flex-col items-center gap-8">
 
           {/* Microphone decoration */}
@@ -82,45 +115,33 @@ export default async function DemoDownloadPage({ params }: { params: Promise<{ s
             Free to download for audition and casting purposes.
             <br />© Dean Miller Narration
           </p>
+
+          {/* Mobile prev/next (arrows hidden on mobile) */}
+          {(prevDemo || nextDemo) && (
+            <div className="sm:hidden flex items-center justify-between w-full pt-2">
+              {prevDemo
+                ? <Link href={`/demos/${prevDemo.slug}`}
+                    className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white transition-colors">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    {prevDemo.title}
+                  </Link>
+                : <span />
+              }
+              {nextDemo
+                ? <Link href={`/demos/${nextDemo.slug}`}
+                    className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white transition-colors">
+                    {nextDemo.title}
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
+                    </svg>
+                  </Link>
+                : <span />
+              }
+            </div>
+          )}
         </div>
-
-        {/* Other Demos */}
-        {otherDemos.length > 0 && (
-          <div className="w-full max-w-2xl mt-16">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="h-px w-6 bg-[#D4AF37]" />
-              <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Other Demos</p>
-              <div className="flex-1 h-px bg-[#D4AF37]/20" />
-            </div>
-
-            <div className="flex flex-nowrap overflow-x-auto gap-4 pb-4 -mx-4 px-4 scrollbar-hide">
-              {otherDemos.map(d => (
-                <Link key={d.slug} href={`/demos/${d.slug}`}
-                  className={`w-64 shrink-0 rounded-xl border-t-2 ${d.color} bg-[#0B1224] p-4 hover:ring-1 hover:ring-white/10 transition-all group flex flex-col`}>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-sm text-white mb-1 leading-snug">{d.title}</h3>
-                    <p className="text-xs text-white/50 mb-3 leading-snug">{d.desc}</p>
-                    {d.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {d.tags.map(tag => (
-                          <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-white/8 text-white/50">{tag}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-4 flex items-center gap-2 pt-3 border-t border-white/8">
-                    <div className="h-8 w-8 rounded-full bg-[#D4AF37]/15 border border-[#D4AF37]/30 flex items-center justify-center group-hover:bg-[#D4AF37]/25 transition-colors shrink-0">
-                      <svg className="h-3.5 w-3.5 translate-x-0.5 text-[#D4AF37]" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M8 5.14v13.72l11-6.86L8 5.14z"/>
-                      </svg>
-                    </div>
-                    <span className="text-xs text-white/40 group-hover:text-white/60 transition-colors">Listen &amp; Download</span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Back link */}
