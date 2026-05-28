@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
-import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Merch — Dean Miller Narration",
@@ -26,13 +24,11 @@ export default function MerchPage() {
 
       {/* Product Card */}
       <div className="bg-[#0A0D3A] border border-[#D4AF37]/20 shadow-2xl rounded-2xl overflow-hidden w-full max-w-sm">
-        <div className="relative w-full aspect-square bg-[#06082E]">
-          <Image
-            src="/merch/tote-placeholder.jpg"
-            alt="Dean Miller Narration Tote Bag"
-            fill
-            className="object-cover"
-          />
+        <div className="w-full aspect-square bg-[#06082E] border border-[#D4AF37]/20 rounded-xl flex flex-col items-center justify-center gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-[#D4AF37]/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          </svg>
+          <p className="text-white/20 text-xs uppercase tracking-widest">Mockup Coming Soon</p>
         </div>
         <div className="p-6 flex flex-col gap-3">
           <h2 className="text-lg font-bold text-white">
@@ -52,10 +48,14 @@ export default function MerchPage() {
 
       {/* Notification line */}
       <p className="mt-10 text-sm text-white/40 text-center max-w-sm">
-        Want to be notified when the shop opens?{" "}
-        <Link href="/contact" className="text-[#D4AF37]/70 hover:text-[#D4AF37] underline underline-offset-2 transition-colors">
-          Reach out via the contact page.
-        </Link>
+        Interested in getting early access?{" "}
+        <a
+          href="mailto:deanmillernarrator@gmail.com"
+          className="text-[#D4AF37] hover:text-[#F0D060] transition-colors underline underline-offset-2"
+        >
+          Reach out directly
+        </a>{" "}
+        and I&apos;ll let you know when the shop opens.
       </p>
 
     </main>
