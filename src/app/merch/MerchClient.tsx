@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { useCart } from "@/context/CartContext";
 
@@ -76,7 +77,7 @@ function ProductCard({ product }: { product: PrintifyProduct }) {
 
   return (
     <div className="flex flex-col bg-[#0A0D3A] border border-[#D4AF37]/20 rounded-xl overflow-hidden hover:border-[#D4AF37]/40 transition-colors">
-      <div className="relative aspect-square bg-[#06082E]">
+      <Link href={`/merch/${product.id}`} className="relative aspect-square bg-[#06082E] block">
         <Image
           src={variantImage}
           alt={product.title}
@@ -84,11 +85,11 @@ function ProductCard({ product }: { product: PrintifyProduct }) {
           className="object-cover"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
-      </div>
+      </Link>
 
       <div className="flex flex-col gap-3 p-5 flex-1">
         <div className="flex flex-col gap-1">
-          <h2 className="text-sm font-bold text-white leading-snug">{product.title}</h2>
+          <Link href={`/merch/${product.id}`} className="text-sm font-bold text-white leading-snug hover:text-[#D4AF37] transition-colors">{product.title}</Link>
           <p className="text-[#D4AF37] font-bold">${(selectedVariant.price / 100).toFixed(0)}</p>
         </div>
 
