@@ -1,67 +1,105 @@
-import type { Metadata } from "next";
-import Image from "next/image";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Merch — Dean Miller Narration",
-  description: "Branded merch from Dean Miller Narration. Coming soon.",
+import Image from "next/image";
+import { useState } from "react";
+import { useCart } from "@/context/CartContext";
+
+const PRODUCT_ID = "6a18942f21f4508fc90277ff";
+const VARIANT_ID = 101409;
+const PRICE = 2500;
+
+const IMAGES = {
+  front: "https://images-api.printify.com/mockup/6a18942f21f4508fc90277ff/101409/93895/cotton-canvas-tote-bag.jpg?camera_label=front",
+  lifestyle: "https://images-api.printify.com/mockup/6a18942f21f4508fc90277ff/101409/94286/cotton-canvas-tote-bag.jpg?camera_label=person-front",
 };
 
 export default function MerchPage() {
+  const { addItem, openCart, count } = useCart();
+  const [activeImage, setActiveImage] = useState<"front" | "lifestyle">("front");
+  const [added, setAdded] = useState(false);
+
+  const handleAddToCart = () => {
+    addItem({
+      productId: PRODUCT_ID,
+      variantId: VARIANT_ID,
+      title: "Cotton Canvas Tote Bag",
+      price: PRICE,
+      image: IMAGES.front,
+    });
+    openCart();
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
+  };
+
   return (
-    <main className="min-h-screen bg-[#06082E] text-white flex flex-col items-center px-6 pt-32 pb-20">
+    <main className="min-h-screen bg-[#06082E] text-white px-6 pt-28 pb-20">
+      <div className="max-w-4xl mx-auto">
 
-      {/* Header */}
-      <div className="flex flex-col items-center gap-3 mb-12 text-center">
-        <div className="flex items-center gap-3">
-          <h1 className="text-4xl font-bold text-white">Merch</h1>
-          <span className="text-[#D4AF37] border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
-            Coming Soon
-          </span>
-        </div>
-        <p className="text-white/50 text-base max-w-md">
-          Branded gear for readers, listeners, and the bookish at heart.
-        </p>
-      </div>
-
-      {/* Product Card */}
-      <div className="bg-[#0A0D3A] border border-[#D4AF37]/20 shadow-2xl rounded-2xl overflow-hidden w-full max-w-sm">
-        <div className="w-full aspect-square rounded-xl overflow-hidden">
-          <Image
-            src="/merch/tote-placeholder.jpg"
-            alt="Dean Miller Narration Tote Bag"
-            width={500}
-            height={500}
-            className="w-full h-full object-cover"
-          />
-        </div>
-        <div className="p-6 flex flex-col gap-3">
-          <h2 className="text-lg font-bold text-white">
-            Dean Miller Narration Tote Bag
-          </h2>
-          <p className="text-sm text-white/50 leading-relaxed">
-            A sturdy, stylish tote featuring the Dean Miller signature logo. Perfect for your next trip to the library.
-          </p>
-          <button
-            disabled
-            className="mt-2 w-full py-3 rounded-full bg-[#D4AF37]/20 text-[#D4AF37]/50 border border-[#D4AF37]/20 text-sm font-bold cursor-not-allowed select-none"
-          >
-            Available Soon
+        {/* Cart icon */}
+        <div className="flex justify-end mb-6">
+          <button onClick={openCart} className="relative p-2 text-white/60 hover:text-white transition-colors">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+            {count > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-[#D4AF37] text-[#06082E] text-[10px] font-bold flex items-center justify-center">
+                {count}
+              </span>
+            )}
           </button>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16">
+
+          {/* Left — Images */}
+          <div className="flex flex-col gap-3">
+            <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-[#0A0D3A] border border-[#D4AF37]/10">
+              <Image
+                key={activeImage}
+                src={IMAGES[activeImage]}
+                alt="Cotton Canvas Tote Bag"
+                fill
+                className="object-cover"
+                priority
+              />
+            </div>
+            <div className="flex gap-3">
+              {(["front", "lifestyle"] as const).map(key => (
+                <button
+                  key={key}
+                  onClick={() => setActiveImage(key)}
+                  className={`relative h-20 w-20 rounded-xl overflow-hidden border-2 transition-all ${activeImage === key ? "border-[#D4AF37]" : "border-white/10 hover:border-white/30"}`}
+                >
+                  <Image src={IMAGES[key]} alt={key} fill className="object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Right — Details */}
+          <div className="flex flex-col gap-5 justify-center">
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-bold text-[#D4AF37] uppercase tracking-widest">Dean Miller Narration</span>
+              <h1 className="text-3xl font-bold text-white">Cotton Canvas Tote Bag</h1>
+              <p className="text-2xl font-bold text-[#D4AF37]">$25</p>
+            </div>
+
+            <p className="text-white/60 text-sm leading-relaxed">
+              100% natural cotton canvas tote featuring the Dean Miller signature logo. One size — 15″ × 16″ with 20″ handles. Perfect for your next trip to the library.
+            </p>
+
+            <p className="text-white/30 text-xs">Print on demand · Ships in 5–10 business days</p>
+
+            <button
+              onClick={handleAddToCart}
+              className="w-full py-3.5 rounded-full bg-[#D4AF37] text-[#06082E] font-bold text-sm hover:bg-[#F0D060] transition-all active:scale-95"
+            >
+              {added ? "Added ✓" : "Add to Cart"}
+            </button>
+          </div>
+
+        </div>
       </div>
-
-      {/* Notification line */}
-      <p className="mt-10 text-sm text-white/40 text-center max-w-sm">
-        Interested in getting early access?{" "}
-        <a
-          href="mailto:deanmillernarrator@gmail.com"
-          className="text-[#D4AF37] hover:text-[#F0D060] transition-colors underline underline-offset-2"
-        >
-          Reach out directly
-        </a>{" "}
-        and I&apos;ll let you know when the shop opens.
-      </p>
-
     </main>
   );
 }

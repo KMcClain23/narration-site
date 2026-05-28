@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { Analytics } from "@vercel/analytics/next";
 import Header from "./components/Header";
+import CartDrawer from "./components/CartDrawer";
+import { CartProvider } from "@/context/CartContext";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -138,8 +140,11 @@ export default function RootLayout({
           Skip to content
         </a>
 
-        <Header />
-        {children}
+        <CartProvider>
+          <Header />
+          {children}
+          <CartDrawer />
+        </CartProvider>
         <Analytics />
       </body>
     </html>

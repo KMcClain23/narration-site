@@ -22,6 +22,11 @@ const nextConfig: NextConfig = {
         hostname: "pub-0274e76b677f47ea8135396e59f3ef10.r2.dev",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "images-api.printify.com",
+        pathname: "/**",
+      },
     ],
   },
 };
