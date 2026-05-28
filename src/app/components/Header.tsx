@@ -31,6 +31,7 @@ export default function Header() {
     () => [
       { name: "Narrated Works", href: "/narrated-works" },
       { name: "Demos", href: "/#demos" },
+      { name: "Merch", href: "/merch" },
       { name: "About", href: "/#about" },
       { name: "Contact", href: "/#contact" },
     ],
