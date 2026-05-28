@@ -124,9 +124,14 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
                   <button
                     key={i}
                     onClick={() => setActiveImage(img.src)}
-                    className={`relative h-16 w-16 rounded-lg overflow-hidden border-2 transition-all shrink-0 ${activeImage === img.src ? "border-[#D4AF37]" : "border-white/10 hover:border-white/30"}`}
+                    className={`relative h-16 w-16 rounded-lg overflow-hidden border-2 transition-all shrink-0 flex-col ${activeImage === img.src ? "border-[#D4AF37]" : "border-white/10 hover:border-white/30"}`}
                   >
-                    <Image src={img.src} alt={`View ${i + 1}`} fill className="object-cover" sizes="64px" />
+                    <Image src={img.src} alt={img.position ?? `View ${i + 1}`} fill className="object-cover" sizes="64px" />
+                    {img.position && (
+                      <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white/90 text-[9px] font-medium text-center py-0.5 capitalize leading-tight">
+                        {img.position.replace(/-/g, " ")}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
