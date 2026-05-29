@@ -21,7 +21,12 @@ export async function POST(request: NextRequest) {
   }
 
   if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session;
+    const sessionId = (event.data.object as Stripe.Checkout.Session).id;
+
+    // Retrieve full session — webhook payload omits shipping_details and other expanded fields
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ["line_items"],
+    });
 
     const items: { productId: string; variantId: number; quantity: number }[] = JSON.parse(
       session.metadata?.items ?? "[]"
