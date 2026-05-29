@@ -17,7 +17,10 @@ export default async function MerchPage() {
     }
   );
   const data = await res.json();
-  const products = data.data ?? [];
+  const products = (data.data ?? []).filter(
+    (p: { visible: boolean; is_deleted: boolean }) =>
+      p.visible === true && p.is_deleted === false
+  );
 
   return <MerchClient products={products} />;
 }

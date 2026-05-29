@@ -9,5 +9,9 @@ export async function GET() {
     }
   );
   const data = await res.json();
-  return NextResponse.json(data.data ?? []);
+  const products = (data.data ?? []).filter(
+    (p: { visible: boolean; is_deleted: boolean }) =>
+      p.visible === true && p.is_deleted === false
+  );
+  return NextResponse.json(products);
 }
