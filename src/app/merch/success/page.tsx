@@ -1,11 +1,17 @@
-import type { Metadata } from "next";
-import Link from "next/link";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Order Confirmed — Dean Miller Narration",
-};
+import { useEffect } from "react";
+import Link from "next/link";
+import { useCart } from "@/context/CartContext";
 
 export default function MerchSuccessPage() {
+  const { clearCart } = useCart();
+
+  useEffect(() => {
+    clearCart();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <main className="min-h-screen bg-[#06082E] text-white flex flex-col items-center justify-center px-6 text-center gap-6">
       <svg className="h-20 w-20 text-[#D4AF37]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

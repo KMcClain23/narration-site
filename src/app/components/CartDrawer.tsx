@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useCart } from "@/context/CartContext";
 
 export default function CartDrawer() {
-  const { items, isOpen, closeCart, removeItem, updateQuantity, total } = useCart();
+  const { items, isOpen, closeCart, removeItem, updateQuantity, total, clearCart } = useCart();
   const [loading, setLoading] = useState(false);
 
   const handleCheckout = async () => {
@@ -18,7 +18,10 @@ export default function CartDrawer() {
         body: JSON.stringify({ items }),
       });
       const data = await res.json();
-      if (data.url) window.location.href = data.url;
+      if (data.url) {
+        clearCart();
+        window.location.href = data.url;
+      }
     } finally {
       setLoading(false);
     }
