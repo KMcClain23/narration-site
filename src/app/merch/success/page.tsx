@@ -15,7 +15,7 @@ export default function MerchSuccessPage() {
       <div className="flex flex-col gap-3 max-w-md">
         <h1 className="text-4xl font-bold text-white">Order Confirmed!</h1>
         <p className="text-white/50 text-base leading-relaxed">
-          Thank you! You&apos;ll receive a shipping confirmation email when your tote bag ships (typically 5–10 business days).
+          Thank you! You&apos;ll receive a shipping confirmation email when your order ships (typically 5–10 business days).
         </p>
       </div>
 
