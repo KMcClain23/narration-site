@@ -1,86 +1,105 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
-export async function POST(request: NextRequest) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+export async function POST(request: Request) {
   const body = await request.text();
   const sig = request.headers.get("stripe-signature");
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   let event: Stripe.Event;
 
-  if (webhookSecret && sig) {
-    try {
-      event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
-    } catch (err) {
-      return NextResponse.json({ error: `Webhook signature verification failed: ${err}` }, { status: 400 });
-    }
-  } else {
-    console.warn("STRIPE_WEBHOOK_SECRET not set — skipping signature verification");
-    event = JSON.parse(body) as Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(
+      body,
+      sig!,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
+  } catch (err) {
+    console.error("Webhook signature verification failed:", err);
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
   if (event.type === "checkout.session.completed") {
-    const sessionId = (event.data.object as Stripe.Checkout.Session).id;
+    try {
+      // Retrieve full session with shipping details expanded
+      const session = await stripe.checkout.sessions.retrieve(
+        (event.data.object as Stripe.Checkout.Session).id,
+        { expand: ["shipping_details"] }
+      );
 
-    // Retrieve full session — webhook payload omits shipping_details and other expanded fields
-    const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ["line_items"],
-    });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const s = session as any;
+      console.log("Session shipping_details:", JSON.stringify(s.shipping_details));
+      console.log("Session metadata:", session.metadata);
+      console.log("Session customer_details:", JSON.stringify(session.customer_details));
 
-    const items: { productId: string; variantId: number; quantity: number }[] = JSON.parse(
-      session.metadata?.items ?? "[]"
-    );
+      const shipping = s.shipping_details as { name?: string; address?: { country?: string; state?: string; line1?: string; line2?: string | null; city?: string; postal_code?: string } } | null;
+      const customer = session.customer_details;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const shipping = (session as any).shipping_details as { name?: string; address?: { country?: string; state?: string; line1?: string; line2?: string; city?: string; postal_code?: string } } | null;
-    const address = shipping?.address;
-    const name = shipping?.name ?? "Customer";
-    const email = session.customer_details?.email ?? "";
+      if (!shipping?.address) {
+        console.error("No shipping address found. Full session:", JSON.stringify(session));
+        return NextResponse.json({ received: true });
+      }
 
-    if (!address) {
-      console.error("No shipping address in session", session.id);
-      return NextResponse.json({ received: true });
-    }
+      const items = JSON.parse(session.metadata?.items ?? "[]");
+      if (!items.length) {
+        console.error("No items in metadata");
+        return NextResponse.json({ received: true });
+      }
 
-    const orderPayload = {
-      external_id: session.id,
-      label: "DMNarration.com Order",
-      line_items: items.map(i => ({
-        product_id: i.productId,
-        variant_id: i.variantId,
-        quantity: i.quantity,
-      })),
-      shipping_method: 1,
-      send_shipping_notification: true,
-      address_to: {
-        first_name: name.split(" ")[0],
-        last_name: name.split(" ").slice(1).join(" ") || "-",
-        email,
-        phone: "",
-        country: address.country ?? "",
-        region: address.state ?? "",
-        address1: address.line1 ?? "",
-        address2: address.line2 ?? "",
-        city: address.city ?? "",
-        zip: address.postal_code ?? "",
-      },
-    };
+      const nameParts = (shipping.name ?? customer?.name ?? "").split(" ");
+      const firstName = nameParts[0] ?? "Customer";
+      const lastName = nameParts.slice(1).join(" ") || "-";
 
-    const res = await fetch("https://api.printify.com/v1/shops/27717431/orders.json", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.PRINTIFY_API_KEY}`,
-      },
-      body: JSON.stringify(orderPayload),
-    });
+      const orderPayload = {
+        external_id: session.id,
+        label: "DMNarration.com Order",
+        line_items: items.map((i: { productId: string; variantId: number; quantity: number }) => ({
+          product_id: i.productId,
+          variant_id: i.variantId,
+          quantity: i.quantity,
+        })),
+        shipping_method: 1,
+        send_shipping_notification: true,
+        address_to: {
+          first_name: firstName,
+          last_name: lastName,
+          email: customer?.email ?? "",
+          phone: "",
+          country: shipping.address.country ?? "US",
+          region: shipping.address.state ?? "",
+          address1: shipping.address.line1 ?? "",
+          address2: shipping.address.line2 ?? "",
+          city: shipping.address.city ?? "",
+          zip: shipping.address.postal_code ?? "",
+        },
+      };
 
-    if (res.ok) {
-      console.log("Printify order created for session", session.id);
-    } else {
-      const err = await res.text();
-      console.error("Printify order failed:", err);
+      console.log("Sending to Printify:", JSON.stringify(orderPayload));
+
+      const printifyRes = await fetch(
+        `https://api.printify.com/v1/shops/27717431/orders.json`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.PRINTIFY_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(orderPayload),
+        }
+      );
+
+      const printifyData = await printifyRes.json();
+      console.log("Printify response:", JSON.stringify(printifyData));
+
+      if (!printifyRes.ok) {
+        console.error("Printify order failed:", printifyData);
+      } else {
+        console.log("Printify order created successfully:", printifyData.id);
+      }
+    } catch (err) {
+      console.error("Error processing order:", err);
     }
   }
 
