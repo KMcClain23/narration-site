@@ -22,23 +22,21 @@ export async function POST(request: Request) {
 
   if (event.type === "checkout.session.completed") {
     try {
-      // Retrieve full session with shipping details expanded
-      const session = await stripe.checkout.sessions.retrieve(
-        (event.data.object as Stripe.Checkout.Session).id,
-        { expand: ["shipping_details"] }
-      );
+      const sessionId = (event.data.object as Stripe.Checkout.Session).id;
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const s = session as any;
-      console.log("Session shipping_details:", JSON.stringify(s.shipping_details));
-      console.log("Session metadata:", session.metadata);
-      console.log("Session customer_details:", JSON.stringify(session.customer_details));
+      console.log("shipping_details:", JSON.stringify(s.shipping_details));
+      console.log("customer_details:", JSON.stringify(session.customer_details));
 
-      const shipping = s.shipping_details as { name?: string; address?: { country?: string; state?: string; line1?: string; line2?: string | null; city?: string; postal_code?: string } } | null;
-      const customer = session.customer_details;
+      // Try multiple address sources — different Stripe API versions store it differently
+      const shippingAddress = s.shipping_details?.address ?? session.customer_details?.address;
+      const shippingName = s.shipping_details?.name ?? session.customer_details?.name ?? "Customer";
 
-      if (!shipping?.address) {
-        console.error("No shipping address found. Full session:", JSON.stringify(session));
+      if (!shippingAddress) {
+        console.error("No address found anywhere in session:", session.id);
+        console.error("Full session:", JSON.stringify(session));
         return NextResponse.json({ received: true });
       }
 
@@ -48,7 +46,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ received: true });
       }
 
-      const nameParts = (shipping.name ?? customer?.name ?? "").split(" ");
+      const nameParts = shippingName.split(" ");
       const firstName = nameParts[0] ?? "Customer";
       const lastName = nameParts.slice(1).join(" ") || "-";
 
@@ -65,14 +63,14 @@ export async function POST(request: Request) {
         address_to: {
           first_name: firstName,
           last_name: lastName,
-          email: customer?.email ?? "",
+          email: session.customer_details?.email ?? "",
           phone: "",
-          country: shipping.address.country ?? "US",
-          region: shipping.address.state ?? "",
-          address1: shipping.address.line1 ?? "",
-          address2: shipping.address.line2 ?? "",
-          city: shipping.address.city ?? "",
-          zip: shipping.address.postal_code ?? "",
+          country: shippingAddress.country ?? "US",
+          region: shippingAddress.state ?? "",
+          address1: shippingAddress.line1 ?? "",
+          address2: shippingAddress.line2 ?? "",
+          city: shippingAddress.city ?? "",
+          zip: shippingAddress.postal_code ?? "",
         },
       };
 
