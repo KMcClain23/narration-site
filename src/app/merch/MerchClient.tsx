@@ -163,6 +163,9 @@ export default function MerchClient({ products }: { products: PrintifyProduct[] 
               <p className="text-white/40 text-sm max-w-xs leading-relaxed">
                 Gear for readers, listeners, and the bookish at heart.
               </p>
+              <p className="text-[#c8a96e]/70 text-xs max-w-xs leading-relaxed italic mt-2">
+                Every purchase helps me keep doing the work I love, bringing stories to life, one voice at a time.
+              </p>
             </div>
           </div>
 
@@ -199,6 +202,9 @@ export default function MerchClient({ products }: { products: PrintifyProduct[] 
               <ComingSoonCard />
             </div>
           )}
+          <p className="text-center text-[#c8a96e]/50 text-xs italic mt-14">
+            Every purchase helps me keep doing the work I love, bringing stories to life, one voice at a time.
+          </p>
         </div>
       </div>
 

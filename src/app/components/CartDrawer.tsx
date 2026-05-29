@@ -123,6 +123,9 @@ export default function CartDrawer() {
             <div className="flex justify-between text-xs text-white/40">
               <span>+ Shipping calculated at checkout</span>
             </div>
+            <p className="text-[#c8a96e]/70 text-xs text-center italic">
+              Every purchase helps me keep doing the work I love, bringing stories to life, one voice at a time.
+            </p>
             <button
               onClick={handleCheckout}
               disabled={loading}
