@@ -50,5 +50,7 @@ export async function POST(req: NextRequest) {
     cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/merch`,
   });
 
+  console.log("Created session with metadata:", session.metadata);
+
   return NextResponse.json({ url: session.url });
 }

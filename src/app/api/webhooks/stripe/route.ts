@@ -27,22 +27,29 @@ export async function POST(request: Request) {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const s = session as any;
+
+      // Log for debugging
       console.log("shipping_details:", JSON.stringify(s.shipping_details));
       console.log("customer_details:", JSON.stringify(session.customer_details));
+      console.log("collected_information:", JSON.stringify(s.collected_information));
+      console.log("metadata:", session.metadata);
 
-      // Try multiple address sources — different Stripe API versions store it differently
-      const shippingAddress = s.shipping_details?.address ?? session.customer_details?.address;
-      const shippingName = s.shipping_details?.name ?? session.customer_details?.name ?? "Customer";
+      // Try all possible address locations (varies by Stripe API version)
+      const collectedInfo = s.collected_information;
+      const shippingDetails = s.shipping_details ?? collectedInfo?.shipping_details;
+
+      const shippingAddress = shippingDetails?.address ?? session.customer_details?.address;
+      const shippingName = shippingDetails?.name ?? session.customer_details?.name ?? "Customer";
 
       if (!shippingAddress) {
-        console.error("No address found anywhere in session:", session.id);
-        console.error("Full session:", JSON.stringify(session));
+        console.error("No address found. Session keys:", Object.keys(session));
         return NextResponse.json({ received: true });
       }
 
+      // Parse items from metadata
       const items = JSON.parse(session.metadata?.items ?? "[]");
       if (!items.length) {
-        console.error("No items in metadata");
+        console.error("No items in metadata. Full metadata:", session.metadata);
         return NextResponse.json({ received: true });
       }
 
