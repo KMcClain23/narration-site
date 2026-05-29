@@ -205,22 +205,15 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
 
             {/* Right — Product details */}
             <div className="flex flex-col gap-6 justify-center">
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 order-1">
                 <h1 className="text-3xl font-bold text-white">{product.title}</h1>
                 <p className="text-2xl font-bold text-[#D4AF37]">
                   ${((selectedVariant?.price ?? 0) / 100).toFixed(0)}
                 </p>
               </div>
 
-              {product.description && (
-                <div
-                  className="text-sm text-white/60 leading-relaxed prose prose-invert prose-sm max-w-none [&_a]:text-[#D4AF37]"
-                  dangerouslySetInnerHTML={{ __html: cleanDescription(product.description) }}
-                />
-              )}
-
               {hasColors && colorOption && (
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 order-2 md:order-3">
                   <p className="text-xs text-white/40 uppercase tracking-widest">Color</p>
                   <div className="flex flex-wrap gap-2">
                     {colorOption.values.map(value => {
@@ -242,8 +235,15 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
                 </div>
               )}
 
+              {product.description && (
+                <div
+                  className="order-3 md:order-2 text-sm text-white/60 leading-relaxed prose prose-invert prose-sm max-w-none [&_a]:text-[#D4AF37]"
+                  dangerouslySetInnerHTML={{ __html: cleanDescription(product.description) }}
+                />
+              )}
+
               {hasSizes && sizeOption && (
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 order-4 md:order-4">
                   <p className="text-xs text-white/40 uppercase tracking-widest">Size</p>
                   <div className="flex flex-wrap gap-2">
                     {sizeOption.values.map(value => {
@@ -272,7 +272,7 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
                 ref={addButtonRef}
                 onClick={handleAddToCart}
                 disabled={!selectedVariant}
-                className="w-full py-3.5 rounded-full bg-[#D4AF37] text-[#06082E] font-bold text-sm hover:bg-[#F0D060] transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="order-5 w-full py-3.5 rounded-full bg-[#D4AF37] text-[#06082E] font-bold text-sm hover:bg-[#F0D060] transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {added ? "Added ✓" : "Add to Cart"}
               </button>
