@@ -184,7 +184,7 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
 
               {/* Thumbnails — horizontally scrollable on mobile */}
               {product.images.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                <div className="flex gap-2 flex-wrap">
                   {product.images.map((img, i) => (
                     <button
                       key={i}
