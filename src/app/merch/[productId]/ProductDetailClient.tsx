@@ -57,6 +57,15 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
   );
   const hasColors = colorOption && enabledVariants.length > 1;
 
+  const sizeOption = product.options.find(
+    o => o.type === "size" || o.name.toLowerCase() === "size"
+  );
+  const hasSizes = sizeOption && enabledVariants.length > 1;
+
+  const selectedSizeOptionId = sizeOption?.values.find(v =>
+    selectedVariant?.options.includes(v.id)
+  )?.id ?? null;
+
   const handleSelectVariant = (variantId: number, colorOptionId: number) => {
     setSelectedVariantId(variantId);
     const variantImg = product.images.find(img => img.variant_ids.includes(variantId))?.src;
@@ -171,6 +180,36 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
                         className={`h-7 w-7 rounded-full border-2 transition-all ${isSelected ? "border-[#D4AF37] scale-110" : "border-transparent hover:border-white/40"}`}
                         style={{ backgroundColor: color }}
                       />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {hasSizes && sizeOption && (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-white/40 uppercase tracking-widest">Size</p>
+                <div className="flex flex-wrap gap-2">
+                  {sizeOption.values.map(value => {
+                    const matchingVariant = enabledVariants.find(v => v.options.includes(value.id));
+                    if (!matchingVariant) return null;
+                    const isSelected = value.id === selectedSizeOptionId;
+                    return (
+                      <button
+                        key={value.id}
+                        onClick={() => {
+                          setSelectedVariantId(matchingVariant.id);
+                          const img = product.images.find(i => i.variant_ids.includes(matchingVariant.id))?.src;
+                          if (img) setActiveImage(img);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                          isSelected
+                            ? "border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]"
+                            : "border-white/15 text-white/50 hover:border-white/30 hover:text-white/80"
+                        }`}
+                      >
+                        {value.title}
+                      </button>
                     );
                   })}
                 </div>

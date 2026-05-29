@@ -40,7 +40,6 @@ function ProductCard({ product }: { product: PrintifyProduct }) {
   const { addItem, openCart } = useCart();
 
   const enabledVariants = product.variants.filter(v => v.is_enabled && v.is_available);
-
   const colorOption = product.options.find(
     o => o.type === "color" || o.name.toLowerCase() === "color"
   );
@@ -50,15 +49,9 @@ function ProductCard({ product }: { product: PrintifyProduct }) {
   const [added, setAdded] = useState(false);
 
   const selectedVariant = enabledVariants.find(v => v.id === selectedVariantId) ?? enabledVariants[0];
-
-  const defaultImage =
-    product.images.find(img => img.is_default)?.src ??
-    product.images[0]?.src ??
-    "";
-
+  const defaultImage = product.images.find(img => img.is_default)?.src ?? product.images[0]?.src ?? "";
   const variantImage =
-    product.images.find(img => img.variant_ids.includes(selectedVariant?.id ?? 0))?.src ??
-    defaultImage;
+    product.images.find(img => img.variant_ids.includes(selectedVariant?.id ?? 0))?.src ?? defaultImage;
 
   if (!selectedVariant) return null;
 
@@ -76,29 +69,35 @@ function ProductCard({ product }: { product: PrintifyProduct }) {
   };
 
   return (
-    <div className="flex flex-col bg-[#0A0D3A] border border-[#D4AF37]/20 rounded-xl overflow-hidden hover:border-[#D4AF37]/40 transition-colors">
-      <Link href={`/merch/${product.id}`} className="relative aspect-square bg-[#06082E] block">
+    <div className="group flex flex-col bg-[#0A0D3A] border border-[#D4AF37]/20 rounded-xl overflow-hidden hover:border-[#D4AF37]/50 hover:shadow-[0_0_32px_rgba(212,175,55,0.08)] transition-all duration-300">
+
+      {/* Image with hover zoom + shine */}
+      <Link href={`/merch/${product.id}`} className="relative aspect-square bg-[#06082E] block overflow-hidden">
         <Image
           src={variantImage}
           alt={product.title}
           fill
-          className="object-cover"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-tr from-transparent via-white/5 to-transparent pointer-events-none" />
       </Link>
 
-      <div className="flex flex-col gap-3 p-5 flex-1">
-        <div className="flex flex-col gap-1">
-          <Link href={`/merch/${product.id}`} className="text-sm font-bold text-white leading-snug hover:text-[#D4AF37] transition-colors">{product.title}</Link>
-          <p className="text-[#D4AF37] font-bold">${(selectedVariant.price / 100).toFixed(0)}</p>
+      <div className="flex flex-col gap-4 p-5 flex-1">
+        <div>
+          <Link
+            href={`/merch/${product.id}`}
+            className="text-sm font-bold text-white leading-snug hover:text-[#D4AF37] transition-colors block mb-2"
+          >
+            {product.title}
+          </Link>
+          <p className="text-xl font-bold text-[#D4AF37]">${(selectedVariant.price / 100).toFixed(0)}</p>
         </div>
 
         {hasColors && colorOption && (
           <div className="flex flex-wrap gap-2">
             {colorOption.values.map(value => {
-              const matchingVariant = enabledVariants.find(v =>
-                v.options.includes(value.id)
-              );
+              const matchingVariant = enabledVariants.find(v => v.options.includes(value.id));
               if (!matchingVariant) return null;
               const color = value.colors?.[0] ?? "#888";
               const isSelected = matchingVariant.id === selectedVariantId;
@@ -126,16 +125,51 @@ function ProductCard({ product }: { product: PrintifyProduct }) {
   );
 }
 
+function ComingSoonCard() {
+  return (
+    <div className="flex flex-col bg-[#0A0D3A]/40 border border-white/5 rounded-xl overflow-hidden">
+      <div className="aspect-square bg-[#06082E]/40 flex items-center justify-center">
+        <svg className="h-10 w-10 text-white/10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+      </div>
+      <div className="p-5 flex flex-col gap-1.5">
+        <p className="text-sm font-bold text-white/20">More Coming Soon</p>
+        <p className="text-xs text-white/15 leading-relaxed">New designs on the way. Check back soon.</p>
+      </div>
+    </div>
+  );
+}
+
 export default function MerchClient({ products }: { products: PrintifyProduct[] }) {
   const { count, openCart } = useCart();
 
   return (
-    <main className="min-h-screen bg-[#06082E] text-white px-6 pt-28 pb-20">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-[#06082E] text-white">
 
-        {/* Cart icon */}
-        <div className="flex justify-end mb-8">
-          <button onClick={openCart} className="relative p-2 text-white/60 hover:text-white transition-colors">
+      {/* Hero */}
+      <div className="relative overflow-hidden pt-28 pb-14 px-6">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0D1040]/80 to-transparent pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full bg-[#D4AF37]/[0.04] blur-3xl pointer-events-none" />
+
+        <div className="relative max-w-5xl mx-auto flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-3">
+            <span className="text-xs font-bold text-[#D4AF37]/50 uppercase tracking-widest">
+              Dean Miller Narration
+            </span>
+            <div>
+              <h1 className="text-5xl sm:text-6xl font-bold text-white mb-3">Merch</h1>
+              <div className="h-0.5 w-14 bg-[#D4AF37] rounded-full mb-4" />
+              <p className="text-white/40 text-sm max-w-xs leading-relaxed">
+                Gear for readers, listeners, and the bookish at heart.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={openCart}
+            className="relative p-2 text-white/50 hover:text-white transition-colors mt-1 shrink-0"
+          >
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
             </svg>
@@ -146,25 +180,28 @@ export default function MerchClient({ products }: { products: PrintifyProduct[] 
             )}
           </button>
         </div>
-
-        {/* Header */}
-        <div className="flex flex-col gap-2 mb-10">
-          <h1 className="text-4xl font-bold text-white">Merch</h1>
-          <p className="text-[#D4AF37]/70 text-sm">Branded gear for readers and bookish souls</p>
-        </div>
-
-        {/* Grid */}
-        {products.length === 0 ? (
-          <p className="text-white/40 text-sm">No products available yet.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map(product => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        )}
-
       </div>
-    </main>
+
+      {/* Product grid */}
+      <div className="px-6 pb-24">
+        <div className="max-w-5xl mx-auto">
+          {products.length === 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <ComingSoonCard />
+              <ComingSoonCard />
+              <ComingSoonCard />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {products.map(product => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+              <ComingSoonCard />
+            </div>
+          )}
+        </div>
+      </div>
+
+    </div>
   );
 }
