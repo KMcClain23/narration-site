@@ -160,12 +160,7 @@ export default function MerchClient({ products }: { products: PrintifyProduct[] 
             <div>
               <h1 className="text-5xl sm:text-6xl font-bold text-white mb-3">Merch</h1>
               <div className="h-0.5 w-14 bg-[#D4AF37] rounded-full mb-4" />
-              <p className="text-white/40 text-sm max-w-xs leading-relaxed">
-                Gear for readers, listeners, and the bookish at heart.
-              </p>
-              <p className="text-[#c8a96e]/70 text-xs max-w-xs leading-relaxed italic mt-2">
-                Every purchase helps me keep doing the work I love, bringing stories to life, one voice at a time.
-              </p>
+              <p className="text-[#c8a96e]/70 text-xs max-w-xs leading-relaxed italic mt-2">Every purchase helps me keep doing the work I love, bringing stories to life, one voice at a time.</p>
             </div>
           </div>
 
