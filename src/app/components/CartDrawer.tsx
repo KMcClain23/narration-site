@@ -32,12 +32,32 @@ export default function CartDrawer() {
         onClick={closeCart}
       />
 
-      {/* Drawer */}
+      {/*
+        Mobile: bottom sheet (slides up, rounded top, max 85dvh)
+        Desktop sm+: side drawer (slides from right, full height)
+      */}
       <div
-        className={`fixed top-0 right-0 h-full w-full max-w-sm z-50 flex flex-col bg-[#0A0D3A] border-l border-[#D4AF37]/20 shadow-2xl transition-transform duration-300 ${isOpen ? "translate-x-0" : "translate-x-full"}`}
+        className={[
+          "fixed z-50 flex flex-col",
+          "bg-[#0A0D3A] border-[#D4AF37]/20 shadow-2xl",
+          "transition-transform duration-300",
+          // Mobile positioning + size
+          "bottom-0 left-0 right-0 w-full max-h-[85dvh] rounded-t-2xl border-t",
+          // Desktop overrides
+          "sm:top-0 sm:right-0 sm:bottom-auto sm:left-auto sm:w-full sm:max-w-sm sm:h-[100dvh] sm:max-h-none sm:rounded-none sm:border-t-0 sm:border-l",
+          // Animation — mobile slides from bottom, desktop from right
+          isOpen
+            ? "translate-y-0 sm:translate-x-0"
+            : "translate-y-full sm:translate-y-0 sm:translate-x-full",
+        ].join(" ")}
       >
+        {/* Drag handle pill — mobile only */}
+        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
+          <div className="h-1 w-10 rounded-full bg-white/20" />
+        </div>
+
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 shrink-0">
           <h2 className="text-lg font-bold text-white">Your Cart</h2>
           <button onClick={closeCart} className="p-1 text-white/40 hover:text-white transition-colors">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -49,7 +69,7 @@ export default function CartDrawer() {
         {/* Items */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+            <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-12">
               <svg className="h-14 w-14 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
@@ -63,7 +83,7 @@ export default function CartDrawer() {
               {items.map(item => (
                 <li key={item.variantId} className="flex gap-3 items-start">
                   <div className="relative h-16 w-16 rounded-lg overflow-hidden shrink-0 bg-[#06082E]">
-                    <Image src={item.image} alt={item.title} fill className="object-cover" />
+                    <Image src={item.image} alt={item.title} fill className="object-cover" sizes="64px" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate">{item.title}</p>
@@ -92,18 +112,13 @@ export default function CartDrawer() {
 
         {/* Footer */}
         {items.length > 0 && (
-          <div className="px-5 py-4 border-t border-white/10 flex flex-col gap-3">
+          <div className="px-5 py-4 border-t border-white/10 flex flex-col gap-3 shrink-0">
             <div className="flex justify-between text-sm text-white/60">
               <span>Subtotal</span>
               <span>${(total / 100).toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-xs text-white/40">
-              <span>+ $5.99 shipping</span>
-              <span>$5.99</span>
-            </div>
-            <div className="flex justify-between text-base font-bold text-[#D4AF37]">
-              <span>Total</span>
-              <span>${((total + 599) / 100).toFixed(2)}</span>
+              <span>+ Shipping calculated at checkout</span>
             </div>
             <button
               onClick={handleCheckout}

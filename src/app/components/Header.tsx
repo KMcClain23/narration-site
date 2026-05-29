@@ -7,12 +7,14 @@ import { FaTiktok, FaInstagram, FaDiscord } from "react-icons/fa";
 import { HiMenu, HiX } from "react-icons/hi";
 import { usePathname, useRouter } from "next/navigation";
 import { SiteSearch } from "./SiteSearch";
+import { useCart } from "@/context/CartContext";
 
 const BOOKINGS_URL =
   "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
+  const { count: cartCount, openCart } = useCart();
   const [isScrolled, setIsScrolled] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminKey, setAdminKey] = useState("");
@@ -232,6 +234,22 @@ export default function Header() {
               </a>
             </div>
           </div>
+
+          {/* Cart button */}
+          <button
+            onClick={openCart}
+            aria-label="Open cart"
+            className="relative p-1.5 text-white/70 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06082E] rounded"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+            {cartCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-[#D4AF37] text-[#06082E] text-[10px] font-bold flex items-center justify-center">
+                {cartCount}
+              </span>
+            )}
+          </button>
 
           {/* Hamburger Menu Toggle */}
           <button
