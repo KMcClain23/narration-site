@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCart } from "@/context/CartContext";
 
 interface PrintifyVariant {
@@ -50,6 +50,14 @@ function ProductCard({ product, index }: { product: PrintifyProduct; index: numb
 
   const [selectedVariantId, setSelectedVariantId] = useState(enabledVariants[0]?.id ?? null);
   const [added, setAdded] = useState(false);
+
+  // Preload all variant images on mount so color switching is instant
+  useEffect(() => {
+    product.images.forEach(img => {
+      const preload = new window.Image();
+      preload.src = img.src;
+    });
+  }, [product.images]);
 
   const selectedVariant = enabledVariants.find(v => v.id === selectedVariantId) ?? enabledVariants[0];
   const defaultImage = product.images.find(img => img.is_default)?.src ?? product.images[0]?.src ?? "";
