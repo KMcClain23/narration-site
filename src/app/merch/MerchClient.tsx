@@ -214,6 +214,14 @@ export default function MerchClient({ products }: { products: PrintifyProduct[] 
           <p className="text-center text-[#c8a96e]/50 text-xs italic mt-14">
             Every purchase helps me keep doing the work I love, bringing stories to life, one voice at a time.
           </p>
+
+          <div className="border-t border-white/5 mt-10 pt-8 flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-white/20">
+            <span>© {new Date().getFullYear()} Dean Miller Narration LLC. All rights reserved.</span>
+            <span className="hidden sm:inline">·</span>
+            <a href="/privacy" className="hover:text-white/50 transition-colors">Privacy Policy</a>
+            <span>·</span>
+            <a href="/terms" className="hover:text-white/50 transition-colors">Terms of Service</a>
+          </div>
         </div>
       </div>
 

@@ -943,8 +943,12 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { accep
                 </div>
               ))}
             </div>
-            <div className="border-t border-white/5 pt-8 text-center text-xs text-white/20">
-              © {new Date().getFullYear()} Dean Miller Narration. All rights reserved.
+            <div className="border-t border-white/5 pt-8 flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-white/20">
+              <span>© {new Date().getFullYear()} Dean Miller Narration. All rights reserved.</span>
+              <span className="hidden sm:inline">·</span>
+              <a href="/privacy" className="hover:text-white/50 transition-colors">Privacy Policy</a>
+              <span>·</span>
+              <a href="/terms" className="hover:text-white/50 transition-colors">Terms of Service</a>
             </div>
           </div>
           <Link href="/admin/login" className="absolute bottom-2 right-2 w-4 h-4 opacity-0" aria-label="Admin login" />
