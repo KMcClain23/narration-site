@@ -22,5 +22,10 @@ export default async function MerchPage() {
       p.visible === true && p.is_deleted === false
   );
 
-  return <MerchClient products={products} />;
+  return (
+    <>
+      <link rel="preconnect" href="https://images-api.printify.com" />
+      <MerchClient products={products} />
+    </>
+  );
 }

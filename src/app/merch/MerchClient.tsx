@@ -36,7 +36,10 @@ interface PrintifyProduct {
   options: PrintifyOption[];
 }
 
-function ProductCard({ product }: { product: PrintifyProduct }) {
+// Neutral dark shimmer used as blur placeholder for all product images
+const BLUR_PLACEHOLDER = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+function ProductCard({ product, index }: { product: PrintifyProduct; index: number }) {
   const { addItem, openCart } = useCart();
 
   const enabledVariants = product.variants.filter(v => v.is_enabled && v.is_available);
@@ -79,6 +82,9 @@ function ProductCard({ product }: { product: PrintifyProduct }) {
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          priority={index < 3}
+          placeholder="blur"
+          blurDataURL={BLUR_PLACEHOLDER}
         />
         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-tr from-transparent via-white/5 to-transparent pointer-events-none" />
       </Link>
@@ -191,8 +197,8 @@ export default function MerchClient({ products }: { products: PrintifyProduct[] 
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {products.map(product => (
-                <ProductCard key={product.id} product={product} />
+              {products.map((product, i) => (
+                <ProductCard key={product.id} product={product} index={i} />
               ))}
               <ComingSoonCard />
             </div>
