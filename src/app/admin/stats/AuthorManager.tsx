@@ -363,6 +363,25 @@ export default function AuthorManager() {
   const filledLinkCount = (a: Author) =>
     [a.website, a.amazon, a.instagram, a.tiktok, a.facebook, a.goodreads].filter(Boolean).length;
 
+  const exportCSV = () => {
+    const rows = [
+      ["Name", "Bio", "Email", "Number of Links"],
+      ...authors.map(a => [
+        a.name,
+        a.bio ?? "",
+        a.email ?? "",
+        filledLinkCount(a).toString(),
+      ]),
+    ];
+    const csv = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "authors.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <section className="mt-12 pt-12 border-t border-[#1A2070]">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -371,6 +390,18 @@ export default function AuthorManager() {
           <p className="mt-1 text-sm text-white/40">Manage links and bios shown in the author popup on Narrated Works.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {authors.length > 0 && (
+            <button
+              onClick={exportCSV}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-2 text-xs font-semibold text-white/70 hover:text-white hover:border-white/30 transition"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export CSV
+            </button>
+          )}
+
           {/* Gather all missing emails */}
           {authors.some(a => !a.email) && (
             <div className="flex flex-col items-end gap-1">
