@@ -39,170 +39,6 @@ interface PrintifyProduct {
 const BLUR_PLACEHOLDER =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
-// ── Quick-view modal ──────────────────────────────────────────────────────────
-
-function QuickViewModal({
-  product,
-  onClose,
-}: {
-  product: PrintifyProduct;
-  onClose: () => void;
-}) {
-  const { addItem, openCart } = useCart();
-  const enabledVariants = product.variants.filter(v => v.is_enabled && v.is_available);
-  const [selectedVariantId, setSelectedVariantId] = useState(enabledVariants[0]?.id ?? null);
-  const [added, setAdded] = useState(false);
-
-  const selectedVariant = enabledVariants.find(v => v.id === selectedVariantId) ?? enabledVariants[0];
-  const colorOption = product.options.find(o => o.type === "color" || o.name.toLowerCase() === "color");
-  const hasColors = colorOption && enabledVariants.length > 1;
-  const sizeOption = product.options.find(o => o.type === "size" || o.name.toLowerCase() === "size");
-  const hasSizes = sizeOption && enabledVariants.length > 1;
-  const defaultImage = product.images.find(img => img.is_default)?.src ?? product.images[0]?.src ?? "";
-  const variantImage =
-    product.images.find(img => img.variant_ids.includes(selectedVariant?.id ?? 0))?.src ?? defaultImage;
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const handleAdd = () => {
-    if (!selectedVariant) return;
-    addItem({
-      productId: product.id,
-      variantId: selectedVariant.id,
-      title: product.title,
-      price: selectedVariant.price,
-      image: defaultImage,
-    });
-    onClose();
-    openCart();
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center"
-      onClick={onClose}
-    >
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-      <div
-        className="relative bg-[#0A0D3A] border border-[#D4AF37]/20 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[90dvh] overflow-y-auto shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Drag handle — mobile only */}
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
-          <div className="h-1 w-10 rounded-full bg-white/20" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-          <h2 className="font-bold text-white text-base truncate pr-4">{product.title}</h2>
-          <button
-            onClick={onClose}
-            className="p-1 text-white/40 hover:text-white transition-colors shrink-0"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex flex-col sm:flex-row gap-5 p-5">
-          {/* Image */}
-          <div className="relative w-full sm:w-52 aspect-square shrink-0 rounded-xl overflow-hidden bg-[#06082E] border border-[#D4AF37]/10">
-            <Image
-              src={variantImage}
-              alt={product.title}
-              fill
-              className="object-cover"
-              sizes="(max-width: 640px) 100vw, 208px"
-            />
-          </div>
-
-          {/* Details */}
-          <div className="flex flex-col gap-4 flex-1 min-w-0">
-            <p className="text-2xl font-bold text-[#D4AF37]">
-              ${((selectedVariant?.price ?? 0) / 100).toFixed(0)}
-            </p>
-
-            {hasColors && colorOption && (
-              <div className="flex flex-col gap-2">
-                <p className="text-xs text-white/40 uppercase tracking-widest">Color</p>
-                <div className="flex flex-wrap gap-2">
-                  {colorOption.values.map(value => {
-                    const matchingVariant = enabledVariants.find(v => v.options.includes(value.id));
-                    if (!matchingVariant) return null;
-                    const color = value.colors?.[0] ?? "#888";
-                    const isSelected = matchingVariant.id === selectedVariantId;
-                    return (
-                      <button
-                        key={value.id}
-                        title={value.title}
-                        onClick={() => setSelectedVariantId(matchingVariant.id)}
-                        className={`h-7 w-7 rounded-full border-2 transition-all ${
-                          isSelected ? "border-[#D4AF37] scale-110" : "border-transparent hover:border-white/40"
-                        }`}
-                        style={{ backgroundColor: color }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {hasSizes && sizeOption && (
-              <div className="flex flex-col gap-2">
-                <p className="text-xs text-white/40 uppercase tracking-widest">Size</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {sizeOption.values.map(value => {
-                    const matchingVariant = enabledVariants.find(v => v.options.includes(value.id));
-                    if (!matchingVariant) return null;
-                    const isSelected = matchingVariant.id === selectedVariantId;
-                    return (
-                      <button
-                        key={value.id}
-                        onClick={() => setSelectedVariantId(matchingVariant.id)}
-                        className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${
-                          isSelected
-                            ? "border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]"
-                            : "border-white/15 text-white/50 hover:border-white/30 hover:text-white/80"
-                        }`}
-                      >
-                        {value.title}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <button
-              onClick={handleAdd}
-              disabled={!selectedVariant}
-              className="w-full py-3 rounded-full bg-[#D4AF37] text-[#06082E] font-bold text-sm hover:bg-[#F0D060] transition-all active:scale-95 disabled:opacity-40 mt-auto"
-            >
-              {added ? "Added ✓" : "Add to Cart"}
-            </button>
-
-            <Link
-              href={`/merch/${product.id}`}
-              onClick={onClose}
-              className="text-center text-xs text-white/30 hover:text-white/60 transition-colors underline underline-offset-2"
-            >
-              View full product details →
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Email capture ─────────────────────────────────────────────────────────────
 
 function EmailCapture() {
@@ -267,11 +103,9 @@ function EmailCapture() {
 function ProductCard({
   product,
   index,
-  onQuickView,
 }: {
   product: PrintifyProduct;
   index: number;
-  onQuickView: (p: PrintifyProduct) => void;
 }) {
   const { addItem, openCart } = useCart();
 
@@ -314,12 +148,8 @@ function ProductCard({
   return (
     <div className="group flex flex-col bg-[#0A0D3A] border border-[#D4AF37]/20 rounded-xl overflow-hidden hover:border-[#D4AF37]/50 hover:shadow-[0_0_32px_rgba(212,175,55,0.08)] transition-all duration-300">
 
-      {/* Image — click opens quick-view */}
-      <button
-        onClick={() => onQuickView(product)}
-        aria-label={`Quick view ${product.title}`}
-        className="relative aspect-square bg-[#06082E] w-full overflow-hidden cursor-zoom-in"
-      >
+      {/* Image — click navigates to product page */}
+      <Link href={`/merch/${product.id}`} className="relative aspect-square bg-[#06082E] block overflow-hidden">
         <Image
           src={variantImage}
           alt={product.title}
@@ -331,12 +161,7 @@ function ProductCard({
           blurDataURL={BLUR_PLACEHOLDER}
         />
         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-tr from-transparent via-white/5 to-transparent pointer-events-none" />
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-          <span className="bg-black/50 backdrop-blur-sm text-white text-[10px] font-semibold px-2.5 py-1 rounded-full">
-            Quick View
-          </span>
-        </div>
-      </button>
+      </Link>
 
       <div className="flex flex-col gap-3 p-3 sm:p-5 flex-1">
         <div>
@@ -406,7 +231,6 @@ function ComingSoonCard() {
 
 export default function MerchClient({ products }: { products: PrintifyProduct[] }) {
   const { count, openCart, total, isOpen: cartOpen } = useCart();
-  const [quickViewProduct, setQuickViewProduct] = useState<PrintifyProduct | null>(null);
 
   return (
     <div className="min-h-screen bg-[#06082E] text-white">
@@ -462,7 +286,6 @@ export default function MerchClient({ products }: { products: PrintifyProduct[] 
                   key={product.id}
                   product={product}
                   index={i}
-                  onQuickView={setQuickViewProduct}
                 />
               ))}
               <ComingSoonCard />
@@ -480,14 +303,6 @@ export default function MerchClient({ products }: { products: PrintifyProduct[] 
           </div>
         </div>
       </div>
-
-      {/* Quick-view modal */}
-      {quickViewProduct && (
-        <QuickViewModal
-          product={quickViewProduct}
-          onClose={() => setQuickViewProduct(null)}
-        />
-      )}
 
       {/* Mobile sticky View Cart bar — hidden when cart drawer is open */}
       {count > 0 && !cartOpen && (
