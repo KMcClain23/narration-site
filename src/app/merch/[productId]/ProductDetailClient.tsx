@@ -231,94 +231,87 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16">
 
-            {/* Left — Image gallery */}
-            <div className="flex flex-col gap-2 md:flex-row md:items-start md:gap-3">
+            {/* Left — image + thumbnails + buying controls */}
+            <div className="flex flex-col gap-5">
 
-              {/* Thumbnail strip — left on desktop, horizontal row below on mobile */}
-              {visibleImages.length > 1 && (
-                <div className="order-2 md:order-1 flex flex-row flex-wrap gap-2 md:flex-col md:flex-nowrap shrink-0 md:w-[64px]">
-                  {visibleImages.map((img, i) => (
-                    <button
-                      key={img.src}
-                      onMouseEnter={() => setActiveImage(img.src)}
-                      onClick={() => setActiveImage(img.src)}
-                      className={`relative h-14 w-14 md:h-[60px] md:w-[60px] rounded-lg overflow-hidden border-2 transition-all shrink-0 ${
-                        activeImage === img.src
-                          ? "border-[#D4AF37]"
-                          : "border-white/10 hover:border-white/40"
-                      }`}
-                    >
-                      <Image
-                        src={img.src}
-                        alt={img.position ?? `View ${i + 1}`}
-                        fill
-                        className="object-cover"
-                        sizes="64px"
-                      />
-                      {img.position && (
-                        <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white/90 text-[9px] font-medium text-center py-0.5 capitalize leading-tight">
-                          {img.position.replace(/-/g, " ")}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* Gallery: thumbnail strip (left on desktop) + main image */}
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:gap-3">
 
-              {/* Main image — zoom on desktop hover, lightbox on click, swipe on mobile */}
-              <div className="order-1 md:order-2 flex-1">
-                <button
-                  className="relative w-full aspect-square rounded-2xl overflow-hidden bg-[#0A0D3A] border border-[#D4AF37]/10 cursor-zoom-in"
-                  onClick={() => setLightboxOpen(true)}
-                  onTouchStart={handleTouchStart}
-                  onTouchEnd={handleTouchEnd}
-                  onMouseEnter={() => setZoom(true)}
-                  onMouseLeave={() => setZoom(false)}
-                  onMouseMove={handleZoomMove}
-                >
-                  <Image
-                    src={activeImage}
-                    alt={product.title}
-                    fill
-                    className="object-cover select-none"
-                    priority
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    style={{
-                      transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
-                      transform: zoom ? "scale(2)" : "scale(1)",
-                      transition: "transform 0.15s ease",
-                    }}
-                  />
-                  {/* Swipe dot indicators — mobile only */}
-                  {visibleImages.length > 1 && (
-                    <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 sm:hidden pointer-events-none">
-                      {visibleImages.map((_, i) => (
-                        <span
-                          key={i}
-                          className={`h-1.5 rounded-full transition-all ${
-                            i === activeImageIndex ? "w-4 bg-[#D4AF37]" : "w-1.5 bg-white/30"
-                          }`}
+                {/* Thumbnails — vertical strip on desktop, horizontal row below on mobile */}
+                {visibleImages.length > 1 && (
+                  <div className="order-2 md:order-1 flex flex-row flex-wrap gap-2 md:flex-col md:flex-nowrap shrink-0 md:w-[64px]">
+                    {visibleImages.map((img, i) => (
+                      <button
+                        key={img.src}
+                        onMouseEnter={() => setActiveImage(img.src)}
+                        onClick={() => setActiveImage(img.src)}
+                        className={`relative h-14 w-14 md:h-[60px] md:w-[60px] rounded-lg overflow-hidden border-2 transition-all shrink-0 ${
+                          activeImage === img.src
+                            ? "border-[#D4AF37]"
+                            : "border-white/10 hover:border-white/40"
+                        }`}
+                      >
+                        <Image
+                          src={img.src}
+                          alt={img.position ?? `View ${i + 1}`}
+                          fill
+                          className="object-cover"
+                          sizes="64px"
                         />
-                      ))}
-                    </div>
-                  )}
-                </button>
+                        {img.position && (
+                          <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white/90 text-[9px] font-medium text-center py-0.5 capitalize leading-tight">
+                            {img.position.replace(/-/g, " ")}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Main image — zoom on desktop hover, lightbox on click, swipe on mobile */}
+                <div className="order-1 md:order-2 flex-1">
+                  <button
+                    className="relative w-full aspect-square rounded-2xl overflow-hidden bg-[#0A0D3A] border border-[#D4AF37]/10 cursor-zoom-in"
+                    onClick={() => setLightboxOpen(true)}
+                    onTouchStart={handleTouchStart}
+                    onTouchEnd={handleTouchEnd}
+                    onMouseEnter={() => setZoom(true)}
+                    onMouseLeave={() => setZoom(false)}
+                    onMouseMove={handleZoomMove}
+                  >
+                    <Image
+                      src={activeImage}
+                      alt={product.title}
+                      fill
+                      className="object-cover select-none"
+                      priority
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      style={{
+                        transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
+                        transform: zoom ? "scale(2)" : "scale(1)",
+                        transition: "transform 0.15s ease",
+                      }}
+                    />
+                    {visibleImages.length > 1 && (
+                      <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 sm:hidden pointer-events-none">
+                        {visibleImages.map((_, i) => (
+                          <span
+                            key={i}
+                            className={`h-1.5 rounded-full transition-all ${
+                              i === activeImageIndex ? "w-4 bg-[#D4AF37]" : "w-1.5 bg-white/30"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </button>
+                </div>
+
               </div>
 
-            </div>
-
-            {/* Right — Product details */}
-            <div className="flex flex-col gap-6">
-              {/* Mobile: color first. Desktop: title first */}
-              <div className="flex flex-col gap-2 order-4 md:order-1">
-                <h1 className="text-3xl font-bold text-white">{product.title}</h1>
-                <p className="text-2xl font-bold text-[#D4AF37]">
-                  ${((selectedVariant?.price ?? 0) / 100).toFixed(0)}
-                </p>
-              </div>
-
+              {/* Color selector */}
               {hasColors && colorOption && (
-                <div className="flex flex-col gap-2 order-1 md:order-2">
+                <div className="flex flex-col gap-2">
                   <p className="text-xs text-white/40 uppercase tracking-widest">Color</p>
                   <div className="flex flex-wrap gap-2">
                     {colorOption.values.map(value => {
@@ -340,8 +333,9 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
                 </div>
               )}
 
+              {/* Size selector */}
               {hasSizes && sizeOption && (
-                <div className="flex flex-col gap-2 order-2 md:order-3">
+                <div className="flex flex-col gap-2">
                   <p className="text-xs text-white/40 uppercase tracking-widest">Size</p>
                   <div className="flex flex-wrap gap-2">
                     {sizeOption.values.map(value => {
@@ -366,17 +360,29 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
                 </div>
               )}
 
+              {/* Add to Cart */}
               <button
                 ref={addButtonRef}
                 onClick={handleAddToCart}
                 disabled={!selectedVariant}
-                className="order-3 md:order-4 w-full py-3.5 rounded-full bg-[#D4AF37] text-[#06082E] font-bold text-sm hover:bg-[#F0D060] transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full py-3.5 rounded-full bg-[#D4AF37] text-[#06082E] font-bold text-sm hover:bg-[#F0D060] transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {added ? "Added ✓" : "Add to Cart"}
               </button>
 
+            </div>
+
+            {/* Right — title, price, description only */}
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <h1 className="text-3xl font-bold text-white">{product.title}</h1>
+                <p className="text-2xl font-bold text-[#D4AF37]">
+                  ${((selectedVariant?.price ?? 0) / 100).toFixed(0)}
+                </p>
+              </div>
+
               {product.description && (
-                <div className="order-5 text-sm text-white/60 leading-relaxed">
+                <div className="text-sm text-white/60 leading-relaxed">
                   <FormattedDescription html={product.description} title={product.title} />
                 </div>
               )}
