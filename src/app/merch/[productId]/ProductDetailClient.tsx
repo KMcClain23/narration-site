@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useCart } from "@/context/CartContext";
 
 interface PrintifyVariant {
@@ -36,8 +36,67 @@ interface PrintifyProduct {
   options: PrintifyOption[];
 }
 
-function cleanDescription(html: string) {
-  return html.replace(/(<br\s*\/?>\s*){2,}/gi, "<br>").trim();
+const KNOWN_HEADERS = new Set([
+  "product features", "care instructions", "about this item",
+  "details", "specifications", "description", "material", "materials",
+]);
+
+function isHeader(line: string) {
+  const lower = line.toLowerCase().replace(/:$/, "").trim();
+  if (KNOWN_HEADERS.has(lower)) return true;
+  return line.length >= 3 && line === line.toUpperCase() && /[A-Z]/.test(line);
+}
+
+function isBullet(line: string) {
+  return /^[•·\-\*]\s/.test(line) || /^\d+\.\s/.test(line);
+}
+
+function FormattedDescription({ html, title }: { html: string; title: string }) {
+  const plain = html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ").replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+    .trim();
+
+  const titleLower = title.toLowerCase();
+  const lines = plain.split("\n").map(l => l.trim()).filter(l => {
+    if (!l) return false;
+    if (l.toLowerCase() === titleLower) return false;
+    if (l.toLowerCase().replace(/:$/, "") === titleLower) return false;
+    return true;
+  });
+
+  const nodes: React.ReactNode[] = [];
+  let listItems: string[] = [];
+
+  const flushList = (key: string) => {
+    if (!listItems.length) return;
+    nodes.push(
+      <ul key={key} className="list-disc list-inside space-y-1">
+        {listItems.map((item, i) => (
+          <li key={i}>{item.replace(/^[•·\-\*]\s*/, "").replace(/^\d+\.\s*/, "")}</li>
+        ))}
+      </ul>
+    );
+    listItems = [];
+  };
+
+  lines.forEach((line, i) => {
+    if (isHeader(line)) {
+      flushList(`list-${i}`);
+      nodes.push(<p key={`h-${i}`} className="font-bold text-white text-sm mt-2 first:mt-0">{line}</p>);
+    } else if (isBullet(line)) {
+      listItems.push(line);
+    } else {
+      flushList(`list-${i}`);
+      nodes.push(<p key={`p-${i}`}>{line}</p>);
+    }
+  });
+  flushList("list-end");
+
+  return <div className="flex flex-col gap-1.5">{nodes}</div>;
 }
 
 export default function ProductDetailClient({ product }: { product: PrintifyProduct }) {
@@ -236,10 +295,9 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
               )}
 
               {product.description && (
-                <div
-                  className="order-3 md:order-2 text-sm text-white/60 leading-relaxed prose prose-invert prose-sm max-w-none [&_a]:text-[#D4AF37]"
-                  dangerouslySetInnerHTML={{ __html: cleanDescription(product.description) }}
-                />
+                <div className="order-3 md:order-2 text-sm text-white/60 leading-relaxed">
+                  <FormattedDescription html={product.description} title={product.title} />
+                </div>
               )}
 
               {hasSizes && sizeOption && (
