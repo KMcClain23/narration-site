@@ -110,6 +110,8 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
   const [added, setAdded] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [showStickyBar, setShowStickyBar] = useState(false);
+  const [zoom, setZoom] = useState(false);
+  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
 
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const touchStartX = useRef<number | null>(null);
@@ -184,6 +186,14 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
     else if (dx > 0 && idx > 0) setActiveImage(product.images[idx - 1].src);
   };
 
+  const handleZoomMove = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setZoomOrigin({
+      x: ((e.clientX - rect.left) / rect.width) * 100,
+      y: ((e.clientY - rect.top) / rect.height) * 100,
+    });
+  };
+
   const activeImageIndex = product.images.findIndex(img => img.src === activeImage);
 
   return (
@@ -215,42 +225,29 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16">
 
             {/* Left — Image gallery */}
-            <div className="flex flex-col gap-3">
-              {/* Main image — click for lightbox, swipe to navigate on mobile */}
-              <button
-                className="relative w-full aspect-square rounded-2xl overflow-hidden bg-[#0A0D3A] border border-[#D4AF37]/10 cursor-zoom-in"
-                onClick={() => setLightboxOpen(true)}
-                onTouchStart={handleTouchStart}
-                onTouchEnd={handleTouchEnd}
-              >
-                <Image
-                  src={activeImage}
-                  alt={product.title}
-                  fill
-                  className="object-cover"
-                  priority
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                />
-                {/* Swipe hint on mobile — only visible if multiple images */}
-                {product.images.length > 1 && (
-                  <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 sm:hidden pointer-events-none">
-                    {product.images.map((_, i) => (
-                      <span key={i} className={`h-1.5 rounded-full transition-all ${i === activeImageIndex ? "w-4 bg-[#D4AF37]" : "w-1.5 bg-white/30"}`} />
-                    ))}
-                  </div>
-                )}
-              </button>
+            <div className="flex flex-col gap-2 md:flex-row md:items-start md:gap-3">
 
-              {/* Thumbnails — horizontally scrollable on mobile */}
+              {/* Thumbnail strip — left on desktop, horizontal row below on mobile */}
               {product.images.length > 1 && (
-                <div className="flex gap-2 flex-wrap">
+                <div className="order-2 md:order-1 flex flex-row gap-2 overflow-x-auto md:flex-col md:overflow-x-visible md:overflow-y-auto shrink-0 md:w-[72px] pb-1 md:pb-0 md:max-h-[560px]">
                   {product.images.map((img, i) => (
                     <button
                       key={i}
+                      onMouseEnter={() => setActiveImage(img.src)}
                       onClick={() => setActiveImage(img.src)}
-                      className={`relative h-16 w-16 rounded-lg overflow-hidden border-2 transition-all shrink-0 ${activeImage === img.src ? "border-[#D4AF37]" : "border-white/10 hover:border-white/30"}`}
+                      className={`relative h-[60px] w-[60px] md:h-[68px] md:w-[68px] rounded-lg overflow-hidden border-2 transition-all shrink-0 ${
+                        activeImage === img.src
+                          ? "border-[#D4AF37]"
+                          : "border-white/10 hover:border-white/40"
+                      }`}
                     >
-                      <Image src={img.src} alt={img.position ?? `View ${i + 1}`} fill className="object-cover" sizes="64px" />
+                      <Image
+                        src={img.src}
+                        alt={img.position ?? `View ${i + 1}`}
+                        fill
+                        className="object-cover"
+                        sizes="72px"
+                      />
                       {img.position && (
                         <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white/90 text-[9px] font-medium text-center py-0.5 capitalize leading-tight">
                           {img.position.replace(/-/g, " ")}
@@ -260,6 +257,47 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
                   ))}
                 </div>
               )}
+
+              {/* Main image — zoom on desktop hover, lightbox on click, swipe on mobile */}
+              <div className="order-1 md:order-2 flex-1">
+                <button
+                  className="relative w-full aspect-square rounded-2xl overflow-hidden bg-[#0A0D3A] border border-[#D4AF37]/10 cursor-zoom-in"
+                  onClick={() => setLightboxOpen(true)}
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                  onMouseEnter={() => setZoom(true)}
+                  onMouseLeave={() => setZoom(false)}
+                  onMouseMove={handleZoomMove}
+                >
+                  <Image
+                    src={activeImage}
+                    alt={product.title}
+                    fill
+                    className="object-cover select-none"
+                    priority
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    style={{
+                      transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
+                      transform: zoom ? "scale(2)" : "scale(1)",
+                      transition: "transform 0.15s ease",
+                    }}
+                  />
+                  {/* Swipe dot indicators — mobile only */}
+                  {product.images.length > 1 && (
+                    <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 sm:hidden pointer-events-none">
+                      {product.images.map((_, i) => (
+                        <span
+                          key={i}
+                          className={`h-1.5 rounded-full transition-all ${
+                            i === activeImageIndex ? "w-4 bg-[#D4AF37]" : "w-1.5 bg-white/30"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </button>
+              </div>
+
             </div>
 
             {/* Right — Product details */}
