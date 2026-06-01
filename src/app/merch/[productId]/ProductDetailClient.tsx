@@ -258,7 +258,7 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
                           className="object-cover"
                           sizes="64px"
                         />
-                        {img.position && (
+                        {img.position && img.position !== "other" && (
                           <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white/90 text-[9px] font-medium text-center py-0.5 capitalize leading-tight">
                             {img.position.replace(/-/g, " ")}
                           </span>
