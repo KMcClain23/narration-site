@@ -132,6 +132,11 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
     selectedVariant?.options.includes(v.id)
   )?.id ?? null;
 
+  // Only show images that belong to the selected variant (empty variant_ids = all variants)
+  const visibleImages = product.images.filter(
+    img => img.variant_ids.length === 0 || img.variant_ids.includes(selectedVariant?.id ?? 0)
+  );
+
   // Show sticky bar when the main Add to Cart button scrolls out of view
   useEffect(() => {
     const el = addButtonRef.current;
@@ -154,8 +159,10 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
 
   const handleSelectVariant = (variantId: number) => {
     setSelectedVariantId(variantId);
-    const img = product.images.find(i => i.variant_ids.includes(variantId))?.src;
-    if (img) setActiveImage(img);
+    const first = product.images.find(
+      img => img.variant_ids.length === 0 || img.variant_ids.includes(variantId)
+    );
+    if (first) setActiveImage(first.src);
   };
 
   const handleAddToCart = () => {
@@ -181,9 +188,9 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
     const dx = e.changedTouches[0].clientX - touchStartX.current;
     touchStartX.current = null;
     if (Math.abs(dx) < 50) return;
-    const idx = product.images.findIndex(img => img.src === activeImage);
-    if (dx < 0 && idx < product.images.length - 1) setActiveImage(product.images[idx + 1].src);
-    else if (dx > 0 && idx > 0) setActiveImage(product.images[idx - 1].src);
+    const idx = visibleImages.findIndex(img => img.src === activeImage);
+    if (dx < 0 && idx < visibleImages.length - 1) setActiveImage(visibleImages[idx + 1].src);
+    else if (dx > 0 && idx > 0) setActiveImage(visibleImages[idx - 1].src);
   };
 
   const handleZoomMove = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -194,7 +201,7 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
     });
   };
 
-  const activeImageIndex = product.images.findIndex(img => img.src === activeImage);
+  const activeImageIndex = visibleImages.findIndex(img => img.src === activeImage);
 
   return (
     <>
@@ -228,14 +235,14 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
             <div className="flex flex-col gap-2 md:flex-row md:items-start md:gap-3">
 
               {/* Thumbnail strip — left on desktop, horizontal row below on mobile */}
-              {product.images.length > 1 && (
-                <div className="order-2 md:order-1 flex flex-row gap-2 overflow-x-auto md:flex-col md:overflow-x-visible md:overflow-y-auto shrink-0 md:w-[72px] pb-1 md:pb-0 md:max-h-[560px]">
-                  {product.images.map((img, i) => (
+              {visibleImages.length > 1 && (
+                <div className="order-2 md:order-1 flex flex-row flex-wrap gap-2 md:flex-col md:flex-nowrap shrink-0 md:w-[64px]">
+                  {visibleImages.map((img, i) => (
                     <button
-                      key={i}
+                      key={img.src}
                       onMouseEnter={() => setActiveImage(img.src)}
                       onClick={() => setActiveImage(img.src)}
-                      className={`relative h-[60px] w-[60px] md:h-[68px] md:w-[68px] rounded-lg overflow-hidden border-2 transition-all shrink-0 ${
+                      className={`relative h-14 w-14 md:h-[60px] md:w-[60px] rounded-lg overflow-hidden border-2 transition-all shrink-0 ${
                         activeImage === img.src
                           ? "border-[#D4AF37]"
                           : "border-white/10 hover:border-white/40"
@@ -246,7 +253,7 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
                         alt={img.position ?? `View ${i + 1}`}
                         fill
                         className="object-cover"
-                        sizes="72px"
+                        sizes="64px"
                       />
                       {img.position && (
                         <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white/90 text-[9px] font-medium text-center py-0.5 capitalize leading-tight">
@@ -283,9 +290,9 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
                     }}
                   />
                   {/* Swipe dot indicators — mobile only */}
-                  {product.images.length > 1 && (
+                  {visibleImages.length > 1 && (
                     <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 sm:hidden pointer-events-none">
-                      {product.images.map((_, i) => (
+                      {visibleImages.map((_, i) => (
                         <span
                           key={i}
                           className={`h-1.5 rounded-full transition-all ${
@@ -417,17 +424,17 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
           {activeImageIndex > 0 && (
             <button
               className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-              onClick={e => { e.stopPropagation(); setActiveImage(product.images[activeImageIndex - 1].src); }}
+              onClick={e => { e.stopPropagation(); setActiveImage(visibleImages[activeImageIndex - 1].src); }}
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
           )}
-          {activeImageIndex < product.images.length - 1 && (
+          {activeImageIndex < visibleImages.length - 1 && (
             <button
               className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-              onClick={e => { e.stopPropagation(); setActiveImage(product.images[activeImageIndex + 1].src); }}
+              onClick={e => { e.stopPropagation(); setActiveImage(visibleImages[activeImageIndex + 1].src); }}
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -449,12 +456,12 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
           </div>
 
           {/* Dot indicators */}
-          {product.images.length > 1 && (
+          {visibleImages.length > 1 && (
             <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2">
-              {product.images.map((_, i) => (
+              {visibleImages.map((_, i) => (
                 <button
                   key={i}
-                  onClick={e => { e.stopPropagation(); setActiveImage(product.images[i].src); }}
+                  onClick={e => { e.stopPropagation(); setActiveImage(visibleImages[i].src); }}
                   className={`h-1.5 rounded-full transition-all ${i === activeImageIndex ? "w-5 bg-[#D4AF37]" : "w-1.5 bg-white/30 hover:bg-white/50"}`}
                 />
               ))}
