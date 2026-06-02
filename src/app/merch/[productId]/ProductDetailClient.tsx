@@ -329,17 +329,20 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
               </div>
 
               {product.description && (
-                <div
-                  dangerouslySetInnerHTML={{ __html: product.description }}
-                  className="
-                    text-white/70 text-sm leading-relaxed
-                    [&_span]:!text-white/70
-                    [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_table]:mt-4 [&_table]:mb-6
-                    [&_td]:!text-white/70 [&_td]:border [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-2
-                    [&_tr:first-child_td]:font-bold [&_tr:first-child_td]:!text-[#D4AF37]
-                    [&_p]:mb-3 [&_p:empty]:hidden
-                  "
-                />
+                <div className="overflow-x-auto">
+                  <div
+                    dangerouslySetInnerHTML={{ __html: product.description }}
+                    className="
+                      text-white/70 text-sm leading-relaxed
+                      [&_span]:!text-white/70
+                      [&_table]:min-w-[700px] [&_table]:border-collapse [&_table]:text-xs [&_table]:mt-4 [&_table]:mb-6
+                      [&_td]:!text-white/70 [&_td]:border [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-2 [&_td]:whitespace-nowrap [&_td]:min-w-[80px]
+                      [&_td:first-child]:min-w-[140px]
+                      [&_tr:first-child_td]:font-bold [&_tr:first-child_td]:!text-[#D4AF37]
+                      [&_p]:mb-3 [&_p:empty]:hidden
+                    "
+                  />
+                </div>
               )}
             </div>
 
