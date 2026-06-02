@@ -133,6 +133,14 @@ export default async function AdminStatsPage() {
           <BookingAvailability initial={availableMonths} />
         </div>
 
+        {/* Quick Links */}
+        <QuickLinks links={[
+          { label: "Printify", href: "https://printify.com/app/dashboard" },
+          { label: "Bluevine", href: "https://app.bluevine.com/dashboard/home" },
+          { label: "Wave", href: "https://www.waveapps.com/" },
+          { label: "Stripe", href: "https://dashboard.stripe.com/acct_1Tc9gjRvS9ovRlDz/dashboard" },
+        ]} />
+
         {/* Monthly schedule */}
         <MonthlySchedule cards={datedCards} />
 
