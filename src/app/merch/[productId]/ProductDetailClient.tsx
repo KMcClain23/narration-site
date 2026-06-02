@@ -51,6 +51,71 @@ function isBullet(line: string) {
   return /^[•·\-\*]\s/.test(line) || /^\d+\.\s/.test(line);
 }
 
+const SIZE_TOKEN_RE = /^(XS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL|6XL|OS)$/i;
+
+function isSizeHeaderRow(line: string): boolean {
+  const parts = line.trim().split(/\s+/);
+  return parts.length >= 3 && parts.every(p => SIZE_TOKEN_RE.test(p));
+}
+
+function isMeasurementDataRow(line: string): boolean {
+  const parts = line.trim().split(/\s+/);
+  return parts.length >= 2 && parts.every(p => /^\d+(\.\d+)?$/.test(p));
+}
+
+function SizeChartTable({
+  chart,
+}: {
+  chart: { headers: string[]; rows: { label: string; values: string[] }[] };
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-1 rounded-lg border border-white/10 overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-bold text-white/60 hover:text-white/80 hover:bg-white/5 transition text-left"
+      >
+        <span>Size Guide</span>
+        <svg
+          className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="overflow-x-auto border-t border-white/10">
+          <table className="w-full text-[11px] border-collapse">
+            <thead>
+              <tr>
+                <th className="px-3 py-2 text-left font-medium bg-white/[0.02]" />
+                {chart.headers.map((h, i) => (
+                  <th key={i} className="px-3 py-2 text-center text-[#D4AF37]/80 font-bold bg-white/[0.02] whitespace-nowrap">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {chart.rows.map((row, i) => (
+                <tr key={i} className="border-t border-white/5">
+                  <td className="px-3 py-2 text-white/50 font-medium whitespace-nowrap">{row.label}</td>
+                  {row.values.map((v, j) => (
+                    <td key={j} className="px-3 py-2 text-center text-white/40">{v}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FormattedDescription({ html, title }: { html: string; title: string }) {
   const plain = html
     .replace(/<br\s*\/?>/gi, "\n")
@@ -68,6 +133,33 @@ function FormattedDescription({ html, title }: { html: string; title: string }) 
     return true;
   });
 
+  // Detect and extract size chart block
+  type SizeChart = { headers: string[]; rows: { label: string; values: string[] }[] };
+  let sizeChart: SizeChart | null = null;
+  let chartStart = -1;
+  let chartEnd = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (isSizeHeaderRow(lines[i])) {
+      const headers = lines[i].trim().split(/\s+/);
+      const rows: SizeChart["rows"] = [];
+      let j = i + 1;
+      while (j + 1 < lines.length && isMeasurementDataRow(lines[j + 1])) {
+        rows.push({ label: lines[j], values: lines[j + 1].trim().split(/\s+/) });
+        j += 2;
+      }
+      if (rows.length >= 1) {
+        sizeChart = { headers, rows };
+        chartStart = i > 0 && isHeader(lines[i - 1]) ? i - 1 : i;
+        chartEnd = j - 1;
+        break;
+      }
+    }
+  }
+
+  const processLines =
+    chartStart >= 0 ? [...lines.slice(0, chartStart), ...lines.slice(chartEnd + 1)] : lines;
+
   const nodes: React.ReactNode[] = [];
   let listItems: string[] = [];
 
@@ -83,7 +175,7 @@ function FormattedDescription({ html, title }: { html: string; title: string }) 
     listItems = [];
   };
 
-  lines.forEach((line, i) => {
+  processLines.forEach((line, i) => {
     if (isHeader(line)) {
       flushList(`list-${i}`);
       nodes.push(<p key={`h-${i}`} className="font-bold text-white text-sm mt-2 first:mt-0">{line}</p>);
@@ -95,6 +187,10 @@ function FormattedDescription({ html, title }: { html: string; title: string }) 
     }
   });
   flushList("list-end");
+
+  if (sizeChart) {
+    nodes.push(<SizeChartTable key="size-chart" chart={sizeChart} />);
+  }
 
   return <div className="flex flex-col gap-1.5">{nodes}</div>;
 }
@@ -129,6 +225,10 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
   const hasSizes = sizeOption && enabledVariants.length > 1;
 
   const selectedSizeOptionId = sizeOption?.values.find(v =>
+    selectedVariant?.options.includes(v.id)
+  )?.id ?? null;
+
+  const selectedColorOptionId = colorOption?.values.find(v =>
     selectedVariant?.options.includes(v.id)
   )?.id ?? null;
 
@@ -339,7 +439,12 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
                   <p className="text-xs text-white/40 uppercase tracking-widest">Size</p>
                   <div className="flex flex-wrap gap-2">
                     {sizeOption.values.map(value => {
-                      const matchingVariant = enabledVariants.find(v => v.options.includes(value.id));
+                      // Prefer a variant matching both this size and the current color; fall back to size-only
+                      const matchingVariant =
+                        enabledVariants.find(v =>
+                          v.options.includes(value.id) &&
+                          (selectedColorOptionId === null || v.options.includes(selectedColorOptionId))
+                        ) ?? enabledVariants.find(v => v.options.includes(value.id));
                       if (!matchingVariant) return null;
                       const isSelected = value.id === selectedSizeOptionId;
                       return (
