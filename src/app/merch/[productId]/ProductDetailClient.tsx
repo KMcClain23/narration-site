@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/context/CartContext";
 
 interface PrintifyVariant {
@@ -36,204 +36,6 @@ interface PrintifyProduct {
   options: PrintifyOption[];
 }
 
-const KNOWN_HEADERS = new Set([
-  "product features", "care instructions", "about this item",
-  "details", "specifications", "description", "material", "materials",
-]);
-
-function isHeader(line: string) {
-  const lower = line.toLowerCase().replace(/:$/, "").trim();
-  if (KNOWN_HEADERS.has(lower)) return true;
-  return line.length >= 3 && line === line.toUpperCase() && /[A-Z]/.test(line);
-}
-
-function isBullet(line: string) {
-  return /^[•·\-\*]\s/.test(line) || /^\d+\.\s/.test(line);
-}
-
-const SIZE_TOKEN_RE = /^(XS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL|6XL|OS)$/i;
-
-function isSizeHeaderRow(line: string): boolean {
-  const parts = line.trim().split(/\s+/);
-  return parts.length >= 3 && parts.every(p => SIZE_TOKEN_RE.test(p));
-}
-
-function isMeasurementDataRow(line: string): boolean {
-  const parts = line.trim().split(/\s+/);
-  return parts.length >= 2 && parts.every(p => /^\d+(\.\d+)?$/.test(p));
-}
-
-function isMeasurementLabel(line: string): boolean {
-  return (
-    /\b(width|height|length|circumference|inseam|outseam|sleeve|chest|bust|waist|hip|shoulder)\b/i.test(line) &&
-    /\b(in|cm|inches|centimeters)\b/i.test(line)
-  );
-}
-
-function SizeChartTable({
-  chart,
-}: {
-  chart: { headers: string[]; rows: { label: string; values: string[] }[] };
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="mt-1 rounded-lg border border-white/10 overflow-hidden">
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-bold text-white/60 hover:text-white/80 hover:bg-white/5 transition text-left"
-      >
-        <span>Size Guide</span>
-        <svg
-          className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      {open && (
-        <div className="overflow-x-auto border-t border-white/10">
-          <table className="w-full text-[11px] border-collapse">
-            <thead>
-              <tr>
-                <th className="px-3 py-2 text-left font-medium bg-white/[0.02]" />
-                {chart.headers.map((h, i) => (
-                  <th key={i} className="px-3 py-2 text-center text-[#D4AF37]/80 font-bold bg-white/[0.02] whitespace-nowrap">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {chart.rows.map((row, i) => (
-                <tr key={i} className="border-t border-white/5">
-                  <td className="px-3 py-2 text-white/50 font-medium whitespace-nowrap">{row.label}</td>
-                  {row.values.map((v, j) => (
-                    <td key={j} className="px-3 py-2 text-center text-white/40">{v}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FormattedDescription({
-  html,
-  title,
-  sizeLabels = [],
-}: {
-  html: string;
-  title: string;
-  sizeLabels?: string[];
-}) {
-  const plain = html
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/&nbsp;/g, " ").replace(/&#39;/g, "'").replace(/&quot;/g, '"')
-    .trim();
-
-  const titleLower = title.toLowerCase();
-  const lines = plain.split("\n").map(l => l.trim()).filter(l => {
-    if (!l) return false;
-    if (l.toLowerCase() === titleLower) return false;
-    if (l.toLowerCase().replace(/:$/, "") === titleLower) return false;
-    return true;
-  });
-
-  type SizeChart = { headers: string[]; rows: { label: string; values: string[] }[] };
-  let sizeChart: SizeChart | null = null;
-  let chartStart = -1;
-  let chartEnd = -1;
-
-  for (let i = 0; i < lines.length && !sizeChart; i++) {
-    // Pattern A: explicit sizes row (XS S M L …) followed by (label, data) pairs
-    if (isSizeHeaderRow(lines[i])) {
-      const headers = lines[i].trim().split(/\s+/);
-      const rows: SizeChart["rows"] = [];
-      let j = i + 1;
-      while (j + 1 < lines.length && isMeasurementLabel(lines[j]) && isMeasurementDataRow(lines[j + 1])) {
-        rows.push({ label: lines[j], values: lines[j + 1].trim().split(/\s+/) });
-        j += 2;
-      }
-      if (rows.length >= 1) {
-        sizeChart = { headers, rows };
-        chartStart = i > 0 && isHeader(lines[i - 1]) ? i - 1 : i;
-        chartEnd = j - 1;
-      }
-    }
-
-    // Pattern B: measurement label lines directly followed by data rows; derive headers from sizeLabels
-    if (!sizeChart && isMeasurementLabel(lines[i]) && i + 1 < lines.length && isMeasurementDataRow(lines[i + 1])) {
-      const rows: SizeChart["rows"] = [];
-      let j = i;
-      while (j + 1 < lines.length && isMeasurementLabel(lines[j]) && isMeasurementDataRow(lines[j + 1])) {
-        rows.push({ label: lines[j], values: lines[j + 1].trim().split(/\s+/) });
-        j += 2;
-      }
-      if (rows.length >= 1) {
-        const numCols = rows[0].values.length;
-        const headers =
-          sizeLabels.length >= numCols
-            ? sizeLabels.slice(0, numCols)
-            : sizeLabels.length > 0
-              ? sizeLabels
-              : Array.from({ length: numCols }, (_, k) => String(k + 1));
-        sizeChart = { headers, rows };
-        // Walk back to absorb any preceding sizes row or SIZE GUIDE header
-        let startIdx = i;
-        if (startIdx > 0 && isSizeHeaderRow(lines[startIdx - 1])) startIdx--;
-        if (startIdx > 0 && isHeader(lines[startIdx - 1])) startIdx--;
-        chartStart = startIdx;
-        chartEnd = j - 1;
-      }
-    }
-  }
-
-  const processLines =
-    chartStart >= 0 ? [...lines.slice(0, chartStart), ...lines.slice(chartEnd + 1)] : lines;
-
-  const nodes: React.ReactNode[] = [];
-  let listItems: string[] = [];
-
-  const flushList = (key: string) => {
-    if (!listItems.length) return;
-    nodes.push(
-      <ul key={key} className="list-disc list-inside space-y-1">
-        {listItems.map((item, i) => (
-          <li key={i}>{item.replace(/^[•·\-\*]\s*/, "").replace(/^\d+\.\s*/, "")}</li>
-        ))}
-      </ul>
-    );
-    listItems = [];
-  };
-
-  processLines.forEach((line, i) => {
-    if (isHeader(line)) {
-      flushList(`list-${i}`);
-      nodes.push(<p key={`h-${i}`} className="font-bold text-white text-sm mt-2 first:mt-0">{line}</p>);
-    } else if (isBullet(line)) {
-      listItems.push(line);
-    } else {
-      flushList(`list-${i}`);
-      nodes.push(<p key={`p-${i}`}>{line}</p>);
-    }
-  });
-  flushList("list-end");
-
-  if (sizeChart) {
-    nodes.push(<SizeChartTable key="size-chart" chart={sizeChart} />);
-  }
-
-  return <div className="flex flex-col gap-1.5">{nodes}</div>;
-}
 
 export default function ProductDetailClient({ product }: { product: PrintifyProduct }) {
   const { addItem, openCart, count, isOpen: cartOpen } = useCart();
@@ -527,13 +329,17 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
               </div>
 
               {product.description && (
-                <div className="text-sm text-white/60 leading-relaxed">
-                  <FormattedDescription
-                    html={product.description}
-                    title={product.title}
-                    sizeLabels={sizeOption?.values.map(v => v.title) ?? []}
-                  />
-                </div>
+                <div
+                  dangerouslySetInnerHTML={{ __html: product.description }}
+                  className="
+                    text-white/70 text-sm leading-relaxed
+                    [&_span]:!text-white/70
+                    [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_table]:mt-4 [&_table]:mb-6
+                    [&_td]:!text-white/70 [&_td]:border [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-2
+                    [&_tr:first-child_td]:font-bold [&_tr:first-child_td]:!text-[#D4AF37]
+                    [&_p]:mb-3 [&_p:empty]:hidden
+                  "
+                />
               )}
             </div>
 
