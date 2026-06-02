@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
         items.map(i => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity }))
       ),
     },
+    automatic_tax: { enabled: true },
     success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/merch/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/merch`,
   });
