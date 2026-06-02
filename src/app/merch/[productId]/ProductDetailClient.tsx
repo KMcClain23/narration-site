@@ -63,6 +63,13 @@ function isMeasurementDataRow(line: string): boolean {
   return parts.length >= 2 && parts.every(p => /^\d+(\.\d+)?$/.test(p));
 }
 
+function isMeasurementLabel(line: string): boolean {
+  return (
+    /\b(width|height|length|circumference|inseam|outseam|sleeve|chest|bust|waist|hip|shoulder)\b/i.test(line) &&
+    /\b(in|cm|inches|centimeters)\b/i.test(line)
+  );
+}
+
 function SizeChartTable({
   chart,
 }: {
@@ -116,7 +123,15 @@ function SizeChartTable({
   );
 }
 
-function FormattedDescription({ html, title }: { html: string; title: string }) {
+function FormattedDescription({
+  html,
+  title,
+  sizeLabels = [],
+}: {
+  html: string;
+  title: string;
+  sizeLabels?: string[];
+}) {
   const plain = html
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n")
@@ -133,18 +148,18 @@ function FormattedDescription({ html, title }: { html: string; title: string }) 
     return true;
   });
 
-  // Detect and extract size chart block
   type SizeChart = { headers: string[]; rows: { label: string; values: string[] }[] };
   let sizeChart: SizeChart | null = null;
   let chartStart = -1;
   let chartEnd = -1;
 
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = 0; i < lines.length && !sizeChart; i++) {
+    // Pattern A: explicit sizes row (XS S M L …) followed by (label, data) pairs
     if (isSizeHeaderRow(lines[i])) {
       const headers = lines[i].trim().split(/\s+/);
       const rows: SizeChart["rows"] = [];
       let j = i + 1;
-      while (j + 1 < lines.length && isMeasurementDataRow(lines[j + 1])) {
+      while (j + 1 < lines.length && isMeasurementLabel(lines[j]) && isMeasurementDataRow(lines[j + 1])) {
         rows.push({ label: lines[j], values: lines[j + 1].trim().split(/\s+/) });
         j += 2;
       }
@@ -152,7 +167,32 @@ function FormattedDescription({ html, title }: { html: string; title: string }) 
         sizeChart = { headers, rows };
         chartStart = i > 0 && isHeader(lines[i - 1]) ? i - 1 : i;
         chartEnd = j - 1;
-        break;
+      }
+    }
+
+    // Pattern B: measurement label lines directly followed by data rows; derive headers from sizeLabels
+    if (!sizeChart && isMeasurementLabel(lines[i]) && i + 1 < lines.length && isMeasurementDataRow(lines[i + 1])) {
+      const rows: SizeChart["rows"] = [];
+      let j = i;
+      while (j + 1 < lines.length && isMeasurementLabel(lines[j]) && isMeasurementDataRow(lines[j + 1])) {
+        rows.push({ label: lines[j], values: lines[j + 1].trim().split(/\s+/) });
+        j += 2;
+      }
+      if (rows.length >= 1) {
+        const numCols = rows[0].values.length;
+        const headers =
+          sizeLabels.length >= numCols
+            ? sizeLabels.slice(0, numCols)
+            : sizeLabels.length > 0
+              ? sizeLabels
+              : Array.from({ length: numCols }, (_, k) => String(k + 1));
+        sizeChart = { headers, rows };
+        // Walk back to absorb any preceding sizes row or SIZE GUIDE header
+        let startIdx = i;
+        if (startIdx > 0 && isSizeHeaderRow(lines[startIdx - 1])) startIdx--;
+        if (startIdx > 0 && isHeader(lines[startIdx - 1])) startIdx--;
+        chartStart = startIdx;
+        chartEnd = j - 1;
       }
     }
   }
@@ -488,7 +528,11 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
 
               {product.description && (
                 <div className="text-sm text-white/60 leading-relaxed">
-                  <FormattedDescription html={product.description} title={product.title} />
+                  <FormattedDescription
+                    html={product.description}
+                    title={product.title}
+                    sizeLabels={sizeOption?.values.map(v => v.title) ?? []}
+                  />
                 </div>
               )}
             </div>
