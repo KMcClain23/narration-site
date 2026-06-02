@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/context/CartContext";
 
 interface PrintifyVariant {
@@ -36,6 +36,87 @@ interface PrintifyProduct {
   options: PrintifyOption[];
 }
 
+type ParsedDescription = {
+  beforeTable: string;
+  afterTable: string;
+  headers: string[];
+  rows: { label: string; values: string[] }[];
+};
+
+function parseDescriptionTable(html: string): ParsedDescription | null {
+  const tableMatch = html.match(/<table[^>]*>[\s\S]*?<\/table>/i);
+  if (!tableMatch) return null;
+
+  const tableHtml = tableMatch[0];
+  const tableIndex = html.indexOf(tableHtml);
+  const beforeTable = html.slice(0, tableIndex);
+  const afterTable = html.slice(tableIndex + tableHtml.length);
+
+  const stripHtml = (s: string) =>
+    s.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
+
+  const parseRow = (rowInner: string): string[] =>
+    [...rowInner.matchAll(/<(?:td|th)[^>]*>([\s\S]*?)<\/(?:td|th)>/gi)].map(c => stripHtml(c[1]));
+
+  const rowMatches = [...tableHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+  if (rowMatches.length === 0) return null;
+
+  const headers = parseRow(rowMatches[0][1]).slice(1).filter(Boolean);
+  const rows = rowMatches.slice(1).map(m => {
+    const cells = parseRow(m[1]);
+    return { label: cells[0] ?? "", values: cells.slice(1) };
+  }).filter(r => r.label || r.values.some(v => v));
+
+  return { beforeTable, afterTable, headers, rows };
+}
+
+function SizeGuide({ headers, rows }: { headers: string[]; rows: { label: string; values: string[] }[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="my-4 rounded-lg border border-white/10 overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-sm font-bold text-white/60 hover:text-white/80 hover:bg-white/5 transition text-left"
+      >
+        <span>Size Guide</span>
+        <svg
+          className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="overflow-x-auto border-t border-white/10">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr>
+                <th className="px-3 py-2 bg-white/[0.02]" />
+                {headers.map((h, i) => (
+                  <th key={i} className="px-3 py-2 text-center text-[#D4AF37] font-bold bg-white/[0.02] whitespace-nowrap">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={i} className="border-t border-white/10">
+                  <td className="px-3 py-2 text-white/60 font-medium whitespace-nowrap">{row.label}</td>
+                  {row.values.map((v, j) => (
+                    <td key={j} className="px-3 py-2 text-center text-white/70 whitespace-nowrap border-l border-white/10">
+                      {v}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ProductDetailClient({ product }: { product: PrintifyProduct }) {
   const { addItem, openCart, count, isOpen: cartOpen } = useCart();
@@ -53,6 +134,11 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
 
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const touchStartX = useRef<number | null>(null);
+
+  const parsedDescription = useMemo(
+    () => parseDescriptionTable(product.description ?? ""),
+    [product.description]
+  );
 
   const selectedVariant = enabledVariants.find(v => v.id === selectedVariantId) ?? enabledVariants[0];
 
@@ -329,19 +415,29 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
               </div>
 
               {product.description && (
-                <div className="overflow-x-auto">
-                  <div
-                    dangerouslySetInnerHTML={{ __html: product.description }}
-                    className="
-                      text-white/70 text-sm leading-relaxed
-                      [&_span]:!text-white/70
-                      [&_table]:min-w-[700px] [&_table]:border-collapse [&_table]:text-xs [&_table]:mt-4 [&_table]:mb-6
-                      [&_td]:!text-white/70 [&_td]:border [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-2 [&_td]:whitespace-nowrap [&_td]:min-w-[80px]
-                      [&_td:first-child]:min-w-[140px]
-                      [&_tr:first-child_td]:font-bold [&_tr:first-child_td]:!text-[#D4AF37]
-                      [&_p]:mb-3 [&_p:empty]:hidden
-                    "
-                  />
+                <div className="text-sm leading-relaxed">
+                  {parsedDescription ? (
+                    <>
+                      {parsedDescription.beforeTable && (
+                        <div
+                          dangerouslySetInnerHTML={{ __html: parsedDescription.beforeTable }}
+                          className="text-white/70 [&_span]:!text-white/70 [&_p]:mb-3 [&_p:empty]:hidden"
+                        />
+                      )}
+                      <SizeGuide headers={parsedDescription.headers} rows={parsedDescription.rows} />
+                      {parsedDescription.afterTable && (
+                        <div
+                          dangerouslySetInnerHTML={{ __html: parsedDescription.afterTable }}
+                          className="text-white/70 [&_span]:!text-white/70 [&_p]:mb-3 [&_p:empty]:hidden"
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <div
+                      dangerouslySetInnerHTML={{ __html: product.description }}
+                      className="text-white/70 [&_span]:!text-white/70 [&_p]:mb-3 [&_p:empty]:hidden"
+                    />
+                  )}
                 </div>
               )}
             </div>
