@@ -29,7 +29,7 @@ export default function TermsOfService() {
 
           <section>
             <h2 className="text-white font-bold text-base mb-2">Fulfillment & Shipping</h2>
-            <p>Orders are fulfilled through Printify and typically ship within 3–7 business days. US shipping is free. International orders ship for a flat rate of $13.99. Delivery times vary by destination and are not guaranteed.</p>
+            <p>Orders are fulfilled through Printify and typically ship within 3–7 business days. US orders ship for a flat rate of $6.99. International orders ship for a flat rate of $13.99. Delivery times vary by destination and are not guaranteed.</p>
           </section>
 
           <section>

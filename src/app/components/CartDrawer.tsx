@@ -121,7 +121,7 @@ export default function CartDrawer() {
               <span>${(total / 100).toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-xs text-white/40">
-              <span>Free US shipping · $13.99 international</span>
+              <span>$6.99 US shipping · $13.99 international</span>
             </div>
             <p className="text-[#c8a96e]/70 text-xs text-center italic">
               Every purchase helps me keep doing the work I love, bringing stories to life, one voice at a time.
