@@ -47,12 +47,12 @@ const fmtDate = (d: string) => {
 const fmtRate = (r: string, unit: string) => r ? `$${r} ${unit}` : "___";
 const fmtNum  = (n: string) => n ? Number(n).toLocaleString() : "___";
 const val     = (v: string, fb = "___") => v?.trim() || fb;
+const dash    = (v: string) => v?.trim() || "—";
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
   page:        { fontFamily: "Helvetica", fontSize: 9.5, color: "#111", paddingTop: 44, paddingBottom: 56, paddingHorizontal: 54, lineHeight: 1.45 },
-  // header
   headerRow:   { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 },
   co:          { fontFamily: "Helvetica-Bold", fontSize: 13 },
   coSub:       { fontSize: 8, color: "#666", marginTop: 2 },
@@ -63,11 +63,20 @@ const s = StyleSheet.create({
   // title
   title:       { fontFamily: "Helvetica-Bold", fontSize: 15, textAlign: "center", marginBottom: 3 },
   titleSub:    { fontSize: 9, textAlign: "center", color: "#555", marginBottom: 8 },
-  // parties intro
-  intro:       { fontSize: 9.5, lineHeight: 1.55, marginBottom: 12 },
-  // section
+  intro:       { fontSize: 9.5, lineHeight: 1.55, marginBottom: 10 },
+  // deal summary box
+  summaryBox:  { backgroundColor: "#f7f7f7", border: "0.5pt solid #ddd", padding: "8pt 12pt", marginBottom: 12 },
+  summaryHead: { fontFamily: "Helvetica-Bold", fontSize: 7.5, color: "#888", marginBottom: 5, letterSpacing: 0.5 },
+  sumCols:     { flexDirection: "row" },
+  sumCol:      { flex: 1 },
+  sumRow:      { flexDirection: "row", marginBottom: 3 },
+  sumLabel:    { fontFamily: "Helvetica-Bold", fontSize: 8, width: 100, color: "#555", flexShrink: 0 },
+  sumValue:    { flex: 1, fontSize: 8 },
+  sumTotal:    { fontFamily: "Helvetica-Bold", fontSize: 8.5, color: "#111" },
+  // sections
   secHead:     { fontFamily: "Helvetica-Bold", fontSize: 10, marginBottom: 4, marginTop: 10 },
   body:        { fontSize: 9.5, lineHeight: 1.5, marginBottom: 2 },
+  bodyIndent:  { fontSize: 9.5, lineHeight: 1.5, marginBottom: 2, marginTop: 4 },
   // schedule A
   schedTitle:  { fontFamily: "Helvetica-Bold", fontSize: 12, marginBottom: 10, textAlign: "center" },
   twoCol:      { flexDirection: "row", marginBottom: 0 },
@@ -107,36 +116,62 @@ function SchField({ label, value }: { label: string; value: string }) {
   );
 }
 
+function SumField({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+  return (
+    <View style={s.sumRow}>
+      <Text style={s.sumLabel}>{label}</Text>
+      <Text style={bold ? s.sumTotal : s.sumValue}>{value || "—"}</Text>
+    </View>
+  );
+}
+
+// Repeating page header used on every page
+function PageHeader({ data }: { data: ContractData }) {
+  return (
+    <>
+      <View style={s.headerRow}>
+        <View>
+          <Text style={s.co}>Dean Miller Narration LLC</Text>
+          <Text style={s.coSub}>Professional Audiobook Narration · dmnarration.com</Text>
+        </View>
+        <View style={s.metaRight}>
+          <Text style={s.metaText}>Contract No: {val(data.contractNumber, "—")}</Text>
+          <Text style={[s.metaText, { marginTop: 2 }]}>Date: {fmtDate(data.contractDate)}</Text>
+        </View>
+      </View>
+      <View style={s.hr} />
+    </>
+  );
+}
+
 // ── Document ───────────────────────────────────────────────────────────────────
 
 export function ContractPDF({ data }: { data: ContractData }) {
   const showChars = data.narrationStyle === "Duet" || data.narrationStyle === "Multicast";
 
-  const pickupText = `Narrator will provide included pickups for ${val(data.pickupDays, "30")} days following delivery of final files. Revisions may include mispronunciation corrections, missed phrases, and performance-related corrections. Additional pickups requested after the included window will be billed at ${fmtRate(data.pickupRatePerMinute, "per finished minute")} or ${fmtRate(data.pickupRatePerHour, "per studio hour")}.`;
+  // Estimated total (PFH only)
+  const rate  = parseFloat(data.rateAmount);
+  const hours = parseFloat(data.finishedHours);
+  const estimatedTotal = (data.rateType === "Per Finished Hour" && !isNaN(rate) && !isNaN(hours))
+    ? rate * hours : null;
+
+  const rateDisplay = data.rateAmount
+    ? `$${data.rateAmount}${data.rateType === "Per Finished Hour" ? " / finished hour" : ` (${data.rateType})`}`
+    : "—";
 
   const pronStatus = data.pronunciationReceived
     ? `Yes${data.pronunciationDate ? ` — Date Received: ${fmtDate(data.pronunciationDate)}` : ""}`
     : "No — Please email pronunciation guide to dean@dmnarration.com prior to the start of recording.";
   const pronText = `Pronunciation Guide Received: ${pronStatus}\nNarrator relies on the pronunciation guide for proper character names, world-building terms, and genre-specific language. Changes to pronunciations after recording has begun may be subject to additional pickup fees.`;
 
-  const comp2Text = `Author will pay Narrator the Fee set forth in Schedule A. 50% of the estimated fee is due upon approval of the 15-minute sample before full recording commences. The remaining balance is due within ${val(data.paymentSchedule, "the agreed payment schedule")}. Final payment is due before release files are delivered. Author is responsible for any applicable sales or VAT taxes.`;
+  const pickupText = `Narrator will provide included pickups for ${val(data.pickupDays, "30")} days following delivery of final files. Included pickups cover narrator errors: mispronunciations, missed phrases, and technical recording errors — at no additional charge. Manuscript changes, new direction after recording has begun, and post-approval performance preference changes are not included and will be billed at ${fmtRate(data.pickupRatePerMinute, "per finished minute")} or ${fmtRate(data.pickupRatePerHour, "per studio hour")}.`;
 
   return (
     <Document title={`DMN Contract — ${val(data.bookTitle, "Untitled")}`} author="Dean Miller Narration LLC">
-      <Page size="LETTER" style={s.page}>
 
-        {/* Header */}
-        <View style={s.headerRow}>
-          <View>
-            <Text style={s.co}>Dean Miller Narration LLC</Text>
-            <Text style={s.coSub}>Professional Audiobook Narration · dmnarration.com</Text>
-          </View>
-          <View style={s.metaRight}>
-            <Text style={s.metaText}>Contract No: {val(data.contractNumber, "—")}</Text>
-            <Text style={[s.metaText, { marginTop: 2 }]}>Date: {fmtDate(data.contractDate)}</Text>
-          </View>
-        </View>
-        <View style={s.hr} />
+      {/* ── Page 1: Agreement ──────────────────────────────────────────── */}
+      <Page size="LETTER" style={s.page}>
+        <PageHeader data={data} />
 
         <Text style={s.title}>AUDIOBOOK NARRATION AGREEMENT</Text>
         <Text style={s.titleSub}>Dean Miller Narration LLC</Text>
@@ -147,14 +182,38 @@ export function ContractPDF({ data }: { data: ContractData }) {
           {`This Agreement is entered into as of ${fmtDate(data.contractDate)} between ${val(data.authorName, "[Author Name]")}${data.companyName ? `, ${data.companyName}` : ""} ("Author") and Dean Miller, Dean Miller Narration LLC ("Narrator").`}
         </Text>
 
+        {/* Deal Summary Box */}
+        <View style={s.summaryBox}>
+          <Text style={s.summaryHead}>DEAL SUMMARY</Text>
+          <View style={s.sumCols}>
+            <View style={[s.sumCol, { marginRight: 16 }]}>
+              <SumField label="Work"         value={dash(data.bookTitle)} />
+              <SumField label="Author"       value={dash([data.authorName, data.companyName].filter(Boolean).join(", "))} />
+              <SumField label="Narrator"     value="Dean Miller" />
+              <SumField label="Rate"         value={rateDisplay} />
+            </View>
+            <View style={s.sumCol}>
+              <SumField label="Est. Hours"   value={data.finishedHours ? `${data.finishedHours} hrs` : "—"} />
+              {estimatedTotal !== null && (
+                <SumField label="Est. Total" value={`$${estimatedTotal.toFixed(2)}`} bold />
+              )}
+              <SumField label="Start Date"   value={fmtDate(data.recordingStart)} />
+              <SumField label="Delivery"     value={fmtDate(data.deliveryDeadline)} />
+            </View>
+          </View>
+        </View>
+
         {/* Section 1 */}
         <Sec n={1} title="SERVICES">
           <Text style={s.body}>Narrator agrees to provide audiobook narration services for the Work described in Schedule A.</Text>
         </Sec>
 
-        {/* Section 2 */}
+        {/* Section 2 — payment schedule rendered as-is, not embedded in a sentence */}
         <Sec n={2} title="COMPENSATION & PAYMENT">
-          <Text style={s.body}>{comp2Text}</Text>
+          <Text style={s.body}>Author will pay Narrator the Fee set forth in Schedule A. Author is responsible for any applicable sales or VAT taxes.</Text>
+          {data.paymentSchedule?.trim() && (
+            <Text style={s.bodyIndent}>{data.paymentSchedule}</Text>
+          )}
         </Sec>
 
         {/* Section 3 */}
@@ -162,7 +221,7 @@ export function ContractPDF({ data }: { data: ContractData }) {
           <Text style={s.body}>Narrator will provide an initial 15-minute sample before beginning full recording. Author agrees to review and approve or request revisions within 3 calendar days of receipt. Recording will not commence until the 50% deposit has been received.</Text>
         </Sec>
 
-        {/* Section 4 */}
+        {/* Section 4 — clarified revision boundaries */}
         <Sec n={4} title="REVISIONS & PICKUPS">
           <Text style={s.body}>{pickupText}</Text>
         </Sec>
@@ -217,57 +276,48 @@ export function ContractPDF({ data }: { data: ContractData }) {
           <Text style={s.body}>This Agreement constitutes the complete agreement between the Parties and supersedes all prior agreements. Any modifications must be in writing and signed by both parties. If any provision is found unenforceable, remaining provisions remain in full force.</Text>
         </Sec>
 
-        {/* Footer + page numbers */}
         <Text style={s.footer}>This agreement is binding upon signature by both parties.</Text>
         <Text style={s.pageNum} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} fixed />
       </Page>
 
-      {/* ── Schedule A ─────────────────────────────────────────────────────── */}
+      {/* ── Page 2: Schedule A + Signatures ────────────────────────────── */}
       <Page size="LETTER" style={s.page}>
-        <View style={s.headerRow}>
-          <View>
-            <Text style={s.co}>Dean Miller Narration LLC</Text>
-            <Text style={s.coSub}>Professional Audiobook Narration · dmnarration.com</Text>
-          </View>
-          <View style={s.metaRight}>
-            <Text style={s.metaText}>Contract No: {val(data.contractNumber, "—")}</Text>
-            <Text style={[s.metaText, { marginTop: 2 }]}>Date: {fmtDate(data.contractDate)}</Text>
-          </View>
-        </View>
-        <View style={s.hr} />
-
+        <PageHeader data={data} />
         <Text style={s.schedTitle}>SCHEDULE A — PRODUCTION DETAILS</Text>
 
         <View style={s.twoCol}>
           <View style={[s.col, { marginRight: 20 }]}>
-            <SchField label="Book Title"            value={data.bookTitle} />
-            <SchField label="Author / Publisher"    value={[data.authorName, data.companyName].filter(Boolean).join(", ")} />
-            <SchField label="Narrator"              value="Dean Miller" />
-            <SchField label="Genre"                 value={data.genre} />
-            <SchField label="Word Count"            value={data.wordCount ? `${fmtNum(data.wordCount)} words` : ""} />
-            <SchField label="Est. Finished Hours"   value={data.finishedHours ? `${data.finishedHours} hrs` : ""} />
-            <SchField label="Narration Style"       value={data.narrationStyle} />
+            <SchField label="Book Title"          value={data.bookTitle} />
+            <SchField label="Author / Publisher"  value={[data.authorName, data.companyName].filter(Boolean).join(", ")} />
+            <SchField label="Narrator"            value="Dean Miller" />
+            <SchField label="Genre"               value={data.genre} />
+            <SchField label="Word Count"          value={data.wordCount ? `${fmtNum(data.wordCount)} words` : ""} />
+            <SchField label="Est. Finished Hours" value={data.finishedHours ? `${data.finishedHours} hrs` : ""} />
+            <SchField label="Narration Style"     value={data.narrationStyle} />
             {showChars && <SchField label="Characters / Roles" value={data.characters} />}
+            {estimatedTotal !== null && (
+              <SchField label="Estimated Total" value={`$${estimatedTotal.toFixed(2)}`} />
+            )}
           </View>
           <View style={s.col}>
-            <SchField label="Rate Type"             value={data.rateType} />
-            <SchField label="Rate Amount"           value={data.rateAmount ? `$${data.rateAmount}` : ""} />
-            <SchField label="Recording Start"       value={fmtDate(data.recordingStart)} />
-            <SchField label="Delivery Deadline"     value={fmtDate(data.deliveryDeadline)} />
-            <SchField label="Pronunciation Guide"   value={data.pronunciationReceived ? `Yes — ${fmtDate(data.pronunciationDate)}` : "No — email guide to dean@dmnarration.com"} />
-            <SchField label="Included Pickups"      value={`${val(data.pickupDays, "30")} days after delivery`} />
-            <SchField label="Add'l Rate / Min"      value={data.pickupRatePerMinute ? `$${data.pickupRatePerMinute}` : ""} />
-            <SchField label="Add'l Rate / Hour"     value={data.pickupRatePerHour ? `$${data.pickupRatePerHour}` : ""} />
+            <SchField label="Rate Type"           value={data.rateType} />
+            <SchField label="Rate Amount"         value={data.rateAmount ? `$${data.rateAmount}` : ""} />
+            <SchField label="Recording Start"     value={fmtDate(data.recordingStart)} />
+            <SchField label="Delivery Deadline"   value={fmtDate(data.deliveryDeadline)} />
+            <SchField label="Pronunciation Guide" value={data.pronunciationReceived ? `Yes — ${fmtDate(data.pronunciationDate)}` : "No — email to dean@dmnarration.com"} />
+            <SchField label="Included Pickups"    value={`${val(data.pickupDays, "30")} days after delivery`} />
+            <SchField label="Add'l Rate / Min"    value={data.pickupRatePerMinute ? `$${data.pickupRatePerMinute}` : ""} />
+            <SchField label="Add'l Rate / Hour"   value={data.pickupRatePerHour ? `$${data.pickupRatePerHour}` : ""} />
           </View>
         </View>
 
-        {data.paymentSchedule && (
-          <View style={{ marginTop: 10 }}>
+        {data.paymentSchedule?.trim() && (
+          <View style={{ marginTop: 8 }}>
             <SchField label="Payment Schedule" value={data.paymentSchedule} />
           </View>
         )}
 
-        <View style={s.hrThin} />
+        <View style={[s.hrThin, { marginTop: 10 }]} />
 
         {/* Signatures */}
         <View style={s.sigSection}>
