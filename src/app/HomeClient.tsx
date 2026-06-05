@@ -670,7 +670,7 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { accep
 
       {/* ── LOGO CAROUSEL ── */}
       <div className="border-y border-white/5 py-10" aria-hidden="true">
-        <div className="max-w-5xl mx-auto px-5 sm:px-6">
+        <div className="max-w-lg mx-auto px-5 sm:px-6">
           <div className="flex justify-center mb-7">
             <div className="flex items-center gap-4">
               <div className="h-px w-6 bg-[#D4AF37]" />

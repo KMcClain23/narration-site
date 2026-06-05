@@ -95,7 +95,4 @@ html {
 .logo-track {
   animation: logo-scroll 32s linear infinite;
 }
-.logo-track:hover {
-  animation-play-state: paused;
-}
 
