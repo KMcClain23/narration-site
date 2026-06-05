@@ -102,7 +102,7 @@ function SchField({ label, value }: { label: string; value: string }) {
   return (
     <View style={s.schRow}>
       <Text style={s.schLabel}>{label}</Text>
-      <Text style={s.schValue}>{value || "—"}</Text>
+      <Text style={s.schValue}>{value || "________________________"}</Text>
     </View>
   );
 }
@@ -114,7 +114,10 @@ export function ContractPDF({ data }: { data: ContractData }) {
 
   const pickupText = `Narrator will provide included pickups for ${val(data.pickupDays, "30")} days following delivery of final files. Revisions may include mispronunciation corrections, missed phrases, and performance-related corrections. Additional pickups requested after the included window will be billed at ${fmtRate(data.pickupRatePerMinute, "per finished minute")} or ${fmtRate(data.pickupRatePerHour, "per studio hour")}.`;
 
-  const pronText = `Pronunciation Guide Received: ${data.pronunciationReceived ? "Yes" : "No"}${data.pronunciationReceived && data.pronunciationDate ? ` — Date Received: ${fmtDate(data.pronunciationDate)}` : ""}\nNarrator relies on the pronunciation guide for proper character names, world-building terms, and genre-specific language. Changes to pronunciations after recording has begun may be subject to additional pickup fees.`;
+  const pronStatus = data.pronunciationReceived
+    ? `Yes${data.pronunciationDate ? ` — Date Received: ${fmtDate(data.pronunciationDate)}` : ""}`
+    : "No — Please email pronunciation guide to dean@dmnarration.com prior to the start of recording.";
+  const pronText = `Pronunciation Guide Received: ${pronStatus}\nNarrator relies on the pronunciation guide for proper character names, world-building terms, and genre-specific language. Changes to pronunciations after recording has begun may be subject to additional pickup fees.`;
 
   const comp2Text = `Author will pay Narrator the Fee set forth in Schedule A. 50% of the estimated fee is due upon approval of the 15-minute sample before full recording commences. The remaining balance is due within ${val(data.paymentSchedule, "the agreed payment schedule")}. Final payment is due before release files are delivered. Author is responsible for any applicable sales or VAT taxes.`;
 
@@ -251,7 +254,7 @@ export function ContractPDF({ data }: { data: ContractData }) {
             <SchField label="Rate Amount"           value={data.rateAmount ? `$${data.rateAmount}` : ""} />
             <SchField label="Recording Start"       value={fmtDate(data.recordingStart)} />
             <SchField label="Delivery Deadline"     value={fmtDate(data.deliveryDeadline)} />
-            <SchField label="Pronunciation Guide"   value={data.pronunciationReceived ? `Yes — ${fmtDate(data.pronunciationDate)}` : "No"} />
+            <SchField label="Pronunciation Guide"   value={data.pronunciationReceived ? `Yes — ${fmtDate(data.pronunciationDate)}` : "No — email guide to dean@dmnarration.com"} />
             <SchField label="Included Pickups"      value={`${val(data.pickupDays, "30")} days after delivery`} />
             <SchField label="Add'l Rate / Min"      value={data.pickupRatePerMinute ? `$${data.pickupRatePerMinute}` : ""} />
             <SchField label="Add'l Rate / Hour"     value={data.pickupRatePerHour ? `$${data.pickupRatePerHour}` : ""} />
