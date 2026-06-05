@@ -19,7 +19,7 @@ const LOGO_ITEMS: { name: string; src: string; href: string; filter?: string }[]
   {
     name: "Spotify Audiobooks",
     src: "https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg",
-    href: "https://open.spotify.com/audiobooks",
+    href: "https://open.spotify.com/show/5rGzXvmCjjza1WQGveIavz",
   },
   {
     name: "Blue Nose Audio",
