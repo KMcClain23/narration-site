@@ -42,6 +42,21 @@ const nextConfig: NextConfig = {
         hostname: "darkstarromance.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "www.authorsrepublic.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "www.ahabtalent.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "images.squarespace-cdn.com",
+        pathname: "/**",
+      },
     ],
   },
 };

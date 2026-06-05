@@ -20,18 +20,45 @@ const LOGO_ITEMS = [
     name: "Spotify Audiobooks",
     src: "https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg",
     href: "https://open.spotify.com/audiobooks",
+    label: "Spotify Audiobooks",
   },
   {
     name: "Blue Nose Audio",
     src: "https://www.bluenoseaudio.com/uploads/7/1/4/6/7146733/untitled-design-2.png",
     href: "https://www.bluenoseaudio.com",
+    label: null,
   },
   {
     name: "Dark Star Romance",
     src: "https://darkstarromance.com/wp-content/uploads/2023/07/1.png",
     href: "https://darkstarromance.com",
+    label: null,
   },
-] as const;
+  {
+    name: "ACX",
+    src: "https://upload.wikimedia.org/wikipedia/commons/e/e0/ACX_LOGO.jpg",
+    href: "https://www.acx.com",
+    label: null,
+  },
+  {
+    name: "Author's Republic",
+    src: "https://www.authorsrepublic.com/images/ar-logo.png",
+    href: "https://www.authorsrepublic.com",
+    label: null,
+  },
+  {
+    name: "AHAB",
+    src: "https://www.ahabtalent.com/wp-content/themes/ahab_talent/assets/images/ahab_logo.svg",
+    href: "https://www.ahabtalent.com",
+    label: null,
+  },
+  {
+    name: "Pink Flamingo Productions",
+    src: "https://images.squarespace-cdn.com/content/v1/5ff4961f791d303194d2bc47/3cbdac2c-6825-422b-b70c-7d272d0b7611/Untitled+design+%2835%29.png",
+    href: "https://www.pinkflamingoproductions.com",
+    label: null,
+  },
+];
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -667,7 +694,7 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { accep
 
       {/* ── LOGO CAROUSEL ── */}
       <div className="border-y border-white/5 py-10" aria-hidden="true">
-        <div className="max-w-3xl mx-auto px-5 sm:px-6">
+        <div className="max-w-5xl mx-auto px-5 sm:px-6">
           <div className="flex justify-center mb-7">
             <div className="flex items-center gap-4">
               <div className="h-px w-6 bg-[#D4AF37]" />
@@ -684,14 +711,19 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { accep
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={logo.name}
-                  className="shrink-0 h-20 w-48 rounded-xl border border-white/20 bg-white/5 px-6 py-4 flex items-center justify-center transition-all duration-200 hover:border-white/50 hover:scale-105"
+                  className="shrink-0 h-20 w-48 rounded-xl border border-white/20 bg-white/5 px-6 py-4 flex items-center justify-center gap-2 transition-all duration-200 hover:border-white/50 hover:scale-105"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={logo.src}
                     alt={logo.name}
-                    className="h-full w-full object-contain"
+                    className={logo.label ? "h-8 w-8 object-contain shrink-0" : "h-full w-full object-contain"}
                   />
+                  {logo.label && (
+                    <span className="text-white text-xs font-semibold leading-tight whitespace-nowrap">
+                      {logo.label}
+                    </span>
+                  )}
                 </a>
               ))}
             </div>
