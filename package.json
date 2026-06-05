@@ -17,6 +17,7 @@
     "@azure/msal-node": "^5.1.5",
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@next/third-parties": "^16.1.6",
+    "@react-pdf/renderer": "^4.5.1",
     "@supabase/supabase-js": "^2.101.1",
     "@upstash/redis": "^1.36.3",
     "@vercel/analytics": "^2.0.1",
