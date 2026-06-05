@@ -19,14 +19,17 @@ const LOGO_ITEMS = [
   {
     name: "Spotify Audiobooks",
     src: "https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg",
+    href: "https://open.spotify.com/audiobooks",
   },
   {
     name: "Blue Nose Audio",
     src: "https://www.bluenoseaudio.com/uploads/7/1/4/6/7146733/untitled-design-2.png",
+    href: "https://www.bluenoseaudio.com",
   },
   {
     name: "Dark Star Romance",
     src: "https://darkstarromance.com/wp-content/uploads/2023/07/1.png",
+    href: "https://darkstarromance.com",
   },
 ] as const;
 
@@ -672,12 +675,16 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { accep
               <div className="h-px w-6 bg-[#D4AF37]" />
             </div>
           </div>
-          <div className="overflow-hidden">
+          <div className="overflow-hidden logo-carousel-wrapper">
             <div className="logo-track flex gap-4 w-max">
               {[...LOGO_ITEMS, ...LOGO_ITEMS].map((logo, i) => (
-                <div
+                <a
                   key={i}
-                  className="shrink-0 h-20 w-48 rounded-xl border border-white/20 bg-white/5 px-6 py-4 flex items-center justify-center"
+                  href={logo.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={logo.name}
+                  className="shrink-0 h-20 w-48 rounded-xl border border-white/20 bg-white/5 px-6 py-4 flex items-center justify-center transition-all duration-200 hover:border-white/50 hover:scale-105"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -685,7 +692,7 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { accep
                     alt={logo.name}
                     className="h-full w-full object-contain"
                   />
-                </div>
+                </a>
               ))}
             </div>
           </div>
