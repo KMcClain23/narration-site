@@ -30,7 +30,6 @@ const LOGO_ITEMS: { name: string; src: string; href: string; filter?: string }[]
     name: "Dark Star Romance",
     src: "https://darkstarromance.com/wp-content/uploads/2023/07/1.png",
     href: "https://darkstarromance.com",
-    filter: "brightness(0) invert(1)",
   },
   {
     name: "ACX",
@@ -60,6 +59,32 @@ function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function LogoCard({ logo }: { logo: { name: string; src: string; href: string; filter?: string } }) {
+  const [imgError, setImgError] = useState(false);
+  return (
+    <a
+      href={logo.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={logo.name}
+      className="shrink-0 w-44 h-20 rounded-xl border border-white/20 bg-white/5 px-5 py-3 flex items-center justify-center transition-all duration-200 hover:border-white/50 hover:scale-105"
+    >
+      {imgError ? (
+        <span className="text-white/70 text-xs font-semibold text-center leading-tight">{logo.name}</span>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={logo.src}
+          alt={logo.name}
+          className="h-full w-full object-contain"
+          style={logo.filter ? { filter: logo.filter } : undefined}
+          onError={() => setImgError(true)}
+        />
+      )}
+    </a>
+  );
 }
 
 // Static waveform heights for the decorative bar animation
@@ -706,22 +731,7 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { accep
           >
             <div className="logo-track flex gap-4 w-max">
               {[...LOGO_ITEMS, ...LOGO_ITEMS].map((logo, i) => (
-                <a
-                  key={i}
-                  href={logo.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={logo.name}
-                  className="shrink-0 w-44 h-20 rounded-xl border border-white/20 bg-white/5 px-5 py-3 flex items-center justify-center transition-all duration-200 hover:border-white/50 hover:scale-105"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={logo.src}
-                    alt={logo.name}
-                    className="h-full w-full object-contain"
-                    style={logo.filter ? { filter: logo.filter } : undefined}
-                  />
-                </a>
+                <LogoCard key={i} logo={logo} />
               ))}
             </div>
           </div>
