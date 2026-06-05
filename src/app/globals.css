@@ -93,6 +93,6 @@ html {
   to   { transform: translateX(-50%); }
 }
 .logo-track {
-  animation: logo-scroll 32s linear infinite;
+  animation: logo-scroll 20s linear infinite;
 }
 
