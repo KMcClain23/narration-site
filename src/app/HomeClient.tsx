@@ -36,7 +36,7 @@ const LOGO_ITEMS = [
   },
   {
     name: "ACX",
-    src: "https://upload.wikimedia.org/wikipedia/commons/e/e0/ACX_LOGO.jpg",
+    src: "https://seeklogo.com/images/A/audiobook-creation-exchange-logo-837E58791F-seeklogo.com.png",
     href: "https://www.acx.com",
     label: null,
   },
@@ -45,6 +45,7 @@ const LOGO_ITEMS = [
     src: "https://www.authorsrepublic.com/images/ar-logo.png",
     href: "https://www.authorsrepublic.com",
     label: null,
+    filter: "brightness(0) invert(1)",
   },
   {
     name: "AHAB",
@@ -718,6 +719,7 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { accep
                     src={logo.src}
                     alt={logo.name}
                     className={logo.label ? "h-8 w-8 object-contain shrink-0" : "h-full w-full object-contain"}
+                    style={"filter" in logo ? { filter: logo.filter } : undefined}
                   />
                   {logo.label && (
                     <span className="text-white text-xs font-semibold leading-tight whitespace-nowrap">
