@@ -27,6 +27,21 @@ const nextConfig: NextConfig = {
         hostname: "images-api.printify.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "upload.wikimedia.org",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "www.bluenoseaudio.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "darkstarromance.com",
+        pathname: "/**",
+      },
     ],
   },
 };

@@ -15,6 +15,27 @@ const BANNER_URL =
 const PROFILE_URL =
   "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile.jpg";
 
+const LOGO_ITEMS = [
+  {
+    name: "Spotify Audiobooks",
+    src: "https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg",
+    height: 28,
+    showName: true,
+  },
+  {
+    name: "Blue Nose Audio",
+    src: "https://www.bluenoseaudio.com/uploads/7/1/4/6/7146733/untitled-design-2.png",
+    height: 44,
+    showName: false,
+  },
+  {
+    name: "Dark Star Romance",
+    src: "https://darkstarromance.com/wp-content/uploads/2023/07/1.png",
+    height: 44,
+    showName: false,
+  },
+] as const;
+
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
   const m = Math.floor(seconds / 60);
@@ -646,6 +667,40 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { accep
           </div>
         </div>
       </section>
+
+      {/* ── LOGO CAROUSEL ── */}
+      <div className="border-y border-white/5 py-10 overflow-hidden" aria-hidden="true">
+        <div className="flex justify-center mb-7">
+          <div className="flex items-center gap-4">
+            <div className="h-px w-6 bg-[#D4AF37]" />
+            <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Works With</p>
+            <div className="h-px w-6 bg-[#D4AF37]" />
+          </div>
+        </div>
+        <div className="logo-track flex w-max">
+          {[...LOGO_ITEMS, ...LOGO_ITEMS].map((logo, i) => (
+            <div key={i} className="flex items-center gap-3 px-14 sm:px-20 shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logo.src}
+                alt=""
+                style={{
+                  height: logo.height,
+                  width: "auto",
+                  display: "block",
+                  filter: "brightness(0) invert(1)",
+                  opacity: 0.35,
+                }}
+              />
+              {logo.showName && (
+                <span className="text-white/35 text-sm font-semibold whitespace-nowrap tracking-wide">
+                  {logo.name}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div className="max-w-5xl mx-auto px-5 sm:px-6">
 
