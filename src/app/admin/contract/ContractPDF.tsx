@@ -13,10 +13,10 @@ export interface ContractData {
   wordCount: string;
   finishedHours: string;
   narrationStyle: string;
+  characters: string;
   rateType: string;
   rateAmount: string;
   paymentSchedule: string;
-  paymentTiming: string;
   recordingStart: string;
   deliveryDeadline: string;
   pronunciationReceived: boolean;
@@ -24,59 +24,99 @@ export interface ContractData {
   pickupDays: string;
   pickupRatePerMinute: string;
   pickupRatePerHour: string;
-  rightsGranted: string;
-  revisionPolicy: string;
   aiProtection: string;
   creditLanguage: string;
   marketingPermissions: string;
   cancellationTerms: string;
+  rightsGranted: string;
   authorSignatureName: string;
   authorSignatureDate: string;
   narratorSignatureDate: string;
 }
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+const fmtDate = (d: string) => {
+  if (!d) return "_______________";
+  try {
+    return new Date(d + "T12:00:00").toLocaleDateString("en-US", {
+      month: "long", day: "numeric", year: "numeric",
+    });
+  } catch { return d; }
+};
+const fmtRate = (r: string, unit: string) => r ? `$${r} ${unit}` : "___";
+const fmtNum  = (n: string) => n ? Number(n).toLocaleString() : "___";
+const val     = (v: string, fb = "___") => v?.trim() || fb;
+
+// ── Styles ─────────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
-  page: { fontFamily: "Helvetica", fontSize: 9, color: "#1a1a1a", paddingTop: 48, paddingBottom: 60, paddingHorizontal: 50, lineHeight: 1.45 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 },
-  company: { fontFamily: "Helvetica-Bold", fontSize: 14 },
-  subtitle: { fontSize: 8, color: "#666", marginTop: 2 },
-  contractMeta: { textAlign: "right" },
-  contractTitle: { fontFamily: "Helvetica-Bold", fontSize: 16, textAlign: "center", marginTop: 6, marginBottom: 2 },
-  contractNum: { fontSize: 8, color: "#666", textAlign: "center", marginBottom: 4 },
-  divider: { borderBottom: "1pt solid #ccc", marginBottom: 14, marginTop: 4 },
-  thinDivider: { borderBottom: "0.5pt solid #e0e0e0", marginBottom: 10 },
-  sectionHead: { fontFamily: "Helvetica-Bold", fontSize: 8.5, color: "#333", textTransform: "uppercase", letterSpacing: 0.8, marginTop: 14, marginBottom: 5, borderBottom: "0.5pt solid #ccc", paddingBottom: 3 },
-  row: { flexDirection: "row", marginBottom: 3 },
-  twoCol: { flexDirection: "row", gap: 20 },
-  col: { flex: 1 },
-  label: { fontFamily: "Helvetica-Bold", fontSize: 8, width: 130, color: "#444", flexShrink: 0 },
-  value: { flex: 1, fontSize: 8.5 },
-  para: { fontSize: 8.5, marginBottom: 5, lineHeight: 1.55 },
-  sigSection: { flexDirection: "row", marginTop: 28, gap: 24 },
-  sigCol: { flex: 1 },
-  sigLine: { borderBottom: "1pt solid #333", marginBottom: 3, marginTop: 24 },
-  sigLabel: { fontFamily: "Helvetica-Bold", fontSize: 7.5, color: "#555", marginBottom: 2 },
-  sigSub: { fontSize: 7.5, color: "#777" },
-  footer: { position: "absolute", bottom: 24, left: 50, right: 50, textAlign: "center", fontSize: 7.5, color: "#999", borderTop: "0.5pt solid #ddd", paddingTop: 6 },
-  pageNum: { position: "absolute", bottom: 24, right: 50, fontSize: 7, color: "#bbb" },
-  empty: { color: "#aaa", fontFamily: "Helvetica-Oblique" },
+  page:        { fontFamily: "Helvetica", fontSize: 9.5, color: "#111", paddingTop: 44, paddingBottom: 56, paddingHorizontal: 54, lineHeight: 1.45 },
+  // header
+  headerRow:   { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 },
+  co:          { fontFamily: "Helvetica-Bold", fontSize: 13 },
+  coSub:       { fontSize: 8, color: "#666", marginTop: 2 },
+  metaRight:   { alignItems: "flex-end" },
+  metaText:    { fontSize: 8, color: "#555" },
+  hr:          { borderBottom: "1pt solid #bbb", marginVertical: 10 },
+  hrThin:      { borderBottom: "0.5pt solid #ddd", marginVertical: 6 },
+  // title
+  title:       { fontFamily: "Helvetica-Bold", fontSize: 15, textAlign: "center", marginBottom: 3 },
+  titleSub:    { fontSize: 9, textAlign: "center", color: "#555", marginBottom: 8 },
+  // parties intro
+  intro:       { fontSize: 9.5, lineHeight: 1.55, marginBottom: 12 },
+  // section
+  secHead:     { fontFamily: "Helvetica-Bold", fontSize: 10, marginBottom: 4, marginTop: 10 },
+  body:        { fontSize: 9.5, lineHeight: 1.5, marginBottom: 2 },
+  // schedule A
+  schedTitle:  { fontFamily: "Helvetica-Bold", fontSize: 12, marginBottom: 10, textAlign: "center" },
+  twoCol:      { flexDirection: "row", marginBottom: 0 },
+  col:         { flex: 1 },
+  schRow:      { flexDirection: "row", marginBottom: 4 },
+  schLabel:    { fontFamily: "Helvetica-Bold", fontSize: 8.5, width: 140, color: "#444", flexShrink: 0 },
+  schValue:    { flex: 1, fontSize: 8.5 },
+  // signatures
+  sigSection:  { flexDirection: "row", marginTop: 28 },
+  sigCol:      { flex: 1, marginRight: 16 },
+  sigTitle:    { fontFamily: "Helvetica-Bold", fontSize: 9, marginBottom: 6 },
+  sigLine:     { borderBottom: "1pt solid #333", marginBottom: 3, marginTop: 22 },
+  sigLabel:    { fontSize: 8, color: "#555" },
+  sigSub:      { fontSize: 8, color: "#555", marginTop: 5 },
+  // footer
+  footer:      { position: "absolute", bottom: 22, left: 54, right: 54, textAlign: "center", fontSize: 7.5, color: "#999", borderTop: "0.5pt solid #ddd", paddingTop: 5 },
+  pageNum:     { position: "absolute", bottom: 22, right: 54, fontSize: 7, color: "#bbb" },
 });
 
-const val = (v: string, fallback = "—") => v?.trim() || fallback;
-const date = (d: string) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—";
+// ── Sub-components ─────────────────────────────────────────────────────────────
 
-function Field({ label, value }: { label: string; value: string }) {
-  const empty = !value?.trim();
+function Sec({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
-    <View style={s.row}>
-      <Text style={s.label}>{label}</Text>
-      <Text style={[s.value, empty ? s.empty : {}]}>{empty ? "—" : value}</Text>
+    <View>
+      <Text style={s.secHead}>{n}. {title}</Text>
+      {children}
     </View>
   );
 }
 
+function SchField({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={s.schRow}>
+      <Text style={s.schLabel}>{label}</Text>
+      <Text style={s.schValue}>{value || "—"}</Text>
+    </View>
+  );
+}
+
+// ── Document ───────────────────────────────────────────────────────────────────
+
 export function ContractPDF({ data }: { data: ContractData }) {
-  const pickupText = `Narrator corrections are included for ${val(data.pickupDays, "30")} days after delivery.`;
+  const showChars = data.narrationStyle === "Duet" || data.narrationStyle === "Multicast";
+
+  const pickupText = `Narrator will provide included pickups for ${val(data.pickupDays, "30")} days following delivery of final files. Revisions may include mispronunciation corrections, missed phrases, and performance-related corrections. Additional pickups requested after the included window will be billed at ${fmtRate(data.pickupRatePerMinute, "per finished minute")} or ${fmtRate(data.pickupRatePerHour, "per studio hour")}.`;
+
+  const pronText = `Pronunciation Guide Received: ${data.pronunciationReceived ? "Yes" : "No"}${data.pronunciationReceived && data.pronunciationDate ? ` — Date Received: ${fmtDate(data.pronunciationDate)}` : ""}\nNarrator relies on the pronunciation guide for proper character names, world-building terms, and genre-specific language. Changes to pronunciations after recording has begun may be subject to additional pickup fees.`;
+
+  const comp2Text = `Author will pay Narrator the Fee set forth in Schedule A. 50% of the estimated fee is due upon approval of the 15-minute sample before full recording commences. The remaining balance is due within ${val(data.paymentSchedule, "the agreed payment schedule")}. Final payment is due before release files are delivered. Author is responsible for any applicable sales or VAT taxes.`;
 
   return (
     <Document title={`DMN Contract — ${val(data.bookTitle, "Untitled")}`} author="Dean Miller Narration LLC">
@@ -85,155 +125,177 @@ export function ContractPDF({ data }: { data: ContractData }) {
         {/* Header */}
         <View style={s.headerRow}>
           <View>
-            <Text style={s.company}>Dean Miller Narration LLC</Text>
-            <Text style={s.subtitle}>Professional Audiobook Narration</Text>
+            <Text style={s.co}>Dean Miller Narration LLC</Text>
+            <Text style={s.coSub}>Professional Audiobook Narration · dmnarration.com</Text>
           </View>
-          <View style={s.contractMeta}>
-            <Text style={{ fontSize: 8, color: "#666" }}>Contract No: {val(data.contractNumber)}</Text>
-            <Text style={{ fontSize: 8, color: "#666", marginTop: 2 }}>Date: {date(data.contractDate)}</Text>
+          <View style={s.metaRight}>
+            <Text style={s.metaText}>Contract No: {val(data.contractNumber, "—")}</Text>
+            <Text style={[s.metaText, { marginTop: 2 }]}>Date: {fmtDate(data.contractDate)}</Text>
           </View>
         </View>
+        <View style={s.hr} />
 
-        <Text style={s.contractTitle}>AUDIOBOOK NARRATION AGREEMENT</Text>
-        <Text style={s.contractNum}>{val(data.contractNumber)}</Text>
-        <View style={s.divider} />
+        <Text style={s.title}>AUDIOBOOK NARRATION AGREEMENT</Text>
+        <Text style={s.titleSub}>Dean Miller Narration LLC</Text>
+        <View style={s.hrThin} />
 
-        {/* Parties */}
+        {/* Parties intro */}
+        <Text style={s.intro}>
+          {`This Agreement is entered into as of ${fmtDate(data.contractDate)} between ${val(data.authorName, "[Author Name]")}${data.companyName ? `, ${data.companyName}` : ""} ("Author") and Dean Miller, Dean Miller Narration LLC ("Narrator").`}
+        </Text>
+
+        {/* Section 1 */}
+        <Sec n={1} title="SERVICES">
+          <Text style={s.body}>Narrator agrees to provide audiobook narration services for the Work described in Schedule A.</Text>
+        </Sec>
+
+        {/* Section 2 */}
+        <Sec n={2} title="COMPENSATION & PAYMENT">
+          <Text style={s.body}>{comp2Text}</Text>
+        </Sec>
+
+        {/* Section 3 */}
+        <Sec n={3} title="SAMPLE APPROVAL">
+          <Text style={s.body}>Narrator will provide an initial 15-minute sample before beginning full recording. Author agrees to review and approve or request revisions within 3 calendar days of receipt. Recording will not commence until the 50% deposit has been received.</Text>
+        </Sec>
+
+        {/* Section 4 */}
+        <Sec n={4} title="REVISIONS & PICKUPS">
+          <Text style={s.body}>{pickupText}</Text>
+        </Sec>
+
+        {/* Section 5 */}
+        <Sec n={5} title="PRONUNCIATION GUIDE">
+          <Text style={s.body}>{pronText}</Text>
+        </Sec>
+
+        {/* Section 6 */}
+        <Sec n={6} title="AI & VOICE PROTECTION">
+          <Text style={s.body}>{val(data.aiProtection)}</Text>
+        </Sec>
+
+        {/* Section 7 */}
+        <Sec n={7} title="CREDIT">
+          <Text style={s.body}>{val(data.creditLanguage)}</Text>
+        </Sec>
+
+        {/* Section 8 */}
+        <Sec n={8} title="MARKETING PERMISSIONS">
+          <Text style={s.body}>{val(data.marketingPermissions)}</Text>
+        </Sec>
+
+        {/* Section 9 */}
+        <Sec n={9} title="RIGHTS">
+          <Text style={s.body}>{val(data.rightsGranted)}</Text>
+        </Sec>
+
+        {/* Section 10 */}
+        <Sec n={10} title="CANCELLATION">
+          <Text style={s.body}>{val(data.cancellationTerms)}</Text>
+        </Sec>
+
+        {/* Section 11 */}
+        <Sec n={11} title="INDEPENDENT CONTRACTOR">
+          <Text style={s.body}>Narrator provides services as an independent contractor, not an employee. Author may not deduct taxes from compensation. Narrator retains full discretion over equipment, schedule, and recording methods.</Text>
+        </Sec>
+
+        {/* Section 12 */}
+        <Sec n={12} title="NON-EXCLUSIVITY">
+          <Text style={s.body}>This Agreement is non-exclusive. Nothing herein prevents Narrator from entering into agreements with other authors, publishers, or production companies.</Text>
+        </Sec>
+
+        {/* Section 13 */}
+        <Sec n={13} title="FORCE MAJEURE">
+          <Text style={s.body}>Neither party shall be in breach due to delays caused by fire, flood, war, equipment failure, internet disruption, or other circumstances beyond their reasonable control. Parties will mutually agree on a revised timeline.</Text>
+        </Sec>
+
+        {/* Section 14 */}
+        <Sec n={14} title="MISCELLANEOUS">
+          <Text style={s.body}>This Agreement constitutes the complete agreement between the Parties and supersedes all prior agreements. Any modifications must be in writing and signed by both parties. If any provision is found unenforceable, remaining provisions remain in full force.</Text>
+        </Sec>
+
+        {/* Footer + page numbers */}
+        <Text style={s.footer}>This agreement is binding upon signature by both parties.</Text>
+        <Text style={s.pageNum} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} fixed />
+      </Page>
+
+      {/* ── Schedule A ─────────────────────────────────────────────────────── */}
+      <Page size="LETTER" style={s.page}>
+        <View style={s.headerRow}>
+          <View>
+            <Text style={s.co}>Dean Miller Narration LLC</Text>
+            <Text style={s.coSub}>Professional Audiobook Narration · dmnarration.com</Text>
+          </View>
+          <View style={s.metaRight}>
+            <Text style={s.metaText}>Contract No: {val(data.contractNumber, "—")}</Text>
+            <Text style={[s.metaText, { marginTop: 2 }]}>Date: {fmtDate(data.contractDate)}</Text>
+          </View>
+        </View>
+        <View style={s.hr} />
+
+        <Text style={s.schedTitle}>SCHEDULE A — PRODUCTION DETAILS</Text>
+
         <View style={s.twoCol}>
-          <View style={s.col}>
-            <Text style={s.sectionHead}>Author / Publisher</Text>
-            <Field label="Name" value={data.authorName} />
-            <Field label="Company / Publisher" value={data.companyName} />
-            <Field label="Email" value={data.authorEmail} />
-            <Field label="Phone" value={data.authorPhone} />
-            <Field label="Address" value={data.authorAddress} />
+          <View style={[s.col, { marginRight: 20 }]}>
+            <SchField label="Book Title"            value={data.bookTitle} />
+            <SchField label="Author / Publisher"    value={[data.authorName, data.companyName].filter(Boolean).join(", ")} />
+            <SchField label="Narrator"              value="Dean Miller" />
+            <SchField label="Genre"                 value={data.genre} />
+            <SchField label="Word Count"            value={data.wordCount ? `${fmtNum(data.wordCount)} words` : ""} />
+            <SchField label="Est. Finished Hours"   value={data.finishedHours ? `${data.finishedHours} hrs` : ""} />
+            <SchField label="Narration Style"       value={data.narrationStyle} />
+            {showChars && <SchField label="Characters / Roles" value={data.characters} />}
           </View>
           <View style={s.col}>
-            <Text style={s.sectionHead}>Narrator</Text>
-            <Field label="Name" value="Dean Miller" />
-            <Field label="Company" value="Dean Miller Narration LLC" />
-            <Field label="Website" value="dmnarration.com" />
-          </View>
-        </View>
-
-        {/* Project */}
-        <Text style={s.sectionHead}>Project Details</Text>
-        <View style={s.twoCol}>
-          <View style={s.col}>
-            <Field label="Book Title" value={data.bookTitle} />
-            <Field label="Genre" value={data.genre} />
-            <Field label="Narration Style" value={data.narrationStyle} />
-          </View>
-          <View style={s.col}>
-            <Field label="Est. Word Count" value={data.wordCount ? `${Number(data.wordCount).toLocaleString()} words` : ""} />
-            <Field label="Est. Finished Hours" value={data.finishedHours ? `${data.finishedHours} hrs` : ""} />
+            <SchField label="Rate Type"             value={data.rateType} />
+            <SchField label="Rate Amount"           value={data.rateAmount ? `$${data.rateAmount}` : ""} />
+            <SchField label="Recording Start"       value={fmtDate(data.recordingStart)} />
+            <SchField label="Delivery Deadline"     value={fmtDate(data.deliveryDeadline)} />
+            <SchField label="Pronunciation Guide"   value={data.pronunciationReceived ? `Yes — ${fmtDate(data.pronunciationDate)}` : "No"} />
+            <SchField label="Included Pickups"      value={`${val(data.pickupDays, "30")} days after delivery`} />
+            <SchField label="Add'l Rate / Min"      value={data.pickupRatePerMinute ? `$${data.pickupRatePerMinute}` : ""} />
+            <SchField label="Add'l Rate / Hour"     value={data.pickupRatePerHour ? `$${data.pickupRatePerHour}` : ""} />
           </View>
         </View>
 
-        {/* Rate */}
-        <Text style={s.sectionHead}>Rate & Payment</Text>
-        <View style={s.twoCol}>
-          <View style={s.col}>
-            <Field label="Rate Type" value={data.rateType} />
-            <Field label="Rate Amount" value={data.rateAmount ? `$${data.rateAmount}` : ""} />
+        {data.paymentSchedule && (
+          <View style={{ marginTop: 10 }}>
+            <SchField label="Payment Schedule" value={data.paymentSchedule} />
           </View>
-          <View style={s.col}>
-            <Field label="Payment Schedule" value={data.paymentSchedule} />
-          </View>
-        </View>
-        {data.paymentTiming && <Text style={[s.para, { marginTop: 4 }]}>{data.paymentTiming}</Text>}
+        )}
 
-        {/* Delivery */}
-        <Text style={s.sectionHead}>Delivery</Text>
-        <View style={s.twoCol}>
-          <View style={s.col}>
-            <Field label="Recording Start" value={date(data.recordingStart)} />
-          </View>
-          <View style={s.col}>
-            <Field label="Delivery Deadline" value={date(data.deliveryDeadline)} />
-          </View>
-        </View>
-
-        {/* Pronunciation Guide */}
-        <Text style={s.sectionHead}>Pronunciation Guide</Text>
-        <Field
-          label="Guide Received"
-          value={data.pronunciationReceived
-            ? `Yes${data.pronunciationDate ? ` — received ${date(data.pronunciationDate)}` : ""}`
-            : "No"}
-        />
-
-        {/* Pickups */}
-        <Text style={s.sectionHead}>Included Pickups</Text>
-        <Text style={s.para}>{pickupText}</Text>
-
-        {/* Additional Pickup Rate */}
-        <Text style={s.sectionHead}>Additional Pickup Rates</Text>
-        <View style={s.twoCol}>
-          <View style={s.col}>
-            <Field label="Per Finished Minute" value={data.pickupRatePerMinute ? `$${data.pickupRatePerMinute}` : ""} />
-          </View>
-          <View style={s.col}>
-            <Field label="Per Studio Hour" value={data.pickupRatePerHour ? `$${data.pickupRatePerHour}` : ""} />
-          </View>
-        </View>
-
-        {/* Rights */}
-        <Text style={s.sectionHead}>Rights Granted</Text>
-        <Text style={s.para}>{val(data.rightsGranted)}</Text>
-
-        {/* Revision */}
-        <Text style={s.sectionHead}>Revision Policy</Text>
-        <Text style={s.para}>{val(data.revisionPolicy)}</Text>
-
-        {/* AI Protection */}
-        <Text style={s.sectionHead}>AI & Voice Protection</Text>
-        <Text style={s.para}>{val(data.aiProtection)}</Text>
-
-        {/* Credit */}
-        <Text style={s.sectionHead}>Credit</Text>
-        <Text style={s.para}>{val(data.creditLanguage)}</Text>
-
-        {/* Marketing */}
-        <Text style={s.sectionHead}>Marketing Permissions</Text>
-        <Text style={s.para}>{val(data.marketingPermissions)}</Text>
-
-        {/* Cancellation */}
-        <Text style={s.sectionHead}>Cancellation Terms</Text>
-        <Text style={s.para}>{val(data.cancellationTerms)}</Text>
+        <View style={s.hrThin} />
 
         {/* Signatures */}
-        <View style={s.divider} />
-        <Text style={[s.sectionHead, { marginTop: 4 }]}>Signatures</Text>
         <View style={s.sigSection}>
           <View style={s.sigCol}>
-            <Text style={s.sigLabel}>Author / Publisher</Text>
+            <Text style={s.sigTitle}>AUTHOR / PUBLISHER</Text>
             <View style={s.sigLine} />
-            <Text style={s.sigSub}>Signature</Text>
+            <Text style={s.sigLabel}>Signature</Text>
+            <Text style={[s.sigSub, { marginTop: 10 }]}>
+              Print Name: {val(data.authorSignatureName, "________________________________")}
+            </Text>
             <Text style={[s.sigSub, { marginTop: 6 }]}>
-              Printed Name: {val(data.authorSignatureName, "________________________")}
+              Date: {data.authorSignatureDate ? fmtDate(data.authorSignatureDate) : "________________________________"}
             </Text>
-            <Text style={[s.sigSub, { marginTop: 4 }]}>
-              Date: {data.authorSignatureDate ? date(data.authorSignatureDate) : "________________________"}
-            </Text>
+            {data.authorAddress && (
+              <Text style={[s.sigSub, { marginTop: 6 }]}>Address: {data.authorAddress}</Text>
+            )}
           </View>
           <View style={s.sigCol}>
-            <Text style={s.sigLabel}>Narrator</Text>
+            <Text style={s.sigTitle}>NARRATOR</Text>
             <View style={s.sigLine} />
-            <Text style={s.sigSub}>Signature</Text>
-            <Text style={[s.sigSub, { marginTop: 6 }]}>
-              Printed Name: Dean Miller, Dean Miller Narration LLC
+            <Text style={s.sigLabel}>Signature</Text>
+            <Text style={[s.sigSub, { marginTop: 10 }]}>
+              Print Name: Dean Miller / Dean Miller Narration LLC
             </Text>
-            <Text style={[s.sigSub, { marginTop: 4 }]}>
-              Date: {data.narratorSignatureDate ? date(data.narratorSignatureDate) : "________________________"}
+            <Text style={[s.sigSub, { marginTop: 6 }]}>
+              Date: {data.narratorSignatureDate ? fmtDate(data.narratorSignatureDate) : "________________________________"}
             </Text>
           </View>
         </View>
 
-        <Text style={s.footer}>
-          This agreement is binding upon signature by both parties.{"\n"}
-          Dean Miller Narration LLC  ·  dmnarration.com
-        </Text>
+        <Text style={s.footer}>This agreement is binding upon signature by both parties.</Text>
         <Text style={s.pageNum} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} fixed />
       </Page>
     </Document>
