@@ -226,7 +226,7 @@ export function ContractPDF({ data, template }: { data: ContractData; template?:
 
         {/* Section 3 */}
         <Sec n={3} title="SAMPLE APPROVAL">
-          <Text style={s.body}>Narrator will provide an initial 15-minute sample before beginning full recording. Author agrees to review and approve or request revisions within 3 calendar days of receipt. Recording will not commence until the 50% deposit has been received.</Text>
+          <Text style={s.body}>Narrator will provide an initial 15-minute sample before beginning full recording. Author agrees to review and approve or request revisions within 3 calendar days of receipt.</Text>
         </Sec>
 
         {/* Section 4 — clarified revision boundaries */}

@@ -77,7 +77,7 @@ function buildDefaults(): ContractData {
     characters:        "",
     rateType:          "Per Finished Hour",
     rateAmount:        "",
-    paymentSchedule:   "50% due upon sample approval. Remaining balance due within 14 days of final file delivery. Final payment due before release files are delivered.",
+    paymentSchedule:   "Payment due in full within 14 days of final file delivery.",
     recordingStart:    "",
     deliveryDeadline:  "",
     pronunciationReceived: false,
