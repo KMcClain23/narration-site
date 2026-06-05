@@ -136,7 +136,7 @@ export default function ContractClient() {
 
   return (
     // Fill viewport below the fixed site header (h-12 sm:h-16)
-    <div className="flex bg-[#06082E] text-white overflow-hidden h-[calc(100dvh-3rem)] sm:h-[calc(100dvh-4rem)]">
+    <div className="flex bg-[#06082E] text-white overflow-hidden mt-12 sm:mt-16 h-[calc(100dvh-3rem)] sm:h-[calc(100dvh-4rem)]">
 
       {/* ── LEFT: Form ─────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden border-r border-[#1A2550]">
