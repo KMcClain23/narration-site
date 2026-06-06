@@ -100,7 +100,7 @@ const s = StyleSheet.create({
 
 function Sec({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
-    <View>
+    <View wrap={false}>
       <Text style={s.secHead}>{n}. {title}</Text>
       {children}
     </View>
