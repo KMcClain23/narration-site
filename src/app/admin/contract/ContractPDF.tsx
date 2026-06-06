@@ -179,14 +179,15 @@ export function ContractPDF({ data, template }: { data: ContractData; template?:
       <Page size="LETTER" style={s.page}>
         <PageHeader data={data} company={narratorCompany} site={narratorSite} />
 
-        <Text style={s.title}>AUDIOBOOK NARRATION AGREEMENT</Text>
-        <Text style={s.titleSub}>Dean Miller Narration LLC</Text>
-        <View style={s.hrThin} />
-
-        {/* Parties intro */}
-        <Text style={s.intro}>
-          {`This Agreement is entered into as of ${fmtDate(data.contractDate)} between ${val(data.authorName, "[Author Name]")}${data.companyName ? `, ${data.companyName}` : ""} ("Author") and ${narratorName}, ${narratorCompany} ("Narrator").`}
-        </Text>
+        {/* Keep title, subtitle, rule, and intro together — prevents orphaned title page */}
+        <View wrap={false}>
+          <Text style={s.title}>AUDIOBOOK NARRATION AGREEMENT</Text>
+          <Text style={s.titleSub}>Dean Miller Narration LLC</Text>
+          <View style={s.hrThin} />
+          <Text style={s.intro}>
+            {`This Agreement is entered into as of ${fmtDate(data.contractDate)} between ${val(data.authorName, "[Author Name]")}${data.companyName ? `, ${data.companyName}` : ""} ("Author") and ${narratorName}, ${narratorCompany} ("Narrator").`}
+          </Text>
+        </View>
 
         {/* Deal Summary Box — hidden for generic template */}
         {!template && (

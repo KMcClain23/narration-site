@@ -5,9 +5,9 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { ContractData } from "./ContractPDF";
 
-// ── Live preview ──────────────────────────────────────────────────────────────
+// ── Live contract view (HTML with fillable inputs) ────────────────────────────
 
-const ContractPreview = dynamic(() => import("./ContractPreview"), {
+const ContractHTMLView = dynamic(() => import("./ContractHTMLView"), {
   ssr: false,
   loading: () => (
     <div className="h-full flex items-center justify-center">
@@ -133,7 +133,6 @@ function Row({ children }: { children: React.ReactNode }) {
 
 export default function ContractClient() {
   const [form, setForm]               = useState<ContractData>(buildDefaults);
-  const [previewData, setPreviewData] = useState<ContractData>(form);
   const [generating, setGenerating]   = useState(false);
   const [previewing, setPreviewing]   = useState(false);
   const [attempted, setAttempted]     = useState(false);
@@ -156,12 +155,6 @@ export default function ContractClient() {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(form));
       setSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
     }, 1000);
-    return () => clearTimeout(t);
-  }, [form]);
-
-  // Debounce live preview (600 ms)
-  useEffect(() => {
-    const t = setTimeout(() => setPreviewData(form), 600);
     return () => clearTimeout(t);
   }, [form]);
 
@@ -569,14 +562,17 @@ export default function ContractClient() {
         </div>
       </div>
 
-      {/* ── RIGHT: Live PDF Preview ─────────────────────────────────────── */}
+      {/* ── RIGHT: Interactive Contract View ───────────────────────────── */}
       <div className="hidden lg:flex w-[46%] flex-col bg-[#050814]">
         <div className="shrink-0 h-12 border-b border-[#1A2550] flex items-center px-5 gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-[#D4AF37]/60" />
-          <span className="text-[11px] uppercase tracking-widest text-white/30 font-medium">Live Preview</span>
+          <span className="text-[11px] uppercase tracking-widest text-white/30 font-medium">Contract Preview</span>
         </div>
         <div className="flex-1 overflow-hidden">
-          <ContractPreview data={previewData} />
+          <ContractHTMLView
+            data={form}
+            onChange={(k, v) => setForm(prev => ({ ...prev, [k]: v }))}
+          />
         </div>
       </div>
 
