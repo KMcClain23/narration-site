@@ -18,10 +18,11 @@ const ContractPreview = dynamic(() => import("./ContractPreview"), {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const inp = "w-full bg-[#06082E] border border-[#1A2550] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D4AF37]/50 transition placeholder:text-white/20";
-const inpErr = "w-full bg-[#06082E] border border-red-500/40 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-400/60 transition placeholder:text-white/20";
-const ta  = `${inp} resize-none`;
-const sel = `${inp} appearance-none`;
+const base = "w-full rounded-xl px-3.5 py-2.5 text-sm text-white/95 placeholder:text-white/30 focus:outline-none transition-all duration-200";
+const inp    = `${base} bg-[#0C0F40] border border-[#252D6E] hover:border-[#3A4585] hover:bg-[#0D1242] focus:border-[#D4AF37]/65 focus:bg-[#0D1242] focus:shadow-[0_0_0_3px_rgba(212,175,55,0.09)]`;
+const inpErr = `${base} bg-[#0C0F40] border border-red-500/55 hover:border-red-400/70 focus:border-red-400/75 focus:shadow-[0_0_0_3px_rgba(239,68,68,0.09)]`;
+const ta     = `${inp} resize-none leading-relaxed`;
+const sel    = `${inp} appearance-none contract-select cursor-pointer`;
 
 // ── Validation ────────────────────────────────────────────────────────────────
 
@@ -100,9 +101,10 @@ function buildDefaults(): ContractData {
 
 function SectionHead({ title }: { title: string }) {
   return (
-    <div className="flex items-center gap-3 mt-8 mb-4">
+    <div className="flex items-center gap-2.5 mt-10 mb-4">
+      <div className="w-0.5 h-[14px] rounded-full bg-[#D4AF37]/65 shrink-0" />
       <h2 className="text-[11px] uppercase tracking-[0.22em] text-[#D4AF37] font-bold whitespace-nowrap">{title}</h2>
-      <div className="flex-1 h-px bg-[#1A2550]" />
+      <div className="flex-1 h-px bg-gradient-to-r from-[#2A3370] to-transparent" />
     </div>
   );
 }
@@ -114,11 +116,16 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] uppercase tracking-widest font-medium mb-1.5 flex items-center justify-between">
-        <span className="text-white/40">
-          {label}{required && <span className="text-[#D4AF37] ml-0.5">*</span>}
+      <span className="flex items-center justify-between mb-1.5">
+        <span className="text-[10.5px] uppercase tracking-[0.14em] font-semibold text-white/55">
+          {label}{required && <span className="text-[#D4AF37]/80 ml-0.5">*</span>}
         </span>
-        {hasError && <span className="text-red-400 text-[10px] font-bold">Required</span>}
+        {hasError && (
+          <span className="flex items-center gap-1 text-[10px] font-semibold text-red-400">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-400 shrink-0" />
+            Required
+          </span>
+        )}
       </span>
       {children}
     </label>
@@ -333,10 +340,10 @@ export default function ContractClient() {
     <div className="flex bg-[#06082E] text-white overflow-hidden mt-12 sm:mt-16 h-[calc(100dvh-3rem)] sm:h-[calc(100dvh-4rem)]">
 
       {/* ── LEFT: Form ─────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden border-r border-[#1A2550]">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden border-r border-[#1E2660]">
 
         {/* Top bar */}
-        <div className="shrink-0 flex items-center justify-between gap-2 px-4 sm:px-5 h-12 border-b border-[#1A2550] bg-[#06082E]/90 backdrop-blur">
+        <div className="shrink-0 flex items-center justify-between gap-2 px-4 sm:px-5 h-12 border-b border-[#1E2660] bg-[#06082E]/90 backdrop-blur">
           <div className="flex items-center gap-2 min-w-0 overflow-hidden">
             <Link href="/admin/stats" className="text-[10px] text-white/30 hover:text-white transition shrink-0">← Admin</Link>
             <span className="text-white/15 text-xs shrink-0">·</span>
@@ -478,8 +485,8 @@ export default function ContractClient() {
 
             {/* Estimated total */}
             {estimatedTotal !== null && (
-              <div className="flex items-center justify-between bg-[#D4AF37]/5 border border-[#D4AF37]/20 rounded-lg px-4 py-3">
-                <span className="text-xs text-white/50">Estimated Project Total ({form.finishedHours} hrs × ${form.rateAmount})</span>
+              <div className="flex items-center justify-between bg-[#D4AF37]/7 border border-[#D4AF37]/25 rounded-xl px-4 py-3">
+                <span className="text-xs text-white/55">Estimated Project Total ({form.finishedHours} hrs × ${form.rateAmount})</span>
                 <span className="text-base font-bold text-[#D4AF37]">${estimatedTotal.toFixed(2)}</span>
               </div>
             )}
@@ -504,7 +511,7 @@ export default function ContractClient() {
           <SectionHead title="Pronunciation Guide" />
           <div className="space-y-4">
             <div className="flex items-center gap-4">
-              <span className="text-[10px] uppercase tracking-widest text-white/40 font-medium">Received</span>
+              <span className="text-[10.5px] uppercase tracking-[0.14em] text-white/55 font-semibold">Received</span>
               {([true, false] as const).map(v => (
                 <button
                   key={String(v)}
@@ -513,7 +520,7 @@ export default function ContractClient() {
                   className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${
                     form.pronunciationReceived === v
                       ? "bg-[#D4AF37]/15 border-[#D4AF37]/60 text-[#D4AF37]"
-                      : "border-[#1A2550] text-white/40 hover:border-white/25"
+                      : "border-[#252D6E] text-white/40 hover:border-[#3A4585] hover:text-white/60"
                   }`}
                 >
                   {v ? "Yes" : "No"}
@@ -565,8 +572,8 @@ export default function ContractClient() {
           {/* Signatures */}
           <SectionHead title="Signatures" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="bg-[#0B1224] border border-[#1A2550] rounded-xl p-4 space-y-4">
-              <p className="text-[10px] uppercase tracking-widest text-[#D4AF37] font-bold">Author / Publisher</p>
+            <div className="bg-[#0C0F40] border border-[#252D6E] rounded-xl p-4 space-y-4">
+              <p className="text-[10.5px] uppercase tracking-[0.14em] text-[#D4AF37]/80 font-bold">Author / Publisher</p>
               <Field label="Print Name" required hasError={e("authorSignatureName")}>
                 <input type="text" value={form.authorSignatureName} onChange={ev => set("authorSignatureName", ev.target.value)} className={i("authorSignatureName")} placeholder="Jane Smith" />
               </Field>
@@ -574,8 +581,8 @@ export default function ContractClient() {
                 <input type="date" value={form.authorSignatureDate} onChange={ev => set("authorSignatureDate", ev.target.value)} className={inp} />
               </Field>
             </div>
-            <div className="bg-[#0B1224] border border-[#1A2550] rounded-xl p-4 space-y-4">
-              <p className="text-[10px] uppercase tracking-widest text-[#D4AF37] font-bold">Narrator</p>
+            <div className="bg-[#0C0F40] border border-[#252D6E] rounded-xl p-4 space-y-4">
+              <p className="text-[10.5px] uppercase tracking-[0.14em] text-[#D4AF37]/80 font-bold">Narrator</p>
               <Field label="Print Name">
                 <input type="text" disabled value="Dean Miller / Dean Miller Narration LLC" className={`${inp} opacity-40`} />
               </Field>
@@ -632,7 +639,7 @@ export default function ContractClient() {
 
       {/* ── RIGHT: Live PDF Preview ─────────────────────────────────────── */}
       <div className="hidden lg:flex w-[46%] flex-col bg-[#050814]">
-        <div className="shrink-0 h-12 border-b border-[#1A2550] flex items-center px-5 gap-2">
+        <div className="shrink-0 h-12 border-b border-[#1E2660] flex items-center px-5 gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-[#D4AF37]/60" />
           <span className="text-[11px] uppercase tracking-widest text-white/30 font-medium">Live Preview</span>
         </div>

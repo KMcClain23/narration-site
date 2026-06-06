@@ -77,6 +77,34 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ── Contract Builder ──────────────────────────────────────────────────────── */
+
+/* Make the native date/time calendar icon visible on dark backgrounds */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.75) brightness(1.2);
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 2px;
+  padding: 1px;
+}
+input[type="date"]:hover::-webkit-calendar-picker-indicator,
+input[type="time"]:hover::-webkit-calendar-picker-indicator {
+  opacity: 0.9;
+}
+
+/* Custom chevron arrow for dark-theme <select> elements */
+.contract-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%23ffffff55' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px 14px;
+  padding-right: 38px !important;
+}
+.contract-select:focus {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%23D4AF37aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+}
+
 /* Prevent native image dragging "ghost" inside carousels (WebKit only) */
 .drag-scroll img,
 .hide-scrollbar img {
