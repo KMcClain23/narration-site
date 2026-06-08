@@ -43,7 +43,7 @@ export const DEMOS: Demo[] = [
   {
     slug: "child-pov-drama",
     title: "Child POV Drama",
-    desc: "Raw emotion, age-appropriate delivery",
+    desc: "Raw emotion",
     color: "border-blue-400",
     tags: ["Drama", "Child POV"],
     src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Child%20(5-year-old%20boy)%2C%20Emotional%20TraumaWitness%20-%20Sample.mp3",
