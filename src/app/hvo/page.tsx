@@ -148,6 +148,20 @@ export default function HVOPage() {
               </label>
             </div>
 
+            {/* Comments */}
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium block mb-1">
+                Comments <span className="text-white/25 normal-case tracking-normal text-[10px]">(optional)</span>
+              </span>
+              <textarea
+                name="comments"
+                rows={3}
+                disabled={status === "submitting"}
+                placeholder="Anything you'd like me to know — genre, tone, character notes…"
+                className="mt-1 w-full rounded-lg bg-black/30 border border-white/8 px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition disabled:opacity-50 resize-none leading-relaxed"
+              />
+            </label>
+
             <p className="text-xs text-white/30 leading-relaxed">
               By submitting, you confirm you hold the rights to the excerpt provided. Your contact information will only be used to follow up about your narration sample.
             </p>

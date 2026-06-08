@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
     const authorName = (formData.get("author_name") as string | null)?.trim();
     const email = (formData.get("email") as string | null)?.trim();
     const bookTitle = (formData.get("book_title") as string | null)?.trim();
+    const comments = (formData.get("comments") as string | null)?.trim();
     const file = formData.get("snippet") as File | null;
 
     if (!authorName || !email || !bookTitle) {
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
             <tr><td style="padding:8px 12px;font-weight:600;">Email</td><td style="padding:8px 12px;"><a href="mailto:${email}">${email}</a></td></tr>
             <tr><td style="padding:8px 12px;font-weight:600;">Book Title</td><td style="padding:8px 12px;">${bookTitle}</td></tr>
             <tr><td style="padding:8px 12px;font-weight:600;">Snippet</td><td style="padding:8px 12px;">${file && file.size > 0 ? `${file.name} (attached)` : "None provided"}</td></tr>
+            ${comments ? `<tr><td style="padding:8px 12px;font-weight:600;vertical-align:top;">Comments</td><td style="padding:8px 12px;white-space:pre-wrap;">${comments}</td></tr>` : ""}
           </table>
         </div>
       `,
