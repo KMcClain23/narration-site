@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET(req: Request) {
@@ -26,6 +27,7 @@ export async function PATCH(req: Request) {
       .from("site_settings")
       .upsert({ key, value: stored, updated_at: new Date().toISOString() }, { onConflict: "key" });
     if (error) throw error;
+    revalidatePath("/");
     return NextResponse.json({ success: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Failed to update setting";
@@ -43,6 +45,7 @@ export async function POST(req: Request) {
       .from("site_settings")
       .upsert({ key, value: String(value), updated_at: new Date().toISOString() }, { onConflict: "key" });
     if (error) throw error;
+    revalidatePath("/");
     return NextResponse.json({ success: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Failed to update setting";

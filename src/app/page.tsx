@@ -3,6 +3,9 @@ import HomeClient from "./HomeClient";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { formatBookingWindow } from "@/lib/format-booking-window";
 
+// Always fetch fresh data so admin booking changes appear immediately
+export const dynamic = "force-dynamic";
+
 export default async function Page() {
   let acceptingProjects = true;
   try {
@@ -16,7 +19,7 @@ export default async function Page() {
     // Table may not exist yet — default to true
   }
 
-  let bookingWindow = formatBookingWindow([8, 9, 10, 11]); // fallback default
+  let bookingWindow = ""; // show nothing if DB read fails
   try {
     const { data: monthsRow } = await supabaseAdmin
       .from("site_settings").select("value").eq("key", "available_months").single();
