@@ -373,12 +373,23 @@ function DemoCard({
   );
 }
 
+// Existing hardcoded demos — used only for the one-time import
+const LEGACY_DEMOS = [
+  { title: "LGBTQ+ Romance",           genre: "Romance",          description: "Bright pacing, playful emotional tone",      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20LGBTQ%2B%20Romance%20-%20Male%20(BrightPlayful)%2C%20Confident%2C%20Sex-PositiveFlirtatious.mp3" },
+  { title: "Romantasy",                genre: "Romantasy",        description: "Atmospheric, grounded fantasy emotion",       src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Romantasy%20-%20Male%20(PossessiveHaunted)%2C%20Harsh%20Control%20to%20Remorse%2C%20Deep%20Loss.mp3" },
+  { title: "Feminine Voice",           genre: "Romance",          description: "Male & Female Dialogue",                      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Female%20Voice%202.mp3" },
+  { title: "Romance Duet",             genre: "Romance",          description: "British accent, romantic restraint",          src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/British%20-%20Romance%20Duet.mp3" },
+  { title: "Child POV Drama",          genre: "Drama",            description: "Raw emotion",                                 src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Child%20(5-year-old%20boy)%2C%20Emotional%20TraumaWitness%20-%20Sample.mp3" },
+  { title: "Multi-Character Dialogue", genre: "Multi-Character",  description: "Clear character separation, vocal range",    src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/4%20Characters.mp3" },
+];
+
 // ── Main client component ─────────────────────────────────────────────────────
 
 export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoRecord[] }) {
-  const [demos,    setDemos]    = useState<DemoRecord[]>(initialDemos);
-  const [isAdding, setIsAdding] = useState(false);
-  const [busy,     setBusy]     = useState<Record<string, boolean>>({});
+  const [demos,     setDemos]     = useState<DemoRecord[]>(initialDemos);
+  const [isAdding,  setIsAdding]  = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [busy,      setBusy]      = useState<Record<string, boolean>>({});
 
   const setBusyFor = (id: string, val: boolean) =>
     setBusy(b => ({ ...b, [id]: val }));
@@ -456,6 +467,39 @@ export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoR
     } catch { /* non-critical */ }
   };
 
+  // One-time migration: insert all hardcoded demos into Supabase
+  const handleImport = async () => {
+    if (!window.confirm("Import all 6 existing demos into Supabase? This runs once.")) return;
+    setImporting(true);
+    try {
+      const inserted: DemoRecord[] = [];
+      for (let i = 0; i < LEGACY_DEMOS.length; i++) {
+        const d = LEGACY_DEMOS[i];
+        // Derive file_key from URL (everything after the host)
+        const fileKey = decodeURIComponent(new URL(d.src).pathname.slice(1));
+        const res = await fetch("/api/demos", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({
+            title:       d.title,
+            genre:       d.genre,
+            description: d.description,
+            file_url:    d.src,
+            file_key:    fileKey,
+            sort_order:  i,
+          }),
+        });
+        if (!res.ok) throw new Error(`Failed on "${d.title}": ${await res.text()}`);
+        inserted.push(await res.json());
+      }
+      setDemos(inserted);
+    } catch (e) {
+      alert("Import failed: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#06082E] text-white p-6 pt-24 md:p-12 md:pt-24">
       <div className="max-w-3xl mx-auto">
@@ -490,10 +534,21 @@ export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoR
           Use ▲ ▼ to reorder · Toggle the switch to show/hide on the public site
         </p>
 
-        {/* Demo list */}
+        {/* Demo list / empty state */}
         {demos.length === 0 ? (
-          <div className="text-center py-20 text-white/20 text-sm">
-            No demos yet — add your first one above.
+          <div className="text-center py-16 space-y-5">
+            <p className="text-white/30 text-sm">No demos in Supabase yet.</p>
+            <button
+              onClick={handleImport}
+              disabled={importing}
+              className="inline-flex items-center gap-2 border border-[#D4AF37]/40 text-[#D4AF37] text-sm font-bold px-6 py-3 rounded-full hover:bg-[#D4AF37]/10 transition disabled:opacity-40"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              {importing ? "Importing…" : "Import existing demos"}
+            </button>
+            <p className="text-white/20 text-xs">Inserts all 6 current demos from the site into Supabase.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -513,23 +568,6 @@ export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoR
             ))}
           </div>
         )}
-
-        {/* SQL setup hint for first-time use */}
-        <details className="mt-12 text-xs text-white/20">
-          <summary className="cursor-pointer hover:text-white/40 transition">DB setup (run once in Supabase SQL editor)</summary>
-          <pre className="mt-3 p-4 bg-black/30 rounded-xl overflow-x-auto text-white/30 leading-relaxed">{`create table if not exists demos (
-  id               uuid primary key default gen_random_uuid(),
-  title            text not null,
-  genre            text,
-  description      text,
-  file_url         text,
-  file_key         text,
-  duration_seconds int,
-  sort_order       int default 0,
-  active           boolean default true,
-  created_at       timestamptz default now()
-);`}</pre>
-        </details>
 
       </div>
     </div>
