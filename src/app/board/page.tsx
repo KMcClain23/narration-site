@@ -1499,6 +1499,18 @@ export default function BoardPage() {
               body: JSON.stringify({ id: d.card.id, title: d.card.title, author: d.card.author }),
             }).catch(() => {});
           }
+          // Fire-and-forget trigger warning generation for all new cards
+          fetch("/api/enrich-trigger-warnings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: d.card.id,
+              title: d.card.title,
+              author: d.card.author,
+              description: d.card.description ?? "",
+              tags: d.card.tags ?? [],
+            }),
+          }).catch(() => {});
         }
         setShowForm(false);
       }
