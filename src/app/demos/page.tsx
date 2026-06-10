@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { TrackedAudio } from "./TrackedAudio";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,7 @@ export default async function DemosPage() {
                 {demo.description && (
                   <p className="text-sm text-white/50 mb-4">{demo.description}</p>
                 )}
-                <audio controls src={demo.file_url} className="w-full h-10" style={{ accentColor: "#D4AF37" }} />
+                <TrackedAudio src={demo.file_url} title={demo.title} genre={demo.genre} />
               </div>
             ))}
           </div>

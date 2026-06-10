@@ -470,12 +470,12 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
                   </div>
                 )}
                 {/* Platform buttons after multicast */}
-                <PlatformButtons audibleUrl={book.link} spotifyUrl={book.spotify_link} arUrl={book.ar_link} size="sm" className="mt-3" />
+                <PlatformButtons audibleUrl={book.link} spotifyUrl={book.spotify_link} arUrl={book.ar_link} size="sm" className="mt-3" bookTitle={book.title} />
               </div>
             )}
             {/* Platform buttons for no co-narrator or single co-narrator */}
             {coNarratorList.length <= 1 && (
-              <PlatformButtons audibleUrl={book.link} spotifyUrl={book.spotify_link} arUrl={book.ar_link} size="sm" className="mt-3" />
+              <PlatformButtons audibleUrl={book.link} spotifyUrl={book.spotify_link} arUrl={book.ar_link} size="sm" className="mt-3" bookTitle={book.title} />
             )}
             {/* Explicit "View details" CTA */}
             <Link

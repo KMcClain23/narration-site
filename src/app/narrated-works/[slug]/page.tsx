@@ -277,6 +277,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
                 audibleUrl={book.audible_link}
                 spotifyUrl={(book as Record<string, unknown>).spotify_link as string | undefined}
                 arUrl={book.ar_link}
+                bookTitle={book.title}
               />
               <Link href="/contact"
                 className="inline-flex items-center gap-2 border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 font-semibold px-6 py-3 rounded-full transition-colors text-sm">

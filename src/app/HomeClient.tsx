@@ -611,6 +611,11 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow, demos: ra
         setSubmittedName(name);
         setFormStatus({ success: true });
         formRef.current?.reset();
+        fetch("/api/analytics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event: "contact_form_submitted", page: "/", metadata: {} }),
+        }).catch(() => {});
       } else {
         setFormStatus({ success: false, message: typeof result.error === "string" ? result.error : "Something went wrong. Please try again." });
       }
