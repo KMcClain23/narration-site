@@ -22,6 +22,7 @@ interface Author {
   tiktok: string;
   facebook: string;
   goodreads: string;
+  threads: string;
 }
 
 const EMPTY_FORM: Omit<Author, "id"> = {
@@ -34,6 +35,7 @@ const EMPTY_FORM: Omit<Author, "id"> = {
   tiktok: "",
   facebook: "",
   goodreads: "",
+  threads: "",
 };
 
 const FIELDS: { key: keyof Omit<Author, "id" | "name" | "bio">; label: string; placeholder: string }[] = [
@@ -41,6 +43,7 @@ const FIELDS: { key: keyof Omit<Author, "id" | "name" | "bio">; label: string; p
   { key: "amazon", label: "Amazon author page", placeholder: "https://amazon.com/author/..." },
   { key: "instagram", label: "Instagram URL", placeholder: "https://instagram.com/..." },
   { key: "tiktok", label: "TikTok URL", placeholder: "https://tiktok.com/@..." },
+  { key: "threads", label: "Threads URL", placeholder: "https://threads.net/@..." },
   { key: "facebook", label: "Facebook URL", placeholder: "https://facebook.com/..." },
   { key: "goodreads", label: "Goodreads URL", placeholder: "https://goodreads.com/author/..." },
 ];
@@ -297,7 +300,7 @@ export default function AuthorManager() {
     const res = await fetch("/api/authors", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: author.id, name: author.name, bio: author.bio, email, website: author.website, amazon: author.amazon, instagram: author.instagram, tiktok: author.tiktok, facebook: author.facebook, goodreads: author.goodreads }),
+      body: JSON.stringify({ id: author.id, name: author.name, bio: author.bio, email, website: author.website, amazon: author.amazon, instagram: author.instagram, tiktok: author.tiktok, threads: author.threads, facebook: author.facebook, goodreads: author.goodreads }),
     });
     if (res.ok) {
       const d = await res.json();
@@ -361,7 +364,7 @@ export default function AuthorManager() {
   };
 
   const filledLinkCount = (a: Author) =>
-    [a.website, a.amazon, a.instagram, a.tiktok, a.facebook, a.goodreads].filter(Boolean).length;
+    [a.website, a.amazon, a.instagram, a.tiktok, a.threads, a.facebook, a.goodreads].filter(Boolean).length;
 
   const exportCSV = () => {
     const rows = [
@@ -507,6 +510,7 @@ export default function AuthorManager() {
                             amazon:    author.amazon   ?? "",
                             instagram: author.instagram ?? "",
                             tiktok:    author.tiktok   ?? "",
+                            threads:   author.threads  ?? "",
                             facebook:  author.facebook ?? "",
                             goodreads: author.goodreads ?? "",
                           }}
