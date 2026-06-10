@@ -31,12 +31,13 @@ interface BoardCard {
   dean_message?: string;
   slug?: string;
   email_updates_enabled?: boolean;
+  trigger_warnings: string[];
 }
 
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
   title:"", author:"", cover_url:"", status:"contracted", deadline:"",
   notes:"", author_notes:"", links:[], co_narrator:"",
-  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", script_url:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"",
+  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", script_url:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"", trigger_warnings:[],
 };
 
 // ─── Timeline view ────────────────────────────────────────────────────────────
@@ -1344,6 +1345,7 @@ export default function BoardPage() {
   const [expanded, setExpanded] = useState<string|null>(null);
   const [linkLabel, setLinkLabel] = useState(""); const [linkUrl, setLinkUrl] = useState("");
   const [tagInput, setTagInput] = useState("");
+  const [triggerInput, setTriggerInput] = useState("");
   const [syncing, setSyncing] = useState<string|null>(null);
   const [error, setError] = useState<string|null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{id:string;title:string}|null>(null);
@@ -1500,7 +1502,7 @@ export default function BoardPage() {
         }
         setShowForm(false);
       }
-      setForm({...EMPTY}); setTagInput("");
+      setForm({...EMPTY}); setTagInput(""); setTriggerInput("");
     } catch (err) { setError(err instanceof Error ? err.message : "Save failed — check connection."); }
     setSaving(false);
   };
@@ -1559,7 +1561,7 @@ export default function BoardPage() {
       links:card.links,co_narrator:card.co_narrator,subtitle:card.subtitle||"",
       tags:card.tags||[],description:card.description||"",
       audible_link:card.audible_link||"",ar_link:card.ar_link||"",spotify_link:card.spotify_link||"",script_url:card.script_url||"",chapters:card.chapters||[],
-      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||""});
+      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||"",trigger_warnings:card.trigger_warnings||[]});
     setShowForm(false);
   };
 
@@ -1627,6 +1629,8 @@ export default function BoardPage() {
   const removeLink = (i:number) => setForm(f=>({...f,links:f.links.filter((_,idx)=>idx!==i)}));
   const addTag = () => { const t=tagInput.trim(); if(t&&!form.tags.includes(t)){setForm(f=>({...f,tags:[...f.tags,t]}));setTagInput("");} };
   const removeTag = (t:string) => setForm(f=>({...f,tags:f.tags.filter(x=>x!==t)}));
+  const addTrigger = () => { const t=triggerInput.trim(); if(t&&!form.trigger_warnings.includes(t)){setForm(f=>({...f,trigger_warnings:[...f.trigger_warnings,t]}));setTriggerInput("");} };
+  const removeTrigger = (t:string) => setForm(f=>({...f,trigger_warnings:f.trigger_warnings.filter(x=>x!==t)}));
 
   const F = ({label,k,placeholder,type="text"}:{label:string;k:string;placeholder?:string;type?:string}) => (
     <label className="block">
@@ -1678,7 +1682,7 @@ export default function BoardPage() {
             </button>
           </div>
 
-          <button onClick={()=>{setShowForm(true);setEditCard(null);setForm({...EMPTY});setTagInput("");setAuthorQuery("");setAuthorDropOpen(false);setCnQuery("");setCnDropOpen(false);}}
+          <button onClick={()=>{setShowForm(true);setEditCard(null);setForm({...EMPTY});setTagInput("");setTriggerInput("");setAuthorQuery("");setAuthorDropOpen(false);setCnQuery("");setCnDropOpen(false);}}
             className="inline-flex items-center gap-1.5 bg-[#D4AF37] text-black text-xs font-bold px-3 sm:px-4 py-2 rounded-full hover:bg-[#E0C15A] transition-colors">
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
             <span className="hidden sm:inline">New project</span>
@@ -1992,6 +1996,23 @@ export default function BoardPage() {
                   <input value={tagInput} onChange={e=>setTagInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addTag();}}}
                     placeholder="e.g. Dark Romance" className="flex-1 rounded-lg bg-black/30 border border-white/8 px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40"/>
                   <button type="button" onClick={addTag} className="bg-white/8 hover:bg-white/15 text-white text-xs px-3 py-2 rounded-lg transition">Add</button>
+                </div>
+              </div>
+
+              {/* Trigger Warnings */}
+              <div>
+                <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium block mb-1">Trigger warnings <span className="text-white/25 normal-case tracking-normal">(public, shown in dropdown)</span></span>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {form.trigger_warnings.map(t=>(
+                    <span key={t} className="inline-flex items-center gap-1 text-xs bg-red-500/10 text-red-300 border border-red-500/25 px-2 py-0.5 rounded-full">
+                      {t}<button type="button" onClick={()=>removeTrigger(t)} className="text-red-400/50 hover:text-red-300">✕</button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input value={triggerInput} onChange={e=>setTriggerInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addTrigger();}}}
+                    placeholder="e.g. Dubious consent, Violence" className="flex-1 rounded-lg bg-black/30 border border-white/8 px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-red-500/30"/>
+                  <button type="button" onClick={addTrigger} className="bg-white/8 hover:bg-white/15 text-white text-xs px-3 py-2 rounded-lg transition">Add</button>
                 </div>
               </div>
 

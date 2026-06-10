@@ -71,6 +71,7 @@ export async function POST(req: Request) {
       word_count = 0, first15_due,
       pfh_rate = 0, payment_type = "pfh", first_15_complete = false,
       dean_message = "", author_email = "", slug = "",
+      trigger_warnings = [],
     } = body;
 
     if (!title?.trim()) return NextResponse.json({ error: "Title required." }, { status: 400 });
@@ -99,6 +100,7 @@ export async function POST(req: Request) {
       payment_type:      payment_type || "pfh",
       first_15_complete: first_15_complete ?? false,
       slug:              slug || makeSlug(title.trim()),
+      trigger_warnings:  Array.isArray(trigger_warnings) ? trigger_warnings : [],
     };
     // Date columns must be null (not "") when empty — Supabase rejects empty strings for date/timestamptz
     insertData.deadline    = deadline    || null;
@@ -165,7 +167,7 @@ export async function PUT(req: Request) {
       "subtitle", "tags", "description", "audible_link", "ar_link", "spotify_link",
       "word_count", "first15_due", "pfh_rate", "payment_type",
       "first_15_complete", "dean_message", "author_email", "author_token",
-      "email_updates_enabled", "script_url",
+      "email_updates_enabled", "script_url", "trigger_warnings",
     ];
     const DATE_FIELDS = new Set(["deadline", "first15_due", "first_15_due"]);
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };

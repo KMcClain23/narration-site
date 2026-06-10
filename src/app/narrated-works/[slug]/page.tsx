@@ -37,7 +37,7 @@ function titleToSlug(title: string): string {
 async function getBook(slug: string) {
   const { data } = await supabaseAdmin
     .from("board_cards")
-    .select("id, title, subtitle, author, author_notes, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status")
+    .select("id, title, subtitle, author, author_notes, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status, trigger_warnings")
     .in("status", ["contracted", "recording", "editing", "released"]);
   if (!data) return null;
   return data.find((card) => titleToSlug(card.title ?? "") === slug) ?? null;
@@ -149,6 +149,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   const statusLabel = STATUS_TO_LABEL[book.status] ?? "";
   const statusStyle = STATUS_TO_STYLE[book.status] ?? "bg-white/10 text-white/50 border-white/10";
   const tags: string[] = Array.isArray(book.tags) ? book.tags : [];
+  const triggerWarnings: string[] = Array.isArray(book.trigger_warnings) ? book.trigger_warnings : [];
   const isReleased = book.status === "released";
 
   return (
@@ -235,9 +236,33 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
 
             {/* Description */}
             {book.description && (
-              <p className="text-sm sm:text-base text-white/70 leading-relaxed mb-8 max-w-prose">
+              <p className="text-sm sm:text-base text-white/70 leading-relaxed mb-6 max-w-prose">
                 {book.description}
               </p>
+            )}
+
+            {/* Trigger warnings */}
+            {triggerWarnings.length > 0 && (
+              <details className="group mb-8 max-w-prose">
+                <summary className="inline-flex cursor-pointer list-none items-center gap-2 text-xs font-semibold text-red-400/70 border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 rounded-full px-3 py-1.5 transition-colors select-none">
+                  <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                  </svg>
+                  Trigger warnings
+                  <svg className="h-3 w-3 shrink-0 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </summary>
+                <div className="mt-3 rounded-xl border border-red-500/15 bg-red-500/5 px-4 py-3">
+                  <div className="flex flex-wrap gap-2">
+                    {triggerWarnings.map(w => (
+                      <span key={w} className="text-xs text-red-300/80 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-full">
+                        {w}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </details>
             )}
 
             {/* Narrator / co-narrator row — hover popups for each person */}
