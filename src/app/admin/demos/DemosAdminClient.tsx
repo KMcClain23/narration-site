@@ -485,10 +485,12 @@ const LEGACY_DEMOS = [
 // ── Main client component ─────────────────────────────────────────────────────
 
 export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoRecord[] }) {
-  const [demos,     setDemos]     = useState<DemoRecord[]>(initialDemos);
-  const [isAdding,  setIsAdding]  = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [busy,      setBusy]      = useState<Record<string, boolean>>({});
+  const [demos,       setDemos]       = useState<DemoRecord[]>(initialDemos);
+  const [isAdding,    setIsAdding]    = useState(false);
+  const [importing,   setImporting]   = useState(false);
+  const [fixingUrls,  setFixingUrls]  = useState(false);
+  const [fixResult,   setFixResult]   = useState<string | null>(null);
+  const [busy,        setBusy]        = useState<Record<string, boolean>>({});
 
   const setBusyFor = (id: string, val: boolean) =>
     setBusy(b => ({ ...b, [id]: val }));
@@ -559,6 +561,27 @@ export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoR
   const handleUpdate = (updated: DemoRecord) =>
     setDemos(prev => prev.map(d => d.id === updated.id ? updated : d));
 
+  const handleFixUrls = async () => {
+    setFixingUrls(true);
+    setFixResult(null);
+    try {
+      const res = await fetch("/api/demos/fix-urls", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Fix failed");
+      setDemos(json.demos);
+      setFixResult(
+        json.fixed === 0
+          ? "All URLs already correct — nothing changed."
+          : `Fixed ${json.fixed} demo URL${json.fixed !== 1 ? "s" : ""}.${json.errors?.length ? ` (${json.errors.length} error${json.errors.length !== 1 ? "s" : ""} — see console)` : ""}`,
+      );
+      if (json.errors?.length) console.error("[fix-urls] errors:", json.errors);
+    } catch (e) {
+      setFixResult("Error: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setFixingUrls(false);
+    }
+  };
+
   // One-time migration: insert all hardcoded demos into Supabase
   const handleImport = async () => {
     if (!window.confirm("Import all 6 existing demos into Supabase? This runs once.")) return;
@@ -619,6 +642,35 @@ export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoR
         {/* Add form */}
         {isAdding && (
           <AddDemoForm onAdded={handleAdded} onCancel={() => setIsAdding(false)} />
+        )}
+
+        {/* Fix URLs banner — only shown when demos exist */}
+        {demos.length > 0 && (
+          <div className="flex items-center justify-between bg-[#0A0C36] border border-[#1E2660] rounded-xl px-4 py-2.5 mb-4 gap-3 flex-wrap">
+            <p className="text-xs text-white/40">
+              If audio files fail to load, click <strong className="text-white/60">Fix URLs</strong> to rewrite all
+              file_url values to use the correct R2 public base URL.
+            </p>
+            <button
+              onClick={handleFixUrls}
+              disabled={fixingUrls}
+              className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40"
+            >
+              {fixingUrls ? "Fixing…" : "Fix URLs"}
+            </button>
+          </div>
+        )}
+
+        {/* Fix result */}
+        {fixResult && (
+          <div className={`flex items-center justify-between gap-3 rounded-xl px-4 py-2.5 mb-4 text-xs ${
+            fixResult.startsWith("Error")
+              ? "bg-red-950/40 border border-red-500/30 text-red-300"
+              : "bg-emerald-950/40 border border-emerald-500/30 text-emerald-300"
+          }`}>
+            <span>{fixResult}</span>
+            <button onClick={() => setFixResult(null)} className="text-white/30 hover:text-white/60 shrink-0">✕</button>
+          </div>
         )}
 
         {/* Hint */}
