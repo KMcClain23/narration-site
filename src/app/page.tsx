@@ -26,6 +26,19 @@ export default async function Page() {
     if (monthsRow?.value) bookingWindow = formatBookingWindow(JSON.parse(monthsRow.value));
   } catch {}
 
+  // Featured demos — active, sorted, max 6
+  type DbDemo = { id: string; title: string; genre: string | null; description: string | null; file_url: string; duration_seconds: number | null; sort_order: number };
+  let featuredDemos: DbDemo[] = [];
+  try {
+    const { data: demoRows } = await supabaseAdmin
+      .from("demos")
+      .select("id,title,genre,description,file_url,duration_seconds,sort_order")
+      .eq("active", true)
+      .order("sort_order", { ascending: true })
+      .limit(6);
+    if (demoRows) featuredDemos = demoRows as DbDemo[];
+  } catch { /* table may not exist yet — show nothing */ }
+
   let stats = { titles: 0, authors: 0, co_narrators: 0, genres: 0, words: 0 };
   try {
     const { data } = await supabaseAdmin
@@ -57,7 +70,7 @@ export default async function Page() {
 
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#050814]" />}>
-      <HomeClient acceptingProjects={acceptingProjects} stats={stats} bookingWindow={bookingWindow} />
+      <HomeClient acceptingProjects={acceptingProjects} stats={stats} bookingWindow={bookingWindow} demos={featuredDemos} />
     </Suspense>
   );
 }

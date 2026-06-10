@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRef, useEffect, useState, useTransition, useCallback, useMemo } from "react";
 import { sendEmail } from "@/app/actions/sendEmail";
 import { sendGAEvent } from "@next/third-parties/google";
-import { DEMOS } from "@/app/demos/config";
+// Demos now come from Supabase via page.tsx — no hardcoded config needed
 
 const BOOKINGS_URL =
   "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
@@ -85,6 +85,27 @@ function LogoCard({ logo }: { logo: { name: string; src: string; href: string; f
       )}
     </a>
   );
+}
+
+// Demo data shape coming from Supabase
+type DbDemo = {
+  id: string;
+  title: string;
+  genre: string | null;
+  description: string | null;
+  file_url: string;
+  duration_seconds: number | null;
+  sort_order: number;
+};
+
+// Rotating border colours for demo cards (cycles if more than 6 demos)
+const DEMO_COLORS = [
+  "border-pink-400","border-purple-400","border-violet-400",
+  "border-rose-300","border-blue-400","border-amber-400",
+];
+
+function titleToSlug(t: string) {
+  return t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
 // Static waveform heights for the decorative bar animation
@@ -571,7 +592,7 @@ function TestimonialsCarousel() {
   );
 }
 
-function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number; words: number }; bookingWindow?: string }) {
+function HomeContent({ acceptingProjects = true, stats, bookingWindow, demos: rawDemos = [] }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number; words: number }; bookingWindow?: string; demos?: DbDemo[] }) {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -604,7 +625,15 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { accep
     });
   }, [activeIndex]);
 
-  const demos = DEMOS;
+  // Adapt Supabase demo rows to the shape DemoPlayer expects
+  const demos = rawDemos.map((d, i) => ({
+    title:  d.title,
+    desc:   d.description ?? "",
+    src:    d.file_url,
+    slug:   titleToSlug(d.title),
+    color:  DEMO_COLORS[i % DEMO_COLORS.length],
+    tags:   d.genre ? [d.genre] : [],
+  }));
 
   return (
     <main className="min-h-screen bg-[#06082E] text-white overflow-x-clip">
@@ -1049,6 +1078,6 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow }: { accep
   );
 }
 
-export default function HomeClient({ acceptingProjects = true, stats, bookingWindow }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number; words: number }; bookingWindow?: string }) {
-  return <HomeContent acceptingProjects={acceptingProjects} stats={stats} bookingWindow={bookingWindow} />;
+export default function HomeClient({ acceptingProjects = true, stats, bookingWindow, demos }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number; words: number }; bookingWindow?: string; demos?: DbDemo[] }) {
+  return <HomeContent acceptingProjects={acceptingProjects} stats={stats} bookingWindow={bookingWindow} demos={demos} />;
 }
