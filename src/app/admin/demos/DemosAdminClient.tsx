@@ -472,13 +472,14 @@ function DemoCard({
   );
 }
 
-// Existing hardcoded demos — used only for the one-time import
+// Existing hardcoded demos — used only for the one-time import.
+// URLs point to files at the bucket root (pre-Demo Manager uploads).
 const LEGACY_DEMOS = [
-  { title: "LGBTQ+ Romance",           genre: "Romance",          description: "Bright pacing, playful emotional tone",      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20LGBTQ%2B%20Romance%20-%20Male%20(BrightPlayful)%2C%20Confident%2C%20Sex-PositiveFlirtatious.mp3" },
-  { title: "Romantasy",                genre: "Romantasy",        description: "Atmospheric, grounded fantasy emotion",       src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Romantasy%20-%20Male%20(PossessiveHaunted)%2C%20Harsh%20Control%20to%20Remorse%2C%20Deep%20Loss.mp3" },
+  { title: "LGBTQ+ Romance",           genre: "Romance",          description: "Bright pacing, playful emotional tone",      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20LGBTQ%2B%20Romance%20-%20Male%20(BrightPlayful)%2C%20Confident%2C%20Sex-Positive%2CFlirtatious.mp3" },
+  { title: "Romantasy",                genre: "Romantasy",        description: "Atmospheric, grounded fantasy emotion",       src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Romantasy%20-%20Male%20(PossessiveHaunted)%2C%20Harsh%20Control%2C%20Dark%20Romance%2CDeeep%20Loss.mp3" },
   { title: "Feminine Voice",           genre: "Romance",          description: "Male & Female Dialogue",                      src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Female%20Voice%202.mp3" },
   { title: "Romance Duet",             genre: "Romance",          description: "British accent, romantic restraint",          src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/British%20-%20Romance%20Duet.mp3" },
-  { title: "Child POV Drama",          genre: "Drama",            description: "Raw emotion",                                 src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Child%20(5-year-old%20boy)%2C%20Emotional%20TraumaWitness%20-%20Sample.mp3" },
+  { title: "Child POV Drama",          genre: "Drama",            description: "Raw emotion",                                 src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Child%20(5-year-old%20boy)%2C%20Emotional%20Trauma%2CWithnessing%20Violence%2C%20-%20Sample.mp3" },
   { title: "Multi-Character Dialogue", genre: "Multi-Character",  description: "Clear character separation, vocal range",    src: "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/4%20Characters.mp3" },
 ];
 
