@@ -10,6 +10,36 @@ const MONTHS = [
   { n: 10, label: "Oct" }, { n: 11, label: "Nov" }, { n: 12, label: "Dec" },
 ];
 
+function getWindowInfo(months: number[]): { startMonth: number; startYear: number } | null {
+  if (!months.length) return null;
+  const now = new Date();
+  const curMonth = now.getMonth() + 1;
+  const curYear = now.getFullYear();
+  const sorted = [...months].sort((a, b) => a - b);
+
+  if (sorted.length === 1) {
+    const m = sorted[0];
+    return { startMonth: m, startYear: m >= curMonth ? curYear : curYear + 1 };
+  }
+
+  let maxGap = 0;
+  let breakAfter = sorted.length - 1;
+  for (let i = 0; i < sorted.length; i++) {
+    const gap = (sorted[(i + 1) % sorted.length] - sorted[i] + 12) % 12;
+    if (gap > maxGap) { maxGap = gap; breakAfter = i; }
+  }
+
+  const startMonth = sorted[(breakAfter + 1) % sorted.length];
+  const startYear = startMonth >= curMonth ? curYear : curYear + 1;
+  return { startMonth, startYear };
+}
+
+function resolveYear(month: number, info: { startMonth: number; startYear: number } | null): number {
+  const fallback = new Date().getFullYear();
+  if (!info) return fallback;
+  return month >= info.startMonth ? info.startYear : info.startYear + 1;
+}
+
 export default function BookingAvailability({ initial }: { initial: number[] }) {
   const [selected, setSelected] = useState<number[]>(initial);
   const [saving, setSaving] = useState(false);
@@ -35,6 +65,7 @@ export default function BookingAvailability({ initial }: { initial: number[] }) 
   };
 
   const preview = formatBookingWindow(selected);
+  const info = getWindowInfo(selected);
 
   return (
     <div className="rounded-2xl border border-[#1A2550] bg-[#0B1224] p-5 mt-4">
@@ -43,20 +74,27 @@ export default function BookingAvailability({ initial }: { initial: number[] }) 
 
       {/* Month picker */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {MONTHS.map(({ n, label }) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => toggle(n)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-              selected.includes(n)
-                ? "bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/40"
-                : "bg-white/5 text-white/40 border-white/10 hover:border-white/25 hover:text-white/60"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+        {MONTHS.map(({ n, label }) => {
+          const isSelected = selected.includes(n);
+          const year = isSelected ? resolveYear(n, info) : null;
+          return (
+            <button
+              key={n}
+              type="button"
+              onClick={() => toggle(n)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                isSelected
+                  ? "bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/40"
+                  : "bg-white/5 text-white/40 border-white/10 hover:border-white/25 hover:text-white/60"
+              }`}
+            >
+              {label}
+              {year !== null && (
+                <span className="ml-0.5 text-[9px] opacity-60">&apos;{String(year).slice(2)}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Preview */}
