@@ -108,11 +108,17 @@ export async function POST(req: Request) {
     if (dean_message) insertData.dean_message = dean_message;
     if (author_email) insertData.author_email = author_email;
 
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from("board_cards")
       .insert(insertData)
       .select()
       .single();
+
+    // If trigger_warnings column doesn't exist yet (migration not run), retry without it
+    if (error && error.message?.includes("trigger_warnings")) {
+      delete insertData.trigger_warnings;
+      ({ data, error } = await supabaseAdmin.from("board_cards").insert(insertData).select().single());
+    }
 
     if (error) {
       // Supabase errors are plain objects — never use String(error) or throw them
@@ -186,8 +192,16 @@ export async function PUT(req: Request) {
       oldStatus = cur?.status ?? null;
     }
 
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from("board_cards").update(update).eq("id", id).select().single();
+
+    // If trigger_warnings column doesn't exist yet (migration not run), retry without it
+    if (error && error.message?.includes("trigger_warnings")) {
+      delete update.trigger_warnings;
+      ({ data, error } = await supabaseAdmin
+        .from("board_cards").update(update).eq("id", id).select().single());
+    }
+
     if (error) {
       console.error("PUT /api/board Supabase error:", JSON.stringify(error), "update keys:", Object.keys(update));
       return NextResponse.json({ error: error.message || JSON.stringify(error) }, { status: 500 });
