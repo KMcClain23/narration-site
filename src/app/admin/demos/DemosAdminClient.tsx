@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 export type DemoRecord = {
   id: string;
@@ -56,8 +56,9 @@ async function uploadToR2(
     xhr.upload.onprogress = e => {
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
     };
-    xhr.onload  = () => (xhr.status < 300 ? resolve() : reject(new Error(`Upload ${xhr.status}`)));
-    xhr.onerror = () => reject(new Error("Upload network error"));
+    xhr.onload  = () => (xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (HTTP ${xhr.status})`)));
+    xhr.onerror = () => reject(new Error("Upload failed — network error or SSL issue with R2 endpoint. Check the browser console."));
+    xhr.onabort = () => reject(new Error("Upload aborted."));
     xhr.send(file);
   });
 
@@ -228,26 +229,69 @@ function AddDemoForm({ onAdded, onCancel }: {
 
 function DemoCard({
   demo, index, total, busy,
-  onToggleActive, onDelete, onMoveUp, onMoveDown, onReplace,
+  onUpdate, onToggleActive, onDelete, onMoveUp, onMoveDown,
 }: {
   demo: DemoRecord;
   index: number;
   total: number;
   busy: boolean;
+  onUpdate: (updated: DemoRecord) => void;
   onToggleActive: () => void;
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
-  onReplace: (file: File) => void;
 }) {
+  // ── Inline edit state ───────────────────────────────────────────────────────
+  const [editing,    setEditing]    = useState(false);
+  const [editTitle,  setEditTitle]  = useState(demo.title);
+  const [editGenre,  setEditGenre]  = useState(demo.genre  ?? "");
+  const [editDesc,   setEditDesc]   = useState(demo.description ?? "");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Sync edit fields if demo prop changes externally
+  useEffect(() => {
+    if (!editing) {
+      setEditTitle(demo.title);
+      setEditGenre(demo.genre ?? "");
+      setEditDesc(demo.description ?? "");
+    }
+  }, [demo, editing]);
+
+  const handleSaveEdit = async () => {
+    if (!editTitle.trim()) return;
+    setSavingEdit(true);
+    try {
+      const res = await fetch("/api/demos", {
+        method:  "PUT",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          id:          demo.id,
+          title:       editTitle.trim(),
+          genre:       editGenre || null,
+          description: editDesc.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      onUpdate(await res.json());
+      setEditing(false);
+    } catch (e) {
+      alert("Save failed: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // ── Replace state ───────────────────────────────────────────────────────────
   const [replaceProgress, setReplaceProgress] = useState(0);
-  const [replacing, setReplacing]             = useState(false);
+  const [replacing,       setReplacing]       = useState(false);
+  const [replaceError,    setReplaceError]    = useState<string | null>(null);
   const replaceRef = useRef<HTMLInputElement>(null);
 
   const handleReplaceFile = async (file: File) => {
-    if (!file.name.toLowerCase().endsWith(".mp3")) { alert("MP3 only."); return; }
+    if (!file.name.toLowerCase().endsWith(".mp3")) { alert("MP3 files only."); return; }
     setReplacing(true);
     setReplaceProgress(0);
+    setReplaceError(null);
     try {
       const duration = Math.round(await detectDuration(file)) || null;
       const { key, publicUrl } = await uploadToR2(file, setReplaceProgress);
@@ -257,30 +301,33 @@ function DemoCard({
         body:    JSON.stringify({ id: demo.id, file_url: publicUrl, file_key: key, duration_seconds: duration }),
       });
       if (!res.ok) throw new Error(await res.text());
-      onReplace(file); // signal parent to refresh this card
+      onUpdate(await res.json());
     } catch (e) {
-      alert("Replace failed: " + (e instanceof Error ? e.message : String(e)));
+      setReplaceError(e instanceof Error ? e.message : "Upload failed — check console for details.");
     } finally {
       setReplacing(false);
     }
   };
 
-  const iconBtn = "p-1.5 rounded-lg text-white/30 hover:text-white hover:bg-white/5 transition disabled:opacity-30";
+  // ── Shared styles ───────────────────────────────────────────────────────────
+  const iconBtn  = "p-1.5 rounded-lg text-white/30 hover:text-white hover:bg-white/5 transition disabled:opacity-30";
+  const editInp  = "w-full bg-[#06082E] border border-[#252D6E] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#D4AF37]/60 transition";
+  const editSel  = `${editInp} appearance-none contract-select cursor-pointer`;
 
   return (
-    <div className={`bg-[#0A0C36] border rounded-2xl p-5 transition-all ${
+    <div className={`bg-[#0A0C36] border rounded-2xl overflow-hidden transition-all ${
       demo.active ? "border-[#252D6E]" : "border-[#1A1F50] opacity-60"
     }`}>
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-4 p-5">
 
         {/* Sort arrows */}
         <div className="flex flex-col gap-0.5 shrink-0 mt-1">
-          <button onClick={onMoveUp}   disabled={busy || index === 0}         className={iconBtn} title="Move up">
+          <button onClick={onMoveUp}   disabled={busy || editing || index === 0}        className={iconBtn} title="Move up">
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7"/>
             </svg>
           </button>
-          <button onClick={onMoveDown} disabled={busy || index === total - 1}  className={iconBtn} title="Move down">
+          <button onClick={onMoveDown} disabled={busy || editing || index === total - 1} className={iconBtn} title="Move down">
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
             </svg>
@@ -289,41 +336,79 @@ function DemoCard({
 
         {/* Main content */}
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="font-bold text-white">{demo.title}</span>
-            {demo.genre && (
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20">
-                {demo.genre}
-              </span>
-            )}
-            {demo.duration_seconds && (
-              <span className="text-[11px] text-white/30">{fmtDuration(demo.duration_seconds)}</span>
-            )}
-          </div>
-          {demo.description && (
-            <p className="text-sm text-white/50 mb-3">{demo.description}</p>
-          )}
-
-          {/* Audio player */}
-          {demo.file_url && (
-            <audio
-              controls
-              src={demo.file_url}
-              className="w-full h-9 mb-3"
-              style={{ accentColor: "#D4AF37" }}
-            />
+          {editing ? (
+            /* ── Edit mode ── */
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Title *</label>
+                  <input value={editTitle} onChange={e => setEditTitle(e.target.value)}
+                    className={editInp} placeholder="Demo title" disabled={savingEdit} />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Genre</label>
+                  <select value={editGenre} onChange={e => setEditGenre(e.target.value)}
+                    className={editSel} disabled={savingEdit}>
+                    <option value="">No genre</option>
+                    {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Description</label>
+                <input value={editDesc} onChange={e => setEditDesc(e.target.value)}
+                  className={editInp} placeholder="Short description…" disabled={savingEdit} />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={handleSaveEdit} disabled={savingEdit || !editTitle.trim()}
+                  className="text-[12px] font-bold px-4 py-1.5 rounded-lg bg-[#D4AF37] text-[#06082E] hover:bg-[#F0D060] transition disabled:opacity-40">
+                  {savingEdit ? "Saving…" : "Save"}
+                </button>
+                <button onClick={() => { setEditing(false); }} disabled={savingEdit}
+                  className="text-[12px] px-4 py-1.5 rounded-lg text-white/40 hover:text-white/70 transition">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* ── View mode ── */
+            <>
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <span className="font-bold text-white">{demo.title}</span>
+                {demo.genre && (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20">
+                    {demo.genre}
+                  </span>
+                )}
+                {demo.duration_seconds && (
+                  <span className="text-[11px] text-white/30">{fmtDuration(demo.duration_seconds)}</span>
+                )}
+              </div>
+              {demo.description && (
+                <p className="text-sm text-white/50 mb-3">{demo.description}</p>
+              )}
+              {demo.file_url && (
+                <audio controls src={demo.file_url} className="w-full h-9 mb-1" style={{ accentColor: "#D4AF37" }} />
+              )}
+            </>
           )}
 
           {/* Replace progress */}
           {replacing && (
-            <div className="mb-3">
+            <div className="mt-3">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-white/40">Replacing…</span>
-                <span className="text-xs text-[#D4AF37]">{replaceProgress}%</span>
+                <span className="text-xs text-white/40">Uploading replacement…</span>
+                <span className="text-xs text-[#D4AF37] font-mono">{replaceProgress}%</span>
               </div>
-              <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
                 <div className="h-full bg-[#D4AF37] rounded-full transition-all" style={{ width: `${replaceProgress}%` }} />
               </div>
+            </div>
+          )}
+          {replaceError && !replacing && (
+            <div className="mt-2 flex items-start gap-2 bg-red-950/50 border border-red-500/30 rounded-lg px-3 py-2">
+              <span className="text-red-400 text-xs leading-relaxed">{replaceError}</span>
+              <button onClick={() => setReplaceError(null)} className="ml-auto text-red-400/50 hover:text-red-400 shrink-0 text-sm leading-none">✕</button>
             </div>
           )}
         </div>
@@ -332,7 +417,7 @@ function DemoCard({
         <div className="flex flex-col items-end gap-2 shrink-0">
           {/* Active toggle */}
           <button
-            onClick={onToggleActive} disabled={busy}
+            onClick={onToggleActive} disabled={busy || editing}
             className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none disabled:opacity-40 ${
               demo.active ? "bg-emerald-500" : "bg-white/15"
             }`}
@@ -344,23 +429,37 @@ function DemoCard({
           </button>
 
           <div className="flex gap-1 mt-1">
+            {/* Edit */}
+            {!editing && (
+              <button
+                onClick={() => setEditing(true)} disabled={busy || replacing}
+                className="text-[11px] font-medium px-2.5 py-1 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40"
+                title="Edit title / genre / description"
+              >
+                Edit
+              </button>
+            )}
             {/* Replace audio */}
-            <button
-              onClick={() => replaceRef.current?.click()}
-              disabled={busy || replacing}
-              className="text-[11px] font-medium px-2.5 py-1 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40"
-              title="Replace audio file"
-            >
-              Replace
-            </button>
+            {!editing && (
+              <button
+                onClick={() => { setReplaceError(null); replaceRef.current?.click(); }}
+                disabled={busy || replacing}
+                className="text-[11px] font-medium px-2.5 py-1 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40"
+                title="Replace audio file"
+              >
+                {replacing ? "…" : "Replace"}
+              </button>
+            )}
             {/* Delete */}
-            <button
-              onClick={onDelete} disabled={busy}
-              className="text-[11px] font-medium px-2.5 py-1 rounded-lg border border-red-500/20 text-red-400/60 hover:text-red-400 hover:border-red-400/40 transition disabled:opacity-40"
-              title="Delete demo"
-            >
-              Delete
-            </button>
+            {!editing && (
+              <button
+                onClick={onDelete} disabled={busy || replacing}
+                className="text-[11px] font-medium px-2.5 py-1 rounded-lg border border-red-500/20 text-red-400/60 hover:text-red-400 hover:border-red-400/40 transition disabled:opacity-40"
+                title="Delete demo"
+              >
+                Delete
+              </button>
+            )}
           </div>
 
           <input
@@ -457,15 +556,8 @@ export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoR
     ));
   };
 
-  // After a replace, refresh the single card from the server
-  const handleReplaced = async (id: string) => {
-    try {
-      const res  = await fetch("/api/demos/admin");
-      const all: DemoRecord[] = await res.json();
-      const updated = all.find(d => d.id === id);
-      if (updated) setDemos(prev => prev.map(d => d.id === id ? updated : d));
-    } catch { /* non-critical */ }
-  };
+  const handleUpdate = (updated: DemoRecord) =>
+    setDemos(prev => prev.map(d => d.id === updated.id ? updated : d));
 
   // One-time migration: insert all hardcoded demos into Supabase
   const handleImport = async () => {
@@ -559,11 +651,11 @@ export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoR
                 index={i}
                 total={demos.length}
                 busy={!!busy[demo.id]}
+                onUpdate={handleUpdate}
                 onToggleActive={() => handleToggleActive(demo)}
                 onDelete={() => handleDelete(demo)}
                 onMoveUp={() => handleMove(i, "up")}
                 onMoveDown={() => handleMove(i, "down")}
-                onReplace={() => handleReplaced(demo.id)}
               />
             ))}
           </div>
