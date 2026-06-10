@@ -5,15 +5,15 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 // These are the authoritative URLs — used by Fix URLs regardless of env vars.
 const LEGACY_URL_MAP: Record<string, string> = {
   "LGBTQ+ Romance":
-    "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20LGBTQ%2B%20Romance%20-%20Male%20(BrightPlayful)%2C%20Confident%2C%20Sex-Positive%2CFlirtatious.mp3",
+    "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20LGBTQ%2B%20Romance%20-%20Male%20%28BrightPlayful%29%2C%20Confident%2C%20Sex-Positive%2CFlirtatious.mp3",
   "Romantasy":
-    "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Romantasy%20-%20Male%20(PossessiveHaunted)%2C%20Harsh%20Control%2C%20Dark%20Romance%2CDeeep%20Loss.mp3",
+    "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Romantasy%20-%20Male%20%28PossessiveHaunted%29%2C%20Harsh%20Control%2C%20Dark%20Romance%2CDeeep%20Loss.mp3",
   "Feminine Voice":
     "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Female%20Voice%202.mp3",
   "Romance Duet":
     "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/British%20-%20Romance%20Duet.mp3",
   "Child POV Drama":
-    "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Child%20(5-year-old%20boy)%2C%20Emotional%20Trauma%2CWithnessing%20Violence%2C%20-%20Sample.mp3",
+    "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Dean%20Miller%20-%20Drama%20-%20Child%20%285-year-old%20boy%29%2C%20Emotional%20TraumaWitnessing%20Violence%2C%20-%20Sample.mp3",
   "Multi-Character Dialogue":
     "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/4%20Characters.mp3",
 };

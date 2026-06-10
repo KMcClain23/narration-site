@@ -228,13 +228,14 @@ function AddDemoForm({ onAdded, onCancel }: {
 // ── Individual demo card ──────────────────────────────────────────────────────
 
 function DemoCard({
-  demo, index, total, busy,
+  demo, index, total, busy, knownBroken,
   onUpdate, onToggleActive, onDelete, onMoveUp, onMoveDown,
 }: {
   demo: DemoRecord;
   index: number;
   total: number;
   busy: boolean;
+  knownBroken?: boolean; // true when Test all URLs confirmed broken
   onUpdate: (updated: DemoRecord) => void;
   onToggleActive: () => void;
   onDelete: () => void;
@@ -256,6 +257,9 @@ function DemoCard({
       setEditDesc(demo.description ?? "");
     }
   }, [demo, editing]);
+
+  // Reset audio health check when the file URL changes
+  useEffect(() => { setAudioOk(null); }, [demo.file_url]);
 
   const handleSaveEdit = async () => {
     if (!editTitle.trim()) return;
@@ -280,6 +284,9 @@ function DemoCard({
       setSavingEdit(false);
     }
   };
+
+  // ── Audio health state ───────────────────────────────────────────────────────
+  const [audioOk, setAudioOk] = useState<boolean | null>(null); // null=unknown, true=ok, false=broken
 
   // ── Replace state ───────────────────────────────────────────────────────────
   const [replaceProgress, setReplaceProgress] = useState(0);
@@ -387,8 +394,21 @@ function DemoCard({
               {demo.description && (
                 <p className="text-sm text-white/50 mb-3">{demo.description}</p>
               )}
+              {(audioOk === false || knownBroken) && (
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-red-400 bg-red-950/40 border border-red-500/30 rounded-lg px-3 py-1.5 mb-2">
+                  <span>⚠</span>
+                  <span>Audio not loading — URL may be broken. Use Fix URLs to repair.</span>
+                </div>
+              )}
               {demo.file_url && (
-                <audio controls src={demo.file_url} className="w-full h-9 mb-1" style={{ accentColor: "#D4AF37" }} />
+                <audio
+                  controls
+                  src={demo.file_url}
+                  className="w-full h-9 mb-1"
+                  style={{ accentColor: "#D4AF37" }}
+                  onLoadedMetadata={() => setAudioOk(true)}
+                  onError={() => setAudioOk(false)}
+                />
               )}
             </>
           )}
@@ -491,6 +511,8 @@ export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoR
   const [importing,   setImporting]   = useState(false);
   const [fixingUrls,  setFixingUrls]  = useState(false);
   const [fixResult,   setFixResult]   = useState<string | null>(null);
+  const [testing,     setTesting]     = useState(false);
+  const [testResults, setTestResults] = useState<Record<string, boolean> | null>(null);
   const [busy,        setBusy]        = useState<Record<string, boolean>>({});
 
   const setBusyFor = (id: string, val: boolean) =>
@@ -583,6 +605,28 @@ export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoR
     }
   };
 
+  // Test every demo URL by trying to load audio metadata
+  const handleTestUrls = async () => {
+    setTesting(true);
+    setTestResults(null);
+    const testUrl = (url: string | null): Promise<boolean> => {
+      if (!url) return Promise.resolve(false);
+      return new Promise(resolve => {
+        const audio = new Audio();
+        const timer = setTimeout(() => { audio.src = ""; resolve(false); }, 8000);
+        audio.onloadedmetadata = () => { clearTimeout(timer); resolve(true); };
+        audio.onerror          = () => { clearTimeout(timer); resolve(false); };
+        audio.src = url;
+      });
+    };
+    const results: Record<string, boolean> = {};
+    await Promise.all(demos.map(async d => {
+      results[d.id] = await testUrl(d.file_url);
+    }));
+    setTestResults(results);
+    setTesting(false);
+  };
+
   // One-time migration: insert all hardcoded demos into Supabase
   const handleImport = async () => {
     if (!window.confirm("Import all 6 existing demos into Supabase? This runs once.")) return;
@@ -645,20 +689,56 @@ export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoR
           <AddDemoForm onAdded={handleAdded} onCancel={() => setIsAdding(false)} />
         )}
 
-        {/* Fix URLs banner — only shown when demos exist */}
+        {/* URL tools banner — only shown when demos exist */}
         {demos.length > 0 && (
-          <div className="flex items-center justify-between bg-[#0A0C36] border border-[#1E2660] rounded-xl px-4 py-2.5 mb-4 gap-3 flex-wrap">
-            <p className="text-xs text-white/40">
-              If audio files fail to load, click <strong className="text-white/60">Fix URLs</strong> to rewrite all
-              file_url values to use the correct R2 public base URL.
-            </p>
-            <button
-              onClick={handleFixUrls}
-              disabled={fixingUrls}
-              className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40"
-            >
-              {fixingUrls ? "Fixing…" : "Fix URLs"}
-            </button>
+          <div className="bg-[#0A0C36] border border-[#1E2660] rounded-xl px-4 py-3 mb-4 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-xs text-white/40">
+                Audio broken? <strong className="text-white/60">Fix URLs</strong> rewrites all
+                file_url values to the correct R2 base.{" "}
+                <strong className="text-white/60">Test all URLs</strong> checks each file loads.
+              </p>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={handleTestUrls}
+                  disabled={testing || fixingUrls}
+                  className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40"
+                >
+                  {testing ? "Testing…" : "Test all URLs"}
+                </button>
+                <button
+                  onClick={handleFixUrls}
+                  disabled={fixingUrls || testing}
+                  className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40"
+                >
+                  {fixingUrls ? "Fixing…" : "Fix URLs"}
+                </button>
+              </div>
+            </div>
+
+            {/* Test results */}
+            {testResults && (
+              <div className="border-t border-[#1E2660] pt-3">
+                <div className="flex flex-wrap gap-2">
+                  {demos.map(d => (
+                    <span
+                      key={d.id}
+                      className={`text-[11px] px-2.5 py-1 rounded-full font-medium ${
+                        testResults[d.id]
+                          ? "bg-emerald-950/50 text-emerald-400 border border-emerald-500/30"
+                          : "bg-red-950/50 text-red-400 border border-red-500/30"
+                      }`}
+                    >
+                      {testResults[d.id] ? "✓" : "✗"} {d.title}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[11px] text-white/30 mt-2">
+                  {Object.values(testResults).filter(Boolean).length} / {demos.length} URLs accessible
+                  {Object.values(testResults).some(v => !v) && " — click Fix URLs to repair broken ones"}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -704,6 +784,7 @@ export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoR
                 index={i}
                 total={demos.length}
                 busy={!!busy[demo.id]}
+                knownBroken={testResults ? testResults[demo.id] === false : undefined}
                 onUpdate={handleUpdate}
                 onToggleActive={() => handleToggleActive(demo)}
                 onDelete={() => handleDelete(demo)}
