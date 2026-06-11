@@ -195,11 +195,13 @@ export async function PUT(req: Request) {
     }
 
     // Auto-stamp released_at when transitioning to "released" and not already set.
-    // Only fires when the caller didn't explicitly supply released_at.
+    // Fires when: key absent from payload OR payload value is empty/null (i.e. the
+    // manual date picker was left blank). Never fires when existingReleasedAt is
+    // already set — that protects manually-entered dates from being overwritten.
     if (
       fields.status === "released" &&
       existingReleasedAt === null &&
-      !("released_at" in fields)
+      (!("released_at" in fields) || !fields.released_at)
     ) {
       update.released_at = new Date().toISOString();
     }

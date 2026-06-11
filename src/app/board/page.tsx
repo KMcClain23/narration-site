@@ -32,12 +32,13 @@ interface BoardCard {
   slug?: string;
   email_updates_enabled?: boolean;
   trigger_warnings: string[];
+  released_at?: string;
 }
 
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
   title:"", author:"", cover_url:"", status:"contracted", deadline:"",
   notes:"", author_notes:"", links:[], co_narrator:"",
-  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", script_url:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"", trigger_warnings:[],
+  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", script_url:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"", trigger_warnings:[], released_at:"",
 };
 
 // ─── Timeline view ────────────────────────────────────────────────────────────
@@ -1573,7 +1574,7 @@ export default function BoardPage() {
       links:card.links,co_narrator:card.co_narrator,subtitle:card.subtitle||"",
       tags:card.tags||[],description:card.description||"",
       audible_link:card.audible_link||"",ar_link:card.ar_link||"",spotify_link:card.spotify_link||"",script_url:card.script_url||"",chapters:card.chapters||[],
-      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||"",trigger_warnings:card.trigger_warnings||[]});
+      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||"",trigger_warnings:card.trigger_warnings||[],released_at:card.released_at||""});
     setShowForm(false);
   };
 
@@ -1906,6 +1907,59 @@ export default function BoardPage() {
                     {COLUMNS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
                   </select>
                 </label>
+
+                {/* Release date — only relevant for released books. Stores YYYY-MM-01T12:00:00.000Z
+                    (first of month, noon UTC) so no timezone can shift the displayed month. */}
+                {form.status === "released" && (
+                  <div>
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium block mb-1.5">
+                      Release date <span className="text-white/20 normal-case tracking-normal text-[10px]">— public</span>
+                    </span>
+                    <div className="flex gap-2 items-center">
+                      <select
+                        value={form.released_at ? String(new Date(form.released_at).getUTCMonth() + 1).padStart(2, "0") : ""}
+                        onChange={e => {
+                          const yr = form.released_at
+                            ? String(new Date(form.released_at).getUTCFullYear())
+                            : String(new Date().getUTCFullYear());
+                          setForm(p => ({ ...p, released_at: e.target.value ? `${yr}-${e.target.value}-01T12:00:00.000Z` : "" }));
+                        }}
+                        className="flex-1 rounded-lg bg-black/30 border border-white/8 px-2 py-2.5 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 appearance-none"
+                      >
+                        <option value="">Month</option>
+                        {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((m,i)=>(
+                          <option key={m} value={String(i+1).padStart(2,"0")}>{m}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={form.released_at ? String(new Date(form.released_at).getUTCFullYear()) : ""}
+                        onChange={e => {
+                          const mo = form.released_at
+                            ? String(new Date(form.released_at).getUTCMonth() + 1).padStart(2, "0")
+                            : "01";
+                          setForm(p => ({ ...p, released_at: e.target.value ? `${e.target.value}-${mo}-01T12:00:00.000Z` : "" }));
+                        }}
+                        className="w-24 rounded-lg bg-black/30 border border-white/8 px-2 py-2.5 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 appearance-none"
+                      >
+                        <option value="">Year</option>
+                        {Array.from({length:8},(_,i)=>new Date().getUTCFullYear()-5+i).map(y=>(
+                          <option key={y} value={String(y)}>{y}</option>
+                        ))}
+                      </select>
+                      {form.released_at && (
+                        <button type="button"
+                          onClick={()=>setForm(p=>({...p,released_at:""}))}
+                          className="text-xs text-white/25 hover:text-white/55 transition-colors">
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    {!form.released_at && (
+                      <p className="text-[10px] text-white/20 mt-1.5">Auto-set when first saved as Released</p>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium block mb-1.5">Deadline</span>
                   <div className="flex gap-2">
