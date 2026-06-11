@@ -325,17 +325,17 @@ function DemoCard({
     <div className={`bg-[#0A0C36] border rounded-2xl overflow-hidden transition-all ${
       demo.active ? "border-[#252D6E]" : "border-[#1A1F50] opacity-60"
     }`}>
-      <div className="flex items-start gap-4 p-5">
+      <div className="flex items-start gap-3 p-4 sm:p-5">
 
         {/* Sort arrows */}
         <div className="flex flex-col gap-0.5 shrink-0 mt-1">
           <button onClick={onMoveUp}   disabled={busy || editing || index === 0}        className={iconBtn} title="Move up">
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7"/>
             </svg>
           </button>
           <button onClick={onMoveDown} disabled={busy || editing || index === total - 1} className={iconBtn} title="Move down">
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
             </svg>
           </button>
@@ -368,11 +368,11 @@ function DemoCard({
               </div>
               <div className="flex gap-2 pt-1">
                 <button onClick={handleSaveEdit} disabled={savingEdit || !editTitle.trim()}
-                  className="text-[12px] font-bold px-4 py-1.5 rounded-lg bg-[#D4AF37] text-[#06082E] hover:bg-[#F0D060] transition disabled:opacity-40">
+                  className="text-[12px] font-bold px-4 py-2 rounded-lg bg-[#D4AF37] text-[#06082E] hover:bg-[#F0D060] transition disabled:opacity-40">
                   {savingEdit ? "Saving…" : "Save"}
                 </button>
                 <button onClick={() => { setEditing(false); }} disabled={savingEdit}
-                  className="text-[12px] px-4 py-1.5 rounded-lg text-white/40 hover:text-white/70 transition">
+                  className="text-[12px] px-4 py-2 rounded-lg text-white/40 hover:text-white/70 transition">
                   Cancel
                 </button>
               </div>
@@ -380,17 +380,32 @@ function DemoCard({
           ) : (
             /* ── View mode ── */
             <>
-              <div className="flex flex-wrap items-center gap-2 mb-1">
-                <span className="font-bold text-white">{demo.title}</span>
-                {demo.genre && (
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20">
-                    {demo.genre}
-                  </span>
-                )}
-                {demo.duration_seconds && (
-                  <span className="text-[11px] text-white/30">{fmtDuration(demo.duration_seconds)}</span>
-                )}
+              {/* Title row — toggle sits here so it never squeezes the audio player */}
+              <div className="flex items-start gap-2 mb-1">
+                <div className="flex-1 flex flex-wrap items-center gap-2 min-w-0">
+                  <span className="font-bold text-white leading-snug">{demo.title}</span>
+                  {demo.genre && (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 shrink-0">
+                      {demo.genre}
+                    </span>
+                  )}
+                  {demo.duration_seconds && (
+                    <span className="text-[11px] text-white/30 shrink-0">{fmtDuration(demo.duration_seconds)}</span>
+                  )}
+                </div>
+                <button
+                  onClick={onToggleActive} disabled={busy}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none disabled:opacity-40 mt-0.5 ${
+                    demo.active ? "bg-emerald-500" : "bg-white/15"
+                  }`}
+                  title={demo.active ? "Active — click to hide" : "Inactive — click to show"}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                    demo.active ? "translate-x-4" : "translate-x-0.5"
+                  }`} />
+                </button>
               </div>
+
               {demo.description && (
                 <p className="text-sm text-white/50 mb-3">{demo.description}</p>
               )}
@@ -404,12 +419,35 @@ function DemoCard({
                 <audio
                   controls
                   src={demo.file_url}
-                  className="w-full h-9 mb-1"
+                  className="w-full h-9 mb-3"
                   style={{ accentColor: "#D4AF37" }}
                   onLoadedMetadata={() => setAudioOk(true)}
                   onError={() => setAudioOk(false)}
                 />
               )}
+
+              {/* Action buttons — below the audio player, full-width available */}
+              <div className="flex gap-1.5 flex-wrap">
+                <button
+                  onClick={() => setEditing(true)} disabled={busy || replacing}
+                  className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => { setReplaceError(null); replaceRef.current?.click(); }}
+                  disabled={busy || replacing}
+                  className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40"
+                >
+                  {replacing ? "…" : "Replace"}
+                </button>
+                <button
+                  onClick={onDelete} disabled={busy || replacing}
+                  className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-red-500/20 text-red-400/60 hover:text-red-400 hover:border-red-400/40 transition disabled:opacity-40"
+                >
+                  Delete
+                </button>
+              </div>
             </>
           )}
 
@@ -431,56 +469,6 @@ function DemoCard({
               <button onClick={() => setReplaceError(null)} className="ml-auto text-red-400/50 hover:text-red-400 shrink-0 text-sm leading-none">✕</button>
             </div>
           )}
-        </div>
-
-        {/* Right controls */}
-        <div className="flex flex-col items-end gap-2 shrink-0">
-          {/* Active toggle */}
-          <button
-            onClick={onToggleActive} disabled={busy || editing}
-            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none disabled:opacity-40 ${
-              demo.active ? "bg-emerald-500" : "bg-white/15"
-            }`}
-            title={demo.active ? "Active — click to hide" : "Inactive — click to show"}
-          >
-            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-              demo.active ? "translate-x-4" : "translate-x-0.5"
-            }`} />
-          </button>
-
-          <div className="flex gap-1 mt-1">
-            {/* Edit */}
-            {!editing && (
-              <button
-                onClick={() => setEditing(true)} disabled={busy || replacing}
-                className="text-[11px] font-medium px-2.5 py-1 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40"
-                title="Edit title / genre / description"
-              >
-                Edit
-              </button>
-            )}
-            {/* Replace audio */}
-            {!editing && (
-              <button
-                onClick={() => { setReplaceError(null); replaceRef.current?.click(); }}
-                disabled={busy || replacing}
-                className="text-[11px] font-medium px-2.5 py-1 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40"
-                title="Replace audio file"
-              >
-                {replacing ? "…" : "Replace"}
-              </button>
-            )}
-            {/* Delete */}
-            {!editing && (
-              <button
-                onClick={onDelete} disabled={busy || replacing}
-                className="text-[11px] font-medium px-2.5 py-1 rounded-lg border border-red-500/20 text-red-400/60 hover:text-red-400 hover:border-red-400/40 transition disabled:opacity-40"
-                title="Delete demo"
-              >
-                Delete
-              </button>
-            )}
-          </div>
 
           <input
             ref={replaceRef} type="file" accept=".mp3,audio/mpeg" className="sr-only"
@@ -661,21 +649,21 @@ export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoR
   };
 
   return (
-    <div className="min-h-screen bg-[#06082E] text-white p-6 pt-24 md:p-12 md:pt-24">
+    <div className="min-h-screen bg-[#06082E] text-white p-4 pt-20 sm:p-6 sm:pt-24 md:p-12 md:pt-24">
       <div className="max-w-3xl mx-auto">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-          <div className="flex items-center gap-4">
-            <a href="/admin/stats" className="text-sm text-white/40 hover:text-white/80 transition">
+        <div className="flex items-center justify-between mb-6 sm:mb-8 gap-3 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <a href="/admin/stats" className="text-sm text-white/40 hover:text-white/80 transition shrink-0">
               ← Admin
             </a>
-            <h1 className="text-3xl font-bold text-[#D4AF37]">Demo Manager</h1>
-            <span className="text-xs text-white/30 font-mono">{demos.length} demo{demos.length !== 1 ? "s" : ""}</span>
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#D4AF37] truncate">Demo Manager</h1>
+            <span className="text-xs text-white/30 font-mono shrink-0">{demos.length} demo{demos.length !== 1 ? "s" : ""}</span>
           </div>
           <button
             onClick={() => setIsAdding(v => !v)}
-            className="flex items-center gap-2 bg-[#D4AF37] text-[#06082E] font-bold text-sm px-5 py-2.5 rounded-full hover:bg-[#F0D060] transition active:scale-95"
+            className="flex items-center gap-2 bg-[#D4AF37] text-[#06082E] font-bold text-sm px-4 py-2.5 sm:px-5 rounded-full hover:bg-[#F0D060] transition active:scale-95 shrink-0"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/>
@@ -692,24 +680,23 @@ export default function DemosAdminClient({ initialDemos }: { initialDemos: DemoR
         {/* URL tools banner — only shown when demos exist */}
         {demos.length > 0 && (
           <div className="bg-[#0A0C36] border border-[#1E2660] rounded-xl px-4 py-3 mb-4 space-y-3">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
               <p className="text-xs text-white/40">
-                Audio broken? <strong className="text-white/60">Fix URLs</strong> rewrites all
-                file_url values to the correct R2 base.{" "}
+                Audio broken? <strong className="text-white/60">Fix URLs</strong> rewrites R2 paths.{" "}
                 <strong className="text-white/60">Test all URLs</strong> checks each file loads.
               </p>
-              <div className="flex gap-2 shrink-0">
+              <div className="flex gap-2">
                 <button
                   onClick={handleTestUrls}
                   disabled={testing || fixingUrls}
-                  className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40"
+                  className="flex-1 sm:flex-none text-[11px] font-bold px-3 py-2 sm:py-1.5 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40 text-center"
                 >
                   {testing ? "Testing…" : "Test all URLs"}
                 </button>
                 <button
                   onClick={handleFixUrls}
                   disabled={fixingUrls || testing}
-                  className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40"
+                  className="flex-1 sm:flex-none text-[11px] font-bold px-3 py-2 sm:py-1.5 rounded-lg border border-[#252D6E] text-white/50 hover:text-white hover:border-[#3A4585] transition disabled:opacity-40 text-center"
                 >
                   {fixingUrls ? "Fixing…" : "Fix URLs"}
                 </button>
