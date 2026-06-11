@@ -212,13 +212,13 @@ export function NarratedBySection({
         {/* Dean Miller */}
         <HoverCard popup={<DeanPopup />}>
           <div className="flex items-center gap-3 cursor-default select-none">
-            <div className="relative h-11 w-11 rounded-full overflow-hidden border border-white/15 shrink-0">
+            <div className="relative h-16 w-16 rounded-full overflow-hidden border border-white/15 shrink-0">
               <Image
                 src="/dean-headshot.jpg"
                 alt="Dean Miller"
                 fill
                 className="object-cover object-top"
-                sizes="44px"
+                sizes="64px"
               />
             </div>
             <div>
@@ -241,7 +241,7 @@ export function NarratedBySection({
             <HoverCard key={name} popup={<CoNarratorPopup {...detail} />}>
               <div className="flex items-center gap-3 cursor-default select-none">
                 <div
-                  className={`relative h-11 w-11 rounded-full overflow-hidden border border-white/15 shrink-0 flex items-center justify-center ${!detail.photo ? color : ""}`}
+                  className={`relative h-16 w-16 rounded-full overflow-hidden border border-white/15 shrink-0 flex items-center justify-center ${!detail.photo ? color : ""}`}
                 >
                   {detail.photo ? (
                     <Image
@@ -249,7 +249,7 @@ export function NarratedBySection({
                       alt={name}
                       fill
                       className="object-cover"
-                      sizes="44px"
+                      sizes="64px"
                     />
                   ) : (
                     <span className="text-xs font-bold text-white/80">{initials}</span>

@@ -71,6 +71,9 @@ alter table authors add column if not exists email text;
 -- email column on co_narrators table
 alter table co_narrators add column if not exists email text;
 
+-- released_at: publication date, auto-stamped when status transitions to "released"
+alter table board_cards add column if not exists released_at timestamptz;
+
 -- analytics events
 create table if not exists analytics_events (
   id         uuid        primary key default gen_random_uuid(),

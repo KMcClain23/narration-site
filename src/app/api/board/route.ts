@@ -173,9 +173,9 @@ export async function PUT(req: Request) {
       "subtitle", "tags", "description", "audible_link", "ar_link", "spotify_link",
       "word_count", "first15_due", "pfh_rate", "payment_type",
       "first_15_complete", "dean_message", "author_email", "author_token",
-      "email_updates_enabled", "script_url", "trigger_warnings",
+      "email_updates_enabled", "script_url", "trigger_warnings", "released_at",
     ];
-    const DATE_FIELDS = new Set(["deadline", "first15_due", "first_15_due"]);
+    const DATE_FIELDS = new Set(["deadline", "first15_due", "first_15_due", "released_at"]);
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
       if (key in fields) {
@@ -184,20 +184,37 @@ export async function PUT(req: Request) {
       }
     }
 
-    // Snapshot old status before update so we can log the change
+    // Snapshot old status before update so we can log the change and auto-stamp released_at
     let oldStatus: string | null = null;
+    let existingReleasedAt: string | null = null;
     if ("status" in fields) {
       const { data: cur } = await supabaseAdmin
-        .from("board_cards").select("status").eq("id", id).single();
+        .from("board_cards").select("status, released_at").eq("id", id).single();
       oldStatus = cur?.status ?? null;
+      existingReleasedAt = (cur as Record<string, unknown>)?.released_at as string ?? null;
+    }
+
+    // Auto-stamp released_at when transitioning to "released" and not already set.
+    // Only fires when the caller didn't explicitly supply released_at.
+    if (
+      fields.status === "released" &&
+      existingReleasedAt === null &&
+      !("released_at" in fields)
+    ) {
+      update.released_at = new Date().toISOString();
     }
 
     let { data, error } = await supabaseAdmin
       .from("board_cards").update(update).eq("id", id).select().single();
 
-    // If trigger_warnings column doesn't exist yet (migration not run), retry without it
+    // Retry shims for columns that may not exist yet (migration not run)
     if (error && error.message?.includes("trigger_warnings")) {
       delete update.trigger_warnings;
+      ({ data, error } = await supabaseAdmin
+        .from("board_cards").update(update).eq("id", id).select().single());
+    }
+    if (error && error.message?.includes("released_at")) {
+      delete update.released_at;
       ({ data, error } = await supabaseAdmin
         .from("board_cards").update(update).eq("id", id).select().single());
     }

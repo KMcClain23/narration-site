@@ -15,6 +15,7 @@ export type Book = {
   category: BookCategory;
   sort_order?: number;
   slug?: string;
+  released_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };

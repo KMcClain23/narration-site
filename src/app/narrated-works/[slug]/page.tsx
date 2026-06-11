@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AuthorHoverName, NarratedBySection } from "./NarratedBySection";
 import type { CoNarratorDetail } from "./NarratedBySection";
 import { TrackPageView } from "./TrackPageView";
-import { PlatformButtons } from "@/app/components/PlatformButtons";
+import { BookPlatformLinks } from "./BookPlatformLinks";
 import { SwipeNav } from "./SwipeNav";
 import { BookNavArrows } from "./BookNavArrows";
 import { PageTransition } from "./PageTransition";
@@ -32,12 +32,21 @@ function titleToSlug(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
+function spotifyEmbedUrl(url: string | undefined | null): string | null {
+  if (!url?.trim()) return null;
+  try {
+    const u = new URL(url);
+    if (!u.pathname.startsWith("/embed/")) u.pathname = "/embed" + u.pathname;
+    return u.toString();
+  } catch { return null; }
+}
+
 // ─── data fetching ────────────────────────────────────────────────────────────
 
 async function getBook(slug: string) {
   const { data } = await supabaseAdmin
     .from("board_cards")
-    .select("id, title, subtitle, author, author_notes, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status, trigger_warnings")
+    .select("id, title, subtitle, author, author_notes, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status, trigger_warnings, released_at")
     .in("status", ["contracted", "recording", "editing", "released"]);
   if (!data) return null;
   return data.find((card) => titleToSlug(card.title ?? "") === slug) ?? null;
@@ -46,7 +55,6 @@ async function getBook(slug: string) {
 async function getCoNarratorDetails(names: string[]): Promise<CoNarratorDetail[]> {
   if (!names.length) return [];
 
-  // Try with photo; fall back if column not yet migrated
   const withPhoto = await supabaseAdmin
     .from("co_narrators")
     .select("name, bio, photo")
@@ -112,19 +120,21 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   const book = await getBook(slug);
   if (!book) notFound();
 
-  // Fetch all books for prev/next navigation
+  // Fetch all books for prev/next navigation — include cover_url for thumbnails
   const { data: allBooksRaw } = await supabaseAdmin
     .from("board_cards")
-    .select("title")
+    .select("title, cover_url")
     .in("status", ["contracted", "recording", "editing", "released"])
     .order("sort_order", { ascending: true })
     .order("title",      { ascending: true });
   const allBooks = (allBooksRaw ?? []).filter(b => b.title);
   const currentIdx = allBooks.findIndex(b => titleToSlug(b.title) === slug);
-  const prevSlug = currentIdx > 0                   ? titleToSlug(allBooks[currentIdx - 1].title) : null;
-  const nextSlug = currentIdx < allBooks.length - 1 ? titleToSlug(allBooks[currentIdx + 1].title) : null;
+  const prevSlug  = currentIdx > 0                   ? titleToSlug(allBooks[currentIdx - 1].title) : null;
+  const nextSlug  = currentIdx < allBooks.length - 1 ? titleToSlug(allBooks[currentIdx + 1].title) : null;
   const prevTitle = currentIdx > 0                   ? allBooks[currentIdx - 1].title : null;
   const nextTitle = currentIdx < allBooks.length - 1 ? allBooks[currentIdx + 1].title : null;
+  const prevCover = currentIdx > 0                   ? (allBooks[currentIdx - 1].cover_url as string | null) : null;
+  const nextCover = currentIdx < allBooks.length - 1 ? (allBooks[currentIdx + 1].cover_url as string | null) : null;
 
   // Parse co-narrator (may be JSON string, array, or plain string)
   let coNarratorNames: string[] = [];
@@ -152,16 +162,24 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   const triggerWarnings: string[] = Array.isArray(book.trigger_warnings) ? book.trigger_warnings : [];
   const isReleased = book.status === "released";
 
+  // Release date — formatted for display
+  const releasedAt = (book as Record<string, unknown>).released_at as string | null ?? null;
+  const formattedDate = releasedAt
+    ? new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date(releasedAt))
+    : null;
+
+  // Spotify embed URL
+  const embedUrl = spotifyEmbedUrl(book.spotify_link);
+
   return (
     <main className="min-h-screen bg-[#06082E] text-white overflow-x-hidden">
       <TrackPageView slug={slug} title={book.title} author={book.author} />
 
       <SwipeNav prevSlug={prevSlug} nextSlug={nextSlug} />
 
-      {/* Book navigation arrows */}
       <BookNavArrows
-        prevSlug={prevSlug} prevTitle={prevTitle}
-        nextSlug={nextSlug} nextTitle={nextTitle}
+        prevSlug={prevSlug} prevTitle={prevTitle} prevCover={prevCover}
+        nextSlug={nextSlug} nextTitle={nextTitle} nextCover={nextCover}
       />
 
       <PageTransition>
@@ -180,7 +198,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
       <div className="max-w-5xl mx-auto px-5 sm:px-8 pb-16">
         <div className="grid md:grid-cols-[auto_1fr] gap-10 lg:gap-16 items-start">
 
-          {/* Cover — wrapper controls height; img fills it at natural width, no cropping */}
+          {/* Cover */}
           <div className="flex justify-center md:justify-end">
             <div className="h-[300px] sm:h-[360px] md:h-[420px] overflow-hidden rounded-2xl shadow-2xl border border-white/10">
               {book.cover_url ? (
@@ -204,11 +222,16 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
           {/* Details */}
           <div className="relative" itemScope itemType="https://schema.org/AudioObject">
 
-            {/* Status badge */}
+            {/* Status badge + release date */}
             {statusLabel && (
-              <span className={`inline-flex items-center text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border mb-4 ${statusStyle}`}>
-                {statusLabel}
-              </span>
+              <div className="flex items-center gap-2.5 mb-4">
+                <span className={`inline-flex items-center text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border ${statusStyle}`}>
+                  {statusLabel}
+                </span>
+                {formattedDate && (
+                  <span className="text-xs text-white/35 font-medium">· {formattedDate}</span>
+                )}
+              </div>
             )}
 
             <h1 className="text-3xl sm:text-4xl font-bold text-white leading-tight mb-2" itemProp="name">
@@ -222,12 +245,12 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
             {/* Author name — hover popup shows bio */}
             <AuthorHoverName name={book.author} bio={authorBio} />
 
-            {/* Tags */}
+            {/* Tags — reduced visual weight */}
             {tags.length > 0 && (
-              <div className="flex flex-nowrap overflow-x-auto scrollbar-hide gap-2 mb-6 pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
+              <div className="flex flex-nowrap overflow-x-auto scrollbar-hide gap-1.5 mb-6 pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
                 {tags.map(tag => (
                   <span key={tag}
-                    className="shrink-0 text-xs font-bold uppercase tracking-wide text-white/50 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
+                    className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-white/30 bg-white/[0.03] border border-white/[0.06] px-2.5 py-0.5 rounded-full">
                     {tag}
                   </span>
                 ))}
@@ -239,6 +262,21 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
               <p className="text-sm sm:text-base text-white/70 leading-relaxed mb-6 max-w-prose">
                 {book.description}
               </p>
+            )}
+
+            {/* Spotify embed */}
+            {embedUrl && (
+              <div className="mb-6 max-w-prose">
+                <iframe
+                  src={embedUrl}
+                  width="100%"
+                  height="152"
+                  frameBorder="0"
+                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                  loading="lazy"
+                  className="rounded-xl"
+                />
+              </div>
             )}
 
             {/* Trigger warnings */}
@@ -265,37 +303,40 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
               </details>
             )}
 
-            {/* Narrator / co-narrator row — hover popups for each person */}
+            {/* Narrator / co-narrator row */}
             <NarratedBySection
               coNarratorNames={coNarratorNames}
               coNarratorDetails={coNarratorDetails}
             />
 
-            {/* CTAs */}
+            {/* Platform pills + quote CTA */}
             <div className="flex flex-wrap gap-3">
-              <PlatformButtons
+              <BookPlatformLinks
                 audibleUrl={book.audible_link}
-                spotifyUrl={(book as Record<string, unknown>).spotify_link as string | undefined}
+                spotifyUrl={book.spotify_link}
                 arUrl={book.ar_link}
-                bookTitle={book.title}
               />
-              <Link href="/contact"
-                className="inline-flex items-center gap-2 border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 font-semibold px-6 py-3 rounded-full transition-colors text-sm">
-                Request a quote
-              </Link>
+              {!isReleased && (
+                <Link href="/contact"
+                  className="inline-flex items-center gap-2 border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 font-semibold px-6 py-3 rounded-full transition-colors text-sm">
+                  Request a quote
+                </Link>
+              )}
             </div>
 
           </div>
         </div>
 
-        {/* Bottom CTA */}
-        <div className="mt-16 border-t border-white/8 pt-8 sm:pt-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-white/35 text-sm">Interested in having your book narrated?</p>
-          <Link href="/contact"
-            className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-6 py-2.5 text-sm font-semibold hover:bg-[#E0C15A] transition">
-            Get in touch
-          </Link>
-        </div>
+        {/* Bottom CTA — hidden for completed books */}
+        {!isReleased && (
+          <div className="mt-16 border-t border-white/8 pt-8 sm:pt-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-white/35 text-sm">Interested in having your book narrated?</p>
+            <Link href="/contact"
+              className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-6 py-2.5 text-sm font-semibold hover:bg-[#E0C15A] transition">
+              Get in touch
+            </Link>
+          </div>
+        )}
       </div>
       </PageTransition>
     </main>
