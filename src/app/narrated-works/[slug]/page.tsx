@@ -198,8 +198,8 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
       <div className="max-w-5xl mx-auto px-5 sm:px-8 pb-16">
         <div className="grid md:grid-cols-[auto_1fr] gap-10 lg:gap-16 items-start">
 
-          {/* Cover */}
-          <div className="flex justify-center md:justify-end">
+          {/* Cover + Spotify embed */}
+          <div className="flex flex-col items-center md:items-end gap-4">
             <div className="h-[300px] sm:h-[360px] md:h-[420px] overflow-hidden rounded-2xl shadow-2xl border border-white/10">
               {book.cover_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -217,6 +217,19 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
                 </div>
               )}
             </div>
+            {embedUrl && (
+              <div className="w-full max-w-[300px] sm:max-w-[360px] md:max-w-none">
+                <iframe
+                  src={embedUrl}
+                  width="100%"
+                  height="152"
+                  frameBorder="0"
+                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                  loading="lazy"
+                  className="rounded-xl"
+                />
+              </div>
+            )}
           </div>
 
           {/* Details */}
@@ -262,21 +275,6 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
               <p className="text-sm sm:text-base text-white/70 leading-relaxed mb-6 max-w-prose">
                 {book.description}
               </p>
-            )}
-
-            {/* Spotify embed */}
-            {embedUrl && (
-              <div className="mb-6 max-w-prose">
-                <iframe
-                  src={embedUrl}
-                  width="100%"
-                  height="152"
-                  frameBorder="0"
-                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                  loading="lazy"
-                  className="rounded-xl"
-                />
-              </div>
             )}
 
             {/* Trigger warnings */}
