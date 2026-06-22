@@ -225,7 +225,10 @@ export default function ContractClient() {
     const bytes  = await blob.arrayBuffer();
     const pdfDoc = await PDFDocument.load(bytes);
     const form   = pdfDoc.getForm();
-    const p2     = pdfDoc.getPages()[1]; // Schedule A + Signatures
+    // react-pdf outputs pages in reverse order internally:
+    //   getPages()[0] = visual page 2 (Schedule A + Signatures)
+    //   getPages()[1] = visual page 1 (Agreement)
+    const p2     = pdfDoc.getPages()[0];
 
     const addField = (name: string, x: number, y: number, w: number, h = 13) => {
       const tf = form.createTextField(name);
@@ -256,12 +259,14 @@ export default function ContractClient() {
     if (isTemplate || !data.pickupRatePerHour)   addField("f.ratePerHr",      RX, 641 - 7 * ROW, CW);
 
     // ── Signature section ────────────────────────────────────────────────────
-    // sigSection starts ≈ 458pt from bottom; "Print Name:" line ≈ y=379,
-    // "Date:" line ≈ y=362. Left col x=54, right col x=306.
-    const NAME_Y = 379;
-    const DATE_Y = 362;
+    // Sig section starts after Schedule A + hrThin (≈ y=460 from bottom).
+    // sigRow has marginTop:22, text ~10pt, marginBottom:8 → Print Name at ≈ y=400.
+    // Date is 16pt below Print Name → ≈ y=384.
+    // "Print Name:" label ≈ 50pt wide; "Date:" label ≈ 28pt wide at 8pt font.
+    const NAME_Y = 400;
+    const DATE_Y = 384;
     const LC = 54;  // left sigCol start x
-    const RC = 306; // right sigCol start x  (54 + 236 + 16)
+    const RC = 306; // right sigCol start x
 
     if (isTemplate || !data.authorSignatureName)  addField("f.authorSigName",   LC + 50, NAME_Y, 160);
     if (isTemplate || !data.authorSignatureDate)   addField("f.authorSigDate",   LC + 28, DATE_Y, 160);
