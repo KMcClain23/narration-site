@@ -30,7 +30,6 @@ const REQUIRED: { key: keyof ContractData; label: string }[] = [
   { key: "authorName",        label: "Author Name" },
   { key: "bookTitle",         label: "Book Title" },
   { key: "rateAmount",        label: "Rate Amount" },
-  { key: "finishedHours",     label: "Estimated Finished Hours" },
   { key: "deliveryDeadline",  label: "Delivery Deadline" },
   { key: "authorSignatureName", label: "Author Signature Name" },
 ];
@@ -451,8 +450,8 @@ export default function ContractClient() {
               <Field label="Word Count">
                 <input type="number" value={form.wordCount} onChange={ev => set("wordCount", ev.target.value)} className={inp} placeholder="80000" />
               </Field>
-              <Field label="Estimated Finished Hours" required hasError={e("finishedHours")}>
-                <input type="number" step="0.5" value={form.finishedHours} onChange={ev => set("finishedHours", ev.target.value)} className={i("finishedHours")} placeholder="9.5" />
+              <Field label="Estimated Finished Hours">
+                <input type="number" step="0.5" value={form.finishedHours} onChange={ev => set("finishedHours", ev.target.value)} className={inp} placeholder="9.5" />
               </Field>
             </Row>
             <Row>
