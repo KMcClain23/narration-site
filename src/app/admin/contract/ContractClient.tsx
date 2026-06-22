@@ -149,6 +149,10 @@ export default function ContractClient() {
   useEffect(() => {
     const draft = loadDraft();
     if (draft) {
+      // Ensure sig name stays in sync with author name on draft restore
+      if (!draft.authorSignatureName || draft.authorSignatureName === draft.authorName) {
+        draft.authorSignatureName = draft.authorName;
+      }
       setForm(draft);
     } else {
       const num = newContractNumber();
@@ -170,6 +174,17 @@ export default function ContractClient() {
     const t = setTimeout(() => setPreviewData(form), 600);
     return () => clearTimeout(t);
   }, [form]);
+
+  // Keep authorSignatureName in sync with authorName unless manually diverged
+  useEffect(() => {
+    setForm(prev => {
+      if (!prev.authorSignatureName.trim() || prev.authorSignatureName === prev.authorName) {
+        return { ...prev, authorSignatureName: form.authorName };
+      }
+      return prev;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.authorName]);
 
   const set = useCallback(<K extends keyof ContractData>(k: K, v: ContractData[K]) => {
     setForm(prev => ({ ...prev, [k]: v }));
