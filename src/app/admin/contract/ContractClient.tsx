@@ -269,7 +269,7 @@ export default function ContractClient() {
       const safeAuthor = (form.authorName || "Author").replace(/[^a-zA-Z0-9]+/g, "-");
       const safeTitle  = (form.bookTitle  || "Contract").replace(/[^a-zA-Z0-9]+/g, "-");
       a.href     = url;
-      a.download = `DMN-${form.contractNumber}-${safeAuthor}-${safeTitle}.pdf`;
+      a.download = `${form.contractNumber}-${safeAuthor}-${safeTitle}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
