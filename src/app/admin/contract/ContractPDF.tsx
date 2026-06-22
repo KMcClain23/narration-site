@@ -88,10 +88,10 @@ const s = StyleSheet.create({
   sigSection:  { flexDirection: "row", marginTop: 28 },
   sigCol:      { flex: 1, marginRight: 16 },
   sigTitle:    { fontFamily: "Helvetica-Bold", fontSize: 9, marginBottom: 6 },
-  sigLine:     { borderBottom: "1pt solid #333", marginBottom: 3, marginTop: 22 },
   sigLabel:    { fontSize: 8, color: "#555" },
   sigSub:      { fontSize: 8, color: "#555", marginTop: 5 },
-  sigName:     { fontFamily: "Helvetica-Oblique", fontSize: 14, color: "#111", marginTop: 12, marginBottom: 2 },
+  sigName:     { fontFamily: "Helvetica-Oblique", fontSize: 14, color: "#111" },
+  sigRow:      { flexDirection: "row", alignItems: "baseline", gap: 6, marginTop: 22, marginBottom: 8 },
   // footer
   footer:      { position: "absolute", bottom: 22, left: 54, right: 54, textAlign: "center", fontSize: 7.5, color: "#999", borderTop: "0.5pt solid #ddd", paddingTop: 5 },
   pageNum:     { position: "absolute", bottom: 22, right: 54, fontSize: 7, color: "#bbb" },
@@ -333,9 +333,10 @@ export function ContractPDF({ data, template }: { data: ContractData; template?:
         <View style={s.sigSection}>
           <View style={s.sigCol}>
             <Text style={s.sigTitle}>AUTHOR / PUBLISHER</Text>
-            <View style={s.sigLine} />
-            <Text style={s.sigLabel}>Signature</Text>
-            <Text style={[s.sigSub, { marginTop: 10 }]}>
+            <View style={s.sigRow}>
+              <Text style={s.sigLabel}>Signature:</Text>
+            </View>
+            <Text style={[s.sigSub, { marginTop: 2 }]}>
               Print Name: {val(data.authorSignatureName, "________________________________")}
             </Text>
             <Text style={[s.sigSub, { marginTop: 6 }]}>
@@ -347,10 +348,11 @@ export function ContractPDF({ data, template }: { data: ContractData; template?:
           </View>
           <View style={s.sigCol}>
             <Text style={s.sigTitle}>NARRATOR</Text>
-            {!template && <Text style={s.sigName}>{narratorName}</Text>}
-            <View style={[s.sigLine, !template ? { marginTop: 4 } : {}]} />
-            <Text style={s.sigLabel}>Signature</Text>
-            <Text style={[s.sigSub, { marginTop: 10 }]}>
+            <View style={s.sigRow}>
+              <Text style={s.sigLabel}>Signature:</Text>
+              {!template && <Text style={s.sigName}>{narratorName}</Text>}
+            </View>
+            <Text style={[s.sigSub, { marginTop: 2 }]}>
               {`Print Name: ${narratorName} / ${narratorCompany}`}
             </Text>
             <Text style={[s.sigSub, { marginTop: 6 }]}>
