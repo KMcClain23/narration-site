@@ -93,7 +93,7 @@ function buildDefaults(): ContractData {
     rightsGranted:     "All narration recordings are works made for hire. All copyrights vest in Author upon receipt of full payment. Narrator retains the right to use excerpts per the Marketing Permissions section above.",
     authorSignatureName: "",
     authorSignatureDate: "",
-    narratorSignatureDate: "",
+    narratorSignatureDate: new Date().toISOString().split("T")[0],
   };
 }
 

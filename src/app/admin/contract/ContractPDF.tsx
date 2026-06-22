@@ -91,6 +91,7 @@ const s = StyleSheet.create({
   sigLine:     { borderBottom: "1pt solid #333", marginBottom: 3, marginTop: 22 },
   sigLabel:    { fontSize: 8, color: "#555" },
   sigSub:      { fontSize: 8, color: "#555", marginTop: 5 },
+  sigName:     { fontFamily: "Helvetica-Oblique", fontSize: 14, color: "#111", marginTop: 12, marginBottom: 2 },
   // footer
   footer:      { position: "absolute", bottom: 22, left: 54, right: 54, textAlign: "center", fontSize: 7.5, color: "#999", borderTop: "0.5pt solid #ddd", paddingTop: 5 },
   pageNum:     { position: "absolute", bottom: 22, right: 54, fontSize: 7, color: "#bbb" },
@@ -346,7 +347,8 @@ export function ContractPDF({ data, template }: { data: ContractData; template?:
           </View>
           <View style={s.sigCol}>
             <Text style={s.sigTitle}>NARRATOR</Text>
-            <View style={s.sigLine} />
+            {!template && <Text style={s.sigName}>{narratorName}</Text>}
+            <View style={[s.sigLine, !template ? { marginTop: 4 } : {}]} />
             <Text style={s.sigLabel}>Signature</Text>
             <Text style={[s.sigSub, { marginTop: 10 }]}>
               {`Print Name: ${narratorName} / ${narratorCompany}`}
