@@ -176,6 +176,14 @@ export default function ContractClient() {
     return () => clearTimeout(t);
   }, [form]);
 
+  // Auto-calculate finishedHours from wordCount (9,300 words per finished hour)
+  useEffect(() => {
+    const wc = parseFloat(form.wordCount);
+    if (!wc || isNaN(wc)) return;
+    set("finishedHours", (wc / 9300).toFixed(1));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.wordCount]);
+
   // Keep authorSignatureName in sync with authorName unless manually diverged
   useEffect(() => {
     setForm(prev => {
@@ -405,8 +413,8 @@ export default function ContractClient() {
               <Field label="Word Count">
                 <input type="number" value={form.wordCount} onChange={ev => set("wordCount", ev.target.value)} className={inp} placeholder="80000" />
               </Field>
-              <Field label="Estimated Finished Hours">
-                <input type="number" step="0.5" value={form.finishedHours} onChange={ev => set("finishedHours", ev.target.value)} className={inp} placeholder="9.5" />
+              <Field label={`Estimated Finished Hours${form.wordCount ? " (auto)" : ""}`}>
+                <input type="number" step="0.1" value={form.finishedHours} onChange={ev => set("finishedHours", ev.target.value)} className={inp} placeholder="9.5" />
               </Field>
             </Row>
             <Row>
