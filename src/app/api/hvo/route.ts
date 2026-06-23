@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     const { error } = await resend.emails.send({
       from,
-      to: "deanmillernarrator@gmail.com",
+      to: "dean@dmnarration.com",
       replyTo: email,
       subject: `HVO Submission: ${bookTitle} — ${authorName}`,
       html: `

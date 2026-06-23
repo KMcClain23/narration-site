@@ -44,7 +44,7 @@ export default function TermsOfService() {
 
           <section>
             <h2 className="text-white font-bold text-base mb-2">Contact</h2>
-            <p>Questions? Reach us at <a href="mailto:deanmillernarrator@gmail.com" className="text-[#D4AF37] hover:underline">deanmillernarrator@gmail.com</a>.</p>
+            <p>Questions? Reach us at <a href="mailto:dean@dmnarration.com" className="text-[#D4AF37] hover:underline">dean@dmnarration.com</a>.</p>
           </section>
         </div>
       </div>
