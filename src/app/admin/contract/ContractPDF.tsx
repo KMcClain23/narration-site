@@ -37,7 +37,7 @@ export interface ContractData {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const fmtDate = (d: string) => {
-  if (!d) return "_______________";
+  if (!d) return "";
   try {
     return new Date(d + "T12:00:00").toLocaleDateString("en-US", {
       month: "long", day: "numeric", year: "numeric",
@@ -112,7 +112,7 @@ function SchField({ label, value }: { label: string; value: string }) {
   return (
     <View style={s.schRow}>
       <Text style={s.schLabel}>{label}</Text>
-      <Text style={s.schValue}>{value || "________________________"}</Text>
+      <Text style={s.schValue}>{value || ""}</Text>
     </View>
   );
 }
@@ -337,10 +337,10 @@ export function ContractPDF({ data, template }: { data: ContractData; template?:
               <Text style={s.sigLabel}>Signature:</Text>
             </View>
             <Text style={[s.sigSub, { marginTop: 2 }]}>
-              Print Name: {val(data.authorSignatureName, "________________________________")}
+              Print Name: {val(data.authorSignatureName, "")}
             </Text>
             <Text style={[s.sigSub, { marginTop: 6 }]}>
-              Date: {data.authorSignatureDate ? fmtDate(data.authorSignatureDate) : "________________________________"}
+              Date: {fmtDate(data.authorSignatureDate)}
             </Text>
             {data.authorAddress && (
               <Text style={[s.sigSub, { marginTop: 6 }]}>Address: {data.authorAddress}</Text>
@@ -356,7 +356,7 @@ export function ContractPDF({ data, template }: { data: ContractData; template?:
               {`Print Name: ${narratorName} / ${narratorCompany}`}
             </Text>
             <Text style={[s.sigSub, { marginTop: 6 }]}>
-              Date: {data.narratorSignatureDate ? fmtDate(data.narratorSignatureDate) : "________________________________"}
+              Date: {fmtDate(data.narratorSignatureDate)}
             </Text>
           </View>
         </View>
