@@ -157,11 +157,12 @@ export function ContractPDF({ data, template }: { data: ContractData; template?:
   const narratorEmail   = template ? "________________________" : "dean@dmnarration.com";
   const narratorSite    = template ? "" : " · dmnarration.com";
 
-  // Estimated total (PFH only)
+  // Estimated total (PFH only); halved for Duet since narrator covers ~half the book
   const rate  = parseFloat(data.rateAmount);
   const hours = parseFloat(data.finishedHours);
+  const isDuet = data.narrationStyle === "Duet";
   const estimatedTotal = (data.rateType === "Per Finished Hour" && !isNaN(rate) && !isNaN(hours))
-    ? rate * hours : null;
+    ? (isDuet ? (rate * hours) / 2 : rate * hours) : null;
 
   const rateDisplay = data.rateAmount
     ? `$${data.rateAmount}${data.rateType === "Per Finished Hour" ? " / finished hour" : ` (${data.rateType})`}`
@@ -205,7 +206,7 @@ export function ContractPDF({ data, template }: { data: ContractData; template?:
               <View style={s.sumCol}>
                 <SumField label="Est. Hours"   value={data.finishedHours ? `${data.finishedHours} hrs` : "—"} />
                 {estimatedTotal !== null && (
-                  <SumField label="Est. Total" value={`$${estimatedTotal.toFixed(2)}`} bold />
+                  <SumField label={isDuet ? "Est. Narrator Total" : "Est. Total"} value={`$${estimatedTotal.toFixed(2)}`} bold />
                 )}
                 <SumField label="Start Date"   value={fmtDate(data.recordingStart)} />
                 <SumField label="Delivery"     value={fmtDate(data.deliveryDeadline)} />
@@ -307,7 +308,7 @@ export function ContractPDF({ data, template }: { data: ContractData; template?:
             <SchField label="Narration Style"     value={data.narrationStyle} />
             {showChars && <SchField label="Characters / Roles" value={data.characters} />}
             {estimatedTotal !== null && (
-              <SchField label="Estimated Total" value={`$${estimatedTotal.toFixed(2)}`} />
+              <SchField label={isDuet ? "Est. Narrator Total" : "Estimated Total"} value={`$${estimatedTotal.toFixed(2)}`} />
             )}
           </View>
           <View style={s.col}>

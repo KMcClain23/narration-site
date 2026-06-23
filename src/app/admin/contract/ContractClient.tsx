@@ -202,11 +202,13 @@ export default function ContractClient() {
   // Computed
   const errors        = useMemo(() => getErrors(form), [form]);
   const showChars     = form.narrationStyle === "Duet" || form.narrationStyle === "Multicast";
+  const isDuet = form.narrationStyle === "Duet";
   const estimatedTotal = useMemo(() => {
     if (form.rateType !== "Per Finished Hour") return null;
     const r = parseFloat(form.rateAmount), h = parseFloat(form.finishedHours);
-    return !isNaN(r) && !isNaN(h) ? r * h : null;
-  }, [form.rateType, form.rateAmount, form.finishedHours]);
+    if (isNaN(r) || isNaN(h)) return null;
+    return isDuet ? (r * h) / 2 : r * h;
+  }, [form.rateType, form.rateAmount, form.finishedHours, isDuet]);
 
   // Field error helper
   const e = (k: keyof ContractData) => attempted && !String(form[k] ?? "").trim();
@@ -448,7 +450,10 @@ export default function ContractClient() {
             {/* Estimated total */}
             {estimatedTotal !== null && (
               <div className="flex items-center justify-between bg-[#D4AF37]/7 border border-[#D4AF37]/25 rounded-xl px-4 py-3">
-                <span className="text-xs text-white/55">Estimated Project Total ({form.finishedHours} hrs × ${form.rateAmount})</span>
+                <span className="text-xs text-white/55">
+                  {isDuet ? "Est. Narrator Total (½ duet)" : "Estimated Project Total"}{" "}
+                  ({form.finishedHours} hrs × ${form.rateAmount}{isDuet ? " ÷ 2" : ""})
+                </span>
                 <span className="text-base font-bold text-[#D4AF37]">${estimatedTotal.toFixed(2)}</span>
               </div>
             )}
