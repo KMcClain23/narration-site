@@ -18,6 +18,7 @@ export interface ContractData {
   rateAmount: string;
   paymentSchedule: string;
   recordingStart: string;
+  first15Due: string;
   deliveryDeadline: string;
   pronunciationReceived: boolean;
   pronunciationDate: string;
@@ -313,6 +314,7 @@ export function ContractPDF({ data, template }: { data: ContractData; template?:
             <SchField label="Rate Type"           value={data.rateType} />
             <SchField label="Rate Amount"         value={data.rateAmount ? `$${data.rateAmount}` : ""} />
             <SchField label="Recording Start"     value={fmtDate(data.recordingStart)} />
+            <SchField label="First 15 Min. Due"   value={fmtDate(data.first15Due)} />
             <SchField label="Delivery Deadline"   value={fmtDate(data.deliveryDeadline)} />
             <SchField label="Pronunciation Guide" value={data.pronunciationReceived ? `Yes — ${fmtDate(data.pronunciationDate)}` : `No — email to ${narratorEmail}`} />
             <SchField label="Included Pickups"    value={`${val(data.pickupDays, "30")} days after delivery`} />

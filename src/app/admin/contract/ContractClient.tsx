@@ -79,6 +79,7 @@ function buildDefaults(): ContractData {
     rateAmount:        "",
     paymentSchedule:   "Payment due in full within 14 days of final file delivery.",
     recordingStart:    "",
+    first15Due:        "",
     deliveryDeadline:  "",
     pronunciationReceived: false,
     pronunciationDate: "",
@@ -455,6 +456,11 @@ export default function ContractClient() {
             <Field label="Recording Start Date">
               <input type="date" value={form.recordingStart} onChange={ev => set("recordingStart", ev.target.value)} className={inp} />
             </Field>
+            <Field label="First 15 Minutes Due">
+              <input type="date" value={form.first15Due} onChange={ev => set("first15Due", ev.target.value)} className={inp} />
+            </Field>
+          </Row>
+          <Row>
             <Field label="Delivery Deadline" required hasError={e("deliveryDeadline")}>
               <input type="date" value={form.deliveryDeadline} onChange={ev => set("deliveryDeadline", ev.target.value)} className={i("deliveryDeadline")} />
             </Field>
