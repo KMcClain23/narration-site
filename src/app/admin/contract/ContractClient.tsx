@@ -213,79 +213,14 @@ export default function ContractClient() {
     return pdf(<ContractPDF data={form} />).toBlob();
   };
 
-  // Post-process a react-pdf blob to add AcroForm text fields over blank spots.
-  // Coordinates are in pdf-lib convention: x/y from bottom-left, Letter 612×792pt.
-  // paddingTop=44, paddingHorizontal=54, PageHeader≈64pt, schedTitle≈27pt.
-  const addAcroFormFields = async (
-    blob: Blob,
-    data: ContractData,
-    isTemplate: boolean,
-  ): Promise<Blob> => {
-    const { PDFDocument } = await import("pdf-lib");
-    const bytes  = await blob.arrayBuffer();
-    const pdfDoc = await PDFDocument.load(bytes);
-    const form   = pdfDoc.getForm();
-    // react-pdf outputs pages in reverse order internally:
-    //   getPages()[0] = visual page 2 (Schedule A + Signatures)
-    //   getPages()[1] = visual page 1 (Agreement)
-    const p2     = pdfDoc.getPages()[0];
-
-    const addField = (name: string, x: number, y: number, w: number, h = 13) => {
-      const tf = form.createTextField(name);
-      tf.addToPage(p2, { x, y, width: w, height: h, borderWidth: 0 });
-      tf.setFontSize(9);
-    };
-
-    // ── Schedule A rows ─────────────────────────────────────────────────────
-    // Row 0 bottom ≈ y=641 (from page bottom), each row ≈ 16.3pt tall.
-    const ROW = 16.3;
-    const LX  = 194; // left col value x  (54 + 140pt label)
-    const RX  = 456; // right col value x (316 + 140pt label)
-    const CW  = 100; // value column width
-
-    // Left column
-    if (isTemplate || !data.bookTitle)           addField("f.bookTitle",      LX, 641 - 0 * ROW, CW);
-    if (isTemplate || !data.authorName)          addField("f.authorName",     LX, 641 - 1 * ROW, CW);
-    if (isTemplate)                              addField("f.narratorName",   LX, 641 - 2 * ROW, CW);
-    if (isTemplate || !data.genre)               addField("f.genre",          LX, 641 - 3 * ROW, CW);
-    if (isTemplate || !data.wordCount)           addField("f.wordCount",      LX, 641 - 4 * ROW, CW);
-    if (isTemplate || !data.finishedHours)       addField("f.finishedHours",  LX, 641 - 5 * ROW, CW);
-
-    // Right column
-    if (isTemplate || !data.rateAmount)          addField("f.rateAmount",     RX, 641 - 1 * ROW, CW);
-    if (isTemplate || !data.recordingStart)      addField("f.recordingStart", RX, 641 - 2 * ROW, CW);
-    if (isTemplate || !data.deliveryDeadline)    addField("f.deliverBy",      RX, 641 - 3 * ROW, CW);
-    if (isTemplate || !data.pickupRatePerMinute) addField("f.ratePerMin",     RX, 641 - 6 * ROW, CW);
-    if (isTemplate || !data.pickupRatePerHour)   addField("f.ratePerHr",      RX, 641 - 7 * ROW, CW);
-
-    // ── Signature section ────────────────────────────────────────────────────
-    // Sig section starts after Schedule A + hrThin (≈ y=460 from bottom).
-    // sigRow has marginTop:22, text ~10pt, marginBottom:8 → Print Name at ≈ y=400.
-    // Date is 16pt below Print Name → ≈ y=384.
-    // "Print Name:" label ≈ 50pt wide; "Date:" label ≈ 28pt wide at 8pt font.
-    const NAME_Y = 400;
-    const DATE_Y = 384;
-    const LC = 54;  // left sigCol start x
-    const RC = 306; // right sigCol start x
-
-    if (isTemplate || !data.authorSignatureName)  addField("f.authorSigName",   LC + 50, NAME_Y, 160);
-    if (isTemplate || !data.authorSignatureDate)   addField("f.authorSigDate",   LC + 28, DATE_Y, 160);
-    if (isTemplate)                                addField("f.narratorSigName", RC + 50, NAME_Y, 170);
-    if (isTemplate || !data.narratorSignatureDate) addField("f.narratorSigDate", RC + 28, DATE_Y, 160);
-
-    const modified = await pdfDoc.save();
-    return new Blob([modified.buffer as ArrayBuffer], { type: "application/pdf" });
-  };
-
   const handleDownload = async () => {
     setAttempted(true);
     if (errors.length > 0) return;
     setGenerating(true);
     try {
-      const blob     = await generatePDF();
-      const fillable = await addAcroFormFields(blob, form, false);
-      const url      = URL.createObjectURL(fillable);
-      const a        = document.createElement("a");
+      const blob = await generatePDF();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
       const safeAuthor = (form.authorName || "Author").replace(/[^a-zA-Z0-9]+/g, "-");
       const safeTitle  = (form.bookTitle  || "Contract").replace(/[^a-zA-Z0-9]+/g, "-");
       a.href     = url;
@@ -328,9 +263,8 @@ export default function ContractClient() {
         contractNumber: "",
         creditLanguage: "Narrator shall be credited as '________________' wherever narrator credits are displayed, including retail product pages, press releases, and marketing materials.",
       };
-      const blob     = await pdf(<ContractPDF data={templateData} template />).toBlob();
-      const fillable = await addAcroFormFields(blob, templateData, true);
-      const url      = URL.createObjectURL(fillable);
+      const blob = await pdf(<ContractPDF data={templateData} template />).toBlob();
+      const url  = URL.createObjectURL(blob);
       const a        = document.createElement("a");
       a.href     = url;
       a.download = "Generic-Audiobook-Narration-Agreement.pdf";
