@@ -77,10 +77,11 @@ export async function GET() {
 
     const primary = await supabaseAdmin
       .from("board_cards")
-      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, slug")
+      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, slug, deadline")
       .in("status", STATUS_FILTER)
-      .order("sort_order", { ascending: true })
-      .order("title",      { ascending: true });
+      .order("deadline",    { ascending: true, nullsFirst: false })
+      .order("sort_order",  { ascending: true })
+      .order("title",       { ascending: true });
 
     let rows: Record<string, unknown>[];
 
@@ -89,8 +90,9 @@ export async function GET() {
       // Retry without slug
       const fallback = await supabaseAdmin
         .from("board_cards")
-        .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status")
+        .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, deadline")
         .in("status", STATUS_FILTER)
+        .order("deadline",   { ascending: true, nullsFirst: false })
         .order("sort_order", { ascending: true })
         .order("title",      { ascending: true });
 
