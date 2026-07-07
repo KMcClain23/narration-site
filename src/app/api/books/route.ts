@@ -77,9 +77,8 @@ export async function GET() {
 
     const primary = await supabaseAdmin
       .from("board_cards")
-      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, slug, deadline")
+      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, slug, deadline, first15_due, first_15_complete")
       .in("status", STATUS_FILTER)
-      .order("deadline",    { ascending: true, nullsFirst: false })
       .order("sort_order",  { ascending: true })
       .order("title",       { ascending: true });
 
@@ -90,9 +89,8 @@ export async function GET() {
       // Retry without slug
       const fallback = await supabaseAdmin
         .from("board_cards")
-        .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, deadline")
+        .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, deadline, first15_due, first_15_complete")
         .in("status", STATUS_FILTER)
-        .order("deadline",   { ascending: true, nullsFirst: false })
         .order("sort_order", { ascending: true })
         .order("title",      { ascending: true });
 
@@ -104,6 +102,23 @@ export async function GET() {
     } else {
       rows = (primary.data || []) as Record<string, unknown>[];
     }
+
+    // Order by the earliest upcoming milestone — First 15 due date if not yet
+    // complete, otherwise the full deadline — so cards line up by what's
+    // actually due soonest, mirroring the internal board's sort logic.
+    const earliestDue = (row: Record<string, unknown>): number => {
+      const deadline = row.deadline as string | null;
+      const first15Due = row.first_15_complete ? null : (row.first15_due as string | null);
+      const candidates = [first15Due, deadline].filter(Boolean).map((d) => new Date(d as string).getTime());
+      return candidates.length ? Math.min(...candidates) : Infinity;
+    };
+    rows.sort((a, b) => {
+      const diff = earliestDue(a) - earliestDue(b);
+      if (diff !== 0) return diff;
+      const sortDiff = ((a.sort_order as number) || 0) - ((b.sort_order as number) || 0);
+      if (sortDiff !== 0) return sortDiff;
+      return String(a.title).localeCompare(String(b.title));
+    });
 
     const books = mapCards(rows);
 
