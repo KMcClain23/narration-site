@@ -326,6 +326,16 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
           </div>
         </div>
 
+        {/* Full cast — only for multicast books; linked from the compact "+N co-narrators" pill above */}
+        {coNarratorNames.length > 1 && (
+          <div id="full-cast" className="mt-4 border-t border-white/8 pt-8">
+            <NarratedBySection
+              coNarratorNames={coNarratorNames}
+              coNarratorDetails={coNarratorDetails}
+            />
+          </div>
+        )}
+
         {/* Bottom CTA — hidden for completed books */}
         {!isReleased && (
           <div className="mt-16 border-t border-white/8 pt-8 sm:pt-10 flex flex-col sm:flex-row items-center justify-between gap-4">

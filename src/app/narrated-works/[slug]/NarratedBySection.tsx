@@ -275,9 +275,16 @@ export function NarratedBySection({
           </div>
         </HoverCard>
 
-        {/* Co-narrators — 2-column grid when multicast, inline otherwise */}
+        {/* Multicast links out to the full-cast section below instead of rendering
+            a tall grid here — a grid of avatars under the cover made the left column
+            overshoot the details column's height, especially for short descriptions. */}
         {isMulticast ? (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 w-full">{coNarratorNodes}</div>
+          <a
+            href="#full-cast"
+            className="mt-0.5 text-[11px] font-semibold text-[#D4AF37]/70 hover:text-[#D4AF37] transition-colors underline underline-offset-2"
+          >
+            + {coNarratorNames.length} co-narrators
+          </a>
         ) : (
           coNarratorNodes
         )}
