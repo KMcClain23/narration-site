@@ -212,11 +212,11 @@ export function NarratedBySection({
   const wrapGap = compact ? "gap-4" : "gap-5";
 
   return (
-    <div className={compact ? "mb-4" : "mb-8"}>
-      <p className="text-[10px] uppercase tracking-[0.22em] text-white/35 font-semibold mb-3">
+    <div className={compact ? "mb-4 flex flex-col items-center" : "mb-8"}>
+      <p className={`text-[10px] uppercase tracking-[0.22em] text-white/35 font-semibold mb-3 ${compact ? "text-center" : ""}`}>
         Narrated by
       </p>
-      <div className={`flex flex-wrap items-center ${wrapGap}`}>
+      <div className={`flex flex-wrap items-center ${compact ? "justify-center" : ""} ${wrapGap}`}>
 
         {/* Dean Miller */}
         <HoverCard popup={<DeanPopup />}>
