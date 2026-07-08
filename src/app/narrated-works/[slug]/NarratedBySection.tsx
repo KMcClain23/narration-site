@@ -210,13 +210,16 @@ export function NarratedBySection({
   const roleText = compact ? "text-[10px]" : "text-[11px]";
   const rowGap = compact ? "gap-2.5" : "gap-3";
   const wrapGap = compact ? "gap-4" : "gap-5";
+  // Multicast (2+ co-narrators) stacks vertically instead of wrapping wide —
+  // a horizontal row of many avatars blows out the narrow cover column.
+  const isMulticast = compact && coNarratorNames.length > 1;
 
   return (
     <div className={compact ? "mb-4 flex flex-col items-center" : "mb-8"}>
       <p className={`text-[10px] uppercase tracking-[0.22em] text-white/35 font-semibold mb-3 ${compact ? "text-center" : ""}`}>
         Narrated by
       </p>
-      <div className={`flex flex-wrap items-center ${compact ? "justify-center" : ""} ${wrapGap}`}>
+      <div className={isMulticast ? "flex flex-col items-center gap-3" : `flex flex-wrap items-center ${compact ? "justify-center" : ""} ${wrapGap}`}>
 
         {/* Dean Miller */}
         <HoverCard popup={<DeanPopup />}>
