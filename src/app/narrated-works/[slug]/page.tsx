@@ -219,6 +219,21 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
                 </div>
               )}
             </div>
+
+            {embedUrl && (
+              <div className="w-full max-w-[300px] sm:max-w-[360px] md:max-w-none">
+                <iframe
+                  src={embedUrl}
+                  width="100%"
+                  height="152"
+                  frameBorder="0"
+                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                  loading="lazy"
+                  className="rounded-xl"
+                />
+              </div>
+            )}
+
             {/* Narrator / co-narrator row + platform links — sits directly under the cover, always centered under it */}
             <div className="w-full max-w-[300px] sm:max-w-[360px] flex flex-col items-center">
               <NarratedBySection
@@ -240,20 +255,6 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
                 )}
               </div>
             </div>
-
-            {embedUrl && (
-              <div className="w-full max-w-[300px] sm:max-w-[360px] md:max-w-none">
-                <iframe
-                  src={embedUrl}
-                  width="100%"
-                  height="152"
-                  frameBorder="0"
-                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                  loading="lazy"
-                  className="rounded-xl"
-                />
-              </div>
-            )}
           </div>
 
           {/* Details */}
