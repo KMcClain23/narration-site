@@ -214,6 +214,41 @@ export function NarratedBySection({
   // a horizontal row of many avatars blows out the narrow cover column.
   const isMulticast = compact && coNarratorNames.length > 1;
 
+  const coNarratorNodes = coNarratorNames.map(name => {
+    const detail = coNarratorDetails.find(d => d.name === name) ?? {
+      name,
+      photo: null,
+      bio: null,
+    };
+    const color = avatarColor(name);
+    const initials = getInitials(name);
+    return (
+      <HoverCard key={name} popup={<CoNarratorPopup {...detail} />}>
+        <div className={`flex items-center ${rowGap} cursor-default select-none`}>
+          <div
+            className={`relative ${avatarSize} rounded-full overflow-hidden border border-white/15 shrink-0 flex items-center justify-center ${!detail.photo ? color : ""}`}
+          >
+            {detail.photo ? (
+              <Image
+                src={detail.photo}
+                alt={name}
+                fill
+                className="object-cover"
+                sizes={avatarSizePx}
+              />
+            ) : (
+              <span className="text-xs font-bold text-white/80">{initials}</span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className={`${nameText} font-semibold text-white leading-tight truncate`}>{name}</p>
+            <p className={`${roleText} text-white/40 leading-tight`}>Co-Narrator</p>
+          </div>
+        </div>
+      </HoverCard>
+    );
+  });
+
   return (
     <div className={compact ? "mb-4 flex flex-col items-center" : "mb-8"}>
       <p className={`text-[10px] uppercase tracking-[0.22em] text-white/35 font-semibold mb-3 ${compact ? "text-center" : ""}`}>
@@ -240,41 +275,12 @@ export function NarratedBySection({
           </div>
         </HoverCard>
 
-        {/* Co-narrators */}
-        {coNarratorNames.map(name => {
-          const detail = coNarratorDetails.find(d => d.name === name) ?? {
-            name,
-            photo: null,
-            bio: null,
-          };
-          const color = avatarColor(name);
-          const initials = getInitials(name);
-          return (
-            <HoverCard key={name} popup={<CoNarratorPopup {...detail} />}>
-              <div className={`flex items-center ${rowGap} cursor-default select-none`}>
-                <div
-                  className={`relative ${avatarSize} rounded-full overflow-hidden border border-white/15 shrink-0 flex items-center justify-center ${!detail.photo ? color : ""}`}
-                >
-                  {detail.photo ? (
-                    <Image
-                      src={detail.photo}
-                      alt={name}
-                      fill
-                      className="object-cover"
-                      sizes={avatarSizePx}
-                    />
-                  ) : (
-                    <span className="text-xs font-bold text-white/80">{initials}</span>
-                  )}
-                </div>
-                <div>
-                  <p className={`${nameText} font-semibold text-white leading-tight`}>{name}</p>
-                  <p className={`${roleText} text-white/40 leading-tight`}>Co-Narrator</p>
-                </div>
-              </div>
-            </HoverCard>
-          );
-        })}
+        {/* Co-narrators — 2-column grid when multicast, inline otherwise */}
+        {isMulticast ? (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 w-full">{coNarratorNodes}</div>
+        ) : (
+          coNarratorNodes
+        )}
 
       </div>
     </div>

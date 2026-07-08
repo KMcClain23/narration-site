@@ -218,7 +218,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
               )}
             </div>
             {/* Narrator / co-narrator row + platform links — sits directly under the cover, always centered under it */}
-            <div className="w-full max-w-[300px] sm:max-w-[360px] md:max-w-none flex flex-col items-center">
+            <div className="w-full max-w-[300px] sm:max-w-[360px] flex flex-col items-center">
               <NarratedBySection
                 coNarratorNames={coNarratorNames}
                 coNarratorDetails={coNarratorDetails}
