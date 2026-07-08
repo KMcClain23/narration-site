@@ -1623,12 +1623,18 @@ export default function BoardPage() {
   const uploadCover = async (file: File) => {
     setUploadingCover(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/upload-cover", { method: "POST", body: fd });
-      const data = await res.json();
-      if (data.coverUrl) setForm(p => ({ ...p, cover_url: data.coverUrl }));
-      else setError(data.error || "Cover upload failed.");
+      const urlRes = await fetch("/api/upload-cover/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, contentType: file.type }),
+      });
+      const urlData = await urlRes.json();
+      if (!urlRes.ok) { setError(urlData.error || "Cover upload failed."); setUploadingCover(false); return; }
+
+      const putRes = await fetch(urlData.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+      if (!putRes.ok) { setError("Cover upload failed."); setUploadingCover(false); return; }
+
+      setForm(p => ({ ...p, cover_url: urlData.publicUrl }));
     } catch { setError("Cover upload failed."); }
     setUploadingCover(false);
   };

@@ -298,21 +298,26 @@ export default function AdminPage() {
       return existingCoverUrl || "";
     }
 
-    const imageFormData = new FormData();
-    imageFormData.append("file", coverFile);
-
-    const uploadResponse = await fetch("/api/upload-cover", {
+    const urlResponse = await fetch("/api/upload-cover/upload-url", {
       method: "POST",
-      body: imageFormData,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: coverFile.name, contentType: coverFile.type }),
     });
-
-    const uploadResult = await uploadResponse.json();
-
-    if (!uploadResponse.ok) {
-      throw new Error(uploadResult.error || "Failed to upload cover.");
+    const urlResult = await urlResponse.json();
+    if (!urlResponse.ok) {
+      throw new Error(urlResult.error || "Failed to upload cover.");
     }
 
-    return uploadResult.coverUrl as string;
+    const putResponse = await fetch(urlResult.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": coverFile.type },
+      body: coverFile,
+    });
+    if (!putResponse.ok) {
+      throw new Error("Failed to upload cover.");
+    }
+
+    return urlResult.publicUrl as string;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
