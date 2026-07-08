@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AuthorHoverName, NarratedBySection } from "./NarratedBySection";
 import type { CoNarratorDetail } from "./NarratedBySection";
+import { FullCastProvider, FullCastPanel } from "./FullCastToggle";
 import { TrackPageView } from "./TrackPageView";
 import { BookPlatformLinks } from "./BookPlatformLinks";
 import { SwipeNav } from "./SwipeNav";
@@ -196,6 +197,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
 
       {/* Hero */}
       <div className="max-w-5xl mx-auto px-5 sm:px-8 pb-16">
+        <FullCastProvider>
         <div className="grid md:grid-cols-[auto_1fr] gap-10 lg:gap-16 items-start">
 
           {/* Cover + Spotify embed */}
@@ -326,15 +328,16 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
           </div>
         </div>
 
-        {/* Full cast — only for multicast books; linked from the compact "+N co-narrators" pill above */}
+        {/* Full cast — only for multicast books; toggled by the compact "+N co-narrators" pill above */}
         {coNarratorNames.length > 1 && (
-          <div id="full-cast" className="mt-4 border-t border-white/8 pt-8">
+          <FullCastPanel>
             <NarratedBySection
               coNarratorNames={coNarratorNames}
               coNarratorDetails={coNarratorDetails}
             />
-          </div>
+          </FullCastPanel>
         )}
+        </FullCastProvider>
 
         {/* Bottom CTA — hidden for completed books */}
         {!isReleased && (
