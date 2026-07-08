@@ -217,6 +217,28 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
                 </div>
               )}
             </div>
+            {/* Narrator / co-narrator row + platform links — sits directly under the cover */}
+            <div className="w-full max-w-[300px] sm:max-w-[360px] md:max-w-none">
+              <NarratedBySection
+                coNarratorNames={coNarratorNames}
+                coNarratorDetails={coNarratorDetails}
+                compact
+              />
+              <div className="flex flex-wrap gap-3">
+                <BookPlatformLinks
+                  audibleUrl={book.audible_link}
+                  spotifyUrl={book.spotify_link}
+                  arUrl={book.ar_link}
+                />
+                {!isReleased && (
+                  <Link href="/contact"
+                    className="inline-flex items-center gap-2 border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 font-semibold px-6 py-3 rounded-full transition-colors text-sm">
+                    Request a quote
+                  </Link>
+                )}
+              </div>
+            </div>
+
             {embedUrl && (
               <div className="w-full max-w-[300px] sm:max-w-[360px] md:max-w-none">
                 <iframe
@@ -300,27 +322,6 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
                 </div>
               </details>
             )}
-
-            {/* Narrator / co-narrator row */}
-            <NarratedBySection
-              coNarratorNames={coNarratorNames}
-              coNarratorDetails={coNarratorDetails}
-            />
-
-            {/* Platform pills + quote CTA */}
-            <div className="flex flex-wrap gap-3">
-              <BookPlatformLinks
-                audibleUrl={book.audible_link}
-                spotifyUrl={book.spotify_link}
-                arUrl={book.ar_link}
-              />
-              {!isReleased && (
-                <Link href="/contact"
-                  className="inline-flex items-center gap-2 border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 font-semibold px-6 py-3 rounded-full transition-colors text-sm">
-                  Request a quote
-                </Link>
-              )}
-            </div>
 
           </div>
         </div>

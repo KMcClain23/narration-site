@@ -198,32 +198,41 @@ export function AuthorHoverName({ name, bio }: { name: string; bio: string | nul
 export function NarratedBySection({
   coNarratorNames,
   coNarratorDetails,
+  compact = false,
 }: {
   coNarratorNames: string[];
   coNarratorDetails: CoNarratorDetail[];
+  compact?: boolean;
 }) {
+  const avatarSize = compact ? "h-10 w-10" : "h-16 w-16";
+  const avatarSizePx = compact ? "40px" : "64px";
+  const nameText = compact ? "text-xs" : "text-sm";
+  const roleText = compact ? "text-[10px]" : "text-[11px]";
+  const rowGap = compact ? "gap-2.5" : "gap-3";
+  const wrapGap = compact ? "gap-4" : "gap-5";
+
   return (
-    <div className="mb-8">
+    <div className={compact ? "mb-4" : "mb-8"}>
       <p className="text-[10px] uppercase tracking-[0.22em] text-white/35 font-semibold mb-3">
         Narrated by
       </p>
-      <div className="flex flex-wrap gap-5">
+      <div className={`flex flex-wrap items-center ${wrapGap}`}>
 
         {/* Dean Miller */}
         <HoverCard popup={<DeanPopup />}>
-          <div className="flex items-center gap-3 cursor-default select-none">
-            <div className="relative h-16 w-16 rounded-full overflow-hidden border border-white/15 shrink-0">
+          <div className={`flex items-center ${rowGap} cursor-default select-none`}>
+            <div className={`relative ${avatarSize} rounded-full overflow-hidden border border-white/15 shrink-0`}>
               <Image
                 src="/dean-headshot.jpg"
                 alt="Dean Miller"
                 fill
                 className="object-cover object-top"
-                sizes="64px"
+                sizes={avatarSizePx}
               />
             </div>
             <div>
-              <p className="text-sm font-semibold text-white leading-tight">Dean Miller</p>
-              <p className="text-[11px] text-white/40 leading-tight">Narrator</p>
+              <p className={`${nameText} font-semibold text-white leading-tight`}>Dean Miller</p>
+              <p className={`${roleText} text-white/40 leading-tight`}>Narrator</p>
             </div>
           </div>
         </HoverCard>
@@ -239,9 +248,9 @@ export function NarratedBySection({
           const initials = getInitials(name);
           return (
             <HoverCard key={name} popup={<CoNarratorPopup {...detail} />}>
-              <div className="flex items-center gap-3 cursor-default select-none">
+              <div className={`flex items-center ${rowGap} cursor-default select-none`}>
                 <div
-                  className={`relative h-16 w-16 rounded-full overflow-hidden border border-white/15 shrink-0 flex items-center justify-center ${!detail.photo ? color : ""}`}
+                  className={`relative ${avatarSize} rounded-full overflow-hidden border border-white/15 shrink-0 flex items-center justify-center ${!detail.photo ? color : ""}`}
                 >
                   {detail.photo ? (
                     <Image
@@ -249,15 +258,15 @@ export function NarratedBySection({
                       alt={name}
                       fill
                       className="object-cover"
-                      sizes="64px"
+                      sizes={avatarSizePx}
                     />
                   ) : (
                     <span className="text-xs font-bold text-white/80">{initials}</span>
                   )}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white leading-tight">{name}</p>
-                  <p className="text-[11px] text-white/40 leading-tight">Co-Narrator</p>
+                  <p className={`${nameText} font-semibold text-white leading-tight`}>{name}</p>
+                  <p className={`${roleText} text-white/40 leading-tight`}>Co-Narrator</p>
                 </div>
               </div>
             </HoverCard>
