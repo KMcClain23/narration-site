@@ -300,10 +300,10 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
 
             {/* Tags — reduced visual weight */}
             {tags.length > 0 && (
-              <div className="flex flex-nowrap overflow-x-auto scrollbar-hide gap-1.5 mb-6 pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
+              <div className="flex flex-wrap gap-1.5 mb-6">
                 {tags.map(tag => (
                   <span key={tag}
-                    className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-white/30 bg-white/[0.03] border border-white/[0.06] px-2.5 py-0.5 rounded-full">
+                    className="text-[10px] font-semibold uppercase tracking-wider text-white/30 bg-white/[0.03] border border-white/[0.06] px-2.5 py-0.5 rounded-full">
                     {tag}
                   </span>
                 ))}
