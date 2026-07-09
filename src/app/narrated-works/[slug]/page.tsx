@@ -241,6 +241,21 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
                 coNarratorDetails={coNarratorDetails}
                 compact
               />
+
+              {/* Mobile: full cast expands right here, between the narrator row and the
+                  pills. The desktop version (full-width below the hero) is a separate
+                  instance further down — same shared open state, different breakpoint. */}
+              {coNarratorNames.length > 1 && (
+                <div className="w-full md:hidden">
+                  <FullCastPanel id="full-cast-mobile">
+                    <NarratedBySection
+                      coNarratorNames={coNarratorNames}
+                      coNarratorDetails={coNarratorDetails}
+                    />
+                  </FullCastPanel>
+                </div>
+              )}
+
               <div className="flex flex-wrap justify-center gap-3">
                 <BookPlatformLinks
                   audibleUrl={book.audible_link}
@@ -329,14 +344,17 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
           </div>
         </div>
 
-        {/* Full cast — only for multicast books; toggled by the compact "+N co-narrators" pill above */}
+        {/* Desktop: full cast expands full-width below the hero; toggled by the same
+            pill above. Mobile has its own inline instance next to the pills instead. */}
         {coNarratorNames.length > 1 && (
-          <FullCastPanel>
-            <NarratedBySection
-              coNarratorNames={coNarratorNames}
-              coNarratorDetails={coNarratorDetails}
-            />
-          </FullCastPanel>
+          <div className="hidden md:block">
+            <FullCastPanel id="full-cast-desktop">
+              <NarratedBySection
+                coNarratorNames={coNarratorNames}
+                coNarratorDetails={coNarratorDetails}
+              />
+            </FullCastPanel>
+          </div>
         )}
         </FullCastProvider>
 
