@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Book } from "@/types/book";
 import { PlatformButtons, PlatformDots } from "@/app/components/PlatformButtons";
+import { ConfidentialCover } from "./ConfidentialCover";
 
 function makeSlug(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -298,7 +299,8 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
     return [];
   })();
 
-  const bookSlug = makeSlug(book.title);
+  const bookSlug = book.slug || makeSlug(book.title);
+  const isConfidential = Boolean(book.is_confidential);
   return (
     <div
       className="group relative rounded-2xl overflow-visible cursor-pointer"
@@ -308,14 +310,18 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
     >
       {/* Cover wrapper — also the primary navigation link for the card */}
       <Link href={`/narrated-works/${bookSlug}`} className="absolute inset-0 block rounded-2xl overflow-hidden">
-        <Image
-          src={book.cover_url}
-          alt={`${book.title} audiobook narrated by Dean Miller`}
-          fill
-          className="object-cover transition-transform duration-700 group-hover:scale-110"
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
-          itemProp="image"
-        />
+        {isConfidential ? (
+          <ConfidentialCover />
+        ) : (
+          <Image
+            src={book.cover_url}
+            alt={`${book.title} audiobook narrated by Dean Miller`}
+            fill
+            className="object-cover transition-transform duration-700 group-hover:scale-110"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
+            itemProp="image"
+          />
+        )}
 
         {/* Ambient glow */}
         <div className="absolute -inset-2 opacity-0 group-hover:opacity-30 transition-opacity duration-700 blur-2xl bg-[#D4AF37] pointer-events-none z-0" />
@@ -337,6 +343,15 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
             ))}
           </div>
         </div>
+
+        {/* NDA badge — opposite corner from the status badge */}
+        {isConfidential && (
+          <div className="absolute top-3 left-3 z-30">
+            <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-[#D4AF37]/80 border border-[#D4AF37]/40 bg-black/40 backdrop-blur-sm">
+              Under NDA
+            </span>
+          </div>
+        )}
 
         {/* Status badge */}
         {statusBadge && (
@@ -379,15 +394,17 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
             <h3 className="font-semibold text-xs sm:text-sm leading-snug text-white truncate" itemProp="name">
               {book.title}
             </h3>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
-              className="text-[10px] sm:text-xs text-[#D4AF37] font-medium hover:text-[#F0D060] transition-colors text-left block truncate w-full"
-              itemProp="author"
-              aria-label={`View ${book.author} author info`}
-            >
-              {book.author}
-            </button>
+            {book.author && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
+                className="text-[10px] sm:text-xs text-[#D4AF37] font-medium hover:text-[#F0D060] transition-colors text-left block truncate w-full"
+                itemProp="author"
+                aria-label={`View ${book.author} author info`}
+              >
+                {book.author}
+              </button>
+            )}
             {coNarratorList.length === 1 && (
               <div className="flex items-center gap-1 mt-0.5">
                 <span className="text-[9px] text-white/30 uppercase tracking-wide">with</span>
@@ -418,15 +435,17 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
             {book.subtitle && (
               <p className="text-xs sm:text-sm text-white mt-1 sm:mt-1.5 leading-snug font-medium">{book.subtitle}</p>
             )}
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
-              className="mt-1.5 sm:mt-2 text-sm sm:text-base text-[#D4AF37] font-bold hover:text-[#F0D060] transition-colors text-left hover:underline underline-offset-2 block"
-              itemProp="author"
-              aria-label={`View ${book.author} author info`}
-            >
-              {book.author}
-            </button>
+            {book.author && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setShowAuthorPopup((v) => !v); }}
+                className="mt-1.5 sm:mt-2 text-sm sm:text-base text-[#D4AF37] font-bold hover:text-[#F0D060] transition-colors text-left hover:underline underline-offset-2 block"
+                itemProp="author"
+                aria-label={`View ${book.author} author info`}
+              >
+                {book.author}
+              </button>
+            )}
             {coNarratorList.length === 1 && (
               <div className="flex items-center gap-1.5 mt-1.5">
                 <span className="text-xs text-white/30 uppercase tracking-wide">with</span>

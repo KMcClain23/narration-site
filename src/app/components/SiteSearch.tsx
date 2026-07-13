@@ -156,8 +156,8 @@ export function SiteSearch() {
         const entries: Entry[] = (data.books as Array<{
           title: string; author?: string; subtitle?: string; tags?: string[];
           description?: string; co_narrator?: string[]; category?: string;
-          cover_url?: string; slug?: string;
-        }>).map(book => {
+          cover_url?: string; slug?: string; is_confidential?: boolean;
+        }>).filter(book => !book.is_confidential).map(book => {
           const slug = book.slug || makeSlug(book.title);
           const coNarrators = Array.isArray(book.co_narrator)
             ? book.co_narrator.filter(Boolean)

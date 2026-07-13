@@ -18,4 +18,5 @@ export type Book = {
   released_at?: string | null;
   created_at?: string;
   updated_at?: string;
+  is_confidential?: boolean;
 };

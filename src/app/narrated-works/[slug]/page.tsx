@@ -10,6 +10,7 @@ import { BookPlatformLinks } from "./BookPlatformLinks";
 import { SwipeNav } from "./SwipeNav";
 import { BookNavArrows } from "./BookNavArrows";
 import { PageTransition } from "./PageTransition";
+import { ConfidentialCover } from "../ConfidentialCover";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,40 @@ function titleToSlug(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
+// Confidential cards route on an id-based slug, never a title-derived one —
+// a slug based on the real title (or the redacted "Untitled Project") would
+// either leak the title or collide across every confidential card.
+function slugFor(card: { id: string; title: string; is_confidential?: boolean }): string {
+  return card.is_confidential ? `confidential-${card.id}` : titleToSlug(card.title ?? "");
+}
+
+const CONFIDENTIAL_TITLE = "Untitled Project";
+
+// Under-NDA cards keep their real title/author/cover/links/description/etc.
+// in the DB (Dean still needs those on the admin board) but must never leak
+// them to the public detail page — redacted here, at the source, rather than
+// relying on the JSX below to remember to hide every field correctly.
+function redactIfConfidential<T extends Record<string, unknown> & { is_confidential?: boolean; id: string }>(
+  card: T
+): T {
+  if (!card.is_confidential) return card;
+  return {
+    ...card,
+    title: CONFIDENTIAL_TITLE,
+    subtitle: null,
+    author: "",
+    author_notes: "",
+    cover_url: "",
+    audible_link: "",
+    ar_link: "",
+    spotify_link: "",
+    co_narrator: "",
+    tags: Array.isArray(card.tags) ? card.tags : [],
+    description: "",
+    trigger_warnings: [],
+  };
+}
+
 function spotifyEmbedUrl(url: string | undefined | null): string | null {
   if (!url?.trim()) return null;
   try {
@@ -47,10 +82,11 @@ function spotifyEmbedUrl(url: string | undefined | null): string | null {
 async function getBook(slug: string) {
   const { data } = await supabaseAdmin
     .from("board_cards")
-    .select("id, title, subtitle, author, author_notes, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status, trigger_warnings, released_at")
+    .select("id, title, subtitle, author, author_notes, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status, trigger_warnings, released_at, is_confidential")
     .in("status", ["contracted", "recording", "editing", "released"]);
   if (!data) return null;
-  return data.find((card) => titleToSlug(card.title ?? "") === slug) ?? null;
+  const card = data.find((c) => slugFor(c as { id: string; title: string; is_confidential?: boolean }) === slug);
+  return card ? redactIfConfidential(card) : null;
 }
 
 async function getCoNarratorDetails(names: string[]): Promise<CoNarratorDetail[]> {
@@ -90,6 +126,18 @@ export async function generateMetadata(
   const book = await getBook(slug);
   if (!book) return { title: "Book not found" };
 
+  if (book.is_confidential) {
+    const title = `${CONFIDENTIAL_TITLE} | Narrated by Dean Miller`;
+    const description = "Details will be shared once the author announces this project.";
+    return {
+      title,
+      description,
+      robots: { index: false, follow: false },
+      openGraph: { title, description, type: "book", images: [{ url: "/opengraph-image.png", width: 1200, height: 630 }] },
+      twitter: { card: "summary_large_image", title, description, images: ["/opengraph-image.png"] },
+    };
+  }
+
   const description = book.description
     ? book.description.slice(0, 160)
     : `${book.title} narrated by Dean Miller. ${STATUS_TO_LABEL[book.status] ?? ""}`;
@@ -121,17 +169,21 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   const book = await getBook(slug);
   if (!book) notFound();
 
-  // Fetch all books for prev/next navigation — include cover_url for thumbnails
+  // Fetch all books for prev/next navigation — include cover_url for thumbnails.
+  // Confidential neighbors get redacted the same as the main book: no real
+  // title/cover in the nav arrows, and an id-based slug to route to.
   const { data: allBooksRaw } = await supabaseAdmin
     .from("board_cards")
-    .select("title, cover_url")
+    .select("id, title, cover_url, is_confidential")
     .in("status", ["contracted", "recording", "editing", "released"])
     .order("sort_order", { ascending: true })
     .order("title",      { ascending: true });
-  const allBooks = (allBooksRaw ?? []).filter(b => b.title);
-  const currentIdx = allBooks.findIndex(b => titleToSlug(b.title) === slug);
-  const prevSlug  = currentIdx > 0                   ? titleToSlug(allBooks[currentIdx - 1].title) : null;
-  const nextSlug  = currentIdx < allBooks.length - 1 ? titleToSlug(allBooks[currentIdx + 1].title) : null;
+  const allBooks = (allBooksRaw ?? [])
+    .filter(b => b.title)
+    .map(b => b.is_confidential ? { ...b, title: CONFIDENTIAL_TITLE, cover_url: null } : b);
+  const currentIdx = allBooks.findIndex(b => slugFor(b as { id: string; title: string; is_confidential?: boolean }) === slug);
+  const prevSlug  = currentIdx > 0                   ? slugFor(allBooks[currentIdx - 1] as { id: string; title: string; is_confidential?: boolean }) : null;
+  const nextSlug  = currentIdx < allBooks.length - 1 ? slugFor(allBooks[currentIdx + 1] as { id: string; title: string; is_confidential?: boolean }) : null;
   const prevTitle = currentIdx > 0                   ? allBooks[currentIdx - 1].title : null;
   const nextTitle = currentIdx < allBooks.length - 1 ? allBooks[currentIdx + 1].title : null;
   const prevCover = currentIdx > 0                   ? (allBooks[currentIdx - 1].cover_url as string | null) : null;
@@ -149,13 +201,16 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
 
   const coNarratorDetails = await getCoNarratorDetails(coNarratorNames);
 
-  // Look up the author's bio from the authors table
-  const { data: authorRow } = await supabaseAdmin
-    .from("authors")
-    .select("bio")
-    .eq("name", book.author)
-    .single();
-  const authorBio = (authorRow?.bio as string) || null;
+  // Look up the author's bio from the authors table (skipped when redacted)
+  let authorBio: string | null = null;
+  if (book.author) {
+    const { data: authorRow } = await supabaseAdmin
+      .from("authors")
+      .select("bio")
+      .eq("name", book.author)
+      .single();
+    authorBio = (authorRow?.bio as string) || null;
+  }
 
   const statusLabel = STATUS_TO_LABEL[book.status] ?? "";
   const statusStyle = STATUS_TO_STYLE[book.status] ?? "bg-white/10 text-white/50 border-white/10";
@@ -203,7 +258,11 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
           {/* Cover + Spotify embed */}
           <div className="flex flex-col items-center md:items-end gap-4">
             <div className="h-[300px] sm:h-[360px] md:h-[420px] overflow-hidden rounded-2xl shadow-2xl border border-white/10">
-              {book.cover_url ? (
+              {book.is_confidential ? (
+                <div className="relative w-[280px] h-[420px]">
+                  <ConfidentialCover />
+                </div>
+              ) : book.cover_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={book.cover_url}
@@ -275,12 +334,19 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
           {/* Details */}
           <div className="relative" itemScope itemType="https://schema.org/AudioObject">
 
-            {/* Status badge + release date */}
-            {statusLabel && (
+            {/* Status badge + release date + NDA badge */}
+            {(statusLabel || book.is_confidential) && (
               <div className="flex items-center gap-2.5 mb-4">
-                <span className={`inline-flex items-center text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border ${statusStyle}`}>
-                  {statusLabel}
-                </span>
+                {statusLabel && (
+                  <span className={`inline-flex items-center text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border ${statusStyle}`}>
+                    {statusLabel}
+                  </span>
+                )}
+                {book.is_confidential && (
+                  <span className="inline-flex items-center text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border border-[#D4AF37]/40 text-[#D4AF37]/80 bg-[#D4AF37]/5">
+                    Under NDA
+                  </span>
+                )}
                 {formattedDate && (
                   <span className="text-xs text-white/35 font-medium">· {formattedDate}</span>
                 )}
@@ -295,8 +361,14 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
               <p className="text-lg text-white/50 mb-3 leading-snug">{book.subtitle}</p>
             )}
 
+            {book.is_confidential && (
+              <p className="text-sm text-white/50 italic mb-4 max-w-prose">
+                Details will be shared once the author announces this project.
+              </p>
+            )}
+
             {/* Author name — hover popup shows bio */}
-            <AuthorHoverName name={book.author} bio={authorBio} />
+            {book.author && <AuthorHoverName name={book.author} bio={authorBio} />}
 
             {/* Tags — reduced visual weight */}
             {tags.length > 0 && (

@@ -86,6 +86,10 @@ create table if not exists analytics_events (
 create index if not exists analytics_events_event_created
   on analytics_events(event, created_at desc);
 
+-- is_confidential: marks under-NDA projects. Hides title/author/cover/etc. on
+-- the public site while remaining fully visible to Dean on the admin board.
+alter table board_cards add column if not exists is_confidential boolean not null default false;
+
 -- production_contacts: outreach CRM for production houses
 create table if not exists production_contacts (
   id                serial      primary key,

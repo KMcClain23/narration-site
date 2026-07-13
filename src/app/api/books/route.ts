@@ -37,7 +37,13 @@ const STATUS_TO_CATEGORY: Record<string, BookCategory> = {
   released:   "completed",
 };
 
-type MappedCard = { id: unknown; title: unknown; subtitle: unknown; author: unknown; link: string; ar_link: string; spotify_link: string; cover_url: string; tags: unknown[]; description: string; category: string; co_narrator: unknown[]; sort_order: number; slug: string | null };
+type MappedCard = { id: unknown; title: unknown; subtitle: unknown; author: unknown; link: string; ar_link: string; spotify_link: string; cover_url: string; tags: unknown[]; description: string; category: string; co_narrator: unknown[]; sort_order: number; slug: string | null; is_confidential: boolean };
+
+// Under-NDA cards keep their real title/author/cover/links in the DB (Dean
+// still needs those on the admin board) but must never leak them to the
+// public API response — so redaction happens here, at the source, rather
+// than relying on every UI consumer to remember to hide fields correctly.
+const CONFIDENTIAL_TITLE = "Untitled Project";
 
 function mapCards(data: Record<string, unknown>[]): MappedCard[] {
   return data
@@ -49,6 +55,31 @@ function mapCards(data: Record<string, unknown>[]): MappedCard[] {
         try { cn = JSON.parse(cn); } catch { cn = cn ? [cn] : []; }
       }
       if (!Array.isArray(cn)) cn = [cn];
+
+      const isConfidential = Boolean(card.is_confidential);
+
+      if (isConfidential) {
+        return {
+          id:              card.id,
+          title:           CONFIDENTIAL_TITLE,
+          subtitle:        null,
+          author:          "",
+          link:            "",
+          ar_link:         "",
+          spotify_link:    "",
+          cover_url:       "",
+          tags:            Array.isArray(card.tags) ? card.tags : [],
+          description:     "",
+          category:        STATUS_TO_CATEGORY[card.status as string] ?? "coming-soon",
+          co_narrator:     [],
+          sort_order:      (card.sort_order as number) || 0,
+          // Always id-based, never card.slug — the stored slug column is
+          // usually auto-derived from the real title at creation time, which
+          // would leak it right back out through the public URL.
+          slug:            `confidential-${card.id}`,
+          is_confidential: true,
+        };
+      }
 
       return {
         id:          card.id,
@@ -65,6 +96,7 @@ function mapCards(data: Record<string, unknown>[]): MappedCard[] {
         co_narrator: (cn as unknown[]).filter(Boolean),
         sort_order:  (card.sort_order  as number) || 0,
         slug:        (card.slug as string) || null,
+        is_confidential: false,
       };
     });
 }
@@ -77,7 +109,7 @@ export async function GET() {
 
     const primary = await supabaseAdmin
       .from("board_cards")
-      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, slug, deadline, first15_due, first_15_complete")
+      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, slug, deadline, first15_due, first_15_complete, is_confidential")
       .in("status", STATUS_FILTER)
       .order("sort_order",  { ascending: true })
       .order("title",       { ascending: true });
@@ -89,16 +121,29 @@ export async function GET() {
       // Retry without slug
       const fallback = await supabaseAdmin
         .from("board_cards")
-        .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, deadline, first15_due, first_15_complete")
+        .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, deadline, first15_due, first_15_complete, is_confidential")
         .in("status", STATUS_FILTER)
         .order("sort_order", { ascending: true })
         .order("title",      { ascending: true });
 
       if (fallback.error) {
-        console.error("GET /api/books — fallback query also failed:", fallback.error.message, fallback.error.details ?? "");
-        throw fallback.error;
+        console.error("GET /api/books — fallback query failed (is_confidential column may be missing):", fallback.error.message, fallback.error.details ?? "");
+        // Retry without is_confidential either (migration not run yet)
+        const fallback2 = await supabaseAdmin
+          .from("board_cards")
+          .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, deadline, first15_due, first_15_complete")
+          .in("status", STATUS_FILTER)
+          .order("sort_order", { ascending: true })
+          .order("title",      { ascending: true });
+
+        if (fallback2.error) {
+          console.error("GET /api/books — fallback2 query also failed:", fallback2.error.message, fallback2.error.details ?? "");
+          throw fallback2.error;
+        }
+        rows = (fallback2.data || []) as Record<string, unknown>[];
+      } else {
+        rows = (fallback.data || []) as Record<string, unknown>[];
       }
-      rows = (fallback.data || []) as Record<string, unknown>[];
     } else {
       rows = (primary.data || []) as Record<string, unknown>[];
     }
@@ -122,10 +167,14 @@ export async function GET() {
 
     const books = mapCards(rows);
 
-    // Deduplicate by title+author
+    // Deduplicate by title+author — confidential cards all share the same
+    // redacted title/author, so key those by id instead or every one past
+    // the first would get dropped as a "duplicate".
     const seen = new Set<string>();
     const deduped = books.filter((b) => {
-      const key = `${String(b.title).trim().toLowerCase()}||${String(b.author).trim().toLowerCase()}`;
+      const key = b.is_confidential
+        ? `confidential||${b.id}`
+        : `${String(b.title).trim().toLowerCase()}||${String(b.author).trim().toLowerCase()}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

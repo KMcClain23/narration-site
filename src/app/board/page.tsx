@@ -33,12 +33,13 @@ interface BoardCard {
   email_updates_enabled?: boolean;
   trigger_warnings: string[];
   released_at?: string;
+  is_confidential?: boolean;
 }
 
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
   title:"", author:"", cover_url:"", status:"contracted", deadline:"",
   notes:"", author_notes:"", links:[], co_narrator:"",
-  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", script_url:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"", trigger_warnings:[], released_at:"",
+  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", script_url:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"", trigger_warnings:[], released_at:"", is_confidential:false,
 };
 
 // ─── Timeline view ────────────────────────────────────────────────────────────
@@ -1574,7 +1575,7 @@ export default function BoardPage() {
       links:card.links,co_narrator:card.co_narrator,subtitle:card.subtitle||"",
       tags:card.tags||[],description:card.description||"",
       audible_link:card.audible_link||"",ar_link:card.ar_link||"",spotify_link:card.spotify_link||"",script_url:card.script_url||"",chapters:card.chapters||[],
-      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||"",trigger_warnings:card.trigger_warnings||[],released_at:card.released_at||""});
+      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||"",trigger_warnings:card.trigger_warnings||[],released_at:card.released_at||"",is_confidential:card.is_confidential||false});
     setShowForm(false);
   };
 
@@ -1791,6 +1792,18 @@ export default function BoardPage() {
               </button>
             </div>
             <div className="px-6 py-5 space-y-4">
+              <label className="flex items-start gap-3 rounded-lg border border-[#D4AF37]/25 bg-[#D4AF37]/5 px-4 py-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={form.is_confidential}
+                  onChange={e => setForm(p => ({ ...p, is_confidential: e.target.checked }))}
+                  className="mt-0.5 h-4 w-4 rounded border-white/20 bg-black/30 text-[#D4AF37] focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-white">Confidential (Under NDA)</span>
+                  <span className="block text-xs text-white/50 mt-0.5">Hides title, author, and cover from the public site. Internal fields still visible to you here.</span>
+                </span>
+              </label>
               <div className="grid sm:grid-cols-2 gap-4">
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Book title *</span><input type="text" value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))} placeholder="e.g. Whiskey &amp; Lies" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Subtitle</span><input type="text" value={form.subtitle} onChange={e=>setForm(p=>({...p,subtitle:e.target.value}))} placeholder="e.g. Sultry Secrets Book 4" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
@@ -2289,9 +2302,17 @@ export default function BoardPage() {
 
                     {/* Details column */}
                     <div className="flex-1 flex flex-col min-w-0 p-3 gap-1">
-                      <Link href={`/board/card/${card.id}`} onClick={e=>e.stopPropagation()}>
-                        <p className="text-sm font-bold text-white leading-snug hover:text-[#D4AF37]/90 transition-colors truncate">{card.title}</p>
-                      </Link>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Link href={`/board/card/${card.id}`} onClick={e=>e.stopPropagation()} className="min-w-0">
+                          <p className="text-sm font-bold text-white leading-snug hover:text-[#D4AF37]/90 transition-colors truncate">{card.title}</p>
+                        </Link>
+                        {card.is_confidential && (
+                          <span title="Confidential — under NDA" className="shrink-0 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-[#D4AF37] border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-1.5 py-0.5 rounded-full">
+                            <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            NDA
+                          </span>
+                        )}
+                      </div>
                       {card.author && <p className="text-xs text-[#D4AF37] font-medium truncate">{card.author}</p>}
                       {card.co_narrator && (
                         <button type="button"
