@@ -26,7 +26,7 @@ export default async function Page() {
     if (monthsRow?.value) bookingWindow = formatBookingWindow(JSON.parse(monthsRow.value));
   } catch {}
 
-  // Featured demos — active, sorted, max 6
+  // Featured demos — active, sorted, max 9
   type DbDemo = { id: string; title: string; genre: string | null; description: string | null; file_url: string; duration_seconds: number | null; sort_order: number };
   let featuredDemos: DbDemo[] = [];
   try {
@@ -35,7 +35,7 @@ export default async function Page() {
       .select("id,title,genre,description,file_url,duration_seconds,sort_order")
       .eq("active", true)
       .order("sort_order", { ascending: true })
-      .limit(6);
+      .limit(9);
     if (demoRows) featuredDemos = demoRows as DbDemo[];
   } catch { /* table may not exist yet — show nothing */ }
 
