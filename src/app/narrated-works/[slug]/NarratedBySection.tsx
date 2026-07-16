@@ -7,13 +7,15 @@ import { FullCastTrigger } from "./FullCastToggle";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import type { NarrationFormat } from "@/types/book";
 
-const FORMAT_LABEL: Record<Exclude<NarrationFormat, "solo">, string> = {
+const FORMAT_LABEL: Record<NarrationFormat, string> = {
+  solo: "Solo Narration",
   dual: "Dual Narration",
   duet: "Duet Narration",
   multicast: "Multicast",
 };
 
-const FORMAT_TOOLTIP: Record<Exclude<NarrationFormat, "solo">, string> = {
+const FORMAT_TOOLTIP: Record<NarrationFormat, string> = {
+  solo: "One narrator performs every character and the narration.",
   dual: "Two narrators alternate chapters or points of view throughout the book.",
   duet: "Both narrators perform every scene together, alternating character voices in real time.",
   multicast: "Three or more narrators voice the full cast, each performing their own character.",
@@ -266,20 +268,20 @@ export function NarratedBySection({
     );
   });
 
-  const showFormatPill = compact && format && format !== "solo";
+  const showFormatPill = compact && Boolean(format);
 
   return (
     <div className={compact ? "mb-4 flex flex-col items-center" : "mb-8"}>
       <p className={`text-[10px] uppercase tracking-[0.22em] text-white/35 font-semibold mb-3 ${compact ? "text-center" : ""}`}>
         Narrated by
       </p>
-      {showFormatPill && (
+      {showFormatPill && format && (
         <div className="mb-3 flex items-center">
           <span className="text-[10px] px-2.5 py-0.5 rounded-full border capitalize text-white/50 border-white/15 bg-white/[0.03]">
-            {FORMAT_LABEL[format as Exclude<NarrationFormat, "solo">]}
+            {FORMAT_LABEL[format]}
           </span>
           <InfoTooltip variant="inline">
-            <p>{FORMAT_TOOLTIP[format as Exclude<NarrationFormat, "solo">]}</p>
+            <p>{FORMAT_TOOLTIP[format]}</p>
           </InfoTooltip>
         </div>
       )}

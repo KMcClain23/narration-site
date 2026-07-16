@@ -8,6 +8,13 @@ import type { Book } from "@/types/book";
 import { PlatformButtons, PlatformDots } from "@/app/components/PlatformButtons";
 import { ConfidentialCover } from "./ConfidentialCover";
 
+const FORMAT_PILL_LABEL: Record<string, string> = {
+  solo: "Solo",
+  dual: "Dual",
+  duet: "Duet",
+  multicast: "Multicast",
+};
+
 function makeSlug(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
@@ -344,12 +351,21 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
           </div>
         </div>
 
-        {/* NDA badge — opposite corner from the status badge */}
-        {isConfidential && (
-          <div className="absolute top-3 left-3 z-30">
-            <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-[#D4AF37]/80 border border-[#D4AF37]/40 bg-black/40 backdrop-blur-sm">
-              Under NDA
-            </span>
+        {/* NDA + narration format badges — opposite corner from the status badge.
+            narration_format is redacted to null for confidential cards, so these
+            never actually stack in practice, but the layout supports it either way. */}
+        {(isConfidential || book.narration_format) && (
+          <div className="absolute top-3 left-3 z-30 flex flex-col items-start gap-1">
+            {isConfidential && (
+              <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-[#D4AF37]/80 border border-[#D4AF37]/40 bg-black/40 backdrop-blur-sm">
+                Under NDA
+              </span>
+            )}
+            {book.narration_format && (
+              <span className="text-[9px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full text-violet-200/90 border border-violet-400/40 bg-black/40 backdrop-blur-sm">
+                {FORMAT_PILL_LABEL[book.narration_format] ?? book.narration_format}
+              </span>
+            )}
           </div>
         )}
 

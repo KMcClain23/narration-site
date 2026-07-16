@@ -37,7 +37,7 @@ const STATUS_TO_CATEGORY: Record<string, BookCategory> = {
   released:   "completed",
 };
 
-type MappedCard = { id: unknown; title: unknown; subtitle: unknown; author: unknown; link: string; ar_link: string; spotify_link: string; cover_url: string; tags: unknown[]; description: string; category: string; co_narrator: unknown[]; sort_order: number; slug: string | null; is_confidential: boolean };
+type MappedCard = { id: unknown; title: unknown; subtitle: unknown; author: unknown; link: string; ar_link: string; spotify_link: string; cover_url: string; tags: unknown[]; description: string; category: string; co_narrator: unknown[]; sort_order: number; slug: string | null; is_confidential: boolean; narration_format: string | null };
 
 // Under-NDA cards keep their real title/author/cover/links in the DB (Dean
 // still needs those on the admin board) but must never leak them to the
@@ -78,6 +78,8 @@ function mapCards(data: Record<string, unknown>[]): MappedCard[] {
           // would leak it right back out through the public URL.
           slug:            `confidential-${card.id}`,
           is_confidential: true,
+          // Anonymized like every other identifying field on a confidential card.
+          narration_format: null,
         };
       }
 
@@ -97,6 +99,7 @@ function mapCards(data: Record<string, unknown>[]): MappedCard[] {
         sort_order:  (card.sort_order  as number) || 0,
         slug:        (card.slug as string) || null,
         is_confidential: false,
+        narration_format: (card.narration_format as string) || null,
       };
     });
 }
@@ -109,7 +112,7 @@ export async function GET() {
 
     const primary = await supabaseAdmin
       .from("board_cards")
-      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, slug, deadline, first15_due, first_15_complete, is_confidential")
+      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, slug, deadline, first15_due, first_15_complete, is_confidential, narration_format")
       .in("status", STATUS_FILTER)
       .order("sort_order",  { ascending: true })
       .order("title",       { ascending: true });
@@ -121,7 +124,7 @@ export async function GET() {
       // Retry without slug
       const fallback = await supabaseAdmin
         .from("board_cards")
-        .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, deadline, first15_due, first_15_complete, is_confidential")
+        .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, deadline, first15_due, first_15_complete, is_confidential, narration_format")
         .in("status", STATUS_FILTER)
         .order("sort_order", { ascending: true })
         .order("title",      { ascending: true });
