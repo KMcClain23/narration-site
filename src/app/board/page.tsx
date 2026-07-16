@@ -942,9 +942,12 @@ function TimelineView({
                         ))}
                       </div>
 
-                      {/* Bar — 80px minimum width, 6px border-radius */}
+                      {/* Bar — 80px minimum width, 6px border-radius.
+                          Editing-stage bars render dimmed — recording is done and it's
+                          off narrating your desk, so it shouldn't compete visually with
+                          what's still actively Contracted/Recording. */}
                       <div
-                        className={`absolute z-10 flex items-center overflow-visible hover:brightness-125 transition-all group/bar border ${bar.bg} ${bar.border}`}
+                        className={`absolute z-10 flex items-center overflow-visible hover:brightness-125 transition-all group/bar border ${bar.bg} ${bar.border} ${card.status === "editing" ? "opacity-40 hover:opacity-70" : ""}`}
                         style={{
                           top: BAR_INSET,
                           bottom: BAR_INSET,
@@ -966,11 +969,13 @@ function TimelineView({
                           <span className="text-[10px] font-semibold truncate text-center leading-tight">{card.title}</span>
                         </Link>
 
-                        {/* Complete button — revealed on hover */}
+                        {/* Complete button — revealed on hover. Recording -> Editing
+                            (finished recording, waiting on pickups); everything else
+                            still jumps straight to Released. */}
                         <button
                           type="button"
-                          title="Mark as released"
-                          onClick={ev => { ev.stopPropagation(); onStatusChange(card.id, "released"); }}
+                          title={card.status === "recording" ? "Mark recording complete → Editing" : "Mark as released"}
+                          onClick={ev => { ev.stopPropagation(); onStatusChange(card.id, card.status === "recording" ? "editing" : "released"); }}
                           className="shrink-0 mr-1.5 h-5 w-5 rounded-full flex items-center justify-center opacity-0 group-hover/bar:opacity-100 bg-white/20 hover:bg-emerald-500/90 transition-all"
                         >
                           <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
