@@ -4,6 +4,20 @@ import Image from "next/image";
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { ReactNode } from "react";
 import { FullCastTrigger } from "./FullCastToggle";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import type { NarrationFormat } from "@/types/book";
+
+const FORMAT_LABEL: Record<Exclude<NarrationFormat, "solo">, string> = {
+  dual: "Dual Narration",
+  duet: "Duet Narration",
+  multicast: "Multicast",
+};
+
+const FORMAT_TOOLTIP: Record<Exclude<NarrationFormat, "solo">, string> = {
+  dual: "Two narrators alternate chapters or points of view throughout the book.",
+  duet: "Both narrators perform every scene together, alternating character voices in real time.",
+  multicast: "Three or more narrators voice the full cast, each performing their own character.",
+};
 
 // ─── shared types ─────────────────────────────────────────────────────────────
 
@@ -200,10 +214,12 @@ export function NarratedBySection({
   coNarratorNames,
   coNarratorDetails,
   compact = false,
+  format = null,
 }: {
   coNarratorNames: string[];
   coNarratorDetails: CoNarratorDetail[];
   compact?: boolean;
+  format?: NarrationFormat | null;
 }) {
   const avatarSize = compact ? "h-10 w-10" : "h-16 w-16";
   const avatarSizePx = compact ? "40px" : "64px";
@@ -250,11 +266,23 @@ export function NarratedBySection({
     );
   });
 
+  const showFormatPill = compact && format && format !== "solo";
+
   return (
     <div className={compact ? "mb-4 flex flex-col items-center" : "mb-8"}>
       <p className={`text-[10px] uppercase tracking-[0.22em] text-white/35 font-semibold mb-3 ${compact ? "text-center" : ""}`}>
         Narrated by
       </p>
+      {showFormatPill && (
+        <div className="mb-3 flex items-center">
+          <span className="text-[10px] px-2.5 py-0.5 rounded-full border capitalize text-white/50 border-white/15 bg-white/[0.03]">
+            {FORMAT_LABEL[format as Exclude<NarrationFormat, "solo">]}
+          </span>
+          <InfoTooltip variant="inline">
+            <p>{FORMAT_TOOLTIP[format as Exclude<NarrationFormat, "solo">]}</p>
+          </InfoTooltip>
+        </div>
+      )}
       <div className={isMulticast ? "flex flex-col items-center gap-3" : `flex flex-wrap items-center ${compact ? "justify-center" : ""} ${wrapGap}`}>
 
         {/* Dean Miller */}

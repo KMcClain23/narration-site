@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       word_count = 0, first15_due,
       pfh_rate = 0, payment_type = "pfh", first_15_complete = false,
       dean_message = "", author_email = "", slug = "",
-      trigger_warnings = [], is_confidential = false,
+      trigger_warnings = [], is_confidential = false, narration_format = null,
     } = body;
 
     if (!title?.trim()) return NextResponse.json({ error: "Title required." }, { status: 400 });
@@ -102,6 +102,7 @@ export async function POST(req: Request) {
       slug:              slug || makeSlug(title.trim()),
       trigger_warnings:  Array.isArray(trigger_warnings) ? trigger_warnings : [],
       is_confidential:   Boolean(is_confidential),
+      narration_format:  narration_format || null,
     };
     // Date columns must be null (not "") when empty — Supabase rejects empty strings for date/timestamptz
     insertData.deadline    = deadline    || null;
@@ -122,6 +123,10 @@ export async function POST(req: Request) {
     }
     if (error && error.message?.includes("is_confidential")) {
       delete insertData.is_confidential;
+      ({ data, error } = await supabaseAdmin.from("board_cards").insert(insertData).select().single());
+    }
+    if (error && error.message?.includes("narration_format")) {
+      delete insertData.narration_format;
       ({ data, error } = await supabaseAdmin.from("board_cards").insert(insertData).select().single());
     }
 
@@ -179,7 +184,7 @@ export async function PUT(req: Request) {
       "word_count", "first15_due", "pfh_rate", "payment_type",
       "first_15_complete", "dean_message", "author_email", "author_token",
       "email_updates_enabled", "script_url", "trigger_warnings", "released_at",
-      "is_confidential",
+      "is_confidential", "narration_format",
     ];
     const DATE_FIELDS = new Set(["deadline", "first15_due", "first_15_due", "released_at"]);
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -228,6 +233,11 @@ export async function PUT(req: Request) {
     }
     if (error && error.message?.includes("is_confidential")) {
       delete update.is_confidential;
+      ({ data, error } = await supabaseAdmin
+        .from("board_cards").update(update).eq("id", id).select().single());
+    }
+    if (error && error.message?.includes("narration_format")) {
+      delete update.narration_format;
       ({ data, error } = await supabaseAdmin
         .from("board_cards").update(update).eq("id", id).select().single());
     }

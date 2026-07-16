@@ -65,6 +65,7 @@ function redactIfConfidential<T extends Record<string, unknown> & { is_confident
     tags: Array.isArray(card.tags) ? card.tags : [],
     description: "",
     trigger_warnings: [],
+    narration_format: null,
   };
 }
 
@@ -82,7 +83,7 @@ function spotifyEmbedUrl(url: string | undefined | null): string | null {
 async function getBook(slug: string) {
   const { data } = await supabaseAdmin
     .from("board_cards")
-    .select("id, title, subtitle, author, author_notes, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status, trigger_warnings, released_at, is_confidential")
+    .select("id, title, subtitle, author, author_notes, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status, trigger_warnings, released_at, is_confidential, narration_format")
     .in("status", ["contracted", "recording", "editing", "released"]);
   if (!data) return null;
   const card = data.find((c) => slugFor(c as { id: string; title: string; is_confidential?: boolean }) === slug);
@@ -298,6 +299,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
               <NarratedBySection
                 coNarratorNames={coNarratorNames}
                 coNarratorDetails={coNarratorDetails}
+                format={book.narration_format}
                 compact
               />
 

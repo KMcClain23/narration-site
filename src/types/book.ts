@@ -1,5 +1,7 @@
 export type BookCategory = "completed" | "in-progress" | "coming-soon";
 
+export type NarrationFormat = "solo" | "dual" | "duet" | "multicast";
+
 export type Book = {
   id: string;
   title: string;
@@ -19,4 +21,5 @@ export type Book = {
   created_at?: string;
   updated_at?: string;
   is_confidential?: boolean;
+  narration_format?: NarrationFormat | null;
 };

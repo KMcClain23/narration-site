@@ -110,3 +110,18 @@ create table if not exists production_contacts (
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
+
+-- narration_format: how the audiobook is narrated. Nullable — unset by default,
+-- no CHECK violation for existing rows.
+alter table board_cards add column if not exists narration_format text;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'board_cards_narration_format_check'
+  ) then
+    alter table board_cards
+      add constraint board_cards_narration_format_check
+      check (narration_format is null or narration_format in ('solo', 'dual', 'duet', 'multicast'));
+  end if;
+end $$;

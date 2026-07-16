@@ -5,13 +5,15 @@ import ReactDOM from "react-dom";
 import Link from "next/link";
 import { EmailScanSection } from "./EmailScanSection";
 import ScriptUploader from "./ScriptUploader";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import type { NarrationFormat } from "@/types/book";
 
 const COLUMNS = [
-  { id: "audition",   label: "Audition",   color: "border-purple-500/40 bg-purple-900/35",  dot: "bg-purple-300",  text: "text-purple-200" },
-  { id: "contracted", label: "Contracted", color: "border-blue-500/40 bg-blue-900/35",      dot: "bg-blue-300",    text: "text-blue-200" },
-  { id: "recording",  label: "Recording",  color: "border-yellow-500/40 bg-yellow-900/25",  dot: "bg-yellow-300",  text: "text-yellow-200" },
-  { id: "editing",    label: "Editing",    color: "border-orange-500/40 bg-orange-900/25",  dot: "bg-orange-300",  text: "text-orange-200" },
-  { id: "released",   label: "Released",   color: "border-emerald-500/40 bg-emerald-900/35",dot: "bg-emerald-300", text: "text-emerald-200" },
+  { id: "audition",   label: "Audition",   color: "border-purple-500/40 bg-purple-900/35",  dot: "bg-purple-300",  text: "text-purple-200", tooltip: "" },
+  { id: "contracted", label: "Contracted", color: "border-blue-500/40 bg-blue-900/35",      dot: "bg-blue-300",    text: "text-blue-200",   tooltip: "Signed but recording hasn't started yet." },
+  { id: "recording",  label: "Recording",  color: "border-yellow-500/40 bg-yellow-900/25",  dot: "bg-yellow-300",  text: "text-yellow-200", tooltip: "Actively narrating this book." },
+  { id: "editing",    label: "Editing",    color: "border-orange-500/40 bg-orange-900/25",  dot: "bg-orange-300",  text: "text-orange-200", tooltip: "Recording done — with an editor for pickups and polish." },
+  { id: "released",   label: "Released",   color: "border-emerald-500/40 bg-emerald-900/35",dot: "bg-emerald-300", text: "text-emerald-200", tooltip: "Audiobook is live and published." },
 ];
 
 interface Link { label: string; url: string; }
@@ -34,12 +36,13 @@ interface BoardCard {
   trigger_warnings: string[];
   released_at?: string;
   is_confidential?: boolean;
+  narration_format?: NarrationFormat | null;
 }
 
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
   title:"", author:"", cover_url:"", status:"contracted", deadline:"",
   notes:"", author_notes:"", links:[], co_narrator:"",
-  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", script_url:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"", trigger_warnings:[], released_at:"", is_confidential:false,
+  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", script_url:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"", trigger_warnings:[], released_at:"", is_confidential:false, narration_format:null,
 };
 
 // ─── Timeline view ────────────────────────────────────────────────────────────
@@ -1015,6 +1018,9 @@ function TimelineView({
         <div className="flex items-center gap-1.5">
           <div className="h-2 w-2 bg-white/80 border border-white/40" style={{ transform: "rotate(45deg)", borderRadius: 1 }} />
           <span className="text-[10px] text-white/30">First 15 due</span>
+          <InfoTooltip variant="inline">
+            <p>First 15 minutes of audio due to rights holder for approval.</p>
+          </InfoTooltip>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="h-3 w-0.5 bg-red-500/70" />
@@ -1330,6 +1336,9 @@ function MonthView({ cards }: { cards: BoardCard[] }) {
         <div className="flex items-center gap-1.5">
           <span className="inline-block h-2 w-2 bg-[#D4AF37]/60 rounded-[1px]" style={{ transform: "rotate(45deg)" }} />
           <span className="text-[10px] text-white/30">First 15 due</span>
+          <InfoTooltip variant="inline">
+            <p>First 15 minutes of audio due to rights holder for approval.</p>
+          </InfoTooltip>
         </div>
       </div>
     </div>
@@ -1580,7 +1589,7 @@ export default function BoardPage() {
       links:card.links,co_narrator:card.co_narrator,subtitle:card.subtitle||"",
       tags:card.tags||[],description:card.description||"",
       audible_link:card.audible_link||"",ar_link:card.ar_link||"",spotify_link:card.spotify_link||"",script_url:card.script_url||"",chapters:card.chapters||[],
-      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||"",trigger_warnings:card.trigger_warnings||[],released_at:card.released_at||"",is_confidential:card.is_confidential||false});
+      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||"",trigger_warnings:card.trigger_warnings||[],released_at:card.released_at||"",is_confidential:card.is_confidential||false,narration_format:card.narration_format??null});
     setShowForm(false);
   };
 
@@ -1804,15 +1813,17 @@ export default function BoardPage() {
                   onChange={e => setForm(p => ({ ...p, is_confidential: e.target.checked }))}
                   className="mt-0.5 h-4 w-4 rounded border-white/20 bg-black/30 text-[#D4AF37] focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
                 />
-                <span>
-                  <span className="block text-sm font-semibold text-white">Confidential (Under NDA)</span>
-                  <span className="block text-xs text-white/50 mt-0.5">Hides title, author, and cover from the public site. Internal fields still visible to you here.</span>
+                <span className="flex items-center text-sm font-semibold text-white">
+                  Confidential (Under NDA)
+                  <InfoTooltip variant="inline">
+                    <p>Hides title, author, and cover from the public site. Internal fields remain visible to you. Use for projects you can&apos;t publicly announce yet.</p>
+                  </InfoTooltip>
                 </span>
               </label>
               <div className="grid sm:grid-cols-2 gap-4">
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Book title *</span><input type="text" value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))} placeholder="e.g. Whiskey &amp; Lies" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
                 <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Subtitle</span><input type="text" value={form.subtitle} onChange={e=>setForm(p=>({...p,subtitle:e.target.value}))} placeholder="e.g. Sultry Secrets Book 4" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/></label>
-                <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">URL slug</span><input type="text" value={form.slug||""} onChange={e=>setForm(p=>({...p,slug:e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-").replace(/-+/g,"-")}))} placeholder="e.g. whiskey-and-lies" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition font-mono"/></label>
+                <label className="block"><span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">URL slug<InfoTooltip><p>Auto-generated from the title if left blank. Only set manually if you need a specific URL, or when renaming a published book (changing this breaks existing links).</p></InfoTooltip></span><input type="text" value={form.slug||""} onChange={e=>setForm(p=>({...p,slug:e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-").replace(/-+/g,"-")}))} placeholder="e.g. whiskey-and-lies" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition font-mono"/></label>
                 <div className="block" ref={authorDropRef}>
                   <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Author</span>
                   <div className="relative mt-1.5">
@@ -1888,6 +1899,33 @@ export default function BoardPage() {
                     })()}
                   </div>
                 </div>
+                <div>
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">
+                    Narration format
+                    <InfoTooltip>
+                      <p><strong>Solo:</strong> One narrator performs everything.</p>
+                      <p><strong>Dual:</strong> Two narrators alternating chapters or POVs.</p>
+                      <p><strong>Duet:</strong> Both narrators perform every scene together.</p>
+                      <p><strong>Multicast:</strong> Three or more narrators, often a full cast.</p>
+                    </InfoTooltip>
+                  </span>
+                  <div className="mt-1.5 flex gap-1 rounded-lg border border-white/8 bg-black/30 p-1">
+                    {(["solo", "dual", "duet", "multicast"] as const).map(fmt => (
+                      <button
+                        key={fmt}
+                        type="button"
+                        onClick={() => setForm(p => ({ ...p, narration_format: p.narration_format === fmt ? null : fmt }))}
+                        className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium capitalize transition-colors ${
+                          form.narration_format === fmt
+                            ? "bg-[#D4AF37] text-black"
+                            : "text-white/50 hover:text-white hover:bg-white/8"
+                        }`}
+                      >
+                        {fmt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Cover image</span>
                   <div className="mt-1.5 space-y-2">
@@ -1938,6 +1976,9 @@ export default function BoardPage() {
                   <div>
                     <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium block mb-1.5">
                       Release date <span className="text-white/20 normal-case tracking-normal text-[10px]">— public</span>
+                      <InfoTooltip>
+                        <p>Public release date shown on the book&apos;s detail page. Auto-filled when status moves to Completed; can be edited manually if needed.</p>
+                      </InfoTooltip>
                     </span>
                     <div className="flex gap-2 items-center">
                       <select
@@ -1985,7 +2026,12 @@ export default function BoardPage() {
                 )}
 
                 <div>
-                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium block mb-1.5">Deadline</span>
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium block mb-1.5">
+                    Deadline
+                    <InfoTooltip>
+                      <p>Final audio delivery deadline. Auto-stamps <strong>released_at</strong> when status moves to Completed if that field is still empty.</p>
+                    </InfoTooltip>
+                  </span>
                   <div className="flex gap-2">
                     <select value={form.deadline ? form.deadline.split("-")[1] : ""}
                       onChange={e => { const p = form.deadline?.split("-") || [new Date().getFullYear().toString(),"","01"]; setForm(f=>({...f,deadline:e.target.value?`${p[0]||new Date().getFullYear()}-${e.target.value}-${p[2]||"01"}`:""}))} }
@@ -2020,11 +2066,23 @@ export default function BoardPage() {
                 <p className="text-[11px] uppercase tracking-[0.2em] text-white/30 font-medium">Production details <span className="text-white/20 normal-case tracking-normal text-[10px]">— private</span></p>
                 <div className="grid grid-cols-2 gap-4">
                   <label className="block">
-                    <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Word count</span>
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">
+                      Word count
+                      <InfoTooltip>
+                        <p>Used to estimate hours (roughly 9,300 words per finished hour) and projected earnings.</p>
+                      </InfoTooltip>
+                    </span>
                     <input type="number" value={form.word_count || ""} onChange={e=>setForm(p=>({...p,word_count:parseInt(e.target.value)||0}))} placeholder="e.g. 90000" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/>
                   </label>
                   <label className="block">
-                    <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Payment type</span>
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">
+                      Payment type
+                      <InfoTooltip>
+                        <p><strong>PFH:</strong> Per Finished Hour of completed audio.</p>
+                        <p><strong>Royalty Share:</strong> Percentage of sales, no upfront payment.</p>
+                        <p><strong>RS+:</strong> Smaller PFH stipend plus royalty share.</p>
+                      </InfoTooltip>
+                    </span>
                     <select value={form.payment_type} onChange={e=>setForm(p=>({...p,payment_type:e.target.value}))} className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 appearance-none">
                       <option value="pfh">PFH (Per Finished Hour)</option>
                       <option value="rs">Royalty Share (RS)</option>
@@ -2034,12 +2092,22 @@ export default function BoardPage() {
                 </div>
                 {(form.payment_type === "pfh" || form.payment_type === "rs_plus") && (
                   <label className="block">
-                    <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">{form.payment_type === "rs_plus" ? "RS+ stipend ($ PFH)" : "PFH rate ($)"}</span>
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">
+                      {form.payment_type === "rs_plus" ? "RS+ stipend ($ PFH)" : "PFH rate ($)"}
+                      <InfoTooltip>
+                        <p>Your per-finished-hour rate for this project. Combines with word count to estimate earnings.</p>
+                      </InfoTooltip>
+                    </span>
                     <input type="number" value={form.pfh_rate || ""} onChange={e=>setForm(p=>({...p,pfh_rate:parseFloat(e.target.value)||0}))} placeholder={form.payment_type === "rs_plus" ? "e.g. 100" : "e.g. 250"} className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/>
                   </label>
                 )}
                 <div>
-                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium block mb-1.5">First 15 due date</span>
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium block mb-1.5">
+                    First 15 due date
+                    <InfoTooltip>
+                      <p>When the first 15 minutes of audio is due to the rights holder for approval. Milestone deadline separate from final delivery.</p>
+                    </InfoTooltip>
+                  </span>
                   <div className="flex gap-2">
                     <select value={form.first15_due ? form.first15_due.split("-")[1] : ""} onChange={e => { const p = form.first15_due?.split("-") || [new Date().getFullYear().toString(),"","01"]; setForm(f=>({...f,first15_due:e.target.value?`${p[0]||new Date().getFullYear()}-${e.target.value}-${p[2]||"01"}`:""}))} } className="flex-1 rounded-lg bg-black/30 border border-white/8 px-2 py-2.5 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 appearance-none">
                       <option value="">Month</option>
@@ -2057,7 +2125,12 @@ export default function BoardPage() {
                 </div>
                 {form.word_count > 0 && (
                   <div className="rounded-lg bg-[#D4AF37]/5 border border-[#D4AF37]/15 px-4 py-3">
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#D4AF37]/60 font-medium mb-1">{form.payment_type==="rs"?"Royalty Share":form.payment_type==="rs_plus"?"RS+ — Estimated upfront":"Estimated earnings"}</p>
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#D4AF37]/60 font-medium mb-1 flex items-center">
+                      {form.payment_type==="rs"?"Royalty Share":form.payment_type==="rs_plus"?"RS+ — Estimated upfront":"Estimated earnings"}
+                      <InfoTooltip variant="inline">
+                        <p>Calculated from word count × PFH rate at ~9,300 words per finished hour. Estimate only.</p>
+                      </InfoTooltip>
+                    </p>
                     {form.payment_type==="rs" ? <p className="text-sm text-[#D4AF37]">~{(form.word_count/9400).toFixed(1)} finished hours · earnings depend on sales</p>
                     : form.pfh_rate>0 ? <p className="text-lg font-bold text-[#D4AF37]">${((form.word_count/9400)*form.pfh_rate).toLocaleString("en-US",{maximumFractionDigits:0})} <span className="text-xs font-normal text-white/30">~{(form.word_count/9400).toFixed(1)} hrs × ${form.pfh_rate}/hr{form.payment_type==="rs_plus"?" + royalties":""}</span></p>
                     : <p className="text-sm text-[#D4AF37]/60">Enter rate to estimate</p>}
@@ -2264,6 +2337,11 @@ export default function BoardPage() {
                 <div className="flex items-center gap-2">
                   <div className={`h-2 w-2 rounded-full ${column.dot}`}/>
                   <h2 className={`text-xs font-bold uppercase tracking-wider ${column.text}`}>{column.label}</h2>
+                  {column.tooltip && (
+                    <InfoTooltip variant="inline">
+                      <p>{column.tooltip}</p>
+                    </InfoTooltip>
+                  )}
                 </div>
                 <span className="text-xs text-white/25 font-mono">{cards.filter(c=>c.status===column.id).length}</span>
               </div>
@@ -2315,6 +2393,11 @@ export default function BoardPage() {
                           <span title="Confidential — under NDA" className="shrink-0 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-[#D4AF37] border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-1.5 py-0.5 rounded-full">
                             <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                             NDA
+                          </span>
+                        )}
+                        {card.narration_format && (
+                          <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full border capitalize text-violet-300 border-violet-400/40 bg-violet-500/10">
+                            {card.narration_format}
                           </span>
                         )}
                       </div>
