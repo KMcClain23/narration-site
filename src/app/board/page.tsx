@@ -49,7 +49,7 @@ interface BoardCard {
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
   title:"", author:"", cover_url:"", status:"contracted", deadline:"",
   notes:"", author_notes:"", links:[], co_narrator:"",
-  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", script_url:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"", trigger_warnings:[], released_at:"", is_confidential:false, narration_format:null, production_type:null, production_company:null,
+  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", script_url:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"", trigger_warnings:[], released_at:"", is_confidential:false, narration_format:null, production_type:"indie", production_company:null,
 };
 
 // ─── Timeline view ────────────────────────────────────────────────────────────
@@ -1601,7 +1601,7 @@ export default function BoardPage() {
       links:card.links,co_narrator:card.co_narrator,subtitle:card.subtitle||"",
       tags:card.tags||[],description:card.description||"",
       audible_link:card.audible_link||"",ar_link:card.ar_link||"",spotify_link:card.spotify_link||"",script_url:card.script_url||"",chapters:card.chapters||[],
-      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||"",trigger_warnings:card.trigger_warnings||[],released_at:card.released_at||"",is_confidential:card.is_confidential||false,narration_format:card.narration_format??null,production_type:card.production_type??null,production_company:card.production_company??null});
+      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||"",trigger_warnings:card.trigger_warnings||[],released_at:card.released_at||"",is_confidential:card.is_confidential||false,narration_format:card.narration_format??null,production_type:card.production_type??"indie",production_company:card.production_company??null});
     setShowForm(false);
   };
 
@@ -1877,9 +1877,10 @@ export default function BoardPage() {
                         key={t}
                         type="button"
                         onClick={() => setForm(p => {
-                          const next = p.production_type === t ? null : t;
-                          if (next !== "company") setCompanyOther(false);
-                          return { ...p, production_type: next, production_company: next === "company" ? p.production_company : null };
+                          // Always one or the other now — Indie is the assumed
+                          // default, so there's no "unset" state to toggle back to.
+                          if (t !== "company") setCompanyOther(false);
+                          return { ...p, production_type: t, production_company: t === "company" ? p.production_company : null };
                         })}
                         className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
                           form.production_type === t
@@ -2472,9 +2473,11 @@ export default function BoardPage() {
                             {card.narration_format}
                           </span>
                         )}
-                        {card.production_type && (
+                        {/* Indie is the assumed default now, so only the exceptional
+                            case (a named production company) gets a pill. */}
+                        {card.production_type === "company" && (
                           <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full border truncate max-w-[110px] text-teal-300 border-teal-400/40 bg-teal-500/10">
-                            {card.production_type === "company" ? (card.production_company || "Company") : "Indie"}
+                            {card.production_company || "Company"}
                           </span>
                         )}
                       </div>
