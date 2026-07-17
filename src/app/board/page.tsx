@@ -1801,9 +1801,15 @@ export default function BoardPage() {
           <div className="w-full max-w-2xl bg-[#0A0D3A] border border-[#1A2070] rounded-2xl shadow-2xl my-8">
             <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/8">
               <h2 className="font-bold text-white text-lg">{editCard?"Edit project":"New project"}</h2>
-              <button onClick={()=>{setShowForm(false);setEditCard(null);}} className="text-white/40 hover:text-white">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
+              <div className="flex items-center gap-3">
+                <button onClick={save} disabled={saving||!form.title.trim()}
+                  className="bg-[#D4AF37] hover:bg-[#E0C15A] text-black font-bold px-4 py-1.5 rounded-full text-xs transition disabled:opacity-50 shrink-0">
+                  {saving?"Saving…":editCard?"Save changes":"Create project"}
+                </button>
+                <button onClick={()=>{setShowForm(false);setEditCard(null);}} className="text-white/40 hover:text-white">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
             </div>
             <div className="px-6 py-5 space-y-4">
               <label className="flex items-start gap-3 rounded-lg border border-[#D4AF37]/25 bg-[#D4AF37]/5 px-4 py-3 cursor-pointer select-none">
