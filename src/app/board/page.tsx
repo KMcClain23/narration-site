@@ -8,6 +8,11 @@ import ScriptUploader from "./ScriptUploader";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import type { NarrationFormat } from "@/types/book";
 
+const PRESET_COMPANIES = [
+  "Spotify", "Blue Nose Audio", "Dark Star Romance", "Podium Audio",
+  "Audible Studios", "Recorded Books", "Tantor Media",
+];
+
 const COLUMNS = [
   { id: "audition",   label: "Audition",   color: "border-purple-500/40 bg-purple-900/35",  dot: "bg-purple-300",  text: "text-purple-200", tooltip: "" },
   { id: "contracted", label: "Contracted", color: "border-blue-500/40 bg-blue-900/35",      dot: "bg-blue-300",    text: "text-blue-200",   tooltip: "Signed but recording hasn't started yet." },
@@ -37,12 +42,14 @@ interface BoardCard {
   released_at?: string;
   is_confidential?: boolean;
   narration_format?: NarrationFormat | null;
+  production_type?: "indie" | "company" | null;
+  production_company?: string | null;
 }
 
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
   title:"", author:"", cover_url:"", status:"contracted", deadline:"",
   notes:"", author_notes:"", links:[], co_narrator:"",
-  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", script_url:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"", trigger_warnings:[], released_at:"", is_confidential:false, narration_format:null,
+  subtitle:"", tags:[], description:"", audible_link:"", ar_link:"", spotify_link:"", script_url:"", chapters:[], word_count:0, first15_due:"", pfh_rate:0, payment_type:"pfh", first_15_complete:false, slug:"", trigger_warnings:[], released_at:"", is_confidential:false, narration_format:null, production_type:null, production_company:null,
 };
 
 // ─── Timeline view ────────────────────────────────────────────────────────────
@@ -1372,6 +1379,10 @@ export default function BoardPage() {
   const authorDropRef = useRef<HTMLDivElement>(null);
   const [cnQuery, setCnQuery] = useState("");
   const [cnDropOpen, setCnDropOpen] = useState(false);
+  // Whether the production-company dropdown is showing its "Other" free-text
+  // input — tracked separately from form.production_company so an in-progress
+  // custom entry (still empty) doesn't get mistaken for "no selection".
+  const [companyOther, setCompanyOther] = useState(false);
   const cnDropRef = useRef<HTMLDivElement>(null);
   const cnInputRef = useRef<HTMLInputElement>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -1584,12 +1595,13 @@ export default function BoardPage() {
     setAuthorQuery(card.author || "");
     setAuthorDropOpen(false);
     setCnQuery(""); setCnDropOpen(false);
+    setCompanyOther(Boolean(card.production_company) && !PRESET_COMPANIES.includes(card.production_company || ""));
     setForm({title:card.title,author:card.author,cover_url:card.cover_url,status:card.status,
       deadline:card.deadline||"",notes:card.notes,author_notes:card.author_notes,
       links:card.links,co_narrator:card.co_narrator,subtitle:card.subtitle||"",
       tags:card.tags||[],description:card.description||"",
       audible_link:card.audible_link||"",ar_link:card.ar_link||"",spotify_link:card.spotify_link||"",script_url:card.script_url||"",chapters:card.chapters||[],
-      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||"",trigger_warnings:card.trigger_warnings||[],released_at:card.released_at||"",is_confidential:card.is_confidential||false,narration_format:card.narration_format??null});
+      word_count:card.word_count||0,first15_due:card.first15_due||"",pfh_rate:card.pfh_rate||0,payment_type:card.payment_type||"pfh",first_15_complete:card.first_15_complete||false,slug:card.slug||"",trigger_warnings:card.trigger_warnings||[],released_at:card.released_at||"",is_confidential:card.is_confidential||false,narration_format:card.narration_format??null,production_type:card.production_type??null,production_company:card.production_company??null});
     setShowForm(false);
   };
 
@@ -1716,7 +1728,7 @@ export default function BoardPage() {
             </button>
           </div>
 
-          <button onClick={()=>{setShowForm(true);setEditCard(null);setForm({...EMPTY});setTagInput("");setTriggerInput("");setAuthorQuery("");setAuthorDropOpen(false);setCnQuery("");setCnDropOpen(false);}}
+          <button onClick={()=>{setShowForm(true);setEditCard(null);setForm({...EMPTY});setTagInput("");setTriggerInput("");setAuthorQuery("");setAuthorDropOpen(false);setCnQuery("");setCnDropOpen(false);setCompanyOther(false);}}
             className="inline-flex items-center gap-1.5 bg-[#D4AF37] text-black text-xs font-bold px-3 sm:px-4 py-2 rounded-full hover:bg-[#E0C15A] transition-colors">
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
             <span className="hidden sm:inline">New project</span>
@@ -1856,6 +1868,60 @@ export default function BoardPage() {
                       );
                     })()}
                   </div>
+                </div>
+                <div>
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Production</span>
+                  <div className="mt-1.5 flex gap-1 rounded-lg border border-white/8 bg-black/30 p-1">
+                    {(["indie", "company"] as const).map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setForm(p => {
+                          const next = p.production_type === t ? null : t;
+                          if (next !== "company") setCompanyOther(false);
+                          return { ...p, production_type: next, production_company: next === "company" ? p.production_company : null };
+                        })}
+                        className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                          form.production_type === t
+                            ? "bg-[#D4AF37] text-black"
+                            : "text-white/50 hover:text-white hover:bg-white/8"
+                        }`}
+                      >
+                        {t === "indie" ? "Indie Author" : "Production Company"}
+                      </button>
+                    ))}
+                  </div>
+                  {form.production_type === "company" && (
+                    <div className="mt-2 space-y-2">
+                      <select
+                        value={companyOther ? "__other__" : (form.production_company || "")}
+                        onChange={e => {
+                          const v = e.target.value;
+                          if (v === "__other__") {
+                            setCompanyOther(true);
+                            setForm(p => ({ ...p, production_company: PRESET_COMPANIES.includes(p.production_company || "") ? "" : (p.production_company || "") }));
+                          } else {
+                            setCompanyOther(false);
+                            setForm(p => ({ ...p, production_company: v }));
+                          }
+                        }}
+                        className="w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#D4AF37]/40 appearance-none"
+                      >
+                        <option value="">Select a company…</option>
+                        {PRESET_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        <option value="__other__">Other…</option>
+                      </select>
+                      {companyOther && (
+                        <input
+                          type="text"
+                          value={form.production_company || ""}
+                          onChange={e => setForm(p => ({ ...p, production_company: e.target.value }))}
+                          placeholder="Company name"
+                          className="w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div ref={cnDropRef}>
                   <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Co-narrator</span>
@@ -2404,6 +2470,11 @@ export default function BoardPage() {
                         {card.narration_format && (
                           <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full border capitalize text-violet-300 border-violet-400/40 bg-violet-500/10">
                             {card.narration_format}
+                          </span>
+                        )}
+                        {card.production_type && (
+                          <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full border truncate max-w-[110px] text-teal-300 border-teal-400/40 bg-teal-500/10">
+                            {card.production_type === "company" ? (card.production_company || "Company") : "Indie"}
                           </span>
                         )}
                       </div>

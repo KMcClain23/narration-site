@@ -125,3 +125,21 @@ begin
       check (narration_format is null or narration_format in ('solo', 'dual', 'duet', 'multicast'));
   end if;
 end $$;
+
+-- production_type/production_company: whether a project is with an indie
+-- author or a production company, and which one. production_company is free
+-- text (not CHECK-constrained) so "Other" custom entries work without a
+-- migration — the admin UI's dropdown enforces the curated list.
+alter table board_cards add column if not exists production_type text;
+alter table board_cards add column if not exists production_company text;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'board_cards_production_type_check'
+  ) then
+    alter table board_cards
+      add constraint board_cards_production_type_check
+      check (production_type is null or production_type in ('indie', 'company'));
+  end if;
+end $$;
