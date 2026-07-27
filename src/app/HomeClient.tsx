@@ -112,16 +112,17 @@ function titleToSlug(t: string) {
 const WAVE_BARS = [3,5,9,14,20,17,12,7,3,6,11,17,22,18,13,8,4,7,13,20,24,17,10,5,3,8,15,22,18,11,5,3];
 
 function DemoPlayer({
-  title, desc, src, slug, index, activeIndex, setActiveIndex, audioRefs, color, tags,
+  title, desc, src, slug, index, activeIndex, setActiveIndex, audioRefs, color, tags, durationSeconds,
 }: {
   title: string; desc: string; src: string; slug: string; index: number; color: string; tags: string[];
   activeIndex: number | null; setActiveIndex: (v: number | null) => void;
   audioRefs: React.MutableRefObject<(HTMLAudioElement | null)[]>;
+  durationSeconds?: number;
 }) {
   const isActive = activeIndex === index;
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
-  const [duration, setDuration] = useState(0);
+  const [duration, setDuration] = useState(durationSeconds ?? 0);
   const [progress, setProgress] = useState(0);
   const [displayTime, setDisplayTime] = useState(0);
   const [muted, setMuted] = useState(false);
@@ -178,11 +179,16 @@ function DemoPlayer({
     const a = audioElRef.current;
     if (!a) return;
     const onTimeUpdate = () => {
-      const dur = a.duration || 0;
+      const rawDur = a.duration;
+      const dur = Number.isFinite(rawDur) && rawDur > 0 ? rawDur : (durationSeconds ?? 0);
       setDisplayTime(a.currentTime);
       setProgress(dur > 0 ? (a.currentTime / dur) * 100 : 0);
     };
-    const onDurationChange = () => setDuration(a.duration || 0);
+    const onDurationChange = () => {
+      // Streamed R2 files sometimes report duration as Infinity/NaN until
+      // fully buffered — keep the known duration_seconds fallback instead.
+      if (Number.isFinite(a.duration) && a.duration > 0) setDuration(a.duration);
+    };
     const onPlay = () => {
       setPlaying(true); setBuffering(false); setActiveIndex(index);
       sendGAEvent("event", "demo_play", { event_category: "Audio", event_label: title, value: index });
@@ -208,7 +214,7 @@ function DemoPlayer({
       a.removeEventListener("playing", onPlaying);
       a.removeEventListener("ended", onEnded);
     };
-  }, [index, title, setActiveIndex]);
+  }, [index, title, setActiveIndex, durationSeconds]);
 
   return (
     <div
@@ -638,6 +644,7 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow, demos: ra
     slug:   titleToSlug(d.title),
     color:  DEMO_COLORS[i % DEMO_COLORS.length],
     tags:   d.genre ? [d.genre] : [],
+    durationSeconds: d.duration_seconds ?? 0,
   }));
 
   return (
@@ -786,7 +793,7 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow, demos: ra
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {demos.map((demo, index) => (
               <DemoPlayer key={demo.title} title={demo.title} desc={demo.desc} src={demo.src} slug={demo.slug}
-                color={demo.color} tags={demo.tags}
+                color={demo.color} tags={demo.tags} durationSeconds={demo.durationSeconds}
                 index={index} activeIndex={activeIndex} setActiveIndex={setActiveIndex} audioRefs={audioRefs} />
             ))}
           </div>
