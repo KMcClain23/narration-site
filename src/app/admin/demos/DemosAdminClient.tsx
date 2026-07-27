@@ -19,6 +19,14 @@ const GENRES = [
   "Romance", "Dark Romance", "Romantasy", "Thriller",
   "Fantasy", "Contemporary", "Drama", "Multi-Character", "Other",
 ];
+const KNOWN_GENRES = GENRES.filter(g => g !== "Other");
+
+// A genre value that isn't one of the presets is treated as a saved custom
+// genre — the select shows "Other" and the free-text field shows the value.
+function splitGenre(g: string | null): { select: string; custom: string } {
+  if (!g) return { select: "", custom: "" };
+  return KNOWN_GENRES.includes(g) ? { select: g, custom: "" } : { select: "Other", custom: g };
+}
 
 function fmtDuration(s: number | null) {
   if (!s) return null;
@@ -71,9 +79,10 @@ function AddDemoForm({ onAdded, onCancel }: {
   onAdded: (demo: DemoRecord) => void;
   onCancel: () => void;
 }) {
-  const [title,    setTitle]    = useState("");
-  const [genre,    setGenre]    = useState("");
-  const [desc,     setDesc]     = useState("");
+  const [title,       setTitle]       = useState("");
+  const [genre,       setGenre]       = useState("");
+  const [customGenre, setCustomGenre] = useState("");
+  const [desc,        setDesc]        = useState("");
   const [file,     setFile]     = useState<File | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
   const [progress, setProgress] = useState(0);
@@ -90,6 +99,7 @@ function AddDemoForm({ onAdded, onCancel }: {
 
   const handleSubmit = async () => {
     if (!title.trim() || !file) return;
+    const finalGenre = genre === "Other" ? customGenre.trim() : genre;
     setBusy(true);
     setProgress(0);
     try {
@@ -98,7 +108,7 @@ function AddDemoForm({ onAdded, onCancel }: {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
-          title: title.trim(), genre: genre || null,
+          title: title.trim(), genre: finalGenre || null,
           description: desc.trim() || null,
           file_url: publicUrl, file_key: key,
           duration_seconds: duration,
@@ -137,6 +147,16 @@ function AddDemoForm({ onAdded, onCancel }: {
           </select>
         </div>
       </div>
+
+      {genre === "Other" && (
+        <div>
+          <label className="block text-[10.5px] uppercase tracking-widest text-white/50 mb-1.5">Custom Genre</label>
+          <input
+            value={customGenre} onChange={e => setCustomGenre(e.target.value)}
+            placeholder="Enter genre…" className={inp} disabled={busy} autoFocus
+          />
+        </div>
+      )}
 
       <div>
         <label className="block text-[10.5px] uppercase tracking-widest text-white/50 mb-1.5">Description</label>
@@ -243,17 +263,20 @@ function DemoCard({
   onMoveDown: () => void;
 }) {
   // ── Inline edit state ───────────────────────────────────────────────────────
-  const [editing,    setEditing]    = useState(false);
-  const [editTitle,  setEditTitle]  = useState(demo.title);
-  const [editGenre,  setEditGenre]  = useState(demo.genre  ?? "");
-  const [editDesc,   setEditDesc]   = useState(demo.description ?? "");
-  const [savingEdit, setSavingEdit] = useState(false);
+  const [editing,     setEditing]     = useState(false);
+  const [editTitle,   setEditTitle]   = useState(demo.title);
+  const [editGenre,   setEditGenre]   = useState(() => splitGenre(demo.genre).select);
+  const [editCustomGenre, setEditCustomGenre] = useState(() => splitGenre(demo.genre).custom);
+  const [editDesc,    setEditDesc]    = useState(demo.description ?? "");
+  const [savingEdit,  setSavingEdit]  = useState(false);
 
   // Sync edit fields if demo prop changes externally
   useEffect(() => {
     if (!editing) {
       setEditTitle(demo.title);
-      setEditGenre(demo.genre ?? "");
+      const { select, custom } = splitGenre(demo.genre);
+      setEditGenre(select);
+      setEditCustomGenre(custom);
       setEditDesc(demo.description ?? "");
     }
   }, [demo, editing]);
@@ -263,6 +286,7 @@ function DemoCard({
 
   const handleSaveEdit = async () => {
     if (!editTitle.trim()) return;
+    const finalGenre = editGenre === "Other" ? editCustomGenre.trim() : editGenre;
     setSavingEdit(true);
     try {
       const res = await fetch("/api/demos", {
@@ -271,7 +295,7 @@ function DemoCard({
         body:    JSON.stringify({
           id:          demo.id,
           title:       editTitle.trim(),
-          genre:       editGenre || null,
+          genre:       finalGenre || null,
           description: editDesc.trim() || null,
         }),
       });
@@ -361,6 +385,13 @@ function DemoCard({
                   </select>
                 </div>
               </div>
+              {editGenre === "Other" && (
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Custom Genre</label>
+                  <input value={editCustomGenre} onChange={e => setEditCustomGenre(e.target.value)}
+                    className={editInp} placeholder="Enter genre…" disabled={savingEdit} autoFocus />
+                </div>
+              )}
               <div>
                 <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Description</label>
                 <input value={editDesc} onChange={e => setEditDesc(e.target.value)}
