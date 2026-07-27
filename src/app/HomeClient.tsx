@@ -669,7 +669,7 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow, demos: ra
       <div id="top" />
 
       {/* ── HERO ── */}
-      <section className="relative min-h-[60vh] flex items-center" aria-label="Introduction">
+      <section className="relative min-h-[60vh] flex items-center pt-16 sm:pt-20" aria-label="Introduction">
         {/* Full bleed background */}
         <div className="absolute inset-0">
           <Image src={BANNER_URL} alt="Dean Miller recording studio" fill

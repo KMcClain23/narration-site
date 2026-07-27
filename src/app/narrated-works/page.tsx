@@ -627,7 +627,7 @@ export default function NarratedWorks() {
 
   return (
     <main className="min-h-screen bg-[#06082E] text-white overflow-x-clip">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-0 pb-12">
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-20 sm:pt-24 pb-12">
 
         {/* Page title — sticky */}
         <div className="sticky top-14 sm:top-16 z-40 -mx-5 sm:-mx-8 px-5 sm:px-8 py-2 sm:py-3 mb-4 sm:mb-6"
