@@ -13,7 +13,7 @@ const BANNER_URL =
   "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerBanner.png";
 
 const PROFILE_URL =
-  "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile.jpg";
+  "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile%20Photo%202.jpg";
 
 const LOGO_ITEMS: { name: string; src: string; href: string; filter?: string }[] = [
   {
@@ -1025,7 +1025,7 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow, demos: ra
             {/* Wordmark */}
             <div className="flex flex-col items-center gap-2 mb-10">
               <div className="h-10 w-10 rounded-full border border-white/15 bg-white/5 overflow-hidden">
-                <Image src="/dean-profile.png" alt="Dean Miller" width={40} height={40} className="object-cover"/>
+                <Image src="https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile%20Photo%202.jpg" alt="Dean Miller" width={40} height={40} className="object-cover" style={{ objectPosition: "center 30%" }}/>
               </div>
               <div className="text-center leading-tight">
                 <p className="text-sm font-semibold text-white/80">Dean Miller</p>

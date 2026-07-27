@@ -144,11 +144,12 @@ export default function Header() {
         >
           <div className="h-9 w-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center overflow-hidden transition group-hover:border-[#D4AF37]/50 group-hover:bg-[#D4AF37]/10">
             <Image
-              src="/dean-profile.png"
+              src="https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile%20Photo%202.jpg"
               alt="Dean Miller"
               width={36}
               height={36}
               className="object-cover"
+              style={{ objectPosition: "center 30%" }}
               priority
             />
           </div>

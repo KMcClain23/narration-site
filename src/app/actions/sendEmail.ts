@@ -18,7 +18,7 @@ const INQUIRY_KEY = "dmn_inquiries";
 
 // Assets and Links
 const LOGO_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerLogo.png";
-const HEADSHOT_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile.jpg";
+const HEADSHOT_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile%20Photo%202.jpg";
 const BANNER_URL = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/DeanMillerBanner.png";
 const BOOKINGS_URL = "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
 const SITE_URL = "https://dmnarration.com";
@@ -89,7 +89,7 @@ const clientTemplate = (name: string) => `
         <table role="presentation" style="margin: 0 auto; text-align: left; border-collapse: collapse;">
           <tr>
             <td style="padding-right: 15px; vertical-align: middle;">
-              <img src="${HEADSHOT_URL}" alt="Dean Miller" style="width: 64px; height: 64px; border-radius: 50%; border: 2px solid #D4AF37; object-fit: cover; display: block;">
+              <img src="${HEADSHOT_URL}" alt="Dean Miller" style="width: 64px; height: 64px; border-radius: 50%; border: 2px solid #D4AF37; object-fit: cover; object-position: center 30%; display: block;">
             </td>
             <td style="vertical-align: middle;">
               <p style="font-size: 18px; font-weight: bold; margin: 0; color: #ffffff; line-height: 1.2;">Dean Miller</p>

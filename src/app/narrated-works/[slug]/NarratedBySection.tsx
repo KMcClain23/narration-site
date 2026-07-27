@@ -146,10 +146,11 @@ function DeanPopup() {
       <div className="flex items-center gap-3 mb-3">
         <div className="relative h-12 w-12 rounded-full overflow-hidden border border-white/15 shrink-0">
           <Image
-            src="/dean-headshot.jpg"
+            src="https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile%20Photo%202.jpg"
             alt="Dean Miller"
             fill
-            className="object-cover object-top"
+            className="object-cover"
+            style={{ objectPosition: "center 30%" }}
             sizes="48px"
           />
         </div>
@@ -292,10 +293,11 @@ export function NarratedBySection({
           <div className={`flex items-center ${rowGap} cursor-default select-none`}>
             <div className={`relative ${avatarSize} rounded-full overflow-hidden border border-white/15 shrink-0`}>
               <Image
-                src="/dean-headshot.jpg"
+                src="https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile%20Photo%202.jpg"
                 alt="Dean Miller"
                 fill
-                className="object-cover object-top"
+                className="object-cover"
+                style={{ objectPosition: "center 30%" }}
                 sizes={avatarSizePx}
               />
             </div>
