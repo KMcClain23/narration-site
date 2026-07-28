@@ -39,12 +39,23 @@ export async function GET(req: Request) {
     }
   }
 
-  // Admin: get all cards
-  const { data, error } = await supabaseAdmin
-    .from("board_cards")
-    .select("*")
-    .order("status")
-    .order("sort_order");
+  // Admin: get all cards. Archived cards are hidden from the main board by
+  // default; pass ?archived=1 to fetch only the archived ones (Archive view).
+  const showArchived = searchParams.get("archived") === "1";
+  let query = supabaseAdmin.from("board_cards").select("*");
+  query = showArchived
+    ? query.not("archived_at", "is", null).order("archived_at", { ascending: false })
+    : query.is("archived_at", null).order("status").order("sort_order");
+  let { data, error } = await query;
+
+  // archived_at column may not exist yet (migration not run) — retry unfiltered
+  // rather than let the whole board fail to load.
+  if (error && error.message?.includes("archived_at")) {
+    const fallback = await supabaseAdmin.from("board_cards").select("*").order("status").order("sort_order");
+    data = fallback.data;
+    error = fallback.error;
+  }
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ cards: data });
 }
@@ -193,8 +204,9 @@ export async function PUT(req: Request) {
       "first_15_complete", "dean_message", "author_email", "author_token",
       "email_updates_enabled", "script_url", "trigger_warnings", "released_at",
       "is_confidential", "narration_format", "production_type", "production_company",
+      "archived_at", "archived_reason", "archived_notes",
     ];
-    const DATE_FIELDS = new Set(["deadline", "first15_due", "first_15_due", "released_at"]);
+    const DATE_FIELDS = new Set(["deadline", "first15_due", "first_15_due", "released_at", "archived_at"]);
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
       if (key in fields) {
@@ -252,6 +264,13 @@ export async function PUT(req: Request) {
     if (error && (error.message?.includes("production_type") || error.message?.includes("production_company"))) {
       delete update.production_type;
       delete update.production_company;
+      ({ data, error } = await supabaseAdmin
+        .from("board_cards").update(update).eq("id", id).select().single());
+    }
+    if (error && (error.message?.includes("archived_at") || error.message?.includes("archived_reason") || error.message?.includes("archived_notes"))) {
+      delete update.archived_at;
+      delete update.archived_reason;
+      delete update.archived_notes;
       ({ data, error } = await supabaseAdmin
         .from("board_cards").update(update).eq("id", id).select().single());
     }

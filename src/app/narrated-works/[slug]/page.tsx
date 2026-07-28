@@ -84,7 +84,8 @@ async function getBook(slug: string) {
   const { data } = await supabaseAdmin
     .from("board_cards")
     .select("id, title, subtitle, author, author_notes, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status, trigger_warnings, released_at, is_confidential, narration_format")
-    .in("status", ["contracted", "recording", "editing", "released"]);
+    .in("status", ["contracted", "recording", "editing", "released"])
+    .is("archived_at", null);
   if (!data) return null;
   const card = data.find((c) => slugFor(c as { id: string; title: string; is_confidential?: boolean }) === slug);
   return card ? redactIfConfidential(card) : null;
@@ -177,6 +178,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
     .from("board_cards")
     .select("id, title, cover_url, is_confidential")
     .in("status", ["contracted", "recording", "editing", "released"])
+    .is("archived_at", null)
     .order("sort_order", { ascending: true })
     .order("title",      { ascending: true });
   const allBooks = (allBooksRaw ?? [])

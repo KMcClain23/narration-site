@@ -7,7 +7,8 @@ export async function GET() {
   const { data, error } = await supabaseAdmin
     .from("board_cards")
     .select("author, tags, co_narrator")
-    .eq("status", "released");
+    .eq("status", "released")
+    .is("archived_at", null);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

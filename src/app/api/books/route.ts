@@ -114,6 +114,7 @@ export async function GET() {
       .from("board_cards")
       .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, slug, deadline, first15_due, first_15_complete, is_confidential, narration_format")
       .in("status", STATUS_FILTER)
+      .is("archived_at", null)
       .order("sort_order",  { ascending: true })
       .order("title",       { ascending: true });
 
@@ -126,6 +127,7 @@ export async function GET() {
         .from("board_cards")
         .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, deadline, first15_due, first_15_complete, is_confidential, narration_format")
         .in("status", STATUS_FILTER)
+        .is("archived_at", null)
         .order("sort_order", { ascending: true })
         .order("title",      { ascending: true });
 
@@ -136,6 +138,7 @@ export async function GET() {
           .from("board_cards")
           .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, deadline, first15_due, first_15_complete")
           .in("status", STATUS_FILTER)
+          .is("archived_at", null)
           .order("sort_order", { ascending: true })
           .order("title",      { ascending: true });
 

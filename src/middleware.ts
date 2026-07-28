@@ -8,7 +8,7 @@ export function middleware(req: NextRequest) {
 
   // Protect /admin/* (except login) and /board/* (except token-based author views)
   const isAdminRoute = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login");
-  const isBoardRoute = pathname === "/board" || pathname.startsWith("/board/card");
+  const isBoardRoute = pathname === "/board" || pathname === "/board/archive" || pathname.startsWith("/board/card");
 
   if (isAdminRoute || isBoardRoute) {
     const cookie = req.cookies.get(COOKIE_NAME)?.value ?? "";
@@ -30,5 +30,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/board", "/board/card/:path*"],
+  matcher: ["/admin/:path*", "/board", "/board/archive", "/board/card/:path*"],
 };

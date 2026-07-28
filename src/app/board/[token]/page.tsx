@@ -36,7 +36,7 @@ export default async function AuthorBoardView({ params }: { params: Promise<{ to
 
   const { data: cardFull, error: fullErr } = await supabaseAdmin
     .from("board_cards")
-    .select(`${BASE_SELECT}, dean_message`)
+    .select(`${BASE_SELECT}, dean_message, archived_at`)
     .eq("author_token", token)
     .single();
 
@@ -104,6 +104,15 @@ export default async function AuthorBoardView({ params }: { params: Promise<{ to
       </div>
 
       <div className="max-w-2xl mx-auto px-5 py-8 sm:py-12 space-y-6">
+
+        {/* ── Archived notice ── */}
+        {card.archived_at && (
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center">
+            <p className="text-xs text-white/45">
+              This project has been archived. Contact Dean if you have questions.
+            </p>
+          </div>
+        )}
 
         {/* ── Hero cover ── */}
         {card.cover_url && (

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { EmailScanSection } from "./EmailScanSection";
 import ScriptUploader from "./ScriptUploader";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
-import type { NarrationFormat } from "@/types/book";
+import type { NarrationFormat, ArchivedReason } from "@/types/book";
 
 const PRESET_COMPANIES = [
   "Spotify", "Blue Nose Audio", "Dark Star Romance", "Podium Audio",
@@ -20,6 +20,9 @@ const COLUMNS = [
   { id: "editing",    label: "Editing",    color: "border-orange-500/40 bg-orange-900/25",  dot: "bg-orange-300",  text: "text-orange-200", tooltip: "Recording done — with an editor for pickups and polish." },
   { id: "released",   label: "Released",   color: "border-emerald-500/40 bg-emerald-900/35",dot: "bg-emerald-300", text: "text-emerald-200", tooltip: "Audiobook is live and published." },
 ];
+
+const ARCHIVE_REASONS = ["recasted", "canceled", "other"] as const;
+const ARCHIVE_REASON_LABEL: Record<string, string> = { recasted: "Recasted", canceled: "Canceled", other: "Other" };
 
 interface Link { label: string; url: string; }
 interface BoardCard {
@@ -44,6 +47,9 @@ interface BoardCard {
   narration_format?: NarrationFormat | null;
   production_type?: "indie" | "company" | null;
   production_company?: string | null;
+  archived_at?: string | null;
+  archived_reason?: ArchivedReason | null;
+  archived_notes?: string | null;
 }
 
 const EMPTY: Omit<BoardCard, "id"|"author_token"|"sort_order"> = {
@@ -1392,6 +1398,12 @@ export default function BoardPage() {
   const [importingId, setImportingId] = useState<string|null>(null);
   const [inlineEdit, setInlineEdit] = useState<{cardId:string;field:"deadline"|"first15_due"|"co_narrator"|"payment";strVal:string;numVal?:number}|null>(null);
   const inlineRef = useRef<HTMLDivElement>(null);
+  const [archivedCount, setArchivedCount] = useState(0);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [archiveReason, setArchiveReason] = useState<typeof ARCHIVE_REASONS[number]>("recasted");
+  const [archiveNotes, setArchiveNotes] = useState("");
+  const [archiving, setArchiving] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1414,6 +1426,22 @@ export default function BoardPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  // Deep-link support: /board?edit=<id> opens the standard Edit Project modal
+  // for that card — used by the Archive list view (archived cards aren't in
+  // the main `cards` list, so this fetches the card directly by id).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const editId = new URLSearchParams(window.location.search).get("edit");
+    if (!editId) return;
+    (async () => {
+      try {
+        const r = await fetch(`/api/board?id=${encodeURIComponent(editId)}`);
+        const d = await r.json();
+        if (d.card) startEdit(d.card);
+      } catch {}
+      window.history.replaceState({}, "", "/board");
+    })();
+  }, []);
   useEffect(() => {
     const saved = localStorage.getItem("boardView");
     if (saved === "board" || saved === "timeline" || saved === "dashboard") setView(saved);
@@ -1446,6 +1474,12 @@ export default function BoardPage() {
     fetch("/api/board-messages?summary=true")
       .then(r => r.json())
       .then(d => { if (d.counts) setUnreadCounts(d.counts); })
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    fetch("/api/board?archived=1")
+      .then(r => r.json())
+      .then(d => setArchivedCount((d.cards || []).length))
       .catch(() => {});
   }, []);
 
@@ -1548,6 +1582,46 @@ export default function BoardPage() {
 
   const del = (id: string, title = "this project") => {
     setDeleteConfirm({ id, title });
+  };
+
+  const doArchive = async () => {
+    if (!editCard) return;
+    setArchiving(true);
+    try {
+      const body = {
+        id: editCard.id,
+        archived_at: new Date().toISOString(),
+        archived_reason: archiveReason,
+        archived_notes: archiveNotes.trim() || null,
+      };
+      const r = await fetch("/api/board", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const d = await r.json();
+      if (!r.ok) { setError(d.error || "Failed to archive project."); setArchiving(false); return; }
+      setCards(p => p.filter(c => c.id !== editCard.id));
+      setArchivedCount(n => n + 1);
+      setArchiveConfirmOpen(false);
+      setEditCard(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Archive failed — check connection.");
+    }
+    setArchiving(false);
+  };
+
+  const doRestore = async () => {
+    if (!editCard) return;
+    setRestoring(true);
+    try {
+      const body = { id: editCard.id, archived_at: null, archived_reason: null, archived_notes: null };
+      const r = await fetch("/api/board", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const d = await r.json();
+      if (!r.ok) { setError(d.error || "Failed to restore project."); setRestoring(false); return; }
+      setEditCard(null);
+      setArchivedCount(n => Math.max(0, n - 1));
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Restore failed — check connection.");
+    }
+    setRestoring(false);
   };
 
   const confirmDel = async () => {
@@ -1698,6 +1772,9 @@ export default function BoardPage() {
           <span className="text-white/20">/</span>
           <h1 className="text-sm font-bold text-white">Production Board</h1>
           <span className="text-xs text-white/25">{cards.length} projects</span>
+          <Link href="/board/archive" className="text-xs text-white/20 hover:text-white/50 transition-colors">
+            Archive{archivedCount > 0 ? ` (${archivedCount})` : ""}
+          </Link>
         </div>
         <div className="flex items-center gap-2">
           {/* Dashboard / Board / Timeline tabs */}
@@ -2313,6 +2390,34 @@ export default function BoardPage() {
                 </div>
               )}
 
+              {/* Archive section — muted, visually separated, near the bottom on purpose */}
+              {editCard && (
+                <div className="pt-5 border-t border-white/8">
+                  {editCard.archived_at ? (
+                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                      <p className="text-xs text-white/45 leading-relaxed">
+                        This project was archived on{" "}
+                        {new Date(editCard.archived_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.
+                        {" "}Reason: <span className="text-white/65 font-medium">{ARCHIVE_REASON_LABEL[editCard.archived_reason ?? "other"]}</span>
+                      </p>
+                      {editCard.archived_notes && (
+                        <p className="text-xs text-white/35 mt-2.5 leading-relaxed whitespace-pre-wrap">{editCard.archived_notes}</p>
+                      )}
+                      <button type="button" onClick={doRestore} disabled={restoring}
+                        className="mt-3.5 text-xs font-bold px-4 py-2 rounded-full border border-white/15 text-white/60 hover:text-white hover:border-white/30 transition-colors disabled:opacity-50">
+                        {restoring ? "Restoring…" : "Restore Project"}
+                      </button>
+                    </div>
+                  ) : (
+                    <button type="button"
+                      onClick={() => { setArchiveReason("recasted"); setArchiveNotes(""); setArchiveConfirmOpen(true); }}
+                      className="text-xs font-bold px-4 py-2 rounded-full border border-white/12 text-white/35 hover:text-white/65 hover:border-white/25 transition-colors">
+                      Archive Project
+                    </button>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-3 pt-2">
                 <button onClick={save} disabled={saving||!form.title.trim()}
                   className="flex-1 bg-[#D4AF37] hover:bg-[#E0C15A] text-black font-bold py-3 rounded-full text-sm transition disabled:opacity-50">
@@ -2321,6 +2426,49 @@ export default function BoardPage() {
                 <button onClick={()=>{setShowForm(false);setEditCard(null);}}
                   className="border border-white/20 text-white/60 hover:text-white px-6 py-3 rounded-full text-sm transition">Cancel</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archive confirmation dialog */}
+      {archiveConfirmOpen && editCard && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center px-4"
+          style={{background:"rgba(0,0,0,0.65)",backdropFilter:"blur(4px)"}}
+          onClick={e=>{if(e.target===e.currentTarget) setArchiveConfirmOpen(false);}}>
+          <div className="w-full max-w-sm bg-[#0A0D3A] border border-white/15 rounded-2xl p-6 shadow-2xl">
+            <h3 className="font-bold text-white text-base mb-2">Archive project?</h3>
+            <p className="text-sm text-white/55 mb-5 leading-relaxed">
+              <span className="text-white font-semibold">&ldquo;{editCard.title}&rdquo;</span>{" "}
+              will be hidden from the board and public site, but kept in the Archive.
+            </p>
+
+            <div className="space-y-2 mb-4">
+              {ARCHIVE_REASONS.map(r => (
+                <label key={r} className="flex items-center gap-2.5 text-sm text-white/70 cursor-pointer">
+                  <input type="radio" name="archive-reason" checked={archiveReason===r}
+                    onChange={()=>setArchiveReason(r)} className="accent-[#D4AF37]"/>
+                  {ARCHIVE_REASON_LABEL[r]}
+                </label>
+              ))}
+            </div>
+
+            <label className="block mb-5">
+              <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Notes (optional)</span>
+              <textarea value={archiveNotes} onChange={e=>setArchiveNotes(e.target.value)} rows={3}
+                placeholder="Context for later — e.g. why it was recasted..."
+                className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 resize-none"/>
+            </label>
+
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setArchiveConfirmOpen(false)}
+                className="flex-1 py-2.5 rounded-full border border-white/15 text-sm text-white/70 hover:text-white transition-colors">
+                Cancel
+              </button>
+              <button type="button" onClick={doArchive} disabled={archiving}
+                className="flex-1 py-2.5 rounded-full bg-white/15 hover:bg-white/25 text-white font-bold text-sm transition-colors disabled:opacity-50">
+                {archiving ? "Archiving…" : "Archive"}
+              </button>
             </div>
           </div>
         </div>

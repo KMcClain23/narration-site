@@ -44,7 +44,8 @@ export default async function Page() {
     const { data } = await supabaseAdmin
       .from("board_cards")
       .select("author, tags, co_narrator, word_count")
-      .eq("status", "released");
+      .eq("status", "released")
+      .is("archived_at", null);
     const rows = data ?? [];
     const coNarratorSet = new Set<string>();
     for (const row of rows) {

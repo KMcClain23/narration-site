@@ -143,3 +143,23 @@ begin
       check (production_type is null or production_type in ('indie', 'company'));
   end if;
 end $$;
+
+-- archived_at/archived_reason/archived_notes: soft-archive for projects no
+-- longer active in the pipeline (recasted, canceled, etc.) that should stay
+-- accessible in the admin but hidden everywhere else. Separate from status
+-- (active workflow stage) and is_confidential (NDA visibility) — a card can
+-- be archived regardless of what either of those is set to.
+alter table board_cards add column if not exists archived_at     timestamptz;
+alter table board_cards add column if not exists archived_reason text;
+alter table board_cards add column if not exists archived_notes  text;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'board_cards_archived_reason_check'
+  ) then
+    alter table board_cards
+      add constraint board_cards_archived_reason_check
+      check (archived_reason is null or archived_reason in ('recasted', 'canceled', 'other'));
+  end if;
+end $$;

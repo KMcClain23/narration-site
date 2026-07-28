@@ -43,7 +43,8 @@ export default async function AdminStatsPage() {
   const { data: cardRows } = await supabaseAdmin
     .from("board_cards")
     .select("id, title, deadline, first15_due, status")
-    .neq("status", "released");
+    .neq("status", "released")
+    .is("archived_at", null);
 
   type CardRow = { id: string; title: string; deadline: string | null; first15_due: string | null; status: string };
   const datedCards: CardRow[] = (cardRows ?? []).filter(
