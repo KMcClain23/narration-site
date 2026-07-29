@@ -10,7 +10,17 @@ export function middleware(req: NextRequest) {
   const isAdminRoute = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login");
   const isBoardRoute = pathname === "/board" || pathname === "/board/archive" || pathname.startsWith("/board/card");
 
-  if (isAdminRoute || isBoardRoute) {
+  // New admin redesign routes (Stage 1+) — same cookie gate as everything else above.
+  const isNewAdminRoute =
+    pathname === "/board-v2" ||
+    pathname === "/schedule" ||
+    pathname.startsWith("/contacts") ||
+    pathname === "/inquiries-v2" ||
+    pathname === "/demos-v2" ||
+    pathname.startsWith("/tools") ||
+    pathname === "/settings";
+
+  if (isAdminRoute || isBoardRoute || isNewAdminRoute) {
     const cookie = req.cookies.get(COOKIE_NAME)?.value ?? "";
     if (!cookie) {
       const url = req.nextUrl.clone();
@@ -30,5 +40,9 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/board", "/board/archive", "/board/card/:path*"],
+  matcher: [
+    "/admin/:path*", "/board", "/board/archive", "/board/card/:path*",
+    "/board-v2", "/schedule", "/contacts", "/contacts/:path*",
+    "/inquiries-v2", "/demos-v2", "/tools", "/tools/:path*", "/settings",
+  ],
 };
