@@ -18,7 +18,8 @@ export function middleware(req: NextRequest) {
     pathname === "/inquiries-v2" ||
     pathname === "/demos-v2" ||
     pathname.startsWith("/tools") ||
-    pathname === "/settings";
+    pathname === "/settings" ||
+    pathname === "/released";
 
   if (isAdminRoute || isBoardRoute || isNewAdminRoute) {
     const cookie = req.cookies.get(COOKIE_NAME)?.value ?? "";
@@ -43,6 +44,6 @@ export const config = {
   matcher: [
     "/admin/:path*", "/board", "/board/archive", "/board/card/:path*",
     "/board-v2", "/schedule", "/contacts", "/contacts/:path*",
-    "/inquiries-v2", "/demos-v2", "/tools", "/tools/:path*", "/settings",
+    "/inquiries-v2", "/demos-v2", "/tools", "/tools/:path*", "/settings", "/released",
   ],
 };
