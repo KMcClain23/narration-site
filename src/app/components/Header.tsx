@@ -12,6 +12,24 @@ import { useCart } from "@/context/CartContext";
 const BOOKINGS_URL =
   "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
 
+// Admin (old and new) is its own world with no public chrome — mirrors the
+// route set middleware.ts gates, plus the rest of /admin/* that middleware
+// doesn't need to gate (e.g. /admin/login) but which still shouldn't show
+// the public header.
+function isAdminWorldRoute(pathname: string): boolean {
+  if (pathname.startsWith("/admin")) return true;
+  if (pathname === "/board" || pathname === "/board/archive" || pathname.startsWith("/board/card")) return true;
+  if (pathname === "/board-v2") return true;
+  if (pathname === "/schedule") return true;
+  if (pathname.startsWith("/contacts")) return true;
+  if (pathname === "/inquiries-v2") return true;
+  if (pathname === "/demos-v2") return true;
+  if (pathname.startsWith("/tools")) return true;
+  if (pathname === "/settings") return true;
+  if (pathname === "/released") return true;
+  return false;
+}
+
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const { count: cartCount, openCart } = useCart();
@@ -129,6 +147,8 @@ export default function Header() {
       setAdminError("Login failed. Try again.");
     }
   };
+
+  if (isAdminWorldRoute(pathname)) return null;
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 h-12 sm:h-16 transition-all duration-200 ${headerClass}`}>

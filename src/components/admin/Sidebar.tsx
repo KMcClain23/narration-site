@@ -75,10 +75,7 @@ export function Sidebar() {
 
   return (
     <aside
-      // Sticks just below the public site's fixed header (top-14/top-16,
-      // matching AdminLayout's pt-14/pt-16) rather than top-0, and fills
-      // exactly the remaining viewport height below that header.
-      className={`shrink-0 min-h-[calc(100vh-3.5rem)] sm:min-h-[calc(100vh-4rem)] sticky top-14 sm:top-16 flex flex-col bg-surface border-r border-surface-border transition-[width] duration-150 ${
+      className={`shrink-0 min-h-screen sticky top-0 flex flex-col bg-surface border-r border-surface-border transition-[width] duration-150 ${
         collapsed ? "w-14" : "w-60"
       }`}
     >

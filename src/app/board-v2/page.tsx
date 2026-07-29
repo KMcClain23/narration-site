@@ -272,7 +272,7 @@ export default function BoardV2Page() {
   return (
     <AdminLayout>
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-        <div className="flex h-[calc(100vh-7.5rem)] flex-col sm:h-[calc(100vh-8rem)]">
+        <div className="flex h-[calc(100vh-4rem)] flex-col">
           {/* Header row — does not scroll */}
           <div className="mb-4 flex shrink-0 items-center justify-between gap-4">
             <h1 className={adminType.titleLg}>Board</h1>
@@ -310,7 +310,7 @@ export default function BoardV2Page() {
                     ({pipelineCards.length}){dateFilter ? ` · ${pipelineFiltered.length} shown` : ""}
                   </span>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                <div className="admin-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
                   {PIPELINE_BUCKETS.map(bucket => (
                     <div key={bucket.id} className="mb-5">
                       <SubgroupDivider label={bucket.label} />
@@ -332,7 +332,7 @@ export default function BoardV2Page() {
                     ({productionCards.length}){dateFilter ? ` · ${productionFiltered.length} shown` : ""}
                   </span>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                <div className="admin-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
                   {productionAllEmpty ? (
                     <p className="text-[13px] text-text-faint">
                       {productionCards.length === 0 ? "— no books —" : "No matches for this filter"}

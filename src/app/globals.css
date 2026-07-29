@@ -163,3 +163,29 @@ html {
   font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Auto-hide scrollbars for admin scroll containers — track stays fully
+   transparent at rest; the thumb only appears on hover/focus-within, so
+   there's no permanent gray bar sitting in the column bodies at rest. */
+.admin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.admin-scrollbar:hover,
+.admin-scrollbar:focus-within {
+  scrollbar-color: var(--color-text-dim) transparent;
+}
+.admin-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+.admin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.admin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+}
+.admin-scrollbar:hover::-webkit-scrollbar-thumb,
+.admin-scrollbar:focus-within::-webkit-scrollbar-thumb {
+  background-color: var(--color-text-dim);
+}
+

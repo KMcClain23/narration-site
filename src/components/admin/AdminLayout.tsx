@@ -11,13 +11,11 @@ const manrope = Manrope({
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    // pt-14 sm:pt-16 clears the public site's fixed Header — body's own
-    // pt-14/pt-16 is dead (globals.css sets `body { padding: 0 !important }`),
-    // so every page in this codebase reserves that space on its own root
-    // element instead. Matching that convention here.
-    <div className={`admin-root ${manrope.variable} flex min-h-screen bg-background text-text-body pt-14 sm:pt-16`}>
+    // Admin is its own world — Header.tsx returns null on every admin route,
+    // so there's no fixed public header to clear here.
+    <div className={`admin-root ${manrope.variable} flex min-h-screen bg-background text-text-body`}>
       <Sidebar />
-      <main className="flex-1 min-w-0 overflow-y-auto p-8">{children}</main>
+      <main className="admin-scrollbar flex-1 min-w-0 overflow-y-auto p-8">{children}</main>
     </div>
   );
 }

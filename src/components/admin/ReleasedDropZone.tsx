@@ -24,7 +24,7 @@ export function ReleasedDropZone({
     ? isOver
       ? "border-solid border-2 border-accent-amber bg-accent-amber/10"
       : "border-solid border-2 border-accent-amber bg-accent-amber/5"
-    : "border-dashed border border-surface-border";
+    : "border-dashed border-2 border-[#4b5061] bg-surface-raised/20";
 
   return (
     <div
