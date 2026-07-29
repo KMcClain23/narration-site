@@ -1801,6 +1801,9 @@ export default function BoardPage() {
           <Link href="/board/archive" className="text-xs text-white/20 hover:text-white/50 transition-colors">
             Archive{archivedCount > 0 ? ` (${archivedCount})` : ""}
           </Link>
+          <a href="/api/board/export" download className="text-xs text-white/20 hover:text-white/50 transition-colors">
+            Export CSV
+          </a>
         </div>
         <div className="flex items-center gap-2">
           {/* Dashboard / Board / Timeline tabs */}
