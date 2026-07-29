@@ -361,7 +361,11 @@ export default function BoardV2Page() {
         </div>
 
         <DragOverlay>
-          {activeCard && <BoardCard card={activeCard} onToggleFirst15={() => {}} />}
+          {activeCard && (
+            <div style={{ opacity: 0.45 }}>
+              <BoardCard card={activeCard} onToggleFirst15={() => {}} />
+            </div>
+          )}
         </DragOverlay>
       </DndContext>
 
