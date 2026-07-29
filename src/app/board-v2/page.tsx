@@ -28,7 +28,14 @@ const PIPELINE_BUCKETS: { id: PipelineBucket; label: string }[] = [
 
 type DateFilter = "week" | "month" | null;
 
-const VALID_DROP_TARGETS = new Set<string>(["prepping", "recording", "editing", RELEASED_DROPZONE_ID]);
+const VALID_DROP_TARGETS = new Set<string>([
+  "prepping", "recording", "editing", "thisWeek", "thisMonth", "later", RELEASED_DROPZONE_ID,
+]);
+
+// Dropping on any Pipeline subgroup always resets status to 'contracted' —
+// the subgroup a card lands in afterward is computed from its own
+// completion_date, not from which of the three zones it was dropped on.
+const PIPELINE_DROP_IDS = new Set<string>(["thisWeek", "thisMonth", "later"]);
 
 // ─── pure helpers ─────────────────────────────────────────────────────────────
 
@@ -241,9 +248,15 @@ export default function BoardV2Page() {
       return;
     }
 
-    const targetStatus = String(over.id);
-    if (VALID_DROP_TARGETS.has(targetStatus) && targetStatus !== card.status) {
-      updateStatus(card.id, targetStatus);
+    const overId = String(over.id);
+
+    if (PIPELINE_DROP_IDS.has(overId)) {
+      if (card.status !== "contracted") updateStatus(card.id, "contracted");
+      return;
+    }
+
+    if (VALID_DROP_TARGETS.has(overId) && overId !== card.status) {
+      updateStatus(card.id, overId);
     }
   };
 
@@ -312,14 +325,16 @@ export default function BoardV2Page() {
                 </div>
                 <div className="admin-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
                   {PIPELINE_BUCKETS.map(bucket => (
-                    <div key={bucket.id} className="mb-5">
-                      <SubgroupDivider label={bucket.label} />
-                      {pipelineBuckets[bucket.id].length === 0 ? (
-                        <p className="text-[13px] text-text-faint">— no books —</p>
-                      ) : (
-                        <div className="space-y-3">{pipelineBuckets[bucket.id].map(renderCard)}</div>
-                      )}
-                    </div>
+                    <DroppableSubgroup key={bucket.id} id={bucket.id}>
+                      <div className="mb-5">
+                        <SubgroupDivider label={bucket.label} />
+                        {pipelineBuckets[bucket.id].length === 0 ? (
+                          <p className="text-[13px] text-text-faint">— no books —</p>
+                        ) : (
+                          <div className="space-y-3">{pipelineBuckets[bucket.id].map(renderCard)}</div>
+                        )}
+                      </div>
+                    </DroppableSubgroup>
                   ))}
                 </div>
               </div>
