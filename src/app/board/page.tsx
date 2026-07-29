@@ -75,6 +75,26 @@ function parseDate(s: string): Date {
   return new Date(y, m - 1, d);
 }
 
+// Builds the subtle post-save toast copy for an Amazon auto-fill result.
+// Returns null when nothing was found — silence is correct in that case,
+// not an apology.
+function amazonFillToastMessage(fill: { description: boolean; tags: number; triggerWarnings: number } | null | undefined): string | null {
+  if (!fill) return null;
+  const { description, tags, triggerWarnings } = fill;
+  const tagsPart = tags > 0 ? `${tags} tag${tags !== 1 ? "s" : ""}` : null;
+  const twPart = triggerWarnings > 0 ? `${triggerWarnings} trigger warning${triggerWarnings !== 1 ? "s" : ""}` : null;
+  const extras = [tagsPart, twPart].filter((s): s is string => Boolean(s));
+
+  if (!description && !extras.length) return null;
+  if (description && !extras.length) return "Fetched description from Amazon";
+  if (description) {
+    return extras.length === 1
+      ? `Fetched from Amazon: description and ${extras[0]}`
+      : `Fetched from Amazon: description, ${extras[0]}, ${extras[1]}`;
+  }
+  return `Fetched from Amazon: ${extras.join(", ")}`;
+}
+
 function parseCoNarrators(raw: string): string[] {
   if (!raw) return [];
   try {
@@ -1398,6 +1418,7 @@ export default function BoardPage() {
   const [importingId, setImportingId] = useState<string|null>(null);
   const [inlineEdit, setInlineEdit] = useState<{cardId:string;field:"deadline"|"first15_due"|"co_narrator"|"payment";strVal:string;numVal?:number}|null>(null);
   const inlineRef = useRef<HTMLDivElement>(null);
+  const [amazonFillToast, setAmazonFillToast] = useState<string | null>(null);
   const [archivedCount, setArchivedCount] = useState(0);
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const [archiveReason, setArchiveReason] = useState<typeof ARCHIVE_REASONS[number]>("recasted");
@@ -1546,6 +1567,11 @@ export default function BoardPage() {
         const updatedCard = d.card || {...editCard, ...cleanForm(form)};
         setCards(p=>p.map(c=>c.id===editCard.id ? updatedCard : c));
         setEditCard(null);
+        const toastMsg = amazonFillToastMessage(d.amazonFill);
+        if (toastMsg) {
+          setAmazonFillToast(toastMsg);
+          setTimeout(() => setAmazonFillToast(null), 5000);
+        }
       } else {
         const r = await fetch("/api/board",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...cleanForm(form),sort_order:col(form.status).length})});
         const d = await r.json();
@@ -1883,6 +1909,17 @@ export default function BoardPage() {
       )}
 
       {error && <div className="mx-5 mt-3 rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-300 flex justify-between"><span>{error}</span><button onClick={()=>setError(null)} className="text-red-300/50 hover:text-red-300">✕</button></div>}
+
+      {/* Amazon auto-fill toast — subtle, auto-dismissing, bottom-right */}
+      {amazonFillToast && (
+        <div className="fixed bottom-5 right-5 z-[400] flex items-center gap-2.5 rounded-xl border border-white/10 bg-[#0A0D3A]/95 backdrop-blur px-4 py-3 shadow-2xl text-xs text-white/60 max-w-xs">
+          <svg className="h-3.5 w-3.5 shrink-0 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M20 12a8 8 0 10-16 0 8 8 0 0016 0z M12 8v4l3 3"/>
+          </svg>
+          <span className="flex-1">{amazonFillToast}</span>
+          <button onClick={() => setAmazonFillToast(null)} className="shrink-0 text-white/25 hover:text-white/50">✕</button>
+        </div>
+      )}
 
       {/* Modal */}
       {(showForm||editCard) && (

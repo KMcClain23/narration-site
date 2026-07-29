@@ -1,5 +1,17 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { fetchAmazonBook } from "@/lib/amazon-scrape";
+
+function isAmazonUrl(url: unknown): url is string {
+  return typeof url === "string" && /^https?:\/\/(www\.)?amazon\.com\//i.test(url.trim());
+}
+
+function isEmptyValue(v: unknown): boolean {
+  if (v === null || v === undefined) return true;
+  if (typeof v === "string") return v.trim() === "";
+  if (Array.isArray(v)) return v.length === 0;
+  return false;
+}
 
 // GET: admin gets all cards, token gets restricted view
 export async function GET(req: Request) {
@@ -215,15 +227,16 @@ export async function PUT(req: Request) {
       }
     }
 
-    // Snapshot old status before update so we can log the change and auto-stamp released_at
-    let oldStatus: string | null = null;
-    let existingReleasedAt: string | null = null;
-    if ("status" in fields) {
-      const { data: cur } = await supabaseAdmin
-        .from("board_cards").select("status, released_at").eq("id", id).single();
-      oldStatus = cur?.status ?? null;
-      existingReleasedAt = (cur as Record<string, unknown>)?.released_at as string ?? null;
-    }
+    // Snapshot the current row — needed to log status changes, auto-stamp
+    // released_at, and check Amazon-fill eligibility (which requires knowing
+    // the CURRENT description/tags/trigger_warnings, not just this payload).
+    const { data: cur } = await supabaseAdmin
+      .from("board_cards")
+      .select("status, released_at, audible_link, description, tags, trigger_warnings")
+      .eq("id", id)
+      .single();
+    const oldStatus: string | null = "status" in fields ? (cur?.status ?? null) : null;
+    const existingReleasedAt: string | null = (cur as Record<string, unknown>)?.released_at as string ?? null;
 
     // Auto-stamp released_at when transitioning to "released" and not already set.
     // Fires when: key absent from payload OR payload value is empty/null (i.e. the
@@ -235,6 +248,37 @@ export async function PUT(req: Request) {
       (!("released_at" in fields) || !fields.released_at)
     ) {
       update.released_at = new Date().toISOString();
+    }
+
+    // Amazon auto-fill: opportunistic, best-effort fetch to fill in an empty
+    // description/tags/trigger_warnings when this card links to amazon.com.
+    // Fill-empty-only — never overwrites a field that already has content,
+    // whether that content came from this payload or was already saved.
+    let amazonFill: { description: boolean; tags: number; triggerWarnings: number } | null = null;
+    const effectiveLink = "audible_link" in fields ? fields.audible_link : cur?.audible_link;
+    if (isAmazonUrl(effectiveLink)) {
+      const descriptionEligible = isEmptyValue("description" in fields ? fields.description : undefined) && isEmptyValue(cur?.description);
+      const tagsEligible        = isEmptyValue("tags" in fields ? fields.tags : undefined) && isEmptyValue(cur?.tags);
+      const twEligible          = isEmptyValue("trigger_warnings" in fields ? fields.trigger_warnings : undefined) && isEmptyValue(cur?.trigger_warnings);
+
+      if (descriptionEligible || tagsEligible || twEligible) {
+        const scraped = await fetchAmazonBook(effectiveLink);
+        if (scraped) {
+          amazonFill = { description: false, tags: 0, triggerWarnings: 0 };
+          if (descriptionEligible && scraped.description) {
+            update.description = scraped.description;
+            amazonFill.description = true;
+          }
+          if (tagsEligible && scraped.tags.length) {
+            update.tags = scraped.tags;
+            amazonFill.tags = scraped.tags.length;
+          }
+          if (twEligible && scraped.triggerWarnings.length) {
+            update.trigger_warnings = scraped.triggerWarnings;
+            amazonFill.triggerWarnings = scraped.triggerWarnings.length;
+          }
+        }
+      }
     }
 
     let { data, error } = await supabaseAdmin
@@ -289,7 +333,7 @@ export async function PUT(req: Request) {
       });
     }
 
-    return NextResponse.json({ success: true, card: data });
+    return NextResponse.json({ success: true, card: data, amazonFill });
   } catch (e) {
     const msg = e instanceof Error ? e.message : JSON.stringify(e);
     console.error("PUT /api/board exception:", msg);
