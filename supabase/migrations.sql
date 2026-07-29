@@ -169,3 +169,21 @@ end $$;
 -- rendered initials when unset.
 alter table authors      add column if not exists photo_url text;
 alter table co_narrators add column if not exists photo_url text;
+
+-- Stage 2 (admin redesign): add 'prepping' as a valid board_cards.status
+-- value, so the new board (/board-v2) can distinguish "queued for
+-- recording" from "actively recording" without overloading an existing
+-- status. Confirmed via production data + app code that the full current
+-- set is audition/contracted/recording/editing/released — all preserved,
+-- 'prepping' is additive only.
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint where conname = 'board_cards_status_check'
+  ) then
+    alter table board_cards drop constraint board_cards_status_check;
+  end if;
+  alter table board_cards
+    add constraint board_cards_status_check
+    check (status in ('audition', 'contracted', 'prepping', 'recording', 'editing', 'released'));
+end $$;
