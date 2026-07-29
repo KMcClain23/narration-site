@@ -280,8 +280,6 @@ export default function BoardV2Page() {
     );
   }
 
-  const productionAllEmpty = PRODUCTION_SUBGROUPS.every(s => productionBuckets[s.id].length === 0);
-
   return (
     <AdminLayout>
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
@@ -348,24 +346,21 @@ export default function BoardV2Page() {
                   </span>
                 </div>
                 <div className="admin-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
-                  {productionAllEmpty ? (
-                    <p className="text-[13px] text-text-faint">
-                      {productionCards.length === 0 ? "— no books —" : "No matches for this filter"}
-                    </p>
-                  ) : (
-                    PRODUCTION_SUBGROUPS.map(s => {
-                      const groupCards = productionBuckets[s.id];
-                      if (groupCards.length === 0) return null;
-                      return (
-                        <DroppableSubgroup key={s.id} id={s.id}>
-                          <div className="mb-5">
-                            <SubgroupDivider label={s.label} />
+                  {PRODUCTION_SUBGROUPS.map(s => {
+                    const groupCards = productionBuckets[s.id];
+                    return (
+                      <DroppableSubgroup key={s.id} id={s.id}>
+                        <div className="mb-5">
+                          <SubgroupDivider label={s.label} />
+                          {groupCards.length === 0 ? (
+                            <p className="text-[13px] text-text-faint">— no books —</p>
+                          ) : (
                             <div className="space-y-3">{groupCards.map(renderCard)}</div>
-                          </div>
-                        </DroppableSubgroup>
-                      );
-                    })
-                  )}
+                          )}
+                        </div>
+                      </DroppableSubgroup>
+                    );
+                  })}
                 </div>
               </div>
 
