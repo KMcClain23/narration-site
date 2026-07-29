@@ -29,10 +29,12 @@ export async function PUT(req: Request) {
   const body = await req.json();
   const { id, ...fields } = body;
   if (!id) return NextResponse.json({ error: "ID required." }, { status: 400 });
-  const payload: Record<string, string> = {};
+  const payload: Record<string, string | null> = {};
   for (const key of ["name", "bio", "website", "amazon", "instagram", "tiktok", "facebook", "goodreads", "email"]) {
     if (key in fields) payload[key] = (fields[key] ?? "").trim();
   }
+  // photo_url is nullable (not a trimmed text field) — null explicitly clears it
+  if ("photo_url" in fields) payload.photo_url = fields.photo_url || null;
   const { data, error } = await supabaseAdmin
     .from("co_narrators").update(payload).eq("id", id).select().single();
   if (error) {

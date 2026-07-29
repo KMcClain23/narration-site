@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { PersonAvatar } from "@/components/PersonAvatar";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,7 @@ interface CoNarrator {
   tiktok: string;
   facebook: string;
   goodreads: string;
+  photo_url?: string | null;
 }
 
 const EMPTY_FORM: Omit<CoNarrator, "id"> = {
@@ -190,6 +192,9 @@ export default function CoNarratorManager() {
   const [gatherAll, setGatherAll] = useState<{ phase: "idle" | "running" | "done"; found: number; total: number }>
     ({ phase: "idle", found: 0, total: 0 });
   const gatherAllRunning = useRef(false);
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoTargetId = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -247,6 +252,63 @@ export default function CoNarratorManager() {
     if (id) setGatherPending(prev => { const n = { ...prev }; delete n[id]; return n; });
     setEditingId(null);
     setAdding(false);
+  };
+
+  // ── photo upload ─────────────────────────────────────────────────────────────
+
+  const triggerPhotoPicker = (id: string) => {
+    photoTargetId.current = id;
+    photoInputRef.current?.click();
+  };
+
+  const handlePhotoFile = async (file: File) => {
+    const narratorId = photoTargetId.current;
+    const narrator = coNarrators.find(n => n.id === narratorId);
+    if (!narratorId || !narrator) return;
+    setUploadingPhotoId(narratorId);
+    try {
+      const urlRes = await fetch("/api/upload-person-photo/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personType: "co_narrator", id: narratorId, name: narrator.name, contentType: file.type }),
+      });
+      const urlData = await urlRes.json();
+      if (!urlRes.ok) throw new Error(urlData.error || "Failed to get upload URL");
+
+      const putRes = await fetch(urlData.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+      if (!putRes.ok) throw new Error("Upload to storage failed");
+
+      const saveRes = await fetch("/api/co-narrators", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: narratorId, photo_url: urlData.publicUrl }),
+      });
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) throw new Error(saveData.error || "Failed to save photo");
+      setCoNarrators(prev => prev.map(n => n.id === narratorId ? saveData.co_narrator : n));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Photo upload failed");
+    } finally {
+      setUploadingPhotoId(null);
+    }
+  };
+
+  const handleRemovePhoto = async (id: string) => {
+    setUploadingPhotoId(id);
+    try {
+      const res = await fetch("/api/co-narrators", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, photo_url: null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to remove photo");
+      setCoNarrators(prev => prev.map(n => n.id === id ? data.co_narrator : n));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to remove photo");
+    } finally {
+      setUploadingPhotoId(null);
+    }
   };
 
   // ── gather email ──────────────────────────────────────────────────────────────
@@ -344,6 +406,13 @@ export default function CoNarratorManager() {
 
   return (
     <section className="mt-12 pt-12 border-t border-[#1A2070]">
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/avif"
+        className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); e.target.value = ""; }}
+      />
 
       {/* Section header */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -463,6 +532,7 @@ export default function CoNarratorManager() {
                   <>
                     {/* ── Collapsed row ── */}
                     <div className="flex items-center gap-4 px-5 py-4">
+                      <PersonAvatar name={narrator.name} photoUrl={narrator.photo_url} size={40} />
                       <div className="flex-1 min-w-0 cursor-pointer"
                         onClick={() => setExpandedId(isExpanded ? null : narrator.id)}>
                         <p className="font-semibold text-white text-sm">{narrator.name}</p>
@@ -482,6 +552,33 @@ export default function CoNarratorManager() {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                        {/* Photo upload / remove */}
+                        {uploadingPhotoId === narrator.id ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-white/40">
+                            <span className="h-3 w-3 border border-white/30 border-t-white/60 rounded-full animate-spin" />
+                            Uploading…
+                          </span>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => triggerPhotoPicker(narrator.id)}
+                              className="rounded-md px-2.5 py-1.5 text-[11px] font-semibold text-white/50 hover:text-[#D4AF37] border border-white/8 hover:border-[#D4AF37]/30 transition"
+                            >
+                              {narrator.photo_url ? "Change photo" : "Add photo"}
+                            </button>
+                            {narrator.photo_url && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePhoto(narrator.id)}
+                                className="rounded-md px-2.5 py-1.5 text-[11px] font-semibold text-white/40 hover:text-red-400 border border-white/8 hover:border-red-400/30 transition"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </>
+                        )}
+
                         {/* Gather state indicators */}
                         {gs.status === "loading" && (
                           <span className="inline-flex items-center gap-1 text-[11px] text-white/40">

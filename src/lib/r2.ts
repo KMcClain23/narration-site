@@ -66,6 +66,8 @@ export const R2_PREFIXES = {
   bookCovers: "book-covers/",
   branding: "branding/",
   social: "social/",
+  authors: "authors/",
+  coNarrators: "co-narrators/",
 } as const;
 
 export function buildR2PublicUrl(bucketPublicBaseUrl: string, objectKey: string) {

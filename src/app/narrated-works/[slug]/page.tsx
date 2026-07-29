@@ -96,26 +96,27 @@ async function getCoNarratorDetails(names: string[]): Promise<CoNarratorDetail[]
 
   const withPhoto = await supabaseAdmin
     .from("co_narrators")
-    .select("name, bio, photo")
+    .select("name, bio, photo_url")
     .in("name", names);
 
   if (!withPhoto.error && withPhoto.data) {
     return withPhoto.data.map(cn => ({
-      name:  cn.name  as string,
-      photo: (cn.photo as string) || null,
-      bio:   (cn.bio   as string) || null,
+      name:      cn.name as string,
+      photo_url: (cn.photo_url as string) || null,
+      bio:       (cn.bio as string) || null,
     }));
   }
 
+  // photo_url column may not exist yet (migration not run) — retry without it
   const withoutPhoto = await supabaseAdmin
     .from("co_narrators")
     .select("name, bio")
     .in("name", names);
 
   return (withoutPhoto.data || []).map(cn => ({
-    name:  cn.name as string,
-    photo: null,
-    bio:   (cn.bio as string) || null,
+    name:      cn.name as string,
+    photo_url: null,
+    bio:       (cn.bio as string) || null,
   }));
 }
 
@@ -204,15 +205,24 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
 
   const coNarratorDetails = await getCoNarratorDetails(coNarratorNames);
 
-  // Look up the author's bio from the authors table (skipped when redacted)
+  // Look up the author's bio/photo from the authors table (skipped when redacted)
   let authorBio: string | null = null;
+  let authorPhotoUrl: string | null = null;
   if (book.author) {
-    const { data: authorRow } = await supabaseAdmin
+    const { data: authorRow, error: authorErr } = await supabaseAdmin
       .from("authors")
-      .select("bio")
+      .select("bio, photo_url")
       .eq("name", book.author)
       .single();
-    authorBio = (authorRow?.bio as string) || null;
+    if (authorErr) {
+      // photo_url column may not exist yet (migration not run) — retry without it
+      const { data: fallbackRow } = await supabaseAdmin
+        .from("authors").select("bio").eq("name", book.author).single();
+      authorBio = (fallbackRow?.bio as string) || null;
+    } else {
+      authorBio = (authorRow?.bio as string) || null;
+      authorPhotoUrl = (authorRow?.photo_url as string) || null;
+    }
   }
 
   const statusLabel = STATUS_TO_LABEL[book.status] ?? "";
@@ -372,7 +382,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
             )}
 
             {/* Author name — hover popup shows bio */}
-            {book.author && <AuthorHoverName name={book.author} bio={authorBio} />}
+            {book.author && <AuthorHoverName name={book.author} bio={authorBio} photoUrl={authorPhotoUrl} />}
 
             {/* Tags — reduced visual weight */}
             {tags.length > 0 && (

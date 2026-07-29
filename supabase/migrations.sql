@@ -163,3 +163,9 @@ begin
       check (archived_reason is null or archived_reason in ('recasted', 'canceled', 'other'));
   end if;
 end $$;
+
+-- photo_url: profile photo for authors and co-narrators, shown alongside
+-- their name on book detail pages. Nullable — PersonAvatar falls back to
+-- rendered initials when unset.
+alter table authors      add column if not exists photo_url text;
+alter table co_narrators add column if not exists photo_url text;

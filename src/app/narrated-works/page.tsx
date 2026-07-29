@@ -30,6 +30,7 @@ interface CoNarrator {
   facebook: string;
   goodreads: string;
   threads: string;
+  photo_url?: string | null;
 }
 
 interface Author {
@@ -43,6 +44,7 @@ interface Author {
   facebook: string;
   goodreads: string;
   threads: string;
+  photo_url?: string | null;
 }
 
 function AuthorLink({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {

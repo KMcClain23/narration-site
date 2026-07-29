@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import type { ReactNode } from "react";
 import { FullCastTrigger } from "./FullCastToggle";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { PersonAvatar } from "@/components/PersonAvatar";
 import type { NarrationFormat } from "@/types/book";
 
 const FORMAT_LABEL: Record<NarrationFormat, string> = {
@@ -23,24 +24,7 @@ const FORMAT_TOOLTIP: Record<NarrationFormat, string> = {
 
 // ─── shared types ─────────────────────────────────────────────────────────────
 
-export type CoNarratorDetail = { name: string; photo: string | null; bio: string | null };
-
-// ─── avatar helpers ───────────────────────────────────────────────────────────
-
-const AVATAR_COLORS = [
-  "bg-violet-800", "bg-indigo-800", "bg-sky-800",
-  "bg-teal-800",   "bg-rose-900",   "bg-amber-900",
-];
-
-function avatarColor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
-}
-
-function getInitials(name: string): string {
-  return name.split(/\s+/).map(w => w[0] ?? "").join("").slice(0, 2).toUpperCase();
-}
+export type CoNarratorDetail = { name: string; photo_url: string | null; bio: string | null };
 
 // ─── popup card shell ─────────────────────────────────────────────────────────
 
@@ -119,13 +103,18 @@ function HoverCard({ children, popup }: { children: ReactNode; popup: ReactNode 
 
 // ─── popup content: author ────────────────────────────────────────────────────
 
-function AuthorPopup({ name, bio }: { name: string; bio: string | null }) {
+function AuthorPopup({ name, bio, photoUrl }: { name: string; bio: string | null; photoUrl?: string | null }) {
   return (
     <div className="p-4">
-      <p className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37]/70 font-semibold mb-1.5">
-        Author
-      </p>
-      <p className="text-sm font-bold text-white mb-2">{name}</p>
+      <div className="flex items-center gap-3 mb-3">
+        <PersonAvatar name={name} photoUrl={photoUrl} size={48} />
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37]/70 font-semibold mb-0.5">
+            Author
+          </p>
+          <p className="text-sm font-bold text-white leading-tight">{name}</p>
+        </div>
+      </div>
       {bio ? (
         <p className="text-xs text-white/55 leading-relaxed line-clamp-5">{bio}</p>
       ) : (
@@ -166,21 +155,11 @@ function DeanPopup() {
 
 // ─── popup content: co-narrator ───────────────────────────────────────────────
 
-function CoNarratorPopup({ name, photo, bio }: CoNarratorDetail) {
-  const color = avatarColor(name);
-  const initials = getInitials(name);
+function CoNarratorPopup({ name, photo_url, bio }: CoNarratorDetail) {
   return (
     <div className="p-4">
       <div className="flex items-center gap-3 mb-3">
-        <div
-          className={`relative h-12 w-12 rounded-full overflow-hidden border border-white/15 shrink-0 flex items-center justify-center ${!photo ? color : ""}`}
-        >
-          {photo ? (
-            <Image src={photo} alt={name} fill className="object-cover" sizes="48px" />
-          ) : (
-            <span className="text-xs font-bold text-white/80">{initials}</span>
-          )}
-        </div>
+        <PersonAvatar name={name} photoUrl={photo_url} size={48} />
         <div>
           <p className="text-sm font-bold text-white leading-tight">{name}</p>
           <p className="text-[11px] text-[#D4AF37]">Co-Narrator</p>
@@ -198,15 +177,15 @@ function CoNarratorPopup({ name, photo, bio }: CoNarratorDetail) {
 // ─── exported: author name with hover popup ───────────────────────────────────
 // Replaces the plain <p> for the author name in the book details header.
 
-export function AuthorHoverName({ name, bio }: { name: string; bio: string | null }) {
+export function AuthorHoverName({ name, bio, photoUrl }: { name: string; bio: string | null; photoUrl?: string | null }) {
   return (
-    <HoverCard popup={<AuthorPopup name={name} bio={bio} />}>
-      <p
-        className="text-[#D4AF37] font-semibold text-lg mb-5 cursor-default w-fit"
-        itemProp="byArtist"
-      >
-        {name}
-      </p>
+    <HoverCard popup={<AuthorPopup name={name} bio={bio} photoUrl={photoUrl} />}>
+      <div className="flex items-center gap-2.5 mb-5 cursor-default w-fit">
+        <PersonAvatar name={name} photoUrl={photoUrl} size={36} />
+        <p className="text-[#D4AF37] font-semibold text-lg" itemProp="byArtist">
+          {name}
+        </p>
+      </div>
     </HoverCard>
   );
 }
@@ -224,8 +203,9 @@ export function NarratedBySection({
   compact?: boolean;
   format?: NarrationFormat | null;
 }) {
-  const avatarSize = compact ? "h-10 w-10" : "h-16 w-16";
+  const avatarSize = compact ? "h-10 w-10" : "h-16 w-16"; // Dean's own avatar (untouched — separate photo pipeline)
   const avatarSizePx = compact ? "40px" : "64px";
+  const avatarSizeNum = compact ? 40 : 64; // co-narrator/author avatars via PersonAvatar
   const nameText = compact ? "text-xs" : "text-sm";
   const roleText = compact ? "text-[10px]" : "text-[11px]";
   const rowGap = compact ? "gap-2.5" : "gap-3";
@@ -237,29 +217,13 @@ export function NarratedBySection({
   const coNarratorNodes = coNarratorNames.map(name => {
     const detail = coNarratorDetails.find(d => d.name === name) ?? {
       name,
-      photo: null,
+      photo_url: null,
       bio: null,
     };
-    const color = avatarColor(name);
-    const initials = getInitials(name);
     return (
       <HoverCard key={name} popup={<CoNarratorPopup {...detail} />}>
         <div className={`flex items-center ${rowGap} cursor-default select-none`}>
-          <div
-            className={`relative ${avatarSize} rounded-full overflow-hidden border border-white/15 shrink-0 flex items-center justify-center ${!detail.photo ? color : ""}`}
-          >
-            {detail.photo ? (
-              <Image
-                src={detail.photo}
-                alt={name}
-                fill
-                className="object-cover"
-                sizes={avatarSizePx}
-              />
-            ) : (
-              <span className="text-xs font-bold text-white/80">{initials}</span>
-            )}
-          </div>
+          <PersonAvatar name={name} photoUrl={detail.photo_url} size={avatarSizeNum} />
           <div className="min-w-0">
             <p className={`${nameText} font-semibold text-white leading-tight truncate`}>{name}</p>
             <p className={`${roleText} text-white/40 leading-tight`}>Co-Narrator</p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { PersonAvatar } from "@/components/PersonAvatar";
 
 // ── types ─────────────────────────────────────────────────────────────────────
 type EmailCandidate = { email: string; senderName: string; subject: string };
@@ -23,6 +24,7 @@ interface Author {
   facebook: string;
   goodreads: string;
   threads: string;
+  photo_url?: string | null;
 }
 
 const EMPTY_FORM: Omit<Author, "id"> = {
@@ -213,6 +215,9 @@ export default function AuthorManager() {
   const [gatherPending, setGatherPending] = useState<Record<string, EmailCandidate[]>>({}); // authorId → candidates for picker
   const [gatherAll, setGatherAll] = useState<{ phase: "idle" | "running" | "done"; found: number; total: number }>({ phase: "idle", found: 0, total: 0 });
   const gatherAllRunning = useRef(false);
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoTargetId = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -288,6 +293,63 @@ export default function AuthorManager() {
       setError(e instanceof Error ? e.message : "Failed to delete author");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  // ── photo upload ─────────────────────────────────────────────────────────────
+
+  const triggerPhotoPicker = (id: string) => {
+    photoTargetId.current = id;
+    photoInputRef.current?.click();
+  };
+
+  const handlePhotoFile = async (file: File) => {
+    const authorId = photoTargetId.current;
+    const author = authors.find(a => a.id === authorId);
+    if (!authorId || !author) return;
+    setUploadingPhotoId(authorId);
+    try {
+      const urlRes = await fetch("/api/upload-person-photo/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personType: "author", id: authorId, name: author.name, contentType: file.type }),
+      });
+      const urlData = await urlRes.json();
+      if (!urlRes.ok) throw new Error(urlData.error || "Failed to get upload URL");
+
+      const putRes = await fetch(urlData.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+      if (!putRes.ok) throw new Error("Upload to storage failed");
+
+      const saveRes = await fetch("/api/authors", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: authorId, photo_url: urlData.publicUrl }),
+      });
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) throw new Error(saveData.error || "Failed to save photo");
+      setAuthors(prev => prev.map(a => a.id === authorId ? saveData.author : a));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Photo upload failed");
+    } finally {
+      setUploadingPhotoId(null);
+    }
+  };
+
+  const handleRemovePhoto = async (id: string) => {
+    setUploadingPhotoId(id);
+    try {
+      const res = await fetch("/api/authors", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, photo_url: null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to remove photo");
+      setAuthors(prev => prev.map(a => a.id === id ? data.author : a));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to remove photo");
+    } finally {
+      setUploadingPhotoId(null);
     }
   };
 
@@ -387,6 +449,13 @@ export default function AuthorManager() {
 
   return (
     <section className="mt-12 pt-12 border-t border-[#1A2070]">
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/avif"
+        className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); e.target.value = ""; }}
+      />
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-semibold text-white">Author profiles</h2>
@@ -530,6 +599,7 @@ export default function AuthorManager() {
                   <>
                     {/* Row header */}
                     <div className="flex items-center gap-4 px-5 py-4">
+                      <PersonAvatar name={author.name} photoUrl={author.photo_url} size={40} />
                       <div
                         className="flex-1 min-w-0 cursor-pointer"
                         onClick={() => setExpandedId(isExpanded ? null : author.id)}
@@ -556,6 +626,33 @@ export default function AuthorManager() {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                        {/* Photo upload / remove */}
+                        {uploadingPhotoId === author.id ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-white/40">
+                            <span className="h-3 w-3 border border-white/30 border-t-white/60 rounded-full animate-spin" />
+                            Uploading…
+                          </span>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => triggerPhotoPicker(author.id)}
+                              className="rounded-md px-2.5 py-1.5 text-[11px] font-semibold text-white/50 hover:text-[#D4AF37] border border-white/8 hover:border-[#D4AF37]/30 transition"
+                            >
+                              {author.photo_url ? "Change photo" : "Add photo"}
+                            </button>
+                            {author.photo_url && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePhoto(author.id)}
+                                className="rounded-md px-2.5 py-1.5 text-[11px] font-semibold text-white/40 hover:text-red-400 border border-white/8 hover:border-red-400/30 transition"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </>
+                        )}
+
                         {/* Gather / Change email button */}
                         {(() => {
                           const gs: GatherState = gatherStates[author.id] ?? { status: "idle" };
