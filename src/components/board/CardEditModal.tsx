@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { ExternalLink, FileText } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { TagsField } from "@/components/admin/PersonForm";
 import { parseCoNarrators } from "@/components/admin/board-card-utils";
 import type { NarrationFormat, ArchivedReason } from "@/types/book";
 
@@ -91,6 +93,25 @@ const NARRATION_FORMATS = ["solo", "dual", "duet", "multicast"] as const;
 const ARCHIVE_REASONS = ["recasted", "canceled", "other"] as const;
 const ARCHIVE_REASON_LABEL: Record<string, string> = { recasted: "Recasted", canceled: "Canceled", other: "Other" };
 
+const PRESET_COMPANIES = [
+  "Spotify", "Blue Nose Audio", "Dark Star Romance", "Podium Audio",
+  "Audible Studios", "Recorded Books", "Tantor Media",
+];
+
+const PAYMENT_TYPES = [
+  { value: "pfh", label: "PFH (Per Finished Hour)" },
+  { value: "rs", label: "Royalty Share (RS)" },
+  { value: "rs_plus", label: "Royalty Share Plus (RS+)" },
+] as const;
+
+// The number that has actually been producing every historical earnings
+// estimate across this codebase (board/page.tsx, /board/[token], and
+// /board/card/[id]) — a stale tooltip elsewhere said 9,300, but the real
+// divisor everywhere has always been 9,400. Fixed the stale string too.
+const WORDS_PER_HOUR = 9400;
+
+const INPUT_CLS = "w-full rounded-lg border border-surface-border bg-background px-3 py-2.5 text-sm text-text-primary placeholder:text-text-dim focus:border-accent-amber-dim focus:outline-none transition-colors";
+
 type TabId = "details" | "production" | "content" | "links";
 const TABS: { id: TabId; label: string }[] = [
   { id: "details", label: "Details" },
@@ -113,6 +134,25 @@ function StatusPill({ value }: { value: string }) {
     <span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-widest ${s.bg} ${s.border} ${s.text}`}>
       {s.label}
     </span>
+  );
+}
+
+function OpenLinkButton({ url }: { url: string }) {
+  const hasUrl = Boolean(url.trim());
+  return (
+    <a
+      href={hasUrl ? url : undefined}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={e => { if (!hasUrl) e.preventDefault(); }}
+      aria-disabled={!hasUrl}
+      title={hasUrl ? "Open link" : undefined}
+      className={`flex shrink-0 items-center justify-center rounded-lg border border-surface-border p-2.5 transition-colors ${
+        hasUrl ? "text-text-muted hover:border-accent-amber-dim hover:text-text-primary" : "cursor-not-allowed text-text-dim/40"
+      }`}
+    >
+      <ExternalLink size={16} />
+    </a>
   );
 }
 
@@ -151,6 +191,11 @@ export function CardEditModal({
   const [archiveReason, setArchiveReason] = useState<typeof ARCHIVE_REASONS[number]>("recasted");
   const [archiveNotes, setArchiveNotes] = useState("");
   const [archiving, setArchiving] = useState(false);
+
+  const [wordCountFocused, setWordCountFocused] = useState(false);
+  const [uploadingScript, setUploadingScript] = useState(false);
+  const [scriptError, setScriptError] = useState<string | null>(null);
+  const scriptInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -210,6 +255,36 @@ export function CardEditModal({
       setSaveError(e instanceof Error ? e.message : "Cover upload failed.");
     } finally {
       setUploadingCover(false);
+    }
+  };
+
+  // Mirrors src/app/board/ScriptUploader.tsx's logic exactly (same 4MB limit,
+  // same /api/onedrive/upload contract) — reimplemented here rather than
+  // imported so the Links tab can style it to match the other three URL
+  // fields instead of inheriting the old modal's markup.
+  const uploadScript = async (file: File) => {
+    setScriptError(null);
+    if (file.size > 4 * 1024 * 1024) {
+      setScriptError("File must be under 4 MB. Compress or export a smaller PDF first.");
+      return;
+    }
+    setUploadingScript(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      body.append("bookTitle", form?.title || "Script");
+      const res = await fetch("/api/onedrive/upload", { method: "POST", body });
+      const text = await res.text();
+      let data: { error?: string; url?: string } = {};
+      try { data = JSON.parse(text); } catch {
+        throw new Error(res.ok ? "Unexpected server response" : `Upload failed (${res.status}): ${text.slice(0, 120)}`);
+      }
+      if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+      setForm(p => (p ? { ...p, script_url: data.url! } : p));
+    } catch (e) {
+      setScriptError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploadingScript(false);
     }
   };
 
@@ -493,6 +568,222 @@ export function CardEditModal({
     );
   };
 
+  const renderProductionTab = () => {
+    if (!form) return null;
+    const hasRate = form.payment_type === "pfh" || form.payment_type === "rs_plus";
+    const hours = form.word_count > 0 ? form.word_count / WORDS_PER_HOUR : 0;
+    const earnings = form.pfh_rate > 0 ? hours * form.pfh_rate : 0;
+
+    return (
+      <div className="space-y-8">
+        {/* Section 1: Production Type */}
+        <div className="space-y-4">
+          <p className={`${adminType.label} mb-1`}>Production Type</p>
+          <div className="flex gap-1 rounded-lg border border-surface-border bg-background p-1">
+            {(["indie", "company"] as const).map(t => (
+              <button key={t} type="button"
+                onClick={() => setForm(p => {
+                  if (!p) return p;
+                  const next = p.production_type === t ? null : t;
+                  return { ...p, production_type: next, production_company: next === "company" ? p.production_company : null };
+                })}
+                className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  form.production_type === t ? "bg-accent-amber text-background" : "text-text-muted hover:bg-surface-raised hover:text-text-primary"
+                }`}>
+                {t === "indie" ? "Indie" : "Company"}
+              </button>
+            ))}
+          </div>
+          {form.production_type === "company" && (
+            <div>
+              <label className={`${adminType.label} mb-1.5 block`}>Production company</label>
+              <input
+                value={form.production_company ?? ""}
+                onChange={e => setForm(p => p && { ...p, production_company: e.target.value })}
+                placeholder="e.g. Podium Audio"
+                list="production-company-suggestions"
+                className={INPUT_CLS}
+              />
+              <datalist id="production-company-suggestions">
+                {PRESET_COMPANIES.map(c => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+          )}
+        </div>
+
+        {/* Section 2: Financials & Milestones */}
+        <div className="border-t border-surface-border pt-6">
+          <p className={`${adminType.label} mb-4`}>Financials &amp; Milestones</p>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={`${adminType.label} mb-1.5 block`}>Word count</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={wordCountFocused ? (form.word_count || "") : (form.word_count ? form.word_count.toLocaleString("en-US") : "")}
+                  onFocus={() => setWordCountFocused(true)}
+                  onBlur={() => setWordCountFocused(false)}
+                  onChange={e => {
+                    const digits = e.target.value.replace(/\D/g, "");
+                    setForm(p => p && { ...p, word_count: digits ? parseInt(digits, 10) : 0 });
+                  }}
+                  placeholder="e.g. 90000"
+                  className={INPUT_CLS}
+                />
+              </div>
+              <div>
+                <label className={`${adminType.label} mb-1.5 block`}>Payment type</label>
+                <select value={form.payment_type} onChange={e => setForm(p => p && { ...p, payment_type: e.target.value })}
+                  className={`${INPUT_CLS} cursor-pointer`}>
+                  {PAYMENT_TYPES.map(pt => <option key={pt.value} value={pt.value}>{pt.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {hasRate && (
+              <div>
+                <label className={`${adminType.label} mb-1.5 block`}>PFH rate ($)</label>
+                <input type="number" value={form.pfh_rate || ""}
+                  onChange={e => setForm(p => p && { ...p, pfh_rate: parseFloat(e.target.value) || 0 })}
+                  placeholder="e.g. 250" className={INPUT_CLS} />
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={`${adminType.label} mb-1.5 block`}>First 15 due</label>
+                <input type="date" value={form.first15_due} onChange={e => setForm(p => p && { ...p, first15_due: e.target.value })}
+                  className={INPUT_CLS} />
+              </div>
+              <div className="flex items-end pb-2.5">
+                <label className="flex cursor-pointer items-center gap-2.5">
+                  <input type="checkbox" checked={form.first_15_complete}
+                    onChange={e => setForm(p => p && { ...p, first_15_complete: e.target.checked })}
+                    className="h-4 w-4 rounded border-surface-border bg-background text-accent-amber focus:outline-none focus:ring-2 focus:ring-accent-amber-dim" />
+                  <span className="text-sm font-medium text-text-primary">First 15 minutes approved</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3: Estimated Earnings — hidden entirely for plain RS,
+            since there's no rate concept to compute against. */}
+        {hasRate && (
+          <div className="rounded-lg border border-accent-amber/15 bg-accent-amber/5 px-4 py-3">
+            <p className={`${adminType.label} mb-1 flex items-center text-accent-amber-bright/70`}>
+              Estimated earnings
+              <InfoTooltip variant="inline">
+                <p>Calculated from word count × PFH rate at ~9,400 words per finished hour. Estimate only.</p>
+              </InfoTooltip>
+            </p>
+            {form.word_count > 0 && form.pfh_rate > 0 ? (
+              <p className="text-lg font-bold text-accent-amber-bright">
+                ${earnings.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                <span className="ml-2 text-xs font-normal text-text-muted">
+                  ~{hours.toFixed(1)} hrs × ${form.pfh_rate}/hr{form.payment_type === "rs_plus" ? " + royalties" : ""}
+                </span>
+              </p>
+            ) : (
+              <p className={adminType.small}>Set word count and PFH rate to see estimated earnings</p>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderContentTab = () => {
+    if (!form) return null;
+    return (
+      <div className="space-y-8">
+        <div>
+          <label className={`${adminType.label} mb-1.5 block`}>Description (public)</label>
+          <div className="relative">
+            <textarea
+              value={form.description}
+              onChange={e => setForm(p => p && { ...p, description: e.target.value })}
+              rows={9}
+              className={`${INPUT_CLS} resize-y pb-6`}
+            />
+            <span className="pointer-events-none absolute bottom-2.5 right-3 text-[11px] text-text-dim">
+              {form.description.length} characters
+            </span>
+          </div>
+          <p className={`${adminType.small} mt-1.5`}>
+            Shown on the public book page. Amazon description auto-fills this field on save if empty and the Amazon/Audible link is set.
+          </p>
+        </div>
+
+        <div>
+          <TagsField label="Tags (public)" value={form.tags} onChange={v => setForm(p => p && { ...p, tags: v })} />
+          <p className={`${adminType.small} mt-1.5`}>Genre tags shown as pills on the public book page. Free-form.</p>
+        </div>
+
+        <div>
+          <TagsField label="Trigger warnings (public)" value={form.trigger_warnings} onChange={v => setForm(p => p && { ...p, trigger_warnings: v })} />
+          <p className={`${adminType.small} mt-1.5`}>Displayed as a collapsible details block on the public book page. Free-form — no controlled vocabulary.</p>
+        </div>
+      </div>
+    );
+  };
+
+  const renderLinksTab = () => {
+    if (!form) return null;
+    return (
+      <div className="space-y-6">
+        <div>
+          <label className={`${adminType.label} mb-1.5 block`}>Amazon / Audible</label>
+          <div className="flex gap-2">
+            <input value={form.audible_link} onChange={e => setForm(p => p && { ...p, audible_link: e.target.value })}
+              placeholder="https://amazon.com/dp/... or audible.com/pd/..." className={INPUT_CLS} />
+            <OpenLinkButton url={form.audible_link} />
+          </div>
+        </div>
+
+        <div>
+          <label className={`${adminType.label} mb-1.5 block`}>Author&apos;s Republic</label>
+          <div className="flex gap-2">
+            <input value={form.ar_link} onChange={e => setForm(p => p && { ...p, ar_link: e.target.value })}
+              placeholder="https://..." className={INPUT_CLS} />
+            <OpenLinkButton url={form.ar_link} />
+          </div>
+        </div>
+
+        <div>
+          <label className={`${adminType.label} mb-1.5 block`}>Spotify</label>
+          <div className="flex gap-2">
+            <input value={form.spotify_link} onChange={e => setForm(p => p && { ...p, spotify_link: e.target.value })}
+              placeholder="https://open.spotify.com/audiobook/..." className={INPUT_CLS} />
+            <OpenLinkButton url={form.spotify_link} />
+          </div>
+        </div>
+
+        <div>
+          <label className={`${adminType.label} mb-1.5 block`}>Script (OneDrive)</label>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => scriptInputRef.current?.click()} disabled={uploadingScript}
+              className="flex items-center gap-2 rounded-lg border border-surface-border px-3.5 py-2.5 text-sm text-text-body transition-colors hover:text-text-primary disabled:opacity-50">
+              <FileText size={15} className="text-text-dim" />
+              {uploadingScript ? "Uploading…" : form.script_url ? "Replace Script" : "Upload Script"}
+            </button>
+            <OpenLinkButton url={form.script_url} />
+            <input
+              ref={scriptInputRef}
+              type="file"
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) uploadScript(f); e.target.value = ""; }}
+            />
+          </div>
+          {scriptError && <p className="mt-1.5 text-[12px] text-alert-red">{scriptError}</p>}
+          <p className={`${adminType.small} mt-1.5`}>PDF or Word · Saved to OneDrive › Production Scripts</p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 px-4">
       {/* Form modal — click-outside intentionally disabled (Stage 5 rule);
@@ -559,13 +850,13 @@ export function CardEditModal({
                 {renderDetailsTab()}
               </div>
               <div className={activeTab === "production" ? "block" : "hidden"}>
-                <p className={`${adminType.body} py-16 text-center text-text-muted`}>Coming in Stage 6.2</p>
+                {renderProductionTab()}
               </div>
               <div className={activeTab === "content" ? "block" : "hidden"}>
-                <p className={`${adminType.body} py-16 text-center text-text-muted`}>Coming in Stage 6.2</p>
+                {renderContentTab()}
               </div>
               <div className={activeTab === "links" ? "block" : "hidden"}>
-                <p className={`${adminType.body} py-16 text-center text-text-muted`}>Coming in Stage 6.2</p>
+                {renderLinksTab()}
               </div>
             </div>
 

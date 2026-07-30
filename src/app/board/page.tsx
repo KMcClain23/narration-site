@@ -2259,7 +2259,7 @@ export default function BoardPage() {
                     <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">
                       Word count
                       <InfoTooltip>
-                        <p>Used to estimate hours (roughly 9,300 words per finished hour) and projected earnings.</p>
+                        <p>Used to estimate hours (roughly 9,400 words per finished hour) and projected earnings.</p>
                       </InfoTooltip>
                     </span>
                     <input type="number" value={form.word_count || ""} onChange={e=>setForm(p=>({...p,word_count:parseInt(e.target.value)||0}))} placeholder="e.g. 90000" className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 transition"/>
@@ -2318,7 +2318,7 @@ export default function BoardPage() {
                     <p className="text-[10px] uppercase tracking-[0.18em] text-[#D4AF37]/60 font-medium mb-1 flex items-center">
                       {form.payment_type==="rs"?"Royalty Share":form.payment_type==="rs_plus"?"RS+ — Estimated upfront":"Estimated earnings"}
                       <InfoTooltip variant="inline">
-                        <p>Calculated from word count × PFH rate at ~9,300 words per finished hour. Estimate only.</p>
+                        <p>Calculated from word count × PFH rate at ~9,400 words per finished hour. Estimate only.</p>
                       </InfoTooltip>
                     </p>
                     {form.payment_type==="rs" ? <p className="text-sm text-[#D4AF37]">~{(form.word_count/9400).toFixed(1)} finished hours · earnings depend on sales</p>

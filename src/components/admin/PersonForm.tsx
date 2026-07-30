@@ -187,7 +187,7 @@ function Field({
   );
 }
 
-function TagsField({
+export function TagsField({
   label, value, onChange, suggestions,
 }: {
   label: string;
