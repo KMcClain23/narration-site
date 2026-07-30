@@ -201,3 +201,16 @@ alter table authors add column if not exists notes              text  not null d
 -- but was never captured in a tracked migration — this brings the file in
 -- sync with reality. No-op if the column already exists.
 alter table authors add column if not exists threads text not null default '';
+
+-- Stage 4.2 (admin redesign — Contacts/Co-Narrators): the only genuinely new
+-- column. location/preferred_contact/skills/notes already exist live in
+-- production (added outside any tracked migration) — see the sync block below.
+alter table co_narrators add column if not exists representation text not null default '';
+
+-- Documentation only — brings migrations.sql in sync with reality for four
+-- columns that already exist live (confirmed via direct query) but were
+-- never captured in a tracked migration, mirroring the 'threads' sync above.
+alter table co_narrators add column if not exists location          text   not null default '';
+alter table co_narrators add column if not exists preferred_contact text   not null default '';
+alter table co_narrators add column if not exists skills            text[] not null default '{}';
+alter table co_narrators add column if not exists notes             text   not null default '';
