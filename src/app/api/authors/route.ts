@@ -23,7 +23,10 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, bio = "", website = "", amazon = "", instagram = "", tiktok = "", facebook = "", goodreads = "", threads = "", email = "" } = body;
+    const {
+      name, bio = "", website = "", amazon = "", instagram = "", tiktok = "", facebook = "", goodreads = "", threads = "", email = "",
+      location = "", preferred_contact = "", genres = [], notes = "",
+    } = body;
 
     if (!name?.trim()) {
       return NextResponse.json({ error: "Author name is required." }, { status: 400 });
@@ -31,7 +34,10 @@ export async function POST(req: Request) {
 
     const { data, error } = await supabaseAdmin
       .from("authors")
-      .insert({ name: name.trim(), bio, website, amazon, instagram, tiktok, facebook, goodreads, threads, email })
+      .insert({
+        name: name.trim(), bio, website, amazon, instagram, tiktok, facebook, goodreads, threads, email,
+        location, preferred_contact, genres: Array.isArray(genres) ? genres : [], notes,
+      })
       .select()
       .single();
 
@@ -57,12 +63,14 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "Author id is required." }, { status: 400 });
     }
 
-    const payload: Record<string, string | null> = {};
-    for (const key of ["name", "bio", "website", "amazon", "instagram", "tiktok", "facebook", "goodreads", "threads", "email"]) {
+    const payload: Record<string, string | string[] | null> = {};
+    for (const key of ["name", "bio", "website", "amazon", "instagram", "tiktok", "facebook", "goodreads", "threads", "email", "location", "preferred_contact", "notes"]) {
       if (key in fields) payload[key] = (fields[key] ?? "").trim();
     }
     // photo_url is nullable (not a trimmed text field) — null explicitly clears it
     if ("photo_url" in fields) payload.photo_url = fields.photo_url || null;
+    // genres is a text[] column, not a trimmed string
+    if ("genres" in fields) payload.genres = Array.isArray(fields.genres) ? fields.genres : [];
 
     if (!payload.name) {
       return NextResponse.json({ error: "Author name cannot be empty." }, { status: 400 });

@@ -2,17 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { buildR2PublicUrl, r2, R2_BUCKETS, R2_PREFIXES } from "@/lib/r2";
+import { sanitizeName } from "@/lib/sanitize-name";
 
 // Same bucket, client, and presigned-PUT pattern as /api/upload-cover/upload-url.
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
-
-function sanitizeName(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
 
 export async function POST(req: NextRequest) {
   try {
