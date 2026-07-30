@@ -66,7 +66,7 @@ export function MonthlyScheduleGrid({ cards }: { cards: ScheduleGridCard[] }) {
                 <span className="shrink-0 text-2xl font-bold text-text-primary">{m.count}</span>
               </div>
 
-              <div className="mt-2.5 flex gap-1">
+              <div className="mt-2 flex gap-1">
                 {Array.from({ length: BAR_SEGMENTS }).map((_, i) => (
                   <div
                     key={i}
@@ -75,12 +75,17 @@ export function MonthlyScheduleGrid({ cards }: { cards: ScheduleGridCard[] }) {
                 ))}
               </div>
 
-              <div className="mt-2.5 flex-1 space-y-0.5 overflow-hidden">
-                {m.titles.map(title => (
-                  <p key={title} className="truncate text-[13px] text-text-body">
+              <div className="mt-2 flex-1 space-y-0.5 overflow-hidden">
+                {m.titles.slice(0, 2).map(title => (
+                  <p key={title} className="truncate text-[13px] leading-tight text-text-body">
                     {title}
                   </p>
                 ))}
+                {m.titles.length > 2 && (
+                  <p className="truncate text-[13px] italic leading-tight text-text-muted">
+                    …+{m.titles.length - 2} more
+                  </p>
+                )}
               </div>
             </div>
           );
