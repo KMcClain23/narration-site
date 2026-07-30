@@ -9,7 +9,13 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { BoardCard, type BoardV2Card, parseLocalDate, daysUntil } from "@/components/admin/BoardCard";
 import { SubgroupDivider } from "@/components/admin/SubgroupDivider";
 import { ReleasedDropZone, RELEASED_DROPZONE_ID } from "@/components/admin/ReleasedDropZone";
+import { CardEditModal, type FullBoardCard } from "@/components/board/CardEditModal";
 import { adminType } from "@/lib/design-tokens";
+
+// Cards on this board only ever show these statuses (see ACTIVE_STATUSES in
+// /api/board-v2/cards) — a save that moves a card off-status (or archives it)
+// makes it vanish from view, same as "released" already does today.
+const VISIBLE_STATUSES = new Set(["contracted", "prepping", "recording", "editing"]);
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -108,6 +114,9 @@ export default function BoardV2Page() {
   const [actionMenu, setActionMenu] = useState<{ card: BoardV2Card; x: number; y: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [fadingIds, setFadingIds] = useState<Set<string>>(new Set());
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [authorNames, setAuthorNames] = useState<string[]>([]);
+  const [coNarratorNames, setCoNarratorNames] = useState<string[]>([]);
 
   const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 8 } }));
 
@@ -115,15 +124,21 @@ export default function BoardV2Page() {
     setLoading(true);
     setError(null);
     try {
-      const [cardsRes, countRes] = await Promise.all([
+      const [cardsRes, countRes, authorsRes, coNarratorsRes] = await Promise.all([
         fetch("/api/board-v2/cards"),
         fetch("/api/board-v2/released-count"),
+        fetch("/api/authors"),
+        fetch("/api/co-narrators"),
       ]);
       const cardsData = await cardsRes.json();
       if (!cardsRes.ok) throw new Error(cardsData.error || "Failed to load board.");
       setCards(cardsData.cards || []);
       const countData = await countRes.json();
       setReleasedCount(countData.count ?? 0);
+      const authorsData = await authorsRes.json();
+      setAuthorNames((authorsData.authors || []).map((a: { name: string }) => a.name).sort());
+      const coNarratorsData = await coNarratorsRes.json();
+      setCoNarratorNames((coNarratorsData.co_narrators || []).map((n: { name: string }) => n.name).sort());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load board.");
     } finally {
@@ -272,9 +287,34 @@ export default function BoardV2Page() {
         card={c}
         onToggleFirst15={handleToggleFirst15}
         onLongPress={(card, x, y) => setActionMenu({ card, x, y })}
+        onOpen={card => setEditingCardId(card.id)}
       />
     </div>
   );
+
+  // A save (or archive) can move a card off this board's visible slice —
+  // same handling "released" already gets today, just generalized: if the
+  // resulting row still belongs here, update it in place; otherwise drop it.
+  const handleCardSaved = useCallback((updated: FullBoardCard) => {
+    if (updated.archived_at || !VISIBLE_STATUSES.has(updated.status)) {
+      setCards(prev => prev.filter(c => c.id !== updated.id));
+      return;
+    }
+    setCards(prev => prev.map(c => (c.id === updated.id ? {
+      ...c,
+      title: updated.title,
+      author: updated.author,
+      co_narrator: updated.co_narrator,
+      cover_url: updated.cover_url,
+      status: updated.status,
+      deadline: updated.deadline || null,
+      first15_due: updated.first15_due || null,
+      first_15_complete: updated.first_15_complete,
+      word_count: updated.word_count,
+      is_confidential: updated.is_confidential,
+      narration_format: updated.narration_format,
+    } : c)));
+  }, []);
 
   if (loading) {
     return (
@@ -439,6 +479,17 @@ export default function BoardV2Page() {
             Mark as Released
           </button>
         </div>
+      )}
+
+      {/* Card Edit modal (Stage 6.1) */}
+      {editingCardId && (
+        <CardEditModal
+          cardId={editingCardId}
+          onClose={() => setEditingCardId(null)}
+          onSaved={handleCardSaved}
+          authorNames={authorNames}
+          coNarratorNames={coNarratorNames}
+        />
       )}
 
       {/* Toast (e.g. "+ New Project" placeholder) */}

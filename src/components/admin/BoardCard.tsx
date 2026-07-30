@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Calendar, Lock, Square, CheckSquare } from "lucide-react";
@@ -49,14 +48,17 @@ export function BoardCard({
   card,
   onToggleFirst15,
   onLongPress,
+  onOpen,
 }: {
   card: BoardV2Card;
   onToggleFirst15: (id: string, complete: boolean) => void;
   /** Mobile long-press (500ms) → opens the action menu at (x, y). Desktop
    *  drag is handled separately via dnd-kit and is unaffected by this. */
   onLongPress?: (card: BoardV2Card, x: number, y: number) => void;
+  /** Click (not drag) → opens the Card Edit modal (Stage 6.1+). Optional so
+   *  the DragOverlay preview instance can render without wiring one up. */
+  onOpen?: (card: BoardV2Card) => void;
 }) {
-  const router = useRouter();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: card.id,
     data: { card },
@@ -98,7 +100,7 @@ export function BoardCard({
       onPointerUp={clearLongPress}
       onPointerLeave={clearLongPress}
       onPointerCancel={clearLongPress}
-      onClick={() => { if (!isDragging) router.push(`/board/card/${card.id}`); }}
+      onClick={() => { if (!isDragging) onOpen?.(card); }}
       className="relative flex h-[176px] w-full shrink-0 cursor-pointer rounded-lg border border-surface-border bg-surface p-3 transition-colors hover:border-accent-amber-dim hover:bg-surface-raised"
     >
       {card.is_confidential && (

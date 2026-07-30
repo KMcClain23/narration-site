@@ -156,6 +156,10 @@ html {
 
   --color-pill-neutral-bg: #4a5265;
   --color-pill-neutral-text: #c4c9d6;
+
+  /* "prepping" board status — sits between contracted's blue and
+     recording's yellow; no other status pill color needed this stage. */
+  --color-status-prepping: #4a9eae;
 }
 
 /* Admin pages opt into Manrope via this class on the AdminLayout root —
