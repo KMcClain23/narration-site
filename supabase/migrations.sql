@@ -187,3 +187,17 @@ begin
     add constraint board_cards_status_check
     check (status in ('audition', 'contracted', 'prepping', 'recording', 'editing', 'released'));
 end $$;
+
+-- Stage 4.1 (admin redesign — Contacts/Authors): new author profile fields
+-- for the /contacts/authors detail page (location, preferred contact method,
+-- genre chips, free-form notes). Mirrors the naming/typing already used on
+-- production_contacts (preferred_contact, genres, notes) for consistency.
+alter table authors add column if not exists location           text  not null default '';
+alter table authors add column if not exists preferred_contact  text  not null default '';
+alter table authors add column if not exists genres             text[] not null default '{}';
+alter table authors add column if not exists notes              text  not null default '';
+
+-- 'threads' has been live on authors for a while (used throughout app code)
+-- but was never captured in a tracked migration — this brings the file in
+-- sync with reality. No-op if the column already exists.
+alter table authors add column if not exists threads text not null default '';
