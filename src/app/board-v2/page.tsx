@@ -489,6 +489,8 @@ export default function BoardV2Page() {
           onSaved={handleCardSaved}
           authorNames={authorNames}
           coNarratorNames={coNarratorNames}
+          onAuthorCreated={name => setAuthorNames(prev => [...prev, name].sort())}
+          onCoNarratorCreated={name => setCoNarratorNames(prev => [...prev, name].sort())}
         />
       )}
 

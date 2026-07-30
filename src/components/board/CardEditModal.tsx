@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { ExternalLink, FileText } from "lucide-react";
+import { ExternalLink, FileText, Plus } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
-import { TagsField } from "@/components/admin/PersonForm";
+import { TagsField, PersonForm, EMPTY_PERSON, type Person } from "@/components/admin/PersonForm";
 import { parseCoNarrators } from "@/components/admin/board-card-utils";
 import type { NarrationFormat, ArchivedReason } from "@/types/book";
 
@@ -162,12 +162,18 @@ export function CardEditModal({
   onSaved,
   authorNames,
   coNarratorNames,
+  onAuthorCreated,
+  onCoNarratorCreated,
 }: {
   cardId: string;
   onClose: () => void;
   onSaved: (card: FullBoardCard) => void;
   authorNames: string[];
   coNarratorNames: string[];
+  /** Bubbles a newly-created name up so the board page's own lists stay
+   *  fresh for the rest of the session, not just within this modal. */
+  onAuthorCreated?: (name: string) => void;
+  onCoNarratorCreated?: (name: string) => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -197,6 +203,16 @@ export function CardEditModal({
   const [scriptError, setScriptError] = useState<string | null>(null);
   const scriptInputRef = useRef<HTMLInputElement>(null);
 
+  // Swap-in-place person creation (Stage 6.3). "book" is the normal Book
+  // Edit view; the other two replace the entire modal body with PersonForm.
+  // Local copies of the name lists so a newly-created person is an instant
+  // typeahead match within this modal session, independent of whether the
+  // parent also refreshes its own lists via the onXCreated callbacks.
+  const [viewMode, setViewMode] = useState<"book" | "create-author" | "create-co-narrator">("book");
+  const [createSeedName, setCreateSeedName] = useState("");
+  const [localAuthorNames, setLocalAuthorNames] = useState<string[]>(authorNames);
+  const [localCoNarratorNames, setLocalCoNarratorNames] = useState<string[]>(coNarratorNames);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -218,11 +234,15 @@ export function CardEditModal({
 
   // Escape closes; click-outside intentionally does not — this is a form
   // modal, matching the admin-wide rule from Stage 5 (Cancel/Escape only).
+  // While a person-create view is active, PersonForm has its own Escape
+  // handler that backs out to the Book Edit view — this one must stand down
+  // so Escape doesn't also close the whole modal in the same keystroke.
   useEffect(() => {
+    if (viewMode !== "book") return;
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  }, [onClose, viewMode]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -362,16 +382,62 @@ export function CardEditModal({
 
   const saveButtonLabel = saving ? (saveSuccess ? "Saved ✓" : "Saving…") : "Save Changes";
 
+  const startCreateAuthor = () => {
+    setCreateSeedName(authorQuery.trim());
+    setAuthorDropOpen(false);
+    setViewMode("create-author");
+  };
+
+  const startCreateCoNarrator = () => {
+    setCreateSeedName(cnQuery.trim());
+    setCnDropOpen(false);
+    setViewMode("create-co-narrator");
+  };
+
+  // PersonForm already POSTs internally and only calls onSaved on success —
+  // on validation/API error it sets its own formError and stays put, so
+  // there's nothing extra to handle here for the failure case.
+  const handlePersonCreated = (person: Person) => {
+    if (viewMode === "create-author") {
+      setForm(p => p && { ...p, author: person.name });
+      setAuthorQuery(person.name);
+      setLocalAuthorNames(prev => [...prev, person.name].sort());
+      onAuthorCreated?.(person.name);
+    } else if (viewMode === "create-co-narrator") {
+      setForm(p => p && { ...p, co_narrator: JSON.stringify([...parseCoNarrators(p.co_narrator), person.name]) });
+      setCnQuery("");
+      setLocalCoNarratorNames(prev => [...prev, person.name].sort());
+      onCoNarratorCreated?.(person.name);
+    }
+    setViewMode("book");
+  };
+
+  const handlePersonCancel = () => setViewMode("book");
+
   const renderDetailsTab = () => {
     if (!form) return null;
     const selectedCoNarrators = parseCoNarrators(form.co_narrator);
     const cnQ = cnQuery.trim().toLowerCase();
-    const cnMatches = (cnQ ? coNarratorNames.filter(n => n.toLowerCase().includes(cnQ)) : coNarratorNames)
+    const cnMatches = (cnQ ? localCoNarratorNames.filter(n => n.toLowerCase().includes(cnQ)) : localCoNarratorNames)
       .filter(n => !selectedCoNarrators.includes(n));
-    const cnCanAddFree = cnQ && !coNarratorNames.some(n => n.toLowerCase() === cnQ) && !selectedCoNarrators.some(n => n.toLowerCase() === cnQ);
+    // "+ Create new" replaces the old bare-string free-text add (Stage 6.3) —
+    // two different "add X" affordances that look identical in the moment
+    // but silently produce different data (real co_narrators row vs a
+    // floating string) was the split-brain UX problem being fixed.
+    const showCreateCoNarrator = cnQuery.trim().length >= 2
+      && !localCoNarratorNames.some(n => n.toLowerCase() === cnQ)
+      && !selectedCoNarrators.some(n => n.toLowerCase() === cnQ);
 
-    const authorQ = authorQuery.trim().toLowerCase();
-    const authorMatches = authorQ.length === 0 ? authorNames : authorNames.filter(n => n.toLowerCase().includes(authorQ));
+    const authorQTrim = authorQuery.trim();
+    const authorQ = authorQTrim.toLowerCase();
+    const authorMatches = authorQ.length === 0 ? localAuthorNames : localAuthorNames.filter(n => n.toLowerCase().includes(authorQ));
+    // Compare against the pre-edit saved value, not form.author — onChange
+    // keeps form.author mirroring authorQuery on every keystroke, so
+    // comparing against form.author would always be comparing a value
+    // against itself and the chip would never appear once typing started.
+    const showCreateAuthor = authorQTrim.length >= 2
+      && !localAuthorNames.some(n => n.toLowerCase() === authorQ)
+      && authorQ !== (savedForm?.author ?? "").trim().toLowerCase();
 
     const inputCls = "w-full rounded-lg border border-surface-border bg-background px-3 py-2.5 text-sm text-text-primary placeholder:text-text-dim focus:border-accent-amber-dim focus:outline-none transition-colors";
 
@@ -425,8 +491,15 @@ export function CardEditModal({
                   placeholder="e.g. E.A. Harper"
                   className={inputCls}
                 />
-                {authorDropOpen && authorMatches.length > 0 && (
+                {authorDropOpen && (authorMatches.length > 0 || showCreateAuthor) && (
                   <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-lg border border-surface-border bg-surface-raised shadow-2xl">
+                    {showCreateAuthor && (
+                      <button type="button" onClick={startCreateAuthor}
+                        className="flex w-full items-center gap-1.5 border-b border-surface-border px-3 py-2 text-left text-sm text-accent-amber-bright/90 transition-colors hover:bg-accent-amber/10">
+                        <Plus size={13} className="shrink-0" />
+                        Create &ldquo;{authorQTrim}&rdquo; as new author
+                      </button>
+                    )}
                     {authorMatches.map(name => (
                       <button key={name} type="button"
                         onClick={() => { setAuthorQuery(name); setForm(p => p && { ...p, author: name }); setAuthorDropOpen(false); }}
@@ -462,8 +535,15 @@ export function CardEditModal({
                     placeholder={selectedCoNarrators.length === 0 ? "Add co-narrator…" : ""}
                     className="min-w-[100px] flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-dim focus:outline-none" />
                 </div>
-                {cnDropOpen && (cnMatches.length > 0 || cnCanAddFree) && (
+                {cnDropOpen && (cnMatches.length > 0 || showCreateCoNarrator) && (
                   <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-lg border border-surface-border bg-surface-raised shadow-2xl">
+                    {showCreateCoNarrator && (
+                      <button type="button" onClick={startCreateCoNarrator}
+                        className="flex w-full items-center gap-1.5 border-b border-surface-border px-3 py-2 text-left text-sm text-accent-amber-bright/90 transition-colors hover:bg-accent-amber/10">
+                        <Plus size={13} className="shrink-0" />
+                        Create &ldquo;{cnQuery.trim()}&rdquo; as new co-narrator
+                      </button>
+                    )}
                     {cnMatches.map(name => (
                       <button key={name} type="button"
                         onClick={() => { setForm(p => p && { ...p, co_narrator: JSON.stringify([...parseCoNarrators(p.co_narrator), name]) }); setCnQuery(""); setCnDropOpen(false); }}
@@ -471,13 +551,6 @@ export function CardEditModal({
                         {name}
                       </button>
                     ))}
-                    {cnCanAddFree && (
-                      <button type="button"
-                        onClick={() => { setForm(p => p && { ...p, co_narrator: JSON.stringify([...parseCoNarrators(p.co_narrator), cnQuery.trim()]) }); setCnQuery(""); setCnDropOpen(false); }}
-                        className="block w-full px-3 py-2 text-left text-sm text-accent-amber-bright transition-colors hover:bg-surface">
-                        Add &ldquo;{cnQuery.trim()}&rdquo;
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
@@ -783,6 +856,30 @@ export function CardEditModal({
       </div>
     );
   };
+
+  if (viewMode !== "book") {
+    // Swap-in-place person creation — not a modal-on-top-of-modal. No
+    // header/tab-bar/footer of our own here: PersonForm already ships its
+    // own bordered surface and its own footer (labeled "Save Author" /
+    // "Save Co-Narrator" via config.labelSingular), so duplicating a second
+    // action bar around it would just be two Save buttons on screen at once.
+    return (
+      <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 px-4">
+        <div className="w-full max-w-[900px]">
+          <p className={`${adminType.titleLg} mb-4`}>
+            {viewMode === "create-author" ? "Add new author" : "Add new co-narrator"}
+          </p>
+          <PersonForm
+            type={viewMode === "create-author" ? "author" : "co-narrator"}
+            mode="quick-add"
+            person={{ ...EMPTY_PERSON, name: createSeedName }}
+            onSaved={handlePersonCreated}
+            onCancel={handlePersonCancel}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 px-4">
