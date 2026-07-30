@@ -73,6 +73,9 @@ export default async function AuthorProfilePage({ params }: { params: Promise<{ 
     skills: [], // not an author field — shared Person shape requires it structurally
     representation: "", // not an author field — shared Person shape requires it structurally
     notes: author.notes ?? "",
+    // Production-company-only fields — not applicable to authors.
+    label: "", status: "", address: "", contact_info: "", finding_source: "",
+    date_contacted: "", next_contact_date: "", job_titles: [], contact_names: [],
   };
 
   return (

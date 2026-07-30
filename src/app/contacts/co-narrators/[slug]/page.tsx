@@ -70,6 +70,9 @@ export default async function CoNarratorProfilePage({ params }: { params: Promis
     skills: coNarrator.skills ?? [],
     representation: coNarrator.representation ?? "",
     notes: coNarrator.notes ?? "",
+    // Production-company-only fields — not applicable to co-narrators.
+    label: "", status: "", address: "", contact_info: "", finding_source: "",
+    date_contacted: "", next_contact_date: "", job_titles: [], contact_names: [],
   };
 
   return (

@@ -1,3 +1,8 @@
+// SECURITY GAP: this route is not covered by middleware.ts's matcher —
+// page-level auth is enforced, but direct API access is unauthenticated.
+// Deferred to Stage 7 cleanup or a standalone security pass.
+// See ContactsClient's /api/contacts pattern for isAdmin() reference.
+
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 

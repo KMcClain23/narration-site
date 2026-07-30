@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { PersonAvatar } from "@/components/PersonAvatar";
 import { adminType } from "@/lib/design-tokens";
+import { zipRoster, STATUSES, CANONICAL_GENRES } from "@/lib/production-contacts-constants";
 
 export type PersonType = "author" | "co-narrator" | "production-company";
 export type PersonFormMode = "contacts" | "quick-add";
@@ -30,27 +31,46 @@ export type Person = {
   skills: string[];
   representation: string;
   notes: string;
+  // Production-company-specific — empty/placeholder for author/co-narrator.
+  label: string;
+  status: string;
+  address: string;
+  contact_info: string;
+  finding_source: string;
+  date_contacted: string;
+  next_contact_date: string;
+  job_titles: string[];
+  contact_names: string[];
 };
 
 export const EMPTY_PERSON: Person = {
   id: "", name: "", email: "", bio: "", website: "",
   amazon: "", instagram: "", tiktok: "", threads: "", facebook: "", goodreads: "",
   photo_url: null, location: "", preferred_contact: "", genres: [], skills: [], representation: "", notes: "",
+  label: "", status: "", address: "", contact_info: "", finding_source: "",
+  date_contacted: "", next_contact_date: "", job_titles: [], contact_names: [],
 };
 
 type TagFieldKey = "genres" | "skills";
-type TextFieldKey = Exclude<keyof Person, "id" | "photo_url" | TagFieldKey>;
+type SelectFieldKey = "status";
+type DateFieldKey = "date_contacted" | "next_contact_date";
+type TextFieldKey = Exclude<keyof Person, "id" | "photo_url" | TagFieldKey | SelectFieldKey | DateFieldKey | "job_titles" | "contact_names">;
 
 type FieldDef =
   | { key: TextFieldKey; label: string; kind: "text" | "email" | "url" | "textarea" }
-  | { key: TagFieldKey; label: string; kind: "tags" };
+  | { key: TagFieldKey; label: string; kind: "tags"; suggestions?: string[] }
+  | { key: SelectFieldKey; label: string; kind: "select"; options: readonly { value: string; label: string }[] }
+  | { key: DateFieldKey; label: string; kind: "date" }
+  | { key: "roster"; label: string; kind: "roster" };
 
 type TypeConfig = {
   labelSingular: string;
+  nameLabel: string;
+  hasPhoto: boolean;
   essentials: FieldDef[];
   more: FieldDef[];
   apiPath: string;
-  uploadPersonType: "author" | "co_narrator";
+  uploadPersonType?: "author" | "co_narrator";
 };
 
 // Only the 'author' entry is functional in Stage 4.1. The other two are
@@ -60,6 +80,8 @@ type TypeConfig = {
 const FIELD_CONFIG: Record<PersonType, TypeConfig> = {
   author: {
     labelSingular: "Author",
+    nameLabel: "Name",
+    hasPhoto: true,
     essentials: [
       { key: "email", label: "Email", kind: "email" },
       { key: "bio", label: "Short bio", kind: "textarea" },
@@ -82,6 +104,8 @@ const FIELD_CONFIG: Record<PersonType, TypeConfig> = {
   },
   "co-narrator": {
     labelSingular: "Co-Narrator",
+    nameLabel: "Name",
+    hasPhoto: true,
     essentials: [
       { key: "email", label: "Email", kind: "email" },
       { key: "bio", label: "Short bio", kind: "textarea" },
@@ -107,19 +131,25 @@ const FIELD_CONFIG: Record<PersonType, TypeConfig> = {
   },
   "production-company": {
     labelSingular: "Production Company",
+    nameLabel: "Company name",
+    hasPhoto: false,
     essentials: [
-      { key: "email", label: "Email", kind: "email" },
-      { key: "bio", label: "Short bio", kind: "textarea" },
+      { key: "label", label: "Label", kind: "text" },
+      { key: "status", label: "Status", kind: "select", options: STATUSES },
       { key: "website", label: "Website", kind: "url" },
+      { key: "preferred_contact", label: "Preferred contact method", kind: "text" },
     ],
     more: [
-      { key: "instagram", label: "Instagram", kind: "url" },
-      { key: "facebook", label: "Facebook", kind: "url" },
+      { key: "address", label: "Address", kind: "text" },
+      { key: "roster", label: "Contact people", kind: "roster" },
+      { key: "contact_info", label: "Contact info", kind: "textarea" },
+      { key: "finding_source", label: "Finding source", kind: "text" },
+      { key: "genres", label: "Genres", kind: "tags", suggestions: CANONICAL_GENRES },
+      { key: "date_contacted", label: "Last contacted", kind: "date" },
+      { key: "next_contact_date", label: "Next contact date", kind: "date" },
+      { key: "notes", label: "Notes", kind: "textarea" },
     ],
-    // Neither this API route nor upload support for this type exist yet —
-    // Stage 4.3 builds both. Structure is here so that stage is additive.
     apiPath: "/api/production-companies",
-    uploadPersonType: "author",
   },
 };
 
@@ -157,8 +187,16 @@ function Field({
   );
 }
 
-function TagsField({ label, value, onChange }: { label: string; value: string[]; onChange: (v: string[]) => void }) {
+function TagsField({
+  label, value, onChange, suggestions,
+}: {
+  label: string;
+  value: string[];
+  onChange: (v: string[]) => void;
+  suggestions?: readonly string[];
+}) {
   const [draft, setDraft] = useState("");
+  const listId = suggestions ? `taglist-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined;
 
   const commit = () => {
     const v = draft.trim();
@@ -189,11 +227,162 @@ function TagsField({ label, value, onChange }: { label: string; value: string[];
           }}
           onBlur={commit}
           placeholder={value.length ? "" : "Type and press Enter…"}
+          list={listId}
           className="min-w-[100px] flex-1 bg-transparent py-0.5 text-sm text-text-primary placeholder:text-text-dim focus:outline-none"
         />
       </div>
+      {suggestions && (
+        <datalist id={listId}>
+          {suggestions.map(s => <option key={s} value={s} />)}
+        </datalist>
+      )}
     </label>
   );
+}
+
+function SelectField({
+  label, value, onChange, options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: readonly { value: string; label: string }[];
+}) {
+  return (
+    <label className="block">
+      <span className={adminType.label}>{label}</span>
+      <select value={value} onChange={e => onChange(e.target.value)} className={inputClass}>
+        {options.map(o => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function DateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="block">
+      <span className={adminType.label}>{label}</span>
+      <input type="date" value={value} onChange={e => onChange(e.target.value)} className={inputClass} />
+    </label>
+  );
+}
+
+// job_titles and contact_names are two independent text[] columns — see
+// zipRoster's comment. Fully controlled: re-zips from the two arrays on
+// every render, edits build a new pair of arrays and hand them back up.
+const rosterInputClass =
+  "w-full rounded-lg border border-surface-border bg-background px-3 py-2 text-sm text-text-primary placeholder:text-text-dim focus:border-accent-amber-dim focus:outline-none";
+
+function RosterField({
+  label, names, jobTitles, onChange,
+}: {
+  label: string;
+  names: string[];
+  jobTitles: string[];
+  onChange: (names: string[], jobTitles: string[]) => void;
+}) {
+  const rows = zipRoster(names, jobTitles);
+
+  const update = (next: { name: string; jobTitle: string }[]) => {
+    onChange(next.map(r => r.name), next.map(r => r.jobTitle));
+  };
+
+  return (
+    <div>
+      <span className={adminType.label}>{label}</span>
+      <div className="mt-1 space-y-2">
+        {rows.map((row, i) => (
+          <div key={i} className="flex gap-2">
+            <input
+              value={row.name}
+              onChange={e => update(rows.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)))}
+              placeholder="Name"
+              className={rosterInputClass}
+            />
+            <input
+              value={row.jobTitle}
+              onChange={e => update(rows.map((r, j) => (j === i ? { ...r, jobTitle: e.target.value } : r)))}
+              placeholder="Job title"
+              className={rosterInputClass}
+            />
+            <button
+              type="button"
+              onClick={() => update(rows.filter((_, j) => j !== i))}
+              className="shrink-0 text-text-dim transition-colors hover:text-alert-red"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => update([...rows, { name: "", jobTitle: "" }])}
+          className="text-xs font-medium text-accent-amber-dim transition-colors hover:text-accent-amber"
+        >
+          + Add person
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Dispatches a single FieldDef to the right editor. Defined outside
+// PersonForm so it's a plain function, not recreated every render.
+function renderField(
+  def: FieldDef,
+  form: Person,
+  setField: (key: TextFieldKey, value: string) => void,
+  setForm: (updater: (f: Person) => Person) => void,
+  error?: string
+) {
+  switch (def.kind) {
+    case "text":
+    case "email":
+    case "url":
+    case "textarea":
+      return <Field key={def.key} def={def} value={form[def.key]} onChange={v => setField(def.key, v)} error={error} />;
+    case "tags":
+      return (
+        <TagsField
+          key={def.key}
+          label={def.label}
+          value={form[def.key]}
+          suggestions={def.suggestions}
+          onChange={v => setForm(f => ({ ...f, [def.key]: v }))}
+        />
+      );
+    case "select":
+      return (
+        <SelectField
+          key={def.key}
+          label={def.label}
+          value={form[def.key]}
+          options={def.options}
+          onChange={v => setForm(f => ({ ...f, [def.key]: v }))}
+        />
+      );
+    case "date":
+      return (
+        <DateField
+          key={def.key}
+          label={def.label}
+          value={form[def.key]}
+          onChange={v => setForm(f => ({ ...f, [def.key]: v }))}
+        />
+      );
+    case "roster":
+      return (
+        <RosterField
+          key={def.key}
+          label={def.label}
+          names={form.contact_names}
+          jobTitles={form.job_titles}
+          onChange={(names, jobTitles) => setForm(f => ({ ...f, contact_names: names, job_titles: jobTitles }))}
+        />
+      );
+  }
 }
 
 export function PersonForm({
@@ -223,7 +412,7 @@ export function PersonForm({
   // the upload route only needs a unique string, not a real DB id yet.
   const uploadIdRef = useRef(person?.id || crypto.randomUUID());
 
-  const bioRequired = mode === "contacts";
+  const bioRequired = mode === "contacts" && config.essentials.some(f => f.key === "bio");
 
   const setField = (key: TextFieldKey, value: string) => {
     setForm(f => ({ ...f, [key]: value }));
@@ -278,7 +467,7 @@ export function PersonForm({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save.");
-      const saved: Person = { ...form, ...(data.author ?? data.co_narrator ?? {}) };
+      const saved: Person = { ...form, ...(data.author ?? data.co_narrator ?? data.production_company ?? {}) };
       onSaved(saved);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to save — changes were not applied.");
@@ -299,23 +488,25 @@ export function PersonForm({
         {/* Essentials */}
         <p className={adminType.label}>Essentials</p>
         <div className="mt-3 space-y-4">
-          <div className="flex items-center gap-4">
-            <PersonAvatar name={form.name || "?"} photoUrl={form.photo_url} size={64} />
-            <div>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="rounded-full border border-surface-border px-3 py-1.5 text-xs font-medium text-text-body transition-colors hover:border-accent-amber-dim hover:text-text-primary disabled:opacity-50"
-              >
-                {uploading ? "Uploading…" : "Change photo"}
-              </button>
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+          {config.hasPhoto && (
+            <div className="flex items-center gap-4">
+              <PersonAvatar name={form.name || "?"} photoUrl={form.photo_url} size={64} />
+              <div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="rounded-full border border-surface-border px-3 py-1.5 text-xs font-medium text-text-body transition-colors hover:border-accent-amber-dim hover:text-text-primary disabled:opacity-50"
+                >
+                  {uploading ? "Uploading…" : "Change photo"}
+                </button>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+              </div>
             </div>
-          </div>
+          )}
 
           <label className="block">
-            <span className={adminType.label}>Name</span>
+            <span className={adminType.label}>{config.nameLabel}</span>
             <input
               type="text"
               value={form.name}
@@ -325,17 +516,7 @@ export function PersonForm({
             {errors.name && <span className="mt-1 block text-[12px] text-alert-red">{errors.name}</span>}
           </label>
 
-          {config.essentials.map(def =>
-            def.kind === "tags" ? null : (
-              <Field
-                key={def.key}
-                def={def}
-                value={form[def.key]}
-                onChange={v => setField(def.key, v)}
-                error={def.key === "bio" ? errors.bio : undefined}
-              />
-            )
-          )}
+          {config.essentials.map(def => renderField(def, form, setField, setForm, def.key === "bio" ? errors.bio : undefined))}
         </div>
 
         {/* More (collapsed by default) */}
@@ -350,18 +531,7 @@ export function PersonForm({
 
         {moreOpen && (
           <div className="mt-3 space-y-4">
-            {config.more.map(def =>
-              def.kind === "tags" ? (
-                <TagsField
-                  key={def.key}
-                  label={def.label}
-                  value={form[def.key]}
-                  onChange={v => setForm(f => ({ ...f, [def.key]: v }))}
-                />
-              ) : (
-                <Field key={def.key} def={def} value={form[def.key]} onChange={v => setField(def.key, v)} />
-              )
-            )}
+            {config.more.map(def => renderField(def, form, setField, setForm))}
           </div>
         )}
       </div>
