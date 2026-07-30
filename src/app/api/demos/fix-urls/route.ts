@@ -20,6 +20,9 @@ const LEGACY_URL_MAP: Record<string, string> = {
 
 const CORRECT_BASE = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev";
 
+// SECURITY GAP: this route is not covered by middleware.ts's matcher —
+// page-level auth is enforced, but direct API access is unauthenticated.
+// Deferred to Stage 7 cleanup or a standalone security pass.
 export async function POST() {
   const { data: demos, error: fetchErr } = await supabaseAdmin
     .from("demos")

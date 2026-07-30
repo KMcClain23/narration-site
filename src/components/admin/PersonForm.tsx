@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { PersonAvatar } from "@/components/PersonAvatar";
 import { adminType } from "@/lib/design-tokens";
@@ -411,6 +411,14 @@ export function PersonForm({
   // Stable id for the photo's storage key even before the record is created —
   // the upload route only needs a unique string, not a real DB id yet.
   const uploadIdRef = useRef(person?.id || crypto.randomUUID());
+
+  // Escape is an intentional, explicit dismiss — unlike a stray click
+  // outside the modal, it can't happen by accident while typing.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
 
   const bioRequired = mode === "contacts" && config.essentials.some(f => f.key === "bio");
 

@@ -20,8 +20,10 @@ export function AuthorProfileEditButton({ person }: { person: Person }) {
 
       {open && (
         <div
+          // Form modal — unlike a confirmation dialog, an accidental outside
+          // click here would silently discard whatever the user just typed.
+          // Cancel button or Escape only.
           className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 px-4"
-          onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}
         >
           <div className="w-full max-w-lg">
             <PersonForm

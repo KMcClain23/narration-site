@@ -1,10 +1,17 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { PlaceholderPage } from "@/components/admin/PlaceholderPage";
+import { getActiveInquiries, getArchivedInquiries } from "@/lib/inquiries";
+import { InquiriesClient } from "@/components/inquiries/InquiriesClient";
 
-export default function InquiriesV2Page() {
+// Admin data changes constantly and staleness has zero acceptable UX here —
+// unlike the public site's ISR-cached pages, this always reads fresh.
+export const dynamic = "force-dynamic";
+
+export default async function InquiriesV2Page() {
+  const [active, archived] = await Promise.all([getActiveInquiries(), getArchivedInquiries()]);
+
   return (
     <AdminLayout>
-      <PlaceholderPage title="Inquiries" stage={5} />
+      <InquiriesClient initialActive={active} initialArchived={archived} />
     </AdminLayout>
   );
 }

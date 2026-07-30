@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+// SECURITY GAP: this route is not covered by middleware.ts's matcher —
+// page-level auth is enforced, but direct API access is unauthenticated.
+// Deferred to Stage 7 cleanup or a standalone security pass.
+
 // Admin — all demos including inactive
 export async function GET() {
   const { data, error } = await supabaseAdmin

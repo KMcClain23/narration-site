@@ -19,6 +19,9 @@ const r2 = new S3Client({
   responseChecksumValidation: "WHEN_REQUIRED",
 });
 
+// SECURITY GAP: this route is not covered by middleware.ts's matcher —
+// page-level auth is enforced, but direct API access is unauthenticated.
+// Deferred to Stage 7 cleanup or a standalone security pass.
 export async function POST(req: NextRequest) {
   try {
     const { filename, contentType } = await req.json();

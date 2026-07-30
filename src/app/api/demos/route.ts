@@ -16,6 +16,11 @@ export async function GET() {
   return NextResponse.json(data ?? []);
 }
 
+// SECURITY GAP: this route is not covered by middleware.ts's matcher —
+// page-level auth is enforced, but direct API access is unauthenticated.
+// Deferred to Stage 7 cleanup or a standalone security pass.
+// (Applies to POST/PUT/DELETE below — GET above is intentionally public.)
+
 // Create new demo record
 export async function POST(req: NextRequest) {
   try {
