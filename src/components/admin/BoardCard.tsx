@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Calendar, Lock, Square, CheckSquare } from "lucide-react";
+import { parseLocalDate, daysUntil, completionUrgency, URGENCY_PILL, type Urgency } from "./board-card-utils";
+
+// Re-exported so existing imports elsewhere (e.g. board-v2/page.tsx) keep working.
+export { parseLocalDate, daysUntil };
 
 const LONG_PRESS_MS = 500;
 
@@ -25,22 +29,8 @@ export type BoardV2Card = {
   created_at: string;
 };
 
-// Parses "YYYY-MM-DD" as a LOCAL date (matching the existing board/page.tsx
-// convention) — `new Date("YYYY-MM-DD")` parses as UTC midnight, which can
-// silently shift a day in negative-UTC-offset timezones.
-export function parseLocalDate(s: string): Date {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, m - 1, d);
-}
-
 function formatShortDate(s: string): string {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(parseLocalDate(s));
-}
-
-export function daysUntil(s: string): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.round((parseLocalDate(s).getTime() - today.getTime()) / 86400000);
 }
 
 function parseCoNarrators(raw: string | null): string[] {
@@ -53,28 +43,11 @@ function parseCoNarrators(raw: string | null): string[] {
   }
 }
 
-// Pre-declared complete class strings (not built via template literals) so
-// Tailwind's static scanner actually picks them up — arbitrary-value classes
-// assembled at runtime from a JS variable never get compiled.
-const URGENCY_PILL = {
-  default: "text-text-body bg-text-body/15",
-  yellow: "text-accent-amber-bright bg-accent-amber-bright/15",
-  red: "text-alert-red bg-alert-red/15",
-} as const;
-
 const URGENCY_TEXT = {
   default: "text-text-body",
   yellow: "text-accent-amber-bright",
   red: "text-alert-red",
 } as const;
-
-type Urgency = keyof typeof URGENCY_PILL;
-
-function completionUrgency(days: number): Urgency {
-  if (days <= 7) return "red";
-  if (days <= 30) return "yellow";
-  return "default";
-}
 
 function first15Urgency(days: number): Urgency {
   if (days < 0) return "red";

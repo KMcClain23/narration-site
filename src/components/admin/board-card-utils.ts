@@ -1,0 +1,36 @@
+// Pure helpers shared between BoardCard (client) and server components that
+// need the same date/urgency logic (e.g. the Schedule page's Due Soon rows).
+// Deliberately has no "use client" directive — Next.js treats every export
+// from a "use client" module as a client-only reference, even pure
+// functions, so anything a server component needs must live outside one.
+
+// Parses "YYYY-MM-DD" as a LOCAL date (matching the existing board/page.tsx
+// convention) — `new Date("YYYY-MM-DD")` parses as UTC midnight, which can
+// silently shift a day in negative-UTC-offset timezones.
+export function parseLocalDate(s: string): Date {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+export function daysUntil(s: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((parseLocalDate(s).getTime() - today.getTime()) / 86400000);
+}
+
+// Pre-declared complete class strings (not built via template literals) so
+// Tailwind's static scanner actually picks them up — arbitrary-value classes
+// assembled at runtime from a JS variable never get compiled.
+export const URGENCY_PILL = {
+  default: "text-text-body bg-text-body/15",
+  yellow: "text-accent-amber-bright bg-accent-amber-bright/15",
+  red: "text-alert-red bg-alert-red/15",
+} as const;
+
+export type Urgency = keyof typeof URGENCY_PILL;
+
+export function completionUrgency(days: number): Urgency {
+  if (days <= 7) return "red";
+  if (days <= 30) return "yellow";
+  return "default";
+}

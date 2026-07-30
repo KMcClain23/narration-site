@@ -55,9 +55,15 @@ function compareCards(a: BoardV2Card, b: BoardV2Card): number {
   return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
 }
 
+// "Due this week/month" chips answer "what needs MY attention" — once a book
+// moves to editing, the remaining deadline is the editor's responsibility,
+// not the narrator's, so editing-stage cards never match these chips (they
+// still render normally in their column, just won't highlight as due-soon).
+const ATTENTION_STATUSES = new Set(["contracted", "prepping", "recording"]);
+
 function passesDateFilter(card: BoardV2Card, filter: DateFilter): boolean {
   if (!filter) return true;
-  if (!card.deadline) return false;
+  if (!card.deadline || !ATTENTION_STATUSES.has(card.status)) return false;
   const days = daysUntil(card.deadline);
   return filter === "week" ? days <= 7 : days <= 30;
 }
