@@ -115,6 +115,7 @@ export default function BoardV2Page() {
   const [toast, setToast] = useState<string | null>(null);
   const [fadingIds, setFadingIds] = useState<Set<string>>(new Set());
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [creatingProject, setCreatingProject] = useState(false);
   const [authorNames, setAuthorNames] = useState<string[]>([]);
   const [coNarratorNames, setCoNarratorNames] = useState<string[]>([]);
 
@@ -294,26 +295,30 @@ export default function BoardV2Page() {
 
   // A save (or archive) can move a card off this board's visible slice —
   // same handling "released" already gets today, just generalized: if the
-  // resulting row still belongs here, update it in place; otherwise drop it.
+  // resulting row still belongs here, update it in place (or insert it, for
+  // a brand-new project that isn't in `cards` yet); otherwise drop it.
   const handleCardSaved = useCallback((updated: FullBoardCard) => {
-    if (updated.archived_at || !VISIBLE_STATUSES.has(updated.status)) {
-      setCards(prev => prev.filter(c => c.id !== updated.id));
-      return;
-    }
-    setCards(prev => prev.map(c => (c.id === updated.id ? {
-      ...c,
-      title: updated.title,
-      author: updated.author,
-      co_narrator: updated.co_narrator,
-      cover_url: updated.cover_url,
-      status: updated.status,
-      deadline: updated.deadline || null,
-      first15_due: updated.first15_due || null,
-      first_15_complete: updated.first_15_complete,
-      word_count: updated.word_count,
-      is_confidential: updated.is_confidential,
-      narration_format: updated.narration_format,
-    } : c)));
+    const isVisible = !updated.archived_at && VISIBLE_STATUSES.has(updated.status);
+    setCards(prev => {
+      const idx = prev.findIndex(c => c.id === updated.id);
+      if (!isVisible) return idx === -1 ? prev : prev.filter(c => c.id !== updated.id);
+      const projected: BoardV2Card = {
+        id: updated.id,
+        title: updated.title,
+        author: updated.author,
+        co_narrator: updated.co_narrator,
+        cover_url: updated.cover_url,
+        status: updated.status,
+        deadline: updated.deadline || null,
+        first15_due: updated.first15_due || null,
+        first_15_complete: updated.first_15_complete,
+        word_count: updated.word_count,
+        is_confidential: updated.is_confidential,
+        narration_format: updated.narration_format,
+        created_at: updated.created_at,
+      };
+      return idx === -1 ? [...prev, projected] : prev.map((c, i) => (i === idx ? projected : c));
+    });
   }, []);
 
   if (loading) {
@@ -334,6 +339,13 @@ export default function BoardV2Page() {
           <div className="mb-4 flex shrink-0 items-center justify-between gap-4">
             <h1 className={adminType.titleLg}>Board</h1>
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCreatingProject(true)}
+                className="rounded-full bg-accent-amber px-4 py-2 text-sm font-bold text-background transition hover:brightness-110"
+              >
+                + New Project
+              </button>
               <FilterChip label="Due this week" active={dateFilter === "week"} onClick={() => toggleFilter("week")} />
               <FilterChip label="Due this month" active={dateFilter === "month"} onClick={() => toggleFilter("month")} />
             </div>
@@ -351,7 +363,7 @@ export default function BoardV2Page() {
             <div className="flex flex-1 flex-col items-center justify-center gap-4">
               <p className={adminType.body}>No active projects</p>
               <button
-                onClick={() => setToast("Coming in Stage 6")}
+                onClick={() => setCreatingProject(true)}
                 className="rounded-full bg-accent-amber px-5 py-2.5 text-sm font-bold text-background transition hover:brightness-110"
               >
                 + New Project
@@ -484,8 +496,22 @@ export default function BoardV2Page() {
       {/* Card Edit modal (Stage 6.1) */}
       {editingCardId && (
         <CardEditModal
+          mode="edit"
           cardId={editingCardId}
           onClose={() => setEditingCardId(null)}
+          onSaved={handleCardSaved}
+          authorNames={authorNames}
+          coNarratorNames={coNarratorNames}
+          onAuthorCreated={name => setAuthorNames(prev => [...prev, name].sort())}
+          onCoNarratorCreated={name => setCoNarratorNames(prev => [...prev, name].sort())}
+        />
+      )}
+
+      {/* New Project modal (Stage 6.4) — same CardEditModal, create mode */}
+      {creatingProject && (
+        <CardEditModal
+          mode="create"
+          onClose={() => setCreatingProject(false)}
           onSaved={handleCardSaved}
           authorNames={authorNames}
           coNarratorNames={coNarratorNames}

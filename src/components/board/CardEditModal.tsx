@@ -14,6 +14,7 @@ import type { NarrationFormat, ArchivedReason } from "@/types/book";
 // type now so Stage 6.2 doesn't need a breaking type change).
 export type FullBoardCard = {
   id: string;
+  created_at: string;
   title: string;
   subtitle: string;
   cover_url: string;
@@ -46,6 +47,7 @@ export type FullBoardCard = {
 function mapToFullBoardCard(row: Record<string, unknown>): FullBoardCard {
   return {
     id: String(row.id),
+    created_at: (row.created_at as string) ?? "",
     title: (row.title as string) ?? "",
     subtitle: (row.subtitle as string) ?? "",
     cover_url: (row.cover_url as string) ?? "",
@@ -73,6 +75,20 @@ function mapToFullBoardCard(row: Record<string, unknown>): FullBoardCard {
     archived_at: (row.archived_at as string) ?? null,
     archived_reason: (row.archived_reason as ArchivedReason) ?? null,
     archived_notes: (row.archived_notes as string) ?? null,
+  };
+}
+
+// Fresh state for the "create" flow — status defaults to "contracted" since
+// /api/board-v2/cards excludes "audition" entirely; a brand-new card
+// defaulting to audition would vanish from the board the instant it saved.
+function blankCard(): FullBoardCard {
+  return {
+    id: "", created_at: "", title: "", subtitle: "", cover_url: "", author: "", co_narrator: "",
+    author_notes: "", narration_format: null, is_confidential: false, deadline: "", status: "contracted",
+    word_count: 0, payment_type: "pfh", pfh_rate: 0, first15_due: "", first_15_complete: false,
+    production_type: null, production_company: null, description: "", tags: [], trigger_warnings: [],
+    audible_link: "", ar_link: "", spotify_link: "", script_url: "",
+    archived_at: null, archived_reason: null, archived_notes: null,
   };
 }
 
@@ -156,16 +172,7 @@ function OpenLinkButton({ url }: { url: string }) {
   );
 }
 
-export function CardEditModal({
-  cardId,
-  onClose,
-  onSaved,
-  authorNames,
-  coNarratorNames,
-  onAuthorCreated,
-  onCoNarratorCreated,
-}: {
-  cardId: string;
+type CardEditModalProps = {
   onClose: () => void;
   onSaved: (card: FullBoardCard) => void;
   authorNames: string[];
@@ -174,11 +181,16 @@ export function CardEditModal({
    *  fresh for the rest of the session, not just within this modal. */
   onAuthorCreated?: (name: string) => void;
   onCoNarratorCreated?: (name: string) => void;
-}) {
-  const [loading, setLoading] = useState(true);
+} & ({ mode: "edit"; cardId: string } | { mode: "create"; cardId?: undefined });
+
+export function CardEditModal(props: CardEditModalProps) {
+  const { mode, onClose, onSaved, authorNames, coNarratorNames, onAuthorCreated, onCoNarratorCreated } = props;
+  const cardId = mode === "edit" ? props.cardId : undefined;
+
+  const [loading, setLoading] = useState(mode === "edit");
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [form, setForm] = useState<FullBoardCard | null>(null);
-  const [savedForm, setSavedForm] = useState<FullBoardCard | null>(null);
+  const [form, setForm] = useState<FullBoardCard | null>(mode === "create" ? blankCard() : null);
+  const [savedForm, setSavedForm] = useState<FullBoardCard | null>(mode === "create" ? blankCard() : null);
   const [activeTab, setActiveTab] = useState<TabId>("details");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -214,6 +226,7 @@ export function CardEditModal({
   const [localCoNarratorNames, setLocalCoNarratorNames] = useState<string[]>(coNarratorNames);
 
   useEffect(() => {
+    if (mode !== "edit") return;
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
@@ -230,7 +243,7 @@ export function CardEditModal({
       .catch(e => { if (!cancelled) setLoadError(e instanceof Error ? e.message : "Failed to load card."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [cardId]);
+  }, [mode, cardId]);
 
   // Escape closes; click-outside intentionally does not — this is a form
   // modal, matching the admin-wide rule from Stage 5 (Cancel/Escape only).
@@ -310,17 +323,21 @@ export function CardEditModal({
 
   const handleSave = async () => {
     if (!form) return;
+    if (mode === "create" && !form.title.trim()) {
+      setSaveError("Book title is required.");
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     try {
       const { id, ...fields } = form;
       const res = await fetch("/api/board", {
-        method: "PUT",
+        method: mode === "create" ? "POST" : "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, ...fields }),
+        body: JSON.stringify(mode === "create" ? fields : { id, ...fields }),
       });
       const d = await res.json();
-      if (!res.ok) throw new Error(d.error || "Failed to save changes.");
+      if (!res.ok) throw new Error(d.error || `Failed to ${mode === "create" ? "create" : "save"} project.`);
       const saved = mapToFullBoardCard(d.card);
       setForm(saved);
       setSavedForm(saved);
@@ -328,7 +345,7 @@ export function CardEditModal({
       onSaved(saved);
       setTimeout(onClose, 500);
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Failed to save changes.");
+      setSaveError(e instanceof Error ? e.message : `Failed to ${mode === "create" ? "create" : "save"} project.`);
       setSaving(false);
     }
   };
@@ -380,7 +397,9 @@ export function CardEditModal({
     }
   };
 
-  const saveButtonLabel = saving ? (saveSuccess ? "Saved ✓" : "Saving…") : "Save Changes";
+  const saveButtonLabel = mode === "create"
+    ? (saving ? (saveSuccess ? "Created ✓" : "Creating…") : "Create Project")
+    : (saving ? (saveSuccess ? "Saved ✓" : "Saving…") : "Save Changes");
 
   const startCreateAuthor = () => {
     setCreateSeedName(authorQuery.trim());
@@ -614,7 +633,9 @@ export function CardEditModal({
           </label>
         </div>
 
-        {/* Section 5: Archive */}
+        {/* Section 5: Archive — doesn't apply to a project that doesn't
+            exist yet */}
+        {mode === "edit" && (
         <div className="border-t border-surface-border pt-8 mt-2">
           {form.archived_at ? (
             <div className="rounded-lg border border-surface-border bg-background p-4">
@@ -637,6 +658,7 @@ export function CardEditModal({
             </button>
           )}
         </div>
+        )}
       </div>
     );
   };
@@ -901,11 +923,13 @@ export function CardEditModal({
           <>
             {/* Sticky header */}
             <div className="flex shrink-0 items-center gap-4 border-b border-surface-border p-5">
-              <div className="relative h-[90px] w-[60px] shrink-0 overflow-hidden rounded bg-background">
-                {form.cover_url && <Image src={form.cover_url} alt={form.title} fill className="object-contain" sizes="60px" />}
-              </div>
+              {mode === "edit" && (
+                <div className="relative h-[90px] w-[60px] shrink-0 overflow-hidden rounded bg-background">
+                  {form.cover_url && <Image src={form.cover_url} alt={form.title} fill className="object-contain" sizes="60px" />}
+                </div>
+              )}
               <div className="min-w-0 flex-1">
-                <h2 className={`${adminType.titleLg} truncate`}>{form.title || "Untitled"}</h2>
+                <h2 className={`${adminType.titleLg} truncate`}>{form.title || (mode === "create" ? "New project" : "Untitled")}</h2>
                 <div className="mt-1.5"><StatusPill value={form.status} /></div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
