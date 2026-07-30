@@ -27,20 +27,23 @@ export type Person = {
   location: string;
   preferred_contact: string;
   genres: string[];
+  skills: string[];
+  representation: string;
   notes: string;
 };
 
 export const EMPTY_PERSON: Person = {
   id: "", name: "", email: "", bio: "", website: "",
   amazon: "", instagram: "", tiktok: "", threads: "", facebook: "", goodreads: "",
-  photo_url: null, location: "", preferred_contact: "", genres: [], notes: "",
+  photo_url: null, location: "", preferred_contact: "", genres: [], skills: [], representation: "", notes: "",
 };
 
-type TextFieldKey = Exclude<keyof Person, "id" | "genres" | "photo_url">;
+type TagFieldKey = "genres" | "skills";
+type TextFieldKey = Exclude<keyof Person, "id" | "photo_url" | TagFieldKey>;
 
 type FieldDef =
   | { key: TextFieldKey; label: string; kind: "text" | "email" | "url" | "textarea" }
-  | { key: "genres"; label: string; kind: "tags" };
+  | { key: TagFieldKey; label: string; kind: "tags" };
 
 type TypeConfig = {
   labelSingular: string;
@@ -88,12 +91,16 @@ const FIELD_CONFIG: Record<PersonType, TypeConfig> = {
       { key: "amazon", label: "Amazon page", kind: "url" },
       { key: "instagram", label: "Instagram", kind: "url" },
       { key: "tiktok", label: "TikTok", kind: "url" },
-      // No Threads for co-narrators yet — pending a Stage 4.2 product
-      // decision (co_narrators has no threads column today either).
+      // No Threads for co-narrators — confirmed the old CoNarratorManager UI
+      // never had one and co_narrators has no threads column (per design
+      // decision: narrators are less active there than authors).
       { key: "facebook", label: "Facebook", kind: "url" },
       { key: "goodreads", label: "Goodreads", kind: "url" },
-      // location/preferred_contact/genres/notes don't exist on co_narrators
-      // yet — Stage 4.2 decides what it actually needs before adding them.
+      { key: "location", label: "Location", kind: "text" },
+      { key: "preferred_contact", label: "Preferred contact method", kind: "text" },
+      { key: "skills", label: "Skills", kind: "tags" },
+      { key: "representation", label: "Representation", kind: "text" },
+      { key: "notes", label: "Notes", kind: "textarea" },
     ],
     apiPath: "/api/co-narrators",
     uploadPersonType: "co_narrator",
@@ -345,7 +352,12 @@ export function PersonForm({
           <div className="mt-3 space-y-4">
             {config.more.map(def =>
               def.kind === "tags" ? (
-                <TagsField key={def.key} label={def.label} value={form.genres} onChange={v => setForm(f => ({ ...f, genres: v }))} />
+                <TagsField
+                  key={def.key}
+                  label={def.label}
+                  value={form[def.key]}
+                  onChange={v => setForm(f => ({ ...f, [def.key]: v }))}
+                />
               ) : (
                 <Field key={def.key} def={def} value={form[def.key]} onChange={v => setField(def.key, v)} />
               )

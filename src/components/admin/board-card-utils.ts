@@ -34,3 +34,18 @@ export function completionUrgency(days: number): Urgency {
   if (days <= 30) return "yellow";
   return "default";
 }
+
+// board_cards.co_narrator is a `text` column, not a native Postgres array —
+// it holds a JSON-encoded array string in most rows, but at least one live
+// row is a bare non-JSON string. This defensive parse handles both; there is
+// no Postgres-level array operator that can be used against this column as
+// stored today (confirmed empirically — see Stage 4.2 planning notes).
+export function parseCoNarrators(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const p = JSON.parse(raw);
+    return Array.isArray(p) ? p.filter(Boolean) : p ? [String(p)] : [];
+  } catch {
+    return [raw];
+  }
+}

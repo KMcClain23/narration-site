@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
-import { FaAmazon, FaInstagram, FaTiktok, FaThreads, FaFacebook, FaGoodreads } from "react-icons/fa6";
-import { Globe, Mail, MapPin, MessageCircle } from "lucide-react";
+import { FaAmazon, FaInstagram, FaTiktok, FaFacebook, FaGoodreads } from "react-icons/fa6";
+import { Globe, Mail, MapPin, MessageCircle, Briefcase } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { adminType } from "@/lib/design-tokens";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sanitizeName } from "@/lib/sanitize-name";
+import { parseCoNarrators } from "@/components/admin/board-card-utils";
 import { PersonAvatar } from "@/components/PersonAvatar";
-import { AuthorProfileEditButton } from "@/components/contacts/AuthorProfileEditButton";
+import { CoNarratorProfileEditButton } from "@/components/contacts/CoNarratorProfileEditButton";
 import { BooksTogetherSection } from "@/components/contacts/BooksTogetherSection";
 import type { Person } from "@/components/admin/PersonForm";
 
@@ -15,64 +16,60 @@ import type { Person } from "@/components/admin/PersonForm";
 // Supabase on every request.
 export const dynamic = "force-dynamic";
 
+// No Threads here — co_narrators has no threads column (confirmed absent;
+// narrators are less active there than authors, per design decision).
 const SOCIAL_LINKS: { key: keyof Person; label: string; Icon: typeof FaAmazon }[] = [
   { key: "amazon", label: "Amazon", Icon: FaAmazon },
   { key: "instagram", label: "Instagram", Icon: FaInstagram },
   { key: "tiktok", label: "TikTok", Icon: FaTiktok },
-  { key: "threads", label: "Threads", Icon: FaThreads },
   { key: "facebook", label: "Facebook", Icon: FaFacebook },
   { key: "goodreads", label: "Goodreads", Icon: FaGoodreads },
 ];
 
-export default async function AuthorProfilePage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function CoNarratorProfilePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  const { data: authors } = await supabaseAdmin.from("authors").select("*");
-  const author = (authors ?? []).find(a => sanitizeName(a.name) === slug);
-  if (!author) notFound();
+  const { data: coNarrators } = await supabaseAdmin.from("co_narrators").select("*");
+  const coNarrator = (coNarrators ?? []).find(cn => sanitizeName(cn.name) === slug);
+  if (!coNarrator) notFound();
 
-  // Books-together: board_cards has no FK to authors — the link is a
-  // case-insensitive, trimmed name-string match, same convention as the
-  // existing emailByName lookup in board/page.tsx. A renamed author or a
-  // typo in board_cards.author silently orphans a book from this list;
-  // same-name authors would share one list. A proper FK is future work
-  // (candidate for Stage 7 cleanup), not in scope here.
+  // Books-together: board_cards.co_narrator is a text column holding a
+  // JSON-encoded array string (occasionally a bare non-JSON string) — NOT a
+  // native Postgres array, so there is no DB-level containment operator to
+  // filter on. Every row is fetched and parsed in JS via parseCoNarrators,
+  // then matched case-insensitively/trimmed against this co-narrator's name
+  // — same convention as the author/board_cards.author string match. A
+  // renamed co-narrator or a typo in board_cards.co_narrator silently
+  // orphans a book from this list; same-name co-narrators would share one
+  // list. A proper FK (or normalizing this column to a real array/join
+  // table) is future work (candidate for Stage 7 cleanup), not in scope here.
   const { data: allCards } = await supabaseAdmin
     .from("board_cards")
-    .select("id, title, cover_url, status, created_at, archived_at, deadline, released_at")
-    .eq("author", author.name); // exact match fast-path; see fallback below
+    .select("id, title, cover_url, status, created_at, archived_at, deadline, released_at, narration_format, co_narrator");
 
-  // Exact match may miss case/whitespace variants — fall back to a full
-  // scan + trimmed/lowercased comparison, matching the app-wide convention.
-  let books = allCards ?? [];
-  if (books.length === 0) {
-    const { data: everything } = await supabaseAdmin
-      .from("board_cards")
-      .select("id, title, cover_url, status, created_at, archived_at, deadline, released_at, author");
-    const target = author.name.trim().toLowerCase();
-    books = (everything ?? []).filter(c => c.author?.trim().toLowerCase() === target);
-  }
+  const target = coNarrator.name.trim().toLowerCase();
+  let books = (allCards ?? []).filter(c => parseCoNarrators(c.co_narrator).some(n => n.trim().toLowerCase() === target));
   books = [...books].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const person: Person = {
-    id: author.id,
-    name: author.name,
-    email: author.email ?? "",
-    bio: author.bio ?? "",
-    website: author.website ?? "",
-    amazon: author.amazon ?? "",
-    instagram: author.instagram ?? "",
-    tiktok: author.tiktok ?? "",
-    threads: author.threads ?? "",
-    facebook: author.facebook ?? "",
-    goodreads: author.goodreads ?? "",
-    photo_url: author.photo_url ?? null,
-    location: author.location ?? "",
-    preferred_contact: author.preferred_contact ?? "",
-    genres: author.genres ?? [],
-    skills: [], // not an author field — shared Person shape requires it structurally
-    representation: "", // not an author field — shared Person shape requires it structurally
-    notes: author.notes ?? "",
+    id: coNarrator.id,
+    name: coNarrator.name,
+    email: coNarrator.email ?? "",
+    bio: coNarrator.bio ?? "",
+    website: coNarrator.website ?? "",
+    amazon: coNarrator.amazon ?? "",
+    instagram: coNarrator.instagram ?? "",
+    tiktok: coNarrator.tiktok ?? "",
+    threads: "", // co_narrators has no threads column
+    facebook: coNarrator.facebook ?? "",
+    goodreads: coNarrator.goodreads ?? "",
+    photo_url: coNarrator.photo_url ?? null,
+    location: coNarrator.location ?? "",
+    preferred_contact: coNarrator.preferred_contact ?? "",
+    genres: [], // not a co-narrator field — shared Person shape requires it structurally
+    skills: coNarrator.skills ?? [],
+    representation: coNarrator.representation ?? "",
+    notes: coNarrator.notes ?? "",
   };
 
   return (
@@ -118,10 +115,15 @@ export default async function AuthorProfilePage({ params }: { params: Promise<{ 
                   <Mail size={14} className="shrink-0 text-text-dim" /> {person.email}
                 </a>
               )}
+              {person.representation && (
+                <div className="flex items-center gap-2 text-sm text-text-body">
+                  <Briefcase size={14} className="shrink-0 text-text-dim" /> {person.representation}
+                </div>
+              )}
             </div>
 
             <div className="mt-5">
-              <AuthorProfileEditButton person={person} />
+              <CoNarratorProfileEditButton person={person} />
             </div>
           </div>
 
@@ -129,14 +131,14 @@ export default async function AuthorProfilePage({ params }: { params: Promise<{ 
           <div className="lg:col-span-2">
             {person.bio && <p className={`${adminType.bodyMd} leading-relaxed text-text-body`}>{person.bio}</p>}
 
-            {person.genres.length > 0 && (
+            {person.skills.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-1.5">
-                {person.genres.map(g => (
+                {person.skills.map(s => (
                   <span
-                    key={g}
+                    key={s}
                     className="rounded bg-pill-neutral-bg px-2 py-0.5 text-[12px] uppercase tracking-wide text-pill-neutral-text"
                   >
-                    {g}
+                    {s}
                   </span>
                 ))}
               </div>

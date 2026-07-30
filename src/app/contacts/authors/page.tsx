@@ -4,6 +4,11 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sanitizeName } from "@/lib/sanitize-name";
 import { AuthorsListClient, type AuthorRow } from "@/components/contacts/AuthorsListClient";
 
+// Admin data changes constantly and staleness has zero acceptable UX here —
+// unlike the public site's ISR-cached pages, this always reads fresh from
+// Supabase on every request.
+export const dynamic = "force-dynamic";
+
 export default async function ContactsAuthorsPage() {
   const [authorsRes, cardsRes] = await Promise.all([
     supabaseAdmin.from("authors").select("id, name, email, bio, photo_url").order("name", { ascending: true }),

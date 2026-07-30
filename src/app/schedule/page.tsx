@@ -13,6 +13,11 @@ import { DueSoonSection } from "@/components/schedule/DueSoonSection";
 // client-oriented API route.
 const ACTIVE_STATUSES = ["contracted", "prepping", "recording", "editing"] as const;
 
+// Admin data changes constantly and staleness has zero acceptable UX here —
+// unlike the public site's ISR-cached pages, this always reads fresh from
+// Supabase on every request.
+export const dynamic = "force-dynamic";
+
 export default async function SchedulePage() {
   const [settingsRes, cardsRes] = await Promise.all([
     supabaseAdmin

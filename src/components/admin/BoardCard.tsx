@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Calendar, Lock, Square, CheckSquare } from "lucide-react";
-import { parseLocalDate, daysUntil, completionUrgency, URGENCY_PILL, type Urgency } from "./board-card-utils";
+import { parseLocalDate, daysUntil, completionUrgency, URGENCY_PILL, parseCoNarrators, type Urgency } from "./board-card-utils";
 
 // Re-exported so existing imports elsewhere (e.g. board-v2/page.tsx) keep working.
 export { parseLocalDate, daysUntil };
@@ -31,16 +31,6 @@ export type BoardV2Card = {
 
 function formatShortDate(s: string): string {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(parseLocalDate(s));
-}
-
-function parseCoNarrators(raw: string | null): string[] {
-  if (!raw) return [];
-  try {
-    const p = JSON.parse(raw);
-    return Array.isArray(p) ? p.filter(Boolean) : p ? [String(p)] : [];
-  } catch {
-    return [raw];
-  }
 }
 
 const URGENCY_TEXT = {
