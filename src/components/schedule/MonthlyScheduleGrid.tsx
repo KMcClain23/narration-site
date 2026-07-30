@@ -51,7 +51,7 @@ export function MonthlyScheduleGrid({ cards }: { cards: ScheduleGridCard[] }) {
           return (
             <div
               key={m.key}
-              className="flex h-[150px] flex-col rounded-lg border border-surface-border bg-surface p-4"
+              className="flex min-h-[150px] flex-col rounded-lg border border-surface-border bg-surface p-4"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -75,17 +75,12 @@ export function MonthlyScheduleGrid({ cards }: { cards: ScheduleGridCard[] }) {
                 ))}
               </div>
 
-              <div className="mt-2 flex-1 space-y-0.5 overflow-hidden">
-                {m.titles.slice(0, 2).map(title => (
-                  <p key={title} className="truncate text-[13px] leading-tight text-text-body">
+              <div className="mt-2 flex-1 space-y-0.5">
+                {m.titles.map(title => (
+                  <p key={title} className="truncate text-[13px] text-text-body">
                     {title}
                   </p>
                 ))}
-                {m.titles.length > 2 && (
-                  <p className="truncate text-[13px] italic leading-tight text-text-muted">
-                    …+{m.titles.length - 2} more
-                  </p>
-                )}
               </div>
             </div>
           );
