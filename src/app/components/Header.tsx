@@ -138,7 +138,7 @@ export default function Header() {
       const data = await r.json();
       if (data.success) {
         setShowAdminModal(false);
-        router.push("/admin/stats");
+        router.push("/board-v2");
       } else {
         setAdminError("Invalid key.");
         setAdminKey("");

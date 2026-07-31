@@ -1794,7 +1794,7 @@ export default function BoardPage() {
       {/* Sticky header */}
       <div className="sticky top-14 sm:top-16 z-40 bg-[#06082E]/95 backdrop-blur border-b border-white/8 px-5 sm:px-8 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Link href="/admin/stats" className="text-xs text-white/40 hover:text-[#D4AF37] transition-colors">← Admin</Link>
+          <Link href="/board-v2" className="text-xs text-white/40 hover:text-[#D4AF37] transition-colors">← Admin</Link>
           <span className="text-white/20">/</span>
           <h1 className="text-sm font-bold text-white">Production Board</h1>
           <span className="text-xs text-white/25">{cards.length} projects</span>

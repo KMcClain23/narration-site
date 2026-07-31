@@ -29,8 +29,8 @@ export async function resetStats(key: string) {
   // Reset the lifetime total
   await redis.del("total_demo_plays");
 
-  // Force Next.js to purge the cache for the stats page
-  revalidatePath('/admin/stats');
+  // Force Next.js to purge the cache for the demo-plays display
+  revalidatePath('/admin/analytics');
   
   return { success: true };
 }

@@ -309,7 +309,7 @@ export default function ContractClient() {
         {/* Top bar */}
         <div className="shrink-0 flex items-center justify-between gap-2 px-4 sm:px-5 h-12 border-b border-[#1E2660] bg-[#06082E]/90 backdrop-blur">
           <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-            <Link href="/admin/stats" className="text-[10px] text-white/30 hover:text-white transition shrink-0">← Admin</Link>
+            <Link href="/board-v2" className="text-[10px] text-white/30 hover:text-white transition shrink-0">← Admin</Link>
             <span className="text-white/15 text-xs shrink-0">·</span>
             <span className="text-xs font-bold text-white shrink-0">Contract Builder</span>
             {form.contractNumber && (
