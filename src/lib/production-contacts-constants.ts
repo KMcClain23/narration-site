@@ -41,21 +41,6 @@ export function isValidDate(raw: string): boolean {
   return !!raw && !isNaN(new Date(raw).getTime());
 }
 
-// date_contacted / next_contact_date are `text` columns (not a real date
-// type) and at least one live row already holds a garbage non-date value
-// ("E-Mail"). Returns the raw string only when it's a genuinely parseable
-// date; otherwise logs (once per call site that passes a context) and
-// returns null so callers render "—" instead of the old ContactsClient
-// bug of showing the literal string "Invalid Date".
-export function parseDateSafe(raw: string, context?: string): string | null {
-  if (!raw) return null;
-  if (!isValidDate(raw)) {
-    if (context) console.warn(`[production-contacts] unparseable date for "${context}": "${raw}"`);
-    return null;
-  }
-  return raw;
-}
-
 export function isOverdue(raw: string): boolean {
   if (!isValidDate(raw)) return false;
   return new Date(raw) < new Date(new Date().toDateString());

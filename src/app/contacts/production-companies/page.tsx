@@ -2,7 +2,6 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { adminType } from "@/lib/design-tokens";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sanitizeName } from "@/lib/sanitize-name";
-import { parseDateSafe } from "@/lib/production-contacts-constants";
 import { ProductionCompaniesListClient, type ProductionCompanyRow } from "@/components/contacts/ProductionCompaniesListClient";
 
 // Admin data changes constantly and staleness has zero acceptable UX here —
@@ -22,8 +21,8 @@ export default async function ContactsProductionCompaniesPage() {
     status: c.status ?? "",
     genres: c.genres ?? [],
     preferred_contact: c.preferred_contact ?? "",
-    date_contacted: parseDateSafe(c.date_contacted ?? "", `${c.company} (date_contacted)`),
-    next_contact_date: parseDateSafe(c.next_contact_date ?? "", `${c.company} (next_contact_date)`),
+    date_contacted: c.date_contacted ?? null,
+    next_contact_date: c.next_contact_date ?? null,
   }));
 
   return (

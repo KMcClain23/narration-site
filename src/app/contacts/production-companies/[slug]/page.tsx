@@ -4,7 +4,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { adminType } from "@/lib/design-tokens";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sanitizeName } from "@/lib/sanitize-name";
-import { statusMeta, isOverdue, formatDateSafe, parseDateSafe, zipRoster, realGenres, genreNotes } from "@/lib/production-contacts-constants";
+import { statusMeta, isOverdue, formatDateSafe, zipRoster, realGenres, genreNotes } from "@/lib/production-contacts-constants";
 import { ProductionCompanyActions } from "@/components/contacts/ProductionCompanyActions";
 import type { Person } from "@/components/admin/PersonForm";
 
@@ -43,8 +43,8 @@ export default async function ProductionCompanyProfilePage({ params }: { params:
     job_titles: row.job_titles ?? [], contact_names: row.contact_names ?? [],
   };
 
-  const dateContacted = parseDateSafe(person.date_contacted, `${person.name} (date_contacted)`);
-  const nextContact = parseDateSafe(person.next_contact_date, `${person.name} (next_contact_date)`);
+  const dateContacted = person.date_contacted || null;
+  const nextContact = person.next_contact_date || null;
   const roster = zipRoster(person.contact_names, person.job_titles, person.name);
   const hasRoster = roster.some(r => r.name || r.jobTitle);
   const genres = realGenres(person.genres);

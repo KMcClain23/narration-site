@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     const {
       name, label = "", status = "", website = "", preferred_contact = "",
       address = "", contact_info = "", finding_source = "", genres = [], notes = "",
-      date_contacted = "", next_contact_date = "", job_titles = [], contact_names = [],
+      date_contacted = null, next_contact_date = null, job_titles = [], contact_names = [],
     } = body;
 
     if (!name?.trim()) {
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
         company: name.trim(), label, status, website, preferred_contact,
         address, contact_info, finding_source,
         genres: Array.isArray(genres) ? genres : [],
-        notes, date_contacted, next_contact_date,
+        notes, date_contacted: date_contacted || null, next_contact_date: next_contact_date || null,
         job_titles: Array.isArray(job_titles) ? job_titles : [],
         contact_names: Array.isArray(contact_names) ? contact_names : [],
       })
@@ -86,8 +86,11 @@ export async function PUT(req: Request) {
 
     const payload: Record<string, string | string[] | null> = {};
     if ("name" in fields) payload.company = (fields.name ?? "").trim();
-    for (const key of ["label", "status", "website", "preferred_contact", "address", "contact_info", "finding_source", "notes", "date_contacted", "next_contact_date"]) {
+    for (const key of ["label", "status", "website", "preferred_contact", "address", "contact_info", "finding_source", "notes"]) {
       if (key in fields) payload[key] = fields[key] ?? "";
+    }
+    for (const key of ["date_contacted", "next_contact_date"] as const) {
+      if (key in fields) payload[key] = fields[key] || null;
     }
     if ("genres" in fields) payload.genres = Array.isArray(fields.genres) ? fields.genres : [];
     if ("job_titles" in fields) payload.job_titles = Array.isArray(fields.job_titles) ? fields.job_titles : [];
