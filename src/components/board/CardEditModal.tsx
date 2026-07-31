@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { ExternalLink, FileText, Plus } from "lucide-react";
+import { ExternalLink, Plus } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { TagsField, PersonForm, EMPTY_PERSON, type Person } from "@/components/admin/PersonForm";
@@ -211,9 +211,6 @@ export function CardEditModal(props: CardEditModalProps) {
   const [archiving, setArchiving] = useState(false);
 
   const [wordCountFocused, setWordCountFocused] = useState(false);
-  const [uploadingScript, setUploadingScript] = useState(false);
-  const [scriptError, setScriptError] = useState<string | null>(null);
-  const scriptInputRef = useRef<HTMLInputElement>(null);
 
   // Swap-in-place person creation (Stage 6.3). "book" is the normal Book
   // Edit view; the other two replace the entire modal body with PersonForm.
@@ -288,36 +285,6 @@ export function CardEditModal(props: CardEditModalProps) {
       setSaveError(e instanceof Error ? e.message : "Cover upload failed.");
     } finally {
       setUploadingCover(false);
-    }
-  };
-
-  // Mirrors src/app/board/ScriptUploader.tsx's logic exactly (same 4MB limit,
-  // same /api/onedrive/upload contract) — reimplemented here rather than
-  // imported so the Links tab can style it to match the other three URL
-  // fields instead of inheriting the old modal's markup.
-  const uploadScript = async (file: File) => {
-    setScriptError(null);
-    if (file.size > 4 * 1024 * 1024) {
-      setScriptError("File must be under 4 MB. Compress or export a smaller PDF first.");
-      return;
-    }
-    setUploadingScript(true);
-    try {
-      const body = new FormData();
-      body.append("file", file);
-      body.append("bookTitle", form?.title || "Script");
-      const res = await fetch("/api/onedrive/upload", { method: "POST", body });
-      const text = await res.text();
-      let data: { error?: string; url?: string } = {};
-      try { data = JSON.parse(text); } catch {
-        throw new Error(res.ok ? "Unexpected server response" : `Upload failed (${res.status}): ${text.slice(0, 120)}`);
-      }
-      if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
-      setForm(p => (p ? { ...p, script_url: data.url! } : p));
-    } catch (e) {
-      setScriptError(e instanceof Error ? e.message : "Upload failed");
-    } finally {
-      setUploadingScript(false);
     }
   };
 
@@ -857,23 +824,12 @@ export function CardEditModal(props: CardEditModalProps) {
 
         <div>
           <label className={`${adminType.label} mb-1.5 block`}>Script (OneDrive)</label>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => scriptInputRef.current?.click()} disabled={uploadingScript}
-              className="flex items-center gap-2 rounded-lg border border-surface-border px-3.5 py-2.5 text-sm text-text-body transition-colors hover:text-text-primary disabled:opacity-50">
-              <FileText size={15} className="text-text-dim" />
-              {uploadingScript ? "Uploading…" : form.script_url ? "Replace Script" : "Upload Script"}
-            </button>
+          <div className="flex gap-2">
+            <input value={form.script_url} onChange={e => setForm(p => p && { ...p, script_url: e.target.value })}
+              placeholder="https://1drv.ms/... or https://onedrive.live.com/..." className={INPUT_CLS} />
             <OpenLinkButton url={form.script_url} />
-            <input
-              ref={scriptInputRef}
-              type="file"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) uploadScript(f); e.target.value = ""; }}
-            />
           </div>
-          {scriptError && <p className="mt-1.5 text-[12px] text-alert-red">{scriptError}</p>}
-          <p className={`${adminType.small} mt-1.5`}>PDF or Word · Saved to OneDrive › Production Scripts</p>
+          <p className={`${adminType.small} mt-1.5`}>Paste the shareable OneDrive link from your OneDrive Production Scripts folder</p>
         </div>
       </div>
     );
