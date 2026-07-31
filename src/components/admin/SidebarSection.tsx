@@ -27,11 +27,18 @@ export function SidebarSection({
   const leafActive = sectionActive && !item.subItems;
   const autoExpanded = !collapsed && !!item.subItems && pathname.startsWith(item.href);
   const Icon = item.icon;
+  // Parent rows with sub-items (Contacts, Tools) deep-link straight to their
+  // first sub-item — item.href itself is a server-redirect page (e.g.
+  // /contacts -> /contacts/authors), and routing a client-side Link through
+  // it causes a visible flash of the previous page while the two hops
+  // resolve. item.href is still used above for active-state matching, since
+  // that needs the parent prefix to cover every sub-item.
+  const linkHref = item.subItems?.[0]?.href ?? item.href;
 
   return (
     <div>
       <Link
-        href={item.href}
+        href={linkHref}
         title={collapsed ? item.label : undefined}
         aria-current={leafActive ? "page" : undefined}
         className={`group relative flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors ${
