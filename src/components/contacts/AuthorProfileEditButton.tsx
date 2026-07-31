@@ -7,6 +7,28 @@ import { PersonForm, type Person } from "@/components/admin/PersonForm";
 export function AuthorProfileEditButton({ person }: { person: Person }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    const confirmed = confirm(
+      `Delete ${person.name}? This permanently removes their profile. Any board_cards referencing them will keep the name as a bare string.`
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/authors", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: person.id }),
+      });
+      if (!res.ok) throw new Error();
+      router.push("/contacts/authors");
+      router.refresh();
+    } catch {
+      setDeleting(false);
+      alert("Failed to delete. Please try again.");
+    }
+  };
 
   return (
     <>
@@ -36,6 +58,16 @@ export function AuthorProfileEditButton({ person }: { person: Person }) {
                 router.refresh();
               }}
             />
+            <div className="mt-3 flex justify-center">
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="text-xs font-medium text-text-faint transition-colors hover:text-alert-red disabled:opacity-50"
+              >
+                {deleting ? "Deleting…" : "Delete author"}
+              </button>
+            </div>
           </div>
         </div>
       )}
