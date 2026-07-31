@@ -214,3 +214,191 @@ alter table co_narrators add column if not exists location          text   not n
 alter table co_narrators add column if not exists preferred_contact text   not null default '';
 alter table co_narrators add column if not exists skills            text[] not null default '{}';
 alter table co_narrators add column if not exists notes             text   not null default '';
+
+-- ============================================================
+-- Stage 7.2a — schema drift documentation sync (audited 2026-07-31)
+-- Every statement below is documentation-only: the column/constraint/table
+-- already exists live. IF NOT EXISTS / guarded DO blocks make all of this
+-- a permanent no-op against production. Nothing here changes live data.
+-- ============================================================
+
+-- ----------------------------------------------------------------
+-- GROUP 1 — column-drift doc-sync on existing (partially-tracked) tables
+-- ----------------------------------------------------------------
+
+-- board_cards: base columns that predate this migrations file entirely
+-- (confirmed live via information_schema audit, Stage 7.2a)
+alter table board_cards add column if not exists title                  text        not null;
+alter table board_cards add column if not exists author                 text        not null default '';
+alter table board_cards add column if not exists cover_url              text        not null default '';
+alter table board_cards add column if not exists status                 text        not null default 'audition';
+alter table board_cards add column if not exists deadline               date;
+alter table board_cards add column if not exists notes                  text        not null default '';
+alter table board_cards add column if not exists author_notes           text        not null default '';
+alter table board_cards add column if not exists links                  jsonb       not null default '[]';
+alter table board_cards add column if not exists author_token           text        not null default encode(gen_random_bytes(16), 'hex');
+alter table board_cards add column if not exists co_narrator            text        not null default '';
+alter table board_cards add column if not exists sort_order             integer     not null default 0;
+alter table board_cards add column if not exists created_at             timestamptz not null default now();
+alter table board_cards add column if not exists updated_at             timestamptz not null default now();
+alter table board_cards add column if not exists subtitle               text        not null default '';
+alter table board_cards add column if not exists tags                   text[]      not null default '{}';
+alter table board_cards add column if not exists description            text        not null default '';
+alter table board_cards add column if not exists audible_link           text        not null default '';
+alter table board_cards add column if not exists ar_link                text        not null default '';
+alter table board_cards add column if not exists books_table_id         uuid;
+alter table board_cards add column if not exists chapters               jsonb       not null default '[]';
+alter table board_cards add column if not exists word_count             integer     not null default 0;
+alter table board_cards add column if not exists first15_due            date;
+alter table board_cards add column if not exists pfh_rate               numeric     not null default 0;
+alter table board_cards add column if not exists payment_type           text        not null default 'pfh';
+alter table board_cards add column if not exists email_updates_enabled  boolean     default true;
+alter table board_cards add column if not exists spotify_link           text;
+alter table board_cards add column if not exists script_url             text;
+alter table board_cards add column if not exists trigger_warnings       text[]      not null default '{}';
+
+-- authors: base columns that predate this migrations file entirely
+alter table authors add column if not exists id          uuid        primary key default gen_random_uuid();
+alter table authors add column if not exists name        text        not null;
+alter table authors add column if not exists bio         text        not null default '';
+alter table authors add column if not exists website     text        not null default '';
+alter table authors add column if not exists amazon      text        not null default '';
+alter table authors add column if not exists instagram   text        not null default '';
+alter table authors add column if not exists tiktok      text        not null default '';
+alter table authors add column if not exists facebook    text        not null default '';
+alter table authors add column if not exists goodreads   text        not null default '';
+alter table authors add column if not exists created_at  timestamptz not null default now();
+
+-- co_narrators: base columns that predate this migrations file entirely
+alter table co_narrators add column if not exists id          uuid        primary key default gen_random_uuid();
+alter table co_narrators add column if not exists name        text        not null;
+alter table co_narrators add column if not exists bio         text        not null default '';
+alter table co_narrators add column if not exists website     text        not null default '';
+alter table co_narrators add column if not exists amazon      text        not null default '';
+alter table co_narrators add column if not exists instagram   text        not null default '';
+alter table co_narrators add column if not exists tiktok      text        not null default '';
+alter table co_narrators add column if not exists facebook    text        not null default '';
+alter table co_narrators add column if not exists goodreads   text        not null default '';
+alter table co_narrators add column if not exists created_at  timestamptz not null default now();
+
+-- production_contacts: already matches live exactly, no drift — no
+-- statements needed, listed here only to confirm it was checked.
+
+-- ----------------------------------------------------------------
+-- GROUP 2 — constraint doc-sync on existing tables
+-- ----------------------------------------------------------------
+
+-- payment_type: valid values already enforced live but never captured here
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'board_cards_payment_type_check'
+  ) then
+    alter table board_cards
+      add constraint board_cards_payment_type_check
+      check (payment_type in ('pfh', 'rs', 'rs_plus'));
+  end if;
+end $$;
+
+-- Note: board_messages_sender_check intentionally NOT doc-synced — the
+-- table itself is retired in Stage 7.5 (see comment + memory note below),
+-- so the constraint goes away with it rather than being tracked here.
+
+-- ----------------------------------------------------------------
+-- GROUP 3 — full CREATE TABLE reconstruction (four fully-untracked tables)
+-- ----------------------------------------------------------------
+
+-- books: legacy public-book listing table. NOTE: /api/books GET actually
+-- reads from board_cards ("source of truth is board_cards"), while
+-- POST/PUT/PATCH/DELETE still write to this table — read/write paths are
+-- disconnected. Reconstructed here for documentation only; likely a
+-- candidate for its own future deletion review.
+create table if not exists books (
+  id          uuid        primary key default gen_random_uuid(),
+  title       text        not null,
+  subtitle    text,
+  author      text        not null,
+  link        text        not null default '',
+  cover_url   text        not null,
+  tags        text[]      not null default '{}',
+  description text        not null default '',
+  category    text        not null,
+  sort_order  integer     not null default 0,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  -- Normalized to match board_cards.co_narrator's convention (plain text,
+  -- default '') rather than the odd array-literal default observed live —
+  -- two same-named columns in the same codebase should share a shape.
+  co_narrator text        not null default ''
+);
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'books_category_check'
+  ) then
+    alter table books
+      add constraint books_category_check
+      check (category in ('completed', 'in-progress', 'coming-soon'));
+  end if;
+end $$;
+
+-- demos: backs /demos-v2
+create table if not exists demos (
+  id                uuid        primary key default gen_random_uuid(),
+  title             text        not null,
+  genre             text,
+  description       text,
+  file_url          text,
+  file_key          text,
+  duration_seconds  integer,
+  sort_order        integer     default 0,
+  active            boolean     default true,
+  created_at        timestamptz default now()
+);
+
+-- pdf_jobs: async PDF-generation job tracking (board-pdf-* routes)
+create table if not exists pdf_jobs (
+  id         uuid        primary key default gen_random_uuid(),
+  status     text        not null default 'pending',
+  chapters   jsonb,
+  error      text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- testimonials: Testimonial Queue (relevant to Stage 7.3)
+create table if not exists testimonials (
+  id            uuid        primary key default gen_random_uuid(),
+  reviewer_name text        not null,
+  reviewer_role text        not null,
+  book_title    text        not null default '',
+  quote         text        not null,
+  status        text        not null default 'pending',
+  created_at    timestamptz not null default now()
+);
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'testimonials_reviewer_role_check'
+  ) then
+    alter table testimonials
+      add constraint testimonials_reviewer_role_check
+      check (reviewer_role in ('author', 'narrator'));
+  end if;
+  if not exists (
+    select 1 from pg_constraint where conname = 'testimonials_status_check'
+  ) then
+    alter table testimonials
+      add constraint testimonials_status_check
+      check (status in ('pending', 'approved', 'rejected'));
+  end if;
+end $$;
+
+-- ----------------------------------------------------------------
+-- GROUP 4 — board_messages: documented, not reconstructed
+-- ----------------------------------------------------------------
+
+-- board_messages: retired feature, table exists in production but not
+-- tracked here. Table itself will be dropped in Stage 7.5.
