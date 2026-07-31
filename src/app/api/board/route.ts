@@ -13,11 +13,9 @@ function isEmptyValue(v: unknown): boolean {
   return false;
 }
 
-// GET: admin gets all cards, token gets restricted view
+// GET: admin gets all cards
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const token = searchParams.get("token");
-  const type = searchParams.get("type") || "author"; // author | co_narrator
 
   // Single card by ID
   const cardId = searchParams.get("id");
@@ -26,29 +24,6 @@ export async function GET(req: Request) {
       .from("board_cards").select("*").eq("id", cardId).single();
     if (error) return NextResponse.json({ error: "Card not found." }, { status: 404 });
     return NextResponse.json({ card: data });
-  }
-
-  if (token) {
-    // Token-based access
-    if (type === "co_narrator") {
-      // Co-narrator sees all their cards
-      const { data, error } = await supabaseAdmin
-        .from("board_cards")
-        .select("id, title, author, cover_url, status, deadline, notes, author_notes, links, co_narrator")
-        .eq("co_narrator", token)
-        .order("sort_order");
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ cards: data, view: "co_narrator" });
-    } else {
-      // Author sees only their card
-      const { data, error } = await supabaseAdmin
-        .from("board_cards")
-        .select("id, title, author, cover_url, status, deadline, author_notes, links")
-        .eq("author_token", token)
-        .single();
-      if (error) return NextResponse.json({ error: "Project not found." }, { status: 404 });
-      return NextResponse.json({ card: data, view: "author" });
-    }
   }
 
   // Admin: get all cards. Archived cards are hidden from the main board by
@@ -87,13 +62,13 @@ export async function POST(req: Request) {
     const {
       title, author = "", cover_url = "",
       status = "contracted",          // default to contracted (not audition) so card is visible
-      deadline, notes = "", author_notes = "",
+      deadline, notes = "",
       links = [], co_narrator = "", sort_order = 0, chapters = [],
       subtitle = "", tags = [], description = "",
       audible_link = "", ar_link = "", spotify_link = "",
       word_count = 0, first15_due,
       pfh_rate = 0, payment_type = "pfh", first_15_complete = false,
-      dean_message = "", author_email = "", slug = "",
+      slug = "",
       trigger_warnings = [], is_confidential = false, narration_format = null,
       production_type = null, production_company = null,
     } = body;
@@ -108,7 +83,6 @@ export async function POST(req: Request) {
       cover_url:         cover_url || "",
       status:            status || "contracted",
       notes:             notes || "",
-      author_notes:      author_notes || "",
       links:             Array.isArray(links)    ? links    : [],
       co_narrator:       co_narrator || "",
       sort_order:        sort_order  ?? 0,
@@ -133,8 +107,6 @@ export async function POST(req: Request) {
     // Date columns must be null (not "") when empty — Supabase rejects empty strings for date/timestamptz
     insertData.deadline    = deadline    || null;
     insertData.first15_due = first15_due || null;
-    if (dean_message) insertData.dean_message = dean_message;
-    if (author_email) insertData.author_email = author_email;
 
     let { data, error } = await supabaseAdmin
       .from("board_cards")
@@ -183,38 +155,22 @@ export async function POST(req: Request) {
   }
 }
 
-// PUT: update card (admin) or author_notes (token)
+// PUT: update card (admin)
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, token, ...fields } = body;
+    const { id, ...fields } = body;
     if (!id) return NextResponse.json({ error: "ID required." }, { status: 400 });
-
-    if (token) {
-      // Co-narrator can update notes only
-      const { data, error } = await supabaseAdmin
-        .from("board_cards")
-        .update({ notes: fields.notes, updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .eq("co_narrator", token)
-        .select().single();
-      if (error) {
-        console.error("PUT /api/board (token) Supabase error:", JSON.stringify(error));
-        return NextResponse.json({ error: error.message || JSON.stringify(error) }, { status: 500 });
-      }
-      return NextResponse.json({ success: true, card: data });
-    }
 
     // Admin full update — only columns that actually exist on board_cards.
     // Keep this list in sync with the DB schema; do NOT add speculative columns.
     // Migration needed: ALTER TABLE board_cards ADD COLUMN spotify_link text;
     const allowed = [
       "title", "author", "cover_url", "status", "deadline", "notes",
-      "author_notes", "links", "co_narrator", "sort_order", "chapters",
+      "links", "co_narrator", "sort_order", "chapters",
       "subtitle", "tags", "description", "audible_link", "ar_link", "spotify_link",
       "word_count", "first15_due", "pfh_rate", "payment_type",
-      "first_15_complete", "dean_message", "author_email", "author_token",
-      "email_updates_enabled", "script_url", "trigger_warnings", "released_at",
+      "first_15_complete", "script_url", "trigger_warnings", "released_at",
       "is_confidential", "narration_format", "production_type", "production_company",
       "archived_at", "archived_reason", "archived_notes",
     ];
@@ -227,15 +183,14 @@ export async function PUT(req: Request) {
       }
     }
 
-    // Snapshot the current row — needed to log status changes, auto-stamp
-    // released_at, and check Amazon-fill eligibility (which requires knowing
-    // the CURRENT description/tags/trigger_warnings, not just this payload).
+    // Snapshot the current row — needed to auto-stamp released_at and check
+    // Amazon-fill eligibility (which requires knowing the CURRENT
+    // description/tags/trigger_warnings, not just this payload).
     const { data: cur } = await supabaseAdmin
       .from("board_cards")
-      .select("status, released_at, audible_link, description, tags, trigger_warnings")
+      .select("released_at, audible_link, description, tags, trigger_warnings")
       .eq("id", id)
       .single();
-    const oldStatus: string | null = "status" in fields ? (cur?.status ?? null) : null;
     const existingReleasedAt: string | null = (cur as Record<string, unknown>)?.released_at as string ?? null;
 
     // Auto-stamp released_at when transitioning to "released" and not already set.
@@ -322,15 +277,6 @@ export async function PUT(req: Request) {
     if (error) {
       console.error("PUT /api/board Supabase error:", JSON.stringify(error), "update keys:", Object.keys(update));
       return NextResponse.json({ error: error.message || JSON.stringify(error) }, { status: 500 });
-    }
-
-    // Log status change for batched author emails (fire-and-forget)
-    if (oldStatus && fields.status && oldStatus !== fields.status) {
-      void supabaseAdmin.from("status_change_log").insert({
-        card_id: id,
-        old_status: oldStatus,
-        new_status: String(fields.status),
-      });
     }
 
     return NextResponse.json({ success: true, card: data, amazonFill });

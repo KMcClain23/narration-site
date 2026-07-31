@@ -2735,18 +2735,9 @@ export default function BoardPage() {
                             {card.first_15_complete?<svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>:<span className="h-3 w-3 rounded-sm border border-current inline-block"/>}
                             15
                           </button>
-                          {card.author_email && (
-                            <button type="button"
-                              onClick={async e=>{ e.preventDefault(); e.stopPropagation(); const v=!(card.email_updates_enabled??false); setCards(p=>p.map(c=>c.id===card.id?{...c,email_updates_enabled:v}:c)); await fetch("/api/board",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:card.id,email_updates_enabled:v,...(card.author_email?{author_email:card.author_email}:{})})}); }}
-                              title={(card.email_updates_enabled??false)?"Emails enabled — click to disable":"Emails disabled — click to enable"}
-                              className={`relative p-2 rounded transition-colors ${(card.email_updates_enabled??false)?"text-emerald-300 hover:text-emerald-200":"text-red-400 hover:text-red-300"}`}>
-                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                              {(card.email_updates_enabled??false)
-                                ?<svg className="h-2 w-2 absolute -bottom-0.5 -right-0.5 text-emerald-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
-                                :<svg className="h-2 w-2 absolute -bottom-0.5 -right-0.5 text-red-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/></svg>
-                              }
-                            </button>
-                          )}
+                          {/* Email-updates toggle removed — /api/board no longer
+                              accepts email_updates_enabled/author_email (Stage 7.4,
+                              Commit 3: author-portal retirement). */}
                         </div>
                         <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           {card.script_url && (
