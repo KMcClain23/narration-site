@@ -35,6 +35,28 @@ export function completionUrgency(days: number): Urgency {
   return "default";
 }
 
+const WORDS_PER_FINISHED_HOUR = 9400;
+
+// Board-card display estimate — same ratio as the Production tab's
+// Estimated Earnings block in CardEditModal. board_cards has no per-narrator
+// split, so narration_format drives a hard-coded share: solo/unset = 100%,
+// duet/dual = 50% (accurate for most projects; per-card override deferred),
+// multicast = unknowable and hidden entirely. Returns null whenever any
+// required input is missing — callers hide the line in that case.
+export function estimatedEarnings(
+  wordCount: number | null,
+  pfhRate: number | null,
+  paymentType: string | null,
+  narrationFormat: string | null,
+): number | null {
+  if (paymentType !== "pfh" && paymentType !== "rs_plus") return null;
+  if (!wordCount || !pfhRate) return null;
+  if (narrationFormat === "multicast") return null;
+  const hours = wordCount / WORDS_PER_FINISHED_HOUR;
+  const share = narrationFormat === "duet" || narrationFormat === "dual" ? 0.5 : 1;
+  return hours * pfhRate * share;
+}
+
 // board_cards.co_narrator is a `text` column, not a native Postgres array —
 // it holds a JSON-encoded array string in most rows, but at least one live
 // row is a bare non-JSON string. This defensive parse handles both; there is

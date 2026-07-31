@@ -5,7 +5,7 @@ import { useRef, useEffect } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Calendar, Lock, Square, CheckSquare } from "lucide-react";
-import { parseLocalDate, daysUntil, completionUrgency, URGENCY_PILL, parseCoNarrators, type Urgency } from "./board-card-utils";
+import { parseLocalDate, daysUntil, completionUrgency, URGENCY_PILL, parseCoNarrators, estimatedEarnings, type Urgency } from "./board-card-utils";
 
 // Re-exported so existing imports elsewhere (e.g. board-v2/page.tsx) keep working.
 export { parseLocalDate, daysUntil };
@@ -23,6 +23,8 @@ export type BoardV2Card = {
   first15_due: string | null;
   first_15_complete: boolean;
   word_count: number | null;
+  pfh_rate: number | null;
+  payment_type: string | null;
   is_confidential: boolean;
   narration_format: string | null;
   created_at: string;
@@ -171,7 +173,11 @@ export function BoardCard({
 
         {/* 5. Word count row — empty but height-preserving when unset */}
         <p className="mt-2 text-sm text-text-dim">
-          {card.word_count ? `${card.word_count.toLocaleString()} words` : " "}
+          {card.word_count ? (() => {
+            const earnings = estimatedEarnings(card.word_count, card.pfh_rate, card.payment_type, card.narration_format);
+            const words = `${card.word_count.toLocaleString()} words`;
+            return earnings === null ? words : `${words} · ~$${Math.round(earnings).toLocaleString("en-US")}`;
+          })() : " "}
         </p>
 
         {/* 6. Remaining space intentionally left empty (not vertically centered) */}

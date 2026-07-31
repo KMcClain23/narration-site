@@ -313,6 +313,8 @@ export default function BoardV2Page() {
         first15_due: updated.first15_due || null,
         first_15_complete: updated.first_15_complete,
         word_count: updated.word_count,
+        pfh_rate: updated.pfh_rate,
+        payment_type: updated.payment_type,
         is_confidential: updated.is_confidential,
         narration_format: updated.narration_format,
         created_at: updated.created_at,
