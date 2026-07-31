@@ -5,41 +5,6 @@ import { redis, INQUIRY_KEY, ARCHIVE_KEY, parseInquiryList } from "@/lib/inquiri
 const COOKIE_NAME = "dmn_admin_key";
 
 /**
- * POST: Public - Author/Narrator submits a request
- *
- * Currently unused in production — the live contact form submits through the
- * `sendEmail` server action (src/app/actions/sendEmail.ts), which writes to
- * Redis directly and sends the Resend emails itself. Left in place rather
- * than deleted; retiring it is Stage 7 cleanup material.
- */
-export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const { name, email, role, message } = body;
-
-    if (!name || !email || !message) {
-      return NextResponse.json({ error: "Required fields missing" }, { status: 400 });
-    }
-
-    const newInquiry = {
-      id: crypto.randomUUID(),
-      name,
-      email,
-      role, // "Author", "Narrator", or "Other"
-      message,
-      status: "unread",
-      createdAt: new Date().toISOString(),
-    };
-
-    await redis.lpush(INQUIRY_KEY, JSON.stringify(newInquiry));
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to send inquiry" }, { status: 500 });
-  }
-}
-
-/**
  * GET: Protected - Admin views all inquiries
  */
 export async function GET() {

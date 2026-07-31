@@ -170,7 +170,7 @@ export default async function AnalyticsPage({
             className="inline-flex items-center gap-2 text-sm font-bold text-[#D4AF37] border border-[#D4AF37]/30 px-4 py-2 rounded-full hover:bg-[#D4AF37]/10 transition-colors">
             ← Admin
           </Link>
-          <Link href="/admin/contacts"
+          <Link href="/contacts/production-companies"
             className="inline-flex items-center gap-2 text-sm font-bold text-white/60 border border-white/15 px-4 py-2 rounded-full hover:bg-white/5 transition-colors">
             Contacts
           </Link>
