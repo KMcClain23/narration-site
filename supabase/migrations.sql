@@ -402,3 +402,28 @@ end $$;
 
 -- board_messages: retired feature, table exists in production but not
 -- tracked here. Table itself will be dropped in Stage 7.5.
+
+-- ============================================================
+-- Stage 7.4 Commit 5 — author-portal retirement: drop columns + tables
+-- Applied and verified against production 2026-08-01 (author-facing
+-- /board/[token] portal, its Resend email flow, and the PDF-chapter
+-- subsystem were already deleted in Commits 2-4; this is the final data
+-- cleanup). IF EXISTS guards make this safe to re-run.
+-- ============================================================
+
+begin;
+
+-- Drop six columns from board_cards
+alter table board_cards
+  drop column if exists dean_message,
+  drop column if exists author_notes,
+  drop column if exists author_token,
+  drop column if exists author_email,
+  drop column if exists email_updates_enabled,
+  drop column if exists books_table_id;
+
+-- Drop two orphaned tables
+drop table if exists status_change_log;
+drop table if exists pdf_jobs;
+
+commit;
