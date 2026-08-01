@@ -400,8 +400,9 @@ end $$;
 -- GROUP 4 — board_messages: documented, not reconstructed
 -- ----------------------------------------------------------------
 
--- board_messages: retired feature, table exists in production but not
--- tracked here. Table itself will be dropped in Stage 7.5.
+-- board_messages: retired feature, table existed in production but was
+-- never tracked here. Dropped in Stage 7.5 — see the entry at the bottom
+-- of this file.
 
 -- ============================================================
 -- Stage 7.4 Commit 5 — author-portal retirement: drop columns + tables
@@ -427,3 +428,13 @@ drop table if exists status_change_log;
 drop table if exists pdf_jobs;
 
 commit;
+
+-- ============================================================
+-- Stage 7.5 Commit 4 — old /board retirement: drop board_messages
+-- Applied and verified against production 2026-08-02. Old /board/page.tsx
+-- (Commit 2) and /api/board-messages (Commit 3) were already deleted —
+-- this is the final data cleanup. board_messages_sender_check drops
+-- automatically with the table.
+-- ============================================================
+
+drop table if exists board_messages;
