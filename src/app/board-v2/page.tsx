@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   DndContext, DragOverlay, MouseSensor, useSensor, useSensors, useDroppable,
   type DragEndEvent, type DragStartEvent, type DragOverEvent,
@@ -104,6 +105,7 @@ function DroppableSubgroup({ id, children }: { id: string; children: React.React
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export default function BoardV2Page() {
+  const router = useRouter();
   const [cards, setCards] = useState<BoardV2Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -115,11 +117,43 @@ export default function BoardV2Page() {
   const [toast, setToast] = useState<string | null>(null);
   const [fadingIds, setFadingIds] = useState<Set<string>>(new Set());
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [editingViaDeepLink, setEditingViaDeepLink] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
   const [authorNames, setAuthorNames] = useState<string[]>([]);
   const [coNarratorNames, setCoNarratorNames] = useState<string[]>([]);
 
   const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 8 } }));
+
+  // Deep-linking (?editCard=<id>): open the Edit modal directly on load —
+  // used by /board/archive and other pages linking to a specific card that
+  // isn't necessarily visible in this board's own filtered view (e.g. an
+  // archived project). Reads window.location directly (rather than
+  // next/navigation's useSearchParams) since this only needs to run once on
+  // mount and a plain browser API sidesteps the Suspense-boundary
+  // requirement useSearchParams would otherwise impose on this page.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("editCard");
+    if (id) {
+      setEditingCardId(id);
+      setEditingViaDeepLink(true);
+    }
+  }, []);
+
+  const closeEditModal = useCallback(() => {
+    setEditingCardId(null);
+    setEditingViaDeepLink(false);
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("editCard")) {
+      params.delete("editCard");
+      const query = params.toString();
+      router.replace(query ? `/board-v2?${query}` : "/board-v2", { scroll: false });
+    }
+  }, [router]);
+
+  const handleDeepLinkNotFound = useCallback(() => {
+    closeEditModal();
+    setToast("That card no longer exists.");
+  }, [closeEditModal]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -288,7 +322,7 @@ export default function BoardV2Page() {
         card={c}
         onToggleFirst15={handleToggleFirst15}
         onLongPress={(card, x, y) => setActionMenu({ card, x, y })}
-        onOpen={card => setEditingCardId(card.id)}
+        onOpen={card => { setEditingCardId(card.id); setEditingViaDeepLink(false); }}
       />
     </div>
   );
@@ -500,12 +534,13 @@ export default function BoardV2Page() {
         <CardEditModal
           mode="edit"
           cardId={editingCardId}
-          onClose={() => setEditingCardId(null)}
+          onClose={closeEditModal}
           onSaved={handleCardSaved}
           authorNames={authorNames}
           coNarratorNames={coNarratorNames}
           onAuthorCreated={name => setAuthorNames(prev => [...prev, name].sort())}
           onCoNarratorCreated={name => setCoNarratorNames(prev => [...prev, name].sort())}
+          onLoadError={editingViaDeepLink ? handleDeepLinkNotFound : undefined}
         />
       )}
 

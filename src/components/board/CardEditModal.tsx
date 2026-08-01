@@ -181,10 +181,17 @@ type CardEditModalProps = {
    *  fresh for the rest of the session, not just within this modal. */
   onAuthorCreated?: (name: string) => void;
   onCoNarratorCreated?: (name: string) => void;
+  /** Deep-link support (?editCard=<id>): when set, a failed card fetch calls
+   *  this instead of showing the modal's own inline error, so the caller can
+   *  close the modal entirely and surface a lighter-weight notification —
+   *  a stale/invalid link shouldn't look like a broken modal. Manual opens
+   *  (clicking a real card) don't pass this — a load failure there keeps the
+   *  existing in-modal error, since the card was just visibly on the board. */
+  onLoadError?: () => void;
 } & ({ mode: "edit"; cardId: string } | { mode: "create"; cardId?: undefined });
 
 export function CardEditModal(props: CardEditModalProps) {
-  const { mode, onClose, onSaved, authorNames, coNarratorNames, onAuthorCreated, onCoNarratorCreated } = props;
+  const { mode, onClose, onSaved, authorNames, coNarratorNames, onAuthorCreated, onCoNarratorCreated, onLoadError } = props;
   const cardId = mode === "edit" ? props.cardId : undefined;
 
   const [loading, setLoading] = useState(mode === "edit");
@@ -237,9 +244,16 @@ export function CardEditModal(props: CardEditModalProps) {
         setSavedForm(full);
         setAuthorQuery(full.author);
       })
-      .catch(e => { if (!cancelled) setLoadError(e instanceof Error ? e.message : "Failed to load card."); })
+      .catch(e => {
+        if (cancelled) return;
+        if (onLoadError) onLoadError();
+        else setLoadError(e instanceof Error ? e.message : "Failed to load card.");
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
+    // onLoadError intentionally excluded — this fetch should only re-run when
+    // the card being loaded changes, not when the parent re-renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, cardId]);
 
   // Escape closes; click-outside intentionally does not — this is a form
