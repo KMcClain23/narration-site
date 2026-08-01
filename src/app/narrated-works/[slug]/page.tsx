@@ -56,7 +56,6 @@ function redactIfConfidential<T extends Record<string, unknown> & { is_confident
     title: CONFIDENTIAL_TITLE,
     subtitle: null,
     author: "",
-    author_notes: "",
     cover_url: "",
     audible_link: "",
     ar_link: "",
@@ -83,7 +82,7 @@ function spotifyEmbedUrl(url: string | undefined | null): string | null {
 async function getBook(slug: string) {
   const { data } = await supabaseAdmin
     .from("board_cards")
-    .select("id, title, subtitle, author, author_notes, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status, trigger_warnings, released_at, is_confidential, narration_format")
+    .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status, trigger_warnings, released_at, is_confidential, narration_format")
     .in("status", ["contracted", "recording", "editing", "released"])
     .is("archived_at", null);
   if (!data) return null;

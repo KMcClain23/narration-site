@@ -1390,7 +1390,6 @@ export default function BoardPage() {
   const [saving, setSaving] = useState(false);
   const [dragId, setDragId] = useState<string|null>(null);
   const [dragOver, setDragOver] = useState<string|null>(null);
-  const [copied, setCopied] = useState<string|null>(null);
   const [expanded, setExpanded] = useState<string|null>(null);
   const [linkLabel, setLinkLabel] = useState(""); const [linkUrl, setLinkUrl] = useState("");
   const [tagInput, setTagInput] = useState("");
@@ -1764,11 +1763,6 @@ export default function BoardPage() {
       setForm(p => ({ ...p, cover_url: urlData.publicUrl }));
     } catch { setError("Cover upload failed."); }
     setUploadingCover(false);
-  };
-
-  const copyLink = (token: string) => {
-    navigator.clipboard.writeText(`${window.location.origin}/board/${token}`);
-    setCopied(token); setTimeout(()=>setCopied(null),2000);
   };
 
   const addLink = () => { if(linkLabel&&linkUrl){setForm(f=>({...f,links:[...f.links,{label:linkLabel,url:linkUrl}]}));setLinkLabel("");setLinkUrl("");} };
@@ -2376,12 +2370,9 @@ export default function BoardPage() {
                   className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 resize-none"/>
               </label>
 
-              <label className="block">
-                <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-medium">Note to author (on their link)</span>
-                <textarea value={form.author_notes} onChange={e=>setForm(p=>({...p,author_notes:e.target.value}))} rows={2}
-                  placeholder="Visible to the author on their private link..."
-                  className="mt-1.5 w-full rounded-lg bg-black/30 border border-white/8 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#D4AF37]/40 resize-none"/>
-              </label>
+              {/* "Note to author" field removed — author_notes column dying in
+                  Stage 7.4 Commit 5; the author-portal page it fed was already
+                  deleted in Commit 2. */}
 
               {/* Links */}
               <div>
@@ -2401,27 +2392,9 @@ export default function BoardPage() {
                 </div>
               </div>
 
-              {/* Author link — only shown when editing existing card */}
-              {editCard && (
-                <div className="rounded-xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 p-4">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37] font-medium mb-2">Author project link</p>
-                  <p className="text-xs text-white/50 mb-3">Share this private link with the author so they can track their project status.</p>
-                  <div className="flex gap-2">
-                    <div className="flex-1 rounded-lg bg-black/30 border border-white/8 px-3 py-2 text-xs text-white/60 font-mono truncate">
-                      {typeof window !== "undefined" ? `${window.location.origin}/board/${editCard.author_token}` : `/board/${editCard.author_token}`}
-                    </div>
-                    <button type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/board/${editCard.author_token}`);
-                        setCopied(editCard.author_token);
-                        setTimeout(() => setCopied(null), 2000);
-                      }}
-                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors shrink-0 ${copied === editCard.author_token ? "bg-emerald-500 text-white" : "bg-[#D4AF37] text-black hover:bg-[#E0C15A]"}`}>
-                      {copied === editCard.author_token ? "✓ Copied" : "Copy link"}
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* "Author project link" block removed — /board/[token] (the
+                  destination of this link) was deleted in Stage 7.4 Commit 2;
+                  author_token column dying in Commit 5. */}
 
               {/* Released notice */}
               {form.status==="released" && (
@@ -2749,12 +2722,8 @@ export default function BoardPage() {
                               </svg>
                             </a>
                           )}
-                          <button type="button" onClick={()=>copyLink(card.author_token)} title="Copy author link"
-                            className="text-white/40 hover:text-[#D4AF37] transition-colors">
-                            {copied===card.author_token
-                              ?<svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                              :<svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>}
-                          </button>
+                          {/* "Copy author link" button removed — /board/[token]
+                              deleted in Stage 7.4 Commit 2. */}
                           {card.status==="released" && (
                             <button type="button" onClick={()=>syncToBooks(card)} title="Sync to public Narrated Works"
                               className="text-white/40 hover:text-emerald-400 transition-colors">
