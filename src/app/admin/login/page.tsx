@@ -770,7 +770,7 @@ export default function AdminPage() {
                 Move projects through Audition → Contracted → Recording → Editing → Released. Drag & drop, manage deadlines, share author links, and sync to the public portfolio.
               </p>
             </div>
-            <a href="/board"
+            <a href="/board-v2"
               className="inline-flex items-center gap-2 bg-[#D4AF37] text-black font-bold px-6 py-3 rounded-full text-sm hover:bg-[#E0C15A] transition-colors shrink-0">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
