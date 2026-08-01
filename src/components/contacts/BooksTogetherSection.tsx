@@ -52,7 +52,7 @@ export function BooksTogetherSection({ books }: { books: BookTogetherRow[] }) {
           books.map(book => (
             <Link
               key={book.id}
-              href="/board-v2"
+              href={`/board-v2?editCard=${book.id}`}
               className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-surface-raised"
             >
               {/* Fixed height only — width follows each cover's natural aspect

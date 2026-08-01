@@ -83,7 +83,7 @@ export default function ArchivePage() {
             {cards.map(card => (
               <Link
                 key={card.id}
-                href={`/board?edit=${card.id}`}
+                href={`/board-v2?editCard=${card.id}`}
                 className="flex items-center gap-4 rounded-xl border border-white/8 bg-[#0A0D3A] hover:border-white/20 transition-colors px-4 py-3"
               >
                 {/* Cover thumbnail */}
