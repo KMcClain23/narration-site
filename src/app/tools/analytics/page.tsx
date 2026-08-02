@@ -1,10 +1,135 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { PlaceholderPage } from "@/components/admin/PlaceholderPage";
+import { adminType } from "@/lib/design-tokens";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { VerticalBarChart } from "./VerticalBarChart";
+import { HorizontalBarChart } from "./HorizontalBarChart";
+import { FrequentCollaborators } from "./FrequentCollaborators";
+import { SiteAnalyticsSection, type AnalyticsEvent } from "./SiteAnalyticsSection";
+import {
+  computeCareerTotals,
+  computeEarnings,
+  computeFrequentCollaborators,
+  computeGenreBreakdown,
+  computeReleasePace,
+  getTrailing5Quarters,
+  type AnalyticsCard,
+  type AuthorRow,
+} from "./lib";
 
-export default function ToolsAnalyticsPage() {
+export const dynamic = "force-dynamic";
+
+function sinceDate(days: number): string | null {
+  if (days === 0) return null;
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+const currency = (v: number) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+const numberFmt = (v: number) => v.toLocaleString(undefined, { maximumFractionDigits: 1 });
+
+export default async function ToolsAnalyticsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ days?: string }>;
+}) {
+  const sp = await searchParams;
+  const rawDays = parseInt(sp.days ?? "30", 10);
+  const activeDays = [7, 30, 90, 0].includes(rawDays) ? rawDays : 30;
+  const since = sinceDate(activeDays);
+
+  const [cardsRes, authorsRes, eventsRes] = await Promise.all([
+    supabaseAdmin
+      .from("board_cards")
+      .select("status, released_at, word_count, payment_type, pfh_rate, narration_format, narrator_share_percent, tags, author"),
+    supabaseAdmin.from("authors").select("id, name, photo_url"),
+    (async () => {
+      let q = supabaseAdmin
+        .from("analytics_events")
+        .select("event, page, metadata, created_at")
+        .order("created_at", { ascending: false })
+        .limit(5000);
+      if (since) q = q.gte("created_at", since);
+      return q;
+    })(),
+  ]);
+
+  const cards = (cardsRes.data ?? []) as AnalyticsCard[];
+  const authors = (authorsRes.data ?? []) as AuthorRow[];
+  const events = (eventsRes.data ?? []) as AnalyticsEvent[];
+
+  const quarters = getTrailing5Quarters();
+  const careerTotals = computeCareerTotals(cards);
+  const releasePace = computeReleasePace(cards, quarters);
+  const earnings = computeEarnings(cards, quarters);
+  const genres = computeGenreBreakdown(cards);
+  const collaborators = computeFrequentCollaborators(cards, authors);
+
   return (
     <AdminLayout>
-      <PlaceholderPage title="Analytics" stage={7} />
+      <div className="max-w-5xl space-y-12">
+        <h1 className={adminType.titleLg}>Analytics</h1>
+
+        {/* Metric 1: Career Totals */}
+        <section>
+          <h2 className={`${adminType.label} mb-4`}>Career Totals</h2>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="rounded-2xl border border-surface-border bg-surface p-6">
+              <p className={adminType.titleLg}>{careerTotals.booksReleased.toLocaleString()}</p>
+              <p className={`${adminType.small} mt-1`}>Books released</p>
+            </div>
+            <div className="rounded-2xl border border-surface-border bg-surface p-6">
+              <p className={adminType.titleLg}>{numberFmt(careerTotals.hoursNarrated)}</p>
+              <p className={`${adminType.small} mt-1`}>Hours narrated (share-adjusted)</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Metric 2: Release Pace */}
+        <section>
+          <h2 className={`${adminType.label} mb-4`}>Release Pace</h2>
+          <div className="rounded-2xl border border-surface-border bg-surface p-5">
+            <VerticalBarChart data={releasePace} height={220} unit="released" />
+          </div>
+        </section>
+
+        {/* Metric 3: Earnings */}
+        <section>
+          <h2 className={`${adminType.label} mb-4`}>Earnings</h2>
+          <div className="grid grid-cols-2 gap-6 mb-5">
+            <div className="rounded-2xl border border-surface-border bg-surface p-6">
+              <p className={adminType.titleLg}>{earnings.avgPerBook != null ? currency(earnings.avgPerBook) : "—"}</p>
+              <p className={`${adminType.small} mt-1`}>Average earnings per book</p>
+            </div>
+            <div className="rounded-2xl border border-surface-border bg-surface p-6">
+              <p className={adminType.titleLg}>{currency(earnings.thisQuarterTotal)}</p>
+              <p className={`${adminType.small} mt-1`}>Earnings this quarter</p>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-surface-border bg-surface p-5">
+            <VerticalBarChart data={earnings.quarterly} height={200} format="currency" />
+          </div>
+        </section>
+
+        {/* Metric 4: Genres */}
+        <section>
+          <h2 className={`${adminType.label} mb-4`}>Genres</h2>
+          <div className="rounded-2xl border border-surface-border bg-surface p-5">
+            {genres.length > 0 ? (
+              <HorizontalBarChart data={genres} />
+            ) : (
+              <p className={adminType.small}>No genre tags recorded on released books yet.</p>
+            )}
+          </div>
+        </section>
+
+        {/* Metric 5: Frequent Collaborators */}
+        <section>
+          <h2 className={`${adminType.label} mb-4`}>Frequent Collaborators</h2>
+          <FrequentCollaborators collaborators={collaborators} />
+        </section>
+
+        {/* Site Analytics — preserved marketing/traffic dashboard */}
+        <SiteAnalyticsSection events={events} activeDays={activeDays} />
+      </div>
     </AdminLayout>
   );
 }
