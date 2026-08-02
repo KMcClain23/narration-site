@@ -1,12 +1,14 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   LayoutGrid, Calendar, Users, Mail, Wrench, Settings as SettingsIcon,
   ChevronLeft, ChevronRight, LogOut,
 } from "lucide-react";
 import { SidebarSection, type NavItem } from "./SidebarSection";
+import { useUnreadInquiries } from "./useUnreadInquiries";
+import { useLogout } from "./useLogout";
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Board", href: "/board", icon: LayoutGrid },
@@ -36,24 +38,14 @@ const COLLAPSE_KEY = "dmn_admin_sidebar_collapsed";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   // Lazy initializer reads the persisted choice directly — SSR has no
   // window/localStorage, so it falls back to expanded there.
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(COLLAPSE_KEY) === "1";
   });
-  const [unreadInquiries, setUnreadInquiries] = useState(0);
-  const [loggingOut, setLoggingOut] = useState(false);
-
-  // Same source the current inquiries admin view reads — same Redis-backed
-  // list, no separate/hardcoded count logic.
-  useEffect(() => {
-    fetch("/api/inquiries")
-      .then(r => (r.ok ? r.json() : []))
-      .then(data => setUnreadInquiries(Array.isArray(data) ? data.length : 0))
-      .catch(() => {});
-  }, []);
+  const unreadInquiries = useUnreadInquiries();
+  const { logout: handleLogout, loggingOut } = useLogout();
 
   const toggleCollapsed = () => {
     setCollapsed(prev => {
@@ -61,21 +53,6 @@ export function Sidebar() {
       localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0");
       return next;
     });
-  };
-
-  const handleLogout = async () => {
-    if (loggingOut) return;
-    setLoggingOut(true);
-    try {
-      await fetch("/admin/logout", { method: "POST" });
-    } catch {
-      // Even if the request fails, we still navigate away — the destination
-      // route stays protected by the cookie check on refresh regardless.
-    } finally {
-      router.push("/admin/login");
-      router.refresh();
-      setLoggingOut(false);
-    }
   };
 
   return (

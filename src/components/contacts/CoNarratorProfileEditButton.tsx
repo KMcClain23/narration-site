@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PersonForm, type Person } from "@/components/admin/PersonForm";
+import { useModalOpen } from "@/components/admin/AdminModalContext";
 
 export function CoNarratorProfileEditButton({ person }: { person: Person }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  useModalOpen(open);
 
   const handleDelete = async () => {
     const confirmed = confirm(

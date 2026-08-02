@@ -11,6 +11,7 @@ import { BoardCard, type BoardV2Card, parseLocalDate, daysUntil } from "@/compon
 import { SubgroupDivider } from "@/components/admin/SubgroupDivider";
 import { ReleasedDropZone, RELEASED_DROPZONE_ID } from "@/components/admin/ReleasedDropZone";
 import { CardEditModal, type FullBoardCard } from "@/components/board/CardEditModal";
+import { useModalOpen } from "@/components/admin/AdminModalContext";
 import { adminType } from "@/lib/design-tokens";
 
 // Cards on this board only ever show these statuses (see ACTIVE_STATUSES in
@@ -113,6 +114,7 @@ export default function BoardV2Page() {
   const [dateFilter, setDateFilter] = useState<DateFilter>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [releaseConfirm, setReleaseConfirm] = useState<BoardV2Card | null>(null);
+  useModalOpen(!!releaseConfirm);
   const [actionMenu, setActionMenu] = useState<{ card: BoardV2Card; x: number; y: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [fadingIds, setFadingIds] = useState<Set<string>>(new Set());
@@ -560,7 +562,7 @@ export default function BoardV2Page() {
 
       {/* Toast (e.g. "+ New Project" placeholder) */}
       {toast && (
-        <div className="fixed bottom-5 right-5 z-[400] flex items-center gap-3 rounded-xl border border-surface-border bg-surface px-4 py-3 text-xs text-text-body shadow-2xl">
+        <div className="fixed bottom-24 right-5 z-[400] flex items-center gap-3 rounded-xl border border-surface-border bg-surface px-4 py-3 text-xs text-text-body shadow-2xl md:bottom-5">
           {toast}
           <button onClick={() => setToast(null)} className="text-text-faint transition-colors hover:text-text-body">✕</button>
         </div>

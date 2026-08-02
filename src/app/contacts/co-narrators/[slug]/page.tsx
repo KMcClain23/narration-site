@@ -9,6 +9,7 @@ import { parseCoNarrators } from "@/components/admin/board-card-utils";
 import { PersonAvatar } from "@/components/PersonAvatar";
 import { CoNarratorProfileEditButton } from "@/components/contacts/CoNarratorProfileEditButton";
 import { BooksTogetherSection } from "@/components/contacts/BooksTogetherSection";
+import { ContactsSubNav } from "@/components/contacts/ContactsSubNav";
 import type { Person } from "@/components/admin/PersonForm";
 
 // Admin data changes constantly and staleness has zero acceptable UX here —
@@ -78,6 +79,7 @@ export default async function CoNarratorProfilePage({ params }: { params: Promis
   return (
     <AdminLayout>
       <div className="mx-auto max-w-[1200px]">
+        <ContactsSubNav />
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           {/* Left column */}
           <div className="lg:col-span-1">

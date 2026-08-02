@@ -3,6 +3,7 @@ import { adminType } from "@/lib/design-tokens";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sanitizeName } from "@/lib/sanitize-name";
 import { AuthorsListClient, type AuthorRow } from "@/components/contacts/AuthorsListClient";
+import { ContactsSubNav } from "@/components/contacts/ContactsSubNav";
 
 // Admin data changes constantly and staleness has zero acceptable UX here —
 // unlike the public site's ISR-cached pages, this always reads fresh from
@@ -58,6 +59,7 @@ export default async function ContactsAuthorsPage() {
             Authors <span className="text-text-muted">({rows.length})</span>
           </h1>
         </div>
+        <ContactsSubNav />
         <div className="mt-6">
           <AuthorsListClient initialRows={rows} />
         </div>

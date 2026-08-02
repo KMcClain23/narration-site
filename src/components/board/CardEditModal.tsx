@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { ExternalLink, Plus } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
+import { useModalOpen } from "@/components/admin/AdminModalContext";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { TagsField, PersonForm, EMPTY_PERSON, type Person } from "@/components/admin/PersonForm";
 import { parseCoNarrators } from "@/components/admin/board-card-utils";
@@ -195,6 +196,11 @@ type CardEditModalProps = {
 export function CardEditModal(props: CardEditModalProps) {
   const { mode, onClose, onSaved, authorNames, coNarratorNames, onAuthorCreated, onCoNarratorCreated, onLoadError } = props;
   const cardId = mode === "edit" ? props.cardId : undefined;
+
+  // Only mounted by the parent while actually open (see board/page.tsx), so
+  // this covers the whole mounted lifetime — including the nested
+  // Archive-confirm dialog below, which never outlives this component.
+  useModalOpen(true);
 
   const [loading, setLoading] = useState(mode === "edit");
   const [loadError, setLoadError] = useState<string | null>(null);

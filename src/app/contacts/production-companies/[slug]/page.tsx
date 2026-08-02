@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sanitizeName } from "@/lib/sanitize-name";
 import { statusMeta, isOverdue, formatDateSafe, zipRoster, realGenres, genreNotes } from "@/lib/production-contacts-constants";
 import { ProductionCompanyActions } from "@/components/contacts/ProductionCompanyActions";
+import { ContactsSubNav } from "@/components/contacts/ContactsSubNav";
 import type { Person } from "@/components/admin/PersonForm";
 
 // Admin data changes constantly and staleness has zero acceptable UX here —
@@ -53,6 +54,7 @@ export default async function ProductionCompanyProfilePage({ params }: { params:
   return (
     <AdminLayout>
       <div className="mx-auto max-w-[900px]">
+        <ContactsSubNav />
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className={adminType.titleLg}>{person.name}</h1>
