@@ -17,7 +17,6 @@ export function middleware(req: NextRequest) {
     pathname === "/schedule" ||
     pathname.startsWith("/contacts") ||
     pathname === "/inquiries" ||
-    pathname === "/demos-v2" ||
     pathname.startsWith("/tools") ||
     pathname === "/settings" ||
     pathname === "/released";
@@ -45,6 +44,6 @@ export const config = {
   matcher: [
     "/admin/:path*", "/board", "/board/archive", "/board/card/:path*",
     "/schedule", "/contacts", "/contacts/:path*",
-    "/inquiries", "/demos-v2", "/tools", "/tools/:path*", "/settings", "/released",
+    "/inquiries", "/tools", "/tools/:path*", "/settings", "/released",
   ],
 };

@@ -6,7 +6,7 @@ import { DemosV2Client, type DemoRecord } from "@/components/demos/DemosV2Client
 // unlike the public site's ISR-cached pages, this always reads fresh.
 export const dynamic = "force-dynamic";
 
-export default async function DemosV2Page() {
+export default async function ToolsDemosPage() {
   const { data } = await supabaseAdmin
     .from("demos")
     .select("*")

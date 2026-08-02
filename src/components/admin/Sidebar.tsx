@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  LayoutGrid, Calendar, Users, Mail, Headphones, Wrench, Settings as SettingsIcon,
+  LayoutGrid, Calendar, Users, Mail, Wrench, Settings as SettingsIcon,
   ChevronLeft, ChevronRight, LogOut,
 } from "lucide-react";
 import { SidebarSection, type NavItem } from "./SidebarSection";
@@ -20,13 +20,13 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   { label: "Inquiries", href: "/inquiries", icon: Mail, badge: "inquiries" },
-  { label: "Demos", href: "/demos-v2", icon: Headphones },
   {
     label: "Tools", href: "/tools", icon: Wrench,
     subItems: [
       { label: "Analytics", href: "/tools/analytics" },
       { label: "Contract Builder", href: "/tools/contract-builder" },
       { label: "Testimonials", href: "/tools/testimonials" },
+      { label: "Demos", href: "/tools/demos" },
     ],
   },
   { label: "Settings", href: "/settings", icon: SettingsIcon },
