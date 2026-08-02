@@ -1,10 +1,10 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { PlaceholderPage } from "@/components/admin/PlaceholderPage";
+import ContractClient from "./ContractClient";
 
 export default function ToolsContractBuilderPage() {
   return (
     <AdminLayout>
-      <PlaceholderPage title="Contract Builder" stage={7} />
+      <ContractClient />
     </AdminLayout>
   );
 }

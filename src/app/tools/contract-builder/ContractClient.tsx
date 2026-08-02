@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import type { ContractData } from "./ContractPDF";
 
 // ── Live preview (PDF viewer) ─────────────────────────────────────────────────
@@ -11,16 +10,16 @@ const ContractPreview = dynamic(() => import("./ContractPreview"), {
   ssr: false,
   loading: () => (
     <div className="h-full flex items-center justify-center">
-      <p className="text-white/20 text-xs">Loading preview…</p>
+      <p className="text-text-faint text-xs">Loading preview…</p>
     </div>
   ),
 });
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const base = "w-full rounded-xl px-3.5 py-2.5 text-sm text-white/95 placeholder:text-white/30 focus:outline-none transition-all duration-200";
-const inp    = `${base} bg-[#0C0F40] border border-[#252D6E] hover:border-[#3A4585] hover:bg-[#0D1242] focus:border-[#D4AF37]/65 focus:bg-[#0D1242] focus:shadow-[0_0_0_3px_rgba(212,175,55,0.09)]`;
-const inpErr = `${base} bg-[#0C0F40] border border-red-500/55 hover:border-red-400/70 focus:border-red-400/75 focus:shadow-[0_0_0_3px_rgba(239,68,68,0.09)]`;
+const base = "w-full rounded-xl px-3.5 py-2.5 text-sm text-text-primary placeholder:text-text-dim focus:outline-none transition-colors";
+const inp    = `${base} bg-surface border border-surface-border focus:border-accent-amber-dim`;
+const inpErr = `${base} bg-surface border border-alert-red/55 focus:border-alert-red/75`;
 const ta     = `${inp} resize-none leading-relaxed`;
 const sel    = `${inp} appearance-none contract-select cursor-pointer`;
 
@@ -102,9 +101,9 @@ function buildDefaults(): ContractData {
 function SectionHead({ title }: { title: string }) {
   return (
     <div className="flex items-center gap-2.5 mt-10 mb-4">
-      <div className="w-0.5 h-[14px] rounded-full bg-[#D4AF37]/65 shrink-0" />
-      <h2 className="text-[11px] uppercase tracking-[0.22em] text-[#D4AF37] font-bold whitespace-nowrap">{title}</h2>
-      <div className="flex-1 h-px bg-gradient-to-r from-[#2A3370] to-transparent" />
+      <div className="w-0.5 h-[14px] rounded-full bg-accent-amber/65 shrink-0" />
+      <h2 className="text-[11px] uppercase tracking-[0.22em] text-accent-amber-bright font-bold whitespace-nowrap">{title}</h2>
+      <div className="flex-1 h-px bg-gradient-to-r from-surface-border to-transparent" />
     </div>
   );
 }
@@ -117,12 +116,12 @@ function Field({
   return (
     <label className="block">
       <span className="flex items-center justify-between mb-1.5">
-        <span className="text-[10.5px] uppercase tracking-[0.14em] font-semibold text-white/55">
-          {label}{required && <span className="text-[#D4AF37]/80 ml-0.5">*</span>}
+        <span className="text-[10.5px] uppercase tracking-[0.14em] font-semibold text-text-muted">
+          {label}{required && <span className="text-accent-amber-bright ml-0.5">*</span>}
         </span>
         {hasError && (
-          <span className="flex items-center gap-1 text-[10px] font-semibold text-red-400">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-400 shrink-0" />
+          <span className="flex items-center gap-1 text-[10px] font-semibold text-alert-red">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-alert-red shrink-0" />
             Required
           </span>
         )}
@@ -176,11 +175,15 @@ export default function ContractClient() {
     return () => clearTimeout(t);
   }, [form]);
 
-  // Auto-calculate finishedHours from wordCount (9,300 words per finished hour)
+  // Auto-calculate finishedHours from wordCount. Matches the ratio used
+  // everywhere else in the codebase (board-card-utils.ts, CardEditModal) —
+  // this file's own copy was still using a stale 9,300 until this migration;
+  // the real number has always been 9,400 (see CardEditModal.tsx's own note
+  // on the same historical mismatch).
   useEffect(() => {
     const wc = parseFloat(form.wordCount);
     if (!wc || isNaN(wc)) return;
-    set("finishedHours", (wc / 9300).toFixed(1));
+    set("finishedHours", (wc / 9400).toFixed(1));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.wordCount]);
 
@@ -301,22 +304,20 @@ export default function ContractClient() {
   // ── JSX ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex bg-[#06082E] text-white overflow-hidden mt-12 sm:mt-16 h-[calc(100dvh-3rem)] sm:h-[calc(100dvh-4rem)]">
+    <div className="flex bg-background text-text-primary overflow-hidden rounded-xl border border-surface-border h-[calc(100vh-4rem)]">
 
       {/* ── LEFT: Form ─────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden border-r border-[#1E2660]">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden border-r border-surface-border">
 
         {/* Top bar */}
-        <div className="shrink-0 flex items-center justify-between gap-2 px-4 sm:px-5 h-12 border-b border-[#1E2660] bg-[#06082E]/90 backdrop-blur">
+        <div className="shrink-0 flex items-center justify-between gap-2 px-4 sm:px-5 h-12 border-b border-surface-border bg-surface/60 backdrop-blur">
           <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-            <Link href="/board" className="text-[10px] text-white/30 hover:text-white transition shrink-0">← Admin</Link>
-            <span className="text-white/15 text-xs shrink-0">·</span>
-            <span className="text-xs font-bold text-white shrink-0">Contract Builder</span>
+            <span className="text-xs font-bold text-text-primary shrink-0">Contract Builder</span>
             {form.contractNumber && (
-              <span className="text-[10px] text-[#D4AF37]/50 font-mono hidden sm:inline shrink-0">{form.contractNumber}</span>
+              <span className="text-[10px] text-accent-amber-bright/60 font-mono hidden sm:inline shrink-0">{form.contractNumber}</span>
             )}
             {savedAt && (
-              <span className="text-[9px] text-white/20 hidden md:inline truncate">· saved {savedAt}</span>
+              <span className="text-[9px] text-text-faint hidden md:inline truncate">· saved {savedAt}</span>
             )}
           </div>
 
@@ -325,14 +326,14 @@ export default function ContractClient() {
             <button
               onClick={handlePreview}
               disabled={previewing}
-              className="lg:hidden flex items-center gap-1 border border-white/15 text-white/50 hover:text-white text-[11px] px-2.5 py-1.5 rounded-full transition disabled:opacity-40"
+              className="lg:hidden flex items-center gap-1 border border-surface-border text-text-muted hover:text-text-primary text-[11px] px-2.5 py-1.5 rounded-full transition disabled:opacity-40"
             >
               {previewing ? "…" : "Preview"}
             </button>
             {/* Reset */}
             <button
               onClick={handleReset}
-              className="hidden sm:flex items-center text-[10px] text-white/25 hover:text-white/60 transition px-2 py-1 rounded"
+              className="hidden sm:flex items-center text-[10px] text-text-faint hover:text-text-muted transition px-2 py-1 rounded"
             >
               Reset
             </button>
@@ -340,14 +341,14 @@ export default function ContractClient() {
             <button
               onClick={handleDownload}
               disabled={generating}
-              className="flex items-center gap-1.5 bg-[#D4AF37] text-[#06082E] font-bold text-[11px] px-3 py-1.5 rounded-full hover:bg-[#F0D060] transition active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-1.5 bg-accent-amber text-background font-bold text-[11px] px-3 py-1.5 rounded-full hover:brightness-110 transition active:scale-95 disabled:opacity-50"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4 4m0 0l-4-4m4 4V4" />
               </svg>
               {generating ? "Generating…" : "Download PDF"}
               {attempted && errors.length > 0 && (
-                <span className="bg-red-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center -mr-0.5">
+                <span className="bg-alert-red text-text-primary text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center -mr-0.5">
                   {errors.length}
                 </span>
               )}
@@ -357,7 +358,7 @@ export default function ContractClient() {
 
         {/* Validation banner */}
         {attempted && errors.length > 0 && (
-          <div className="shrink-0 bg-red-950/60 border-b border-red-500/20 px-4 py-2 text-xs text-red-300">
+          <div className="shrink-0 bg-alert-red/10 border-b border-alert-red/20 px-4 py-2 text-xs text-alert-red">
             Missing required fields: {errors.join(", ")}
           </div>
         )}
@@ -449,12 +450,12 @@ export default function ContractClient() {
 
             {/* Estimated total */}
             {estimatedTotal !== null && (
-              <div className="flex items-center justify-between bg-[#D4AF37]/7 border border-[#D4AF37]/25 rounded-xl px-4 py-3">
-                <span className="text-xs text-white/55">
+              <div className="flex items-center justify-between bg-accent-amber/5 border border-accent-amber/25 rounded-xl px-4 py-3">
+                <span className="text-xs text-text-muted">
                   {isDuet ? "Est. Narrator Total (½ duet)" : "Estimated Project Total"}{" "}
                   ({form.finishedHours} hrs × ${form.rateAmount}{isDuet ? " ÷ 2" : ""})
                 </span>
-                <span className="text-base font-bold text-[#D4AF37]">${estimatedTotal.toFixed(2)}</span>
+                <span className="text-base font-bold text-accent-amber-bright">${estimatedTotal.toFixed(2)}</span>
               </div>
             )}
 
@@ -483,7 +484,7 @@ export default function ContractClient() {
           <SectionHead title="Pronunciation Guide" />
           <div className="space-y-4">
             <div className="flex items-center gap-4">
-              <span className="text-[10.5px] uppercase tracking-[0.14em] text-white/55 font-semibold">Received</span>
+              <span className="text-[10.5px] uppercase tracking-[0.14em] text-text-muted font-semibold">Received</span>
               {([true, false] as const).map(v => (
                 <button
                   key={String(v)}
@@ -491,8 +492,8 @@ export default function ContractClient() {
                   onClick={() => set("pronunciationReceived", v)}
                   className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${
                     form.pronunciationReceived === v
-                      ? "bg-[#D4AF37]/15 border-[#D4AF37]/60 text-[#D4AF37]"
-                      : "border-[#252D6E] text-white/40 hover:border-[#3A4585] hover:text-white/60"
+                      ? "bg-accent-amber/15 border-accent-amber/60 text-accent-amber-bright"
+                      : "border-surface-border text-text-dim hover:text-text-muted"
                   }`}
                 >
                   {v ? "Yes" : "No"}
@@ -512,7 +513,7 @@ export default function ContractClient() {
             <Field label="Included Pickup Days">
               <div className="flex items-center gap-3">
                 <input type="number" value={form.pickupDays} onChange={ev => set("pickupDays", ev.target.value)} className={`${inp} max-w-[10rem]`} />
-                <span className="text-xs text-white/30 italic whitespace-nowrap">days after delivery</span>
+                <span className="text-xs text-text-dim italic whitespace-nowrap">days after delivery</span>
               </div>
             </Field>
             <Row>
@@ -544,8 +545,8 @@ export default function ContractClient() {
           {/* Signatures */}
           <SectionHead title="Signatures" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="bg-[#0C0F40] border border-[#252D6E] rounded-xl p-4 space-y-4">
-              <p className="text-[10.5px] uppercase tracking-[0.14em] text-[#D4AF37]/80 font-bold">Author / Publisher</p>
+            <div className="bg-surface border border-surface-border rounded-xl p-4 space-y-4">
+              <p className="text-[10.5px] uppercase tracking-[0.14em] text-accent-amber-bright/80 font-bold">Author / Publisher</p>
               <Field label="Print Name" required hasError={e("authorSignatureName")}>
                 <input type="text" value={form.authorSignatureName} onChange={ev => set("authorSignatureName", ev.target.value)} className={i("authorSignatureName")} placeholder="Jane Smith" />
               </Field>
@@ -553,8 +554,8 @@ export default function ContractClient() {
                 <input type="date" value={form.authorSignatureDate} onChange={ev => set("authorSignatureDate", ev.target.value)} className={inp} />
               </Field>
             </div>
-            <div className="bg-[#0C0F40] border border-[#252D6E] rounded-xl p-4 space-y-4">
-              <p className="text-[10.5px] uppercase tracking-[0.14em] text-[#D4AF37]/80 font-bold">Narrator</p>
+            <div className="bg-surface border border-surface-border rounded-xl p-4 space-y-4">
+              <p className="text-[10.5px] uppercase tracking-[0.14em] text-accent-amber-bright/80 font-bold">Narrator</p>
               <Field label="Print Name">
                 <input type="text" disabled value="Dean Miller / Dean Miller Narration LLC" className={`${inp} opacity-40`} />
               </Field>
@@ -570,7 +571,7 @@ export default function ContractClient() {
               <button
                 onClick={handleDownload}
                 disabled={generating}
-                className="flex items-center gap-2 bg-[#D4AF37] text-[#06082E] font-bold text-sm px-8 py-3.5 rounded-full hover:bg-[#F0D060] transition active:scale-95 disabled:opacity-50"
+                className="flex items-center gap-2 bg-accent-amber text-background font-bold text-sm px-8 py-3.5 rounded-full hover:brightness-110 transition active:scale-95 disabled:opacity-50"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4 4m0 0l-4-4m4 4V4" />
@@ -580,7 +581,7 @@ export default function ContractClient() {
               <button
                 onClick={handlePreview}
                 disabled={previewing}
-                className="lg:hidden flex items-center gap-2 border border-white/20 text-white/60 hover:text-white text-sm px-6 py-3.5 rounded-full transition disabled:opacity-40"
+                className="lg:hidden flex items-center gap-2 border border-surface-border text-text-muted hover:text-text-primary text-sm px-6 py-3.5 rounded-full transition disabled:opacity-40"
               >
                 {previewing ? "Opening…" : "Preview PDF"}
               </button>
@@ -590,7 +591,7 @@ export default function ContractClient() {
             <button
               onClick={handleGenericDownload}
               disabled={generating}
-              className="flex items-center gap-2 border border-white/15 text-white/40 hover:text-white/70 hover:border-white/30 text-xs px-5 py-2 rounded-full transition disabled:opacity-30"
+              className="flex items-center gap-2 border border-surface-border text-text-dim hover:text-text-muted transition text-xs px-5 py-2 rounded-full disabled:opacity-30"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -600,7 +601,7 @@ export default function ContractClient() {
 
             <button
               onClick={handleReset}
-              className="text-xs text-white/20 hover:text-white/50 transition"
+              className="text-xs text-text-faint hover:text-text-muted transition"
             >
               Reset form
             </button>
@@ -610,10 +611,10 @@ export default function ContractClient() {
       </div>
 
       {/* ── RIGHT: Live PDF Preview ─────────────────────────────────────── */}
-      <div className="hidden lg:flex w-[46%] flex-col bg-[#050814]">
-        <div className="shrink-0 h-12 border-b border-[#1E2660] flex items-center px-5 gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#D4AF37]/60" />
-          <span className="text-[11px] uppercase tracking-widest text-white/30 font-medium">Live Preview</span>
+      <div className="hidden lg:flex w-[46%] flex-col bg-background">
+        <div className="shrink-0 h-12 border-b border-surface-border flex items-center px-5 gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent-amber/60" />
+          <span className="text-[11px] uppercase tracking-widest text-text-dim font-medium">Live Preview</span>
         </div>
         <div className="flex-1 overflow-hidden">
           <ContractPreview data={previewData} />
