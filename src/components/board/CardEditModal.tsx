@@ -22,6 +22,7 @@ export type FullBoardCard = {
   co_narrator: string; // JSON-encoded array string — see board-card-utils.ts
   author_notes: string;
   narration_format: NarrationFormat | null;
+  narrator_share_percent: number | null;
   is_confidential: boolean;
   deadline: string;
   status: string;
@@ -55,6 +56,7 @@ function mapToFullBoardCard(row: Record<string, unknown>): FullBoardCard {
     co_narrator: (row.co_narrator as string) ?? "",
     author_notes: (row.author_notes as string) ?? "",
     narration_format: (row.narration_format as NarrationFormat) ?? null,
+    narrator_share_percent: (row.narrator_share_percent as number) ?? null,
     is_confidential: Boolean(row.is_confidential),
     deadline: (row.deadline as string) ?? "",
     status: (row.status as string) ?? "contracted",
@@ -84,7 +86,7 @@ function mapToFullBoardCard(row: Record<string, unknown>): FullBoardCard {
 function blankCard(): FullBoardCard {
   return {
     id: "", created_at: "", title: "", subtitle: "", cover_url: "", author: "", co_narrator: "",
-    author_notes: "", narration_format: null, is_confidential: false, deadline: "", status: "contracted",
+    author_notes: "", narration_format: null, narrator_share_percent: null, is_confidential: false, deadline: "", status: "contracted",
     word_count: 0, payment_type: "pfh", pfh_rate: 0, first15_due: "", first_15_complete: false,
     production_type: null, production_company: null, description: "", tags: [], trigger_warnings: [],
     audible_link: "", ar_link: "", spotify_link: "", script_url: "",
@@ -218,6 +220,8 @@ export function CardEditModal(props: CardEditModalProps) {
   const [archiving, setArchiving] = useState(false);
 
   const [wordCountFocused, setWordCountFocused] = useState(false);
+  const [shareInput, setShareInput] = useState<string | null>(null);
+  const [shareClamped, setShareClamped] = useState(false);
 
   // Swap-in-place person creation (Stage 6.3). "book" is the normal Book
   // Edit view; the other two replace the entire modal body with PersonForm.
@@ -557,7 +561,7 @@ export function CardEditModal(props: CardEditModalProps) {
             </div>
 
             <div>
-              <span className={`${adminType.label} mb-1.5 flex items-center`}>
+              <span className={`${adminType.label} mb-1.5 flex items-center gap-2`}>
                 Narration format
                 <InfoTooltip>
                   <p><strong>Solo:</strong> One narrator performs everything.</p>
@@ -565,6 +569,12 @@ export function CardEditModal(props: CardEditModalProps) {
                   <p><strong>Duet:</strong> Both narrators perform every scene together.</p>
                   <p><strong>Multicast:</strong> Three or more narrators, often a full cast.</p>
                 </InfoTooltip>
+                {(form.narration_format === "duet" || form.narration_format === "dual") &&
+                  form.narrator_share_percent != null && form.narrator_share_percent !== 50 && (
+                  <span className={`${adminType.small} normal-case tracking-normal font-normal`}>
+                    custom share: {form.narrator_share_percent}%
+                  </span>
+                )}
               </span>
               <div className="flex gap-1 rounded-lg border border-surface-border bg-background p-1">
                 {NARRATION_FORMATS.map(fmt => (
@@ -723,6 +733,48 @@ export function CardEditModal(props: CardEditModalProps) {
                 <input type="number" value={form.pfh_rate || ""}
                   onChange={e => setForm(p => p && { ...p, pfh_rate: parseFloat(e.target.value) || 0 })}
                   placeholder="e.g. 250" className={INPUT_CLS} />
+              </div>
+            )}
+
+            {hasRate && (form.narration_format === "duet" || form.narration_format === "dual") && (
+              <div>
+                <label className={`${adminType.label} mb-1.5 block`}>Narrator share</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={shareInput !== null ? shareInput : (form.narrator_share_percent ?? "")}
+                    onFocus={() => setShareInput(form.narrator_share_percent != null ? String(form.narrator_share_percent) : "")}
+                    onChange={e => setShareInput(e.target.value.replace(/\D/g, ""))}
+                    onBlur={() => {
+                      if (shareInput === null) return;
+                      if (shareInput === "") {
+                        setForm(p => p && { ...p, narrator_share_percent: null });
+                      } else {
+                        const raw = parseInt(shareInput, 10);
+                        const clamped = Math.max(1, Math.min(99, raw));
+                        if (clamped !== raw) {
+                          setShareClamped(true);
+                          setTimeout(() => setShareClamped(false), 1500);
+                        }
+                        setForm(p => p && { ...p, narrator_share_percent: clamped });
+                      }
+                      setShareInput(null);
+                    }}
+                    placeholder="Default: 50"
+                    className={`w-24 rounded-lg border bg-background px-3 py-2.5 text-sm text-text-primary placeholder:text-text-dim focus:outline-none transition-colors ${
+                      shareClamped ? "border-accent-amber" : "border-surface-border focus:border-accent-amber-dim"
+                    }`}
+                  />
+                  <span className="rounded-full bg-surface-raised px-2.5 py-1 text-xs font-medium text-text-muted">%</span>
+                </div>
+                {shareClamped ? (
+                  <p className="mt-1.5 text-xs text-accent-amber-bright">Clamped to the 1-99 range.</p>
+                ) : (
+                  <p className={`${adminType.small} mt-1.5`}>
+                    Your share of the total project value. Default is 50% for duet and dual projects.
+                  </p>
+                )}
               </div>
             )}
 

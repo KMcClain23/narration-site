@@ -27,6 +27,7 @@ export type BoardV2Card = {
   payment_type: string | null;
   is_confidential: boolean;
   narration_format: string | null;
+  narrator_share_percent: number | null;
   created_at: string;
 };
 
@@ -174,7 +175,7 @@ export function BoardCard({
         {/* 5. Word count row — empty but height-preserving when unset */}
         <p className="mt-2 text-sm text-text-dim">
           {card.word_count ? (() => {
-            const earnings = estimatedEarnings(card.word_count, card.pfh_rate, card.payment_type, card.narration_format);
+            const earnings = estimatedEarnings(card.word_count, card.pfh_rate, card.payment_type, card.narration_format, card.narrator_share_percent);
             const words = `${card.word_count.toLocaleString()} words`;
             return earnings === null ? words : `${words} · ~$${Math.round(earnings).toLocaleString("en-US")}`;
           })() : " "}

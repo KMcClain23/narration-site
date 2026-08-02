@@ -351,6 +351,7 @@ export default function BoardV2Page() {
         payment_type: updated.payment_type,
         is_confidential: updated.is_confidential,
         narration_format: updated.narration_format,
+        narrator_share_percent: updated.narrator_share_percent,
         created_at: updated.created_at,
       };
       return idx === -1 ? [...prev, projected] : prev.map((c, i) => (i === idx ? projected : c));

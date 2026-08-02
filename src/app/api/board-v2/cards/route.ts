@@ -15,7 +15,7 @@ export async function GET() {
   const { data, error } = await supabaseAdmin
     .from("board_cards")
     .select(
-      "id, title, author, co_narrator, cover_url, status, deadline, first15_due, first_15_complete, word_count, pfh_rate, payment_type, is_confidential, narration_format, created_at"
+      "id, title, author, co_narrator, cover_url, status, deadline, first15_due, first_15_complete, word_count, pfh_rate, payment_type, is_confidential, narration_format, narrator_share_percent, created_at"
     )
     .in("status", ACTIVE_STATUSES)
     .is("archived_at", null);
