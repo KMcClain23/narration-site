@@ -7,7 +7,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Calendar, Lock, Square, CheckSquare } from "lucide-react";
 import { parseLocalDate, daysUntil, completionUrgency, URGENCY_PILL, parseCoNarrators, estimatedEarnings, type Urgency } from "./board-card-utils";
 
-// Re-exported so existing imports elsewhere (e.g. board-v2/page.tsx) keep working.
+// Re-exported so existing imports elsewhere (e.g. board/page.tsx) keep working.
 export { parseLocalDate, daysUntil };
 
 const LONG_PRESS_MS = 500;

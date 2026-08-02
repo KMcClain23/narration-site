@@ -9,7 +9,7 @@ import {
 import { SidebarSection, type NavItem } from "./SidebarSection";
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Board", href: "/board-v2", icon: LayoutGrid },
+  { label: "Board", href: "/board", icon: LayoutGrid },
   { label: "Schedule", href: "/schedule", icon: Calendar },
   {
     label: "Contacts", href: "/contacts", icon: Users,

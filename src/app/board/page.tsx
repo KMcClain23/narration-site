@@ -146,7 +146,7 @@ export default function BoardV2Page() {
     if (params.has("editCard")) {
       params.delete("editCard");
       const query = params.toString();
-      router.replace(query ? `/board-v2?${query}` : "/board-v2", { scroll: false });
+      router.replace(query ? `/board?${query}` : "/board", { scroll: false });
     }
   }, [router]);
 

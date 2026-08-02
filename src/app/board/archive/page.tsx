@@ -51,7 +51,7 @@ export default function ArchivePage() {
     <main className="min-h-screen bg-[#06082E] text-white pt-14 sm:pt-16">
       {/* Sticky header */}
       <div className="sticky top-14 sm:top-16 z-40 bg-[#06082E]/95 backdrop-blur border-b border-white/8 px-5 sm:px-8 py-3 flex items-center gap-3">
-        <Link href="/board-v2" className="text-xs text-white/40 hover:text-[#D4AF37] transition-colors shrink-0">← Board</Link>
+        <Link href="/board" className="text-xs text-white/40 hover:text-[#D4AF37] transition-colors shrink-0">← Board</Link>
         <span className="text-white/20">/</span>
         <h1 className="text-sm font-bold text-white">Archive</h1>
         <span className="text-xs text-white/25">{cards.length} project{cards.length !== 1 ? "s" : ""}</span>
@@ -83,7 +83,7 @@ export default function ArchivePage() {
             {cards.map(card => (
               <Link
                 key={card.id}
-                href={`/board-v2?editCard=${card.id}`}
+                href={`/board?editCard=${card.id}`}
                 className="flex items-center gap-4 rounded-xl border border-white/8 bg-[#0A0D3A] hover:border-white/20 transition-colors px-4 py-3"
               >
                 {/* Cover thumbnail */}

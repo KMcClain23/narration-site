@@ -166,7 +166,7 @@ export default async function AnalyticsPage({
 
         {/* Nav */}
         <div className="flex items-center gap-3 mb-8 flex-wrap">
-          <Link href="/board-v2"
+          <Link href="/board"
             className="inline-flex items-center gap-2 text-sm font-bold text-[#D4AF37] border border-[#D4AF37]/30 px-4 py-2 rounded-full hover:bg-[#D4AF37]/10 transition-colors">
             ← Admin
           </Link>

@@ -22,7 +22,7 @@ export function DueSoonRow({ card }: { card: DueSoonCard }) {
 
   return (
     <Link
-      href={`/board-v2?editCard=${card.id}`}
+      href={`/board?editCard=${card.id}`}
       className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-surface-raised"
     >
       <div className="relative h-[60px] w-10 shrink-0 overflow-hidden rounded bg-background">

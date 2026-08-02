@@ -19,7 +19,6 @@ const BOOKINGS_URL =
 function isAdminWorldRoute(pathname: string): boolean {
   if (pathname.startsWith("/admin")) return true;
   if (pathname === "/board" || pathname === "/board/archive" || pathname.startsWith("/board/card")) return true;
-  if (pathname === "/board-v2") return true;
   if (pathname === "/schedule") return true;
   if (pathname.startsWith("/contacts")) return true;
   if (pathname === "/inquiries-v2") return true;
@@ -138,7 +137,7 @@ export default function Header() {
       const data = await r.json();
       if (data.success) {
         setShowAdminModal(false);
-        router.push("/board-v2");
+        router.push("/board");
       } else {
         setAdminError("Invalid key.");
         setAdminKey("");
