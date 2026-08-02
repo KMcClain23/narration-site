@@ -19,7 +19,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: "Production Companies", href: "/contacts/production-companies" },
     ],
   },
-  { label: "Inquiries", href: "/inquiries-v2", icon: Mail, badge: "inquiries" },
+  { label: "Inquiries", href: "/inquiries", icon: Mail, badge: "inquiries" },
   { label: "Demos", href: "/demos-v2", icon: Headphones },
   {
     label: "Tools", href: "/tools", icon: Wrench,

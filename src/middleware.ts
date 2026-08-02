@@ -16,7 +16,7 @@ export function middleware(req: NextRequest) {
   const isNewAdminRoute =
     pathname === "/schedule" ||
     pathname.startsWith("/contacts") ||
-    pathname === "/inquiries-v2" ||
+    pathname === "/inquiries" ||
     pathname === "/demos-v2" ||
     pathname.startsWith("/tools") ||
     pathname === "/settings" ||
@@ -45,6 +45,6 @@ export const config = {
   matcher: [
     "/admin/:path*", "/board", "/board/archive", "/board/card/:path*",
     "/schedule", "/contacts", "/contacts/:path*",
-    "/inquiries-v2", "/demos-v2", "/tools", "/tools/:path*", "/settings", "/released",
+    "/inquiries", "/demos-v2", "/tools", "/tools/:path*", "/settings", "/released",
   ],
 };

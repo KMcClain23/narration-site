@@ -1,4 +1,4 @@
-// Shared between the /inquiries-v2 admin UI and its API routes — the single
+// Shared between the /inquiries admin UI and its API routes — the single
 // source of truth for the Redis keys/connection and inquiry shape, since both
 // read/write the same two lists.
 

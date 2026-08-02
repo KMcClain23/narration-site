@@ -21,7 +21,7 @@ function isAdminWorldRoute(pathname: string): boolean {
   if (pathname === "/board" || pathname === "/board/archive" || pathname.startsWith("/board/card")) return true;
   if (pathname === "/schedule") return true;
   if (pathname.startsWith("/contacts")) return true;
-  if (pathname === "/inquiries-v2") return true;
+  if (pathname === "/inquiries") return true;
   if (pathname === "/demos-v2") return true;
   if (pathname.startsWith("/tools")) return true;
   if (pathname === "/settings") return true;
