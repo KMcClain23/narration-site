@@ -30,7 +30,7 @@ export async function resetStats(key: string) {
   await redis.del("total_demo_plays");
 
   // Force Next.js to purge the cache for the demo-plays display
-  revalidatePath('/admin/analytics');
+  revalidatePath('/tools/analytics');
   
   return { success: true };
 }
