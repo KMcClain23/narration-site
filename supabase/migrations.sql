@@ -438,3 +438,23 @@ commit;
 -- ============================================================
 
 drop table if exists board_messages;
+
+-- ============================================================
+-- Stage 7.7 — per-card narrator share override for Duet/Dual projects
+-- Applied and verified against production 2026-08-02. NULL means "use the
+-- default" (100% Solo/unset, 50% Duet/Dual, hidden for Multicast); any
+-- value 1-99 overrides the default for that card regardless of format.
+-- ============================================================
+
+alter table board_cards add column if not exists narrator_share_percent smallint;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'board_cards_narrator_share_percent_check'
+  ) then
+    alter table board_cards
+      add constraint board_cards_narrator_share_percent_check
+      check (narrator_share_percent is null or (narrator_share_percent between 1 and 99));
+  end if;
+end $$;
