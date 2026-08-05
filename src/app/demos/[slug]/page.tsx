@@ -1,16 +1,64 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { DEMOS } from "../config";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import DemoPlayerClient from "./DemoPlayerClient";
 
-export function generateStaticParams() {
-  return DEMOS.map(d => ({ slug: d.slug }));
+// Admin-managed content (the /tools/demos panel adds/edits/reorders these) —
+// always fetch fresh, matching the homepage's own demos query. This route
+// used to read from a hardcoded config file that was never updated after the
+// homepage grid migrated to Supabase, so any demo added since then had a
+// working card on the homepage but a 404 behind its download link — the
+// two lists had silently diverged. Sourcing both from the same query removes
+// the possibility of that drift recurring.
+export const dynamic = "force-dynamic";
+
+type DbDemo = {
+  id: string;
+  title: string;
+  genre: string | null;
+  description: string | null;
+  file_url: string;
+  duration_seconds: number | null;
+  sort_order: number;
+};
+
+// Rotating border colours — same palette and same index-based assignment as
+// HomeClient's card grid, so a demo's accent color matches between its
+// homepage card and its own download page.
+const DEMO_COLORS = [
+  "border-pink-400", "border-purple-400", "border-violet-400",
+  "border-rose-300", "border-blue-400", "border-amber-400",
+];
+
+function titleToSlug(t: string): string {
+  return t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+type Demo = { slug: string; title: string; desc: string; color: string; tags: string[]; src: string };
+
+async function getDemos(): Promise<Demo[]> {
+  const { data } = await supabaseAdmin
+    .from("demos")
+    .select("id,title,genre,description,file_url,duration_seconds,sort_order")
+    .eq("active", true)
+    .order("sort_order", { ascending: true })
+    .limit(9);
+
+  return ((data ?? []) as DbDemo[]).map((d, i) => ({
+    slug: titleToSlug(d.title),
+    title: d.title,
+    desc: d.description ?? "",
+    color: DEMO_COLORS[i % DEMO_COLORS.length],
+    tags: d.genre ? [d.genre] : [],
+    src: d.file_url,
+  }));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const demo = DEMOS.find(d => d.slug === slug);
+  const demos = await getDemos();
+  const demo = demos.find(d => d.slug === slug);
   if (!demo) return {};
   return {
     title: `${demo.title} Demo — Dean Miller Narration`,
@@ -20,12 +68,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function DemoDownloadPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const currentIdx = DEMOS.findIndex(d => d.slug === slug);
+  const demos = await getDemos();
+  const currentIdx = demos.findIndex(d => d.slug === slug);
   if (currentIdx === -1) notFound();
 
-  const demo     = DEMOS[currentIdx];
-  const prevDemo = currentIdx > 0                  ? DEMOS[currentIdx - 1] : null;
-  const nextDemo = currentIdx < DEMOS.length - 1   ? DEMOS[currentIdx + 1] : null;
+  const demo     = demos[currentIdx];
+  const prevDemo = currentIdx > 0                ? demos[currentIdx - 1] : null;
+  const nextDemo = currentIdx < demos.length - 1 ? demos[currentIdx + 1] : null;
 
   const arrowBtn   = "p-3 rounded-full bg-[#06082E]/80 backdrop-blur border border-white/10 text-white/30 group-hover:text-[#D4AF37] group-hover:border-[#D4AF37]/40 group-hover:bg-[#D4AF37]/10 transition-all shadow-lg";
   const arrowLabel = "text-[10px] text-white/20 group-hover:text-[#D4AF37]/60 transition-colors max-w-[80px] text-center leading-tight truncate";
