@@ -723,13 +723,18 @@ function extractTocEntries(text: string, out: TocEntry[], seen: Set<string>): vo
  * to be ascending — the one expected dip is the roman-numeral → arabic transition
  * at the front-matter / body-chapter boundary ("iv"→4 then "1").
  */
-function parseTocFromPages(pageTexts: string[]): TocEntry[] | null {
+function parseTocFromPages(pageTexts: string[]): { entries: TocEntry[]; lastTocPage: number } | null {
   const entries: TocEntry[] = [];
   const seen = new Set<string>();
+  // Which page the TOC ran to, so title confirmation can search past it and
+  // not match a chapter title against its own contents-listing entry.
+  let lastTocPage = -1;
 
   for (let i = 0; i < Math.min(15, pageTexts.length); i++) {
     if (!pageTexts[i].trim()) continue;
+    const before = entries.length;
     extractTocEntries(pageTexts[i], entries, seen);
+    if (entries.length > before) lastTocPage = i;
   }
 
   if (entries.length < 3) return null;
@@ -742,7 +747,7 @@ function parseTocFromPages(pageTexts: string[]): TocEntry[] | null {
   const ascRatio = asc / (entries.length - 1);
   if (ascRatio < 0.75) return null;
 
-  return entries;
+  return { entries, lastTocPage };
 }
 
 // ─── TOC as primary source ─────────────────────────────────────────────────────
@@ -1416,12 +1421,47 @@ export async function parseManuscript(
     const quality = assessTextQuality(pages);
     logTextQuality("txt", quality);
 
-    const tocEntries = parseTocFromPages(pages);
-    const rawSections = tocEntries
-      ? tocEntries.map((e) => ({ ...e, povCharacter: null }))
-      : await askClaude(buildPageMap(pages));
+    // Same resolution path as the PDF branch: a plaintext manuscript recovered
+    // from OCR still carries printed page numbers in its TOC, so its entries
+    // need the same POV parsing, offset derivation and confirmation rather
+    // than being trusted as PDF indices.
+    const txtToc = parseTocFromPages(pages);
+    const txtResolved = txtToc
+      ? resolveToc(
+          txtToc.entries.map((e) => ({ rawTitle: e.title, printedPage: e.startPage })),
+          pages,
+          txtToc.lastTocPage
+        )
+      : null;
 
-    return { format: "txt", chapters: assignChaptersFromPages(rawSections, pages), quality };
+    let rawSections: Array<{ title: string; startPage: number; povCharacter: string | null }>;
+    let txtPovRoster: string[] = [];
+
+    if (txtResolved) {
+      if (txtResolved.unconfirmed.length) {
+        throw new Error(
+          `TOC validation failed: ${txtResolved.unconfirmed.length} of ${txtResolved.chapters.length} ` +
+            `chapter titles were not found near their computed start page using offset ` +
+            `${txtResolved.offset >= 0 ? "+" : ""}${txtResolved.offset}. Refusing to store possibly ` +
+            `misaligned chapter text.`
+        );
+      }
+      rawSections = txtResolved.chapters.map((c) => ({
+        title: c.rawTitle,
+        startPage: c.pdfPage,
+        povCharacter: c.povCharacter,
+      }));
+      txtPovRoster = Array.from(new Set(txtResolved.chapters.flatMap((c) => c.povNames)));
+    } else {
+      rawSections = await askClaude(buildPageMap(pages));
+    }
+
+    return {
+      format: "txt",
+      chapters: assignChaptersFromPages(rawSections, pages),
+      quality,
+      povRoster: txtPovRoster,
+    };
   }
 
   // ── DOCX path ──────────────────────────────────────────────────────────────
@@ -1467,8 +1507,33 @@ export async function parseManuscript(
   let povRoster: string[] = [];
 
   // ── Primary: the book's own table of contents ────────────────────────────
+  //
+  // Two extraction shapes, one resolution path. Some TOCs come out as separate
+  // title and page-number blocks (true two-column reading order); others come
+  // out with the number, title and page fused onto one line, which the flat
+  // space-joined text reads cleanly and the line-grouped text does not. Which
+  // shape a given PDF produces is not predictable from the layout, so both are
+  // attempted and whichever yields entries is fed through the same POV
+  // parsing, offset derivation and validation.
   const columnToc = parseTocByColumns(linePages);
-  const resolved = columnToc ? resolveToc(columnToc.entries, flatPages, columnToc.lastTocPage) : null;
+  const flatToc = columnToc ? null : parseTocFromPages(flatPages);
+  const tocSource =
+    columnToc ??
+    (flatToc
+      ? {
+          entries: flatToc.entries.map((e) => ({ rawTitle: e.title, printedPage: e.startPage })),
+          lastTocPage: flatToc.lastTocPage,
+        }
+      : null);
+
+  if (tocSource) {
+    console.log(
+      `${TAG} TOC source: ${columnToc ? "column-paired" : "flat"}, ` +
+        `${tocSource.entries.length} entries, TOC ends p.${tocSource.lastTocPage + 1}`
+    );
+  }
+
+  const resolved = tocSource ? resolveToc(tocSource.entries, flatPages, tocSource.lastTocPage) : null;
 
   if (resolved) {
     const { chapters: tocChapters, offset, agreement, unconfirmed } = resolved;
@@ -1508,16 +1573,11 @@ export async function parseManuscript(
     }));
     povRoster = Array.from(new Set(tocChapters.flatMap((c) => c.povNames)));
   } else {
-    // ── Secondary: single-column TOC layouts the flat parser already handles ──
-    const flatToc = parseTocFromPages(flatPages);
-    if (flatToc) {
-      rawSections = flatToc.map((e) => ({ ...e, povCharacter: null }));
-    } else {
-      // ── Last resort: no usable TOC, infer boundaries from the body ────────
-      const pageMap = buildPageMap(flatPages);
-      if (!pageMap) throw new Error("Could not extract any text from PDF");
-      rawSections = await askClaude(pageMap);
-    }
+    // ── Last resort: no usable TOC, infer boundaries from the body ──────────
+    console.log(`${TAG} no usable TOC — falling back to body-text detection`);
+    const pageMap = buildPageMap(flatPages);
+    if (!pageMap) throw new Error("Could not extract any text from PDF");
+    rawSections = await askClaude(pageMap);
   }
 
   const chapters = assignChaptersFromLines(rawSections, cleanedLinePages);
