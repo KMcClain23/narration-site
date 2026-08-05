@@ -51,7 +51,7 @@ export default async function ManuscriptReaderPage({ params }: { params: Promise
   const { data: spans } = chapterIds.length
     ? await supabaseAdmin
         .from("dialogue_spans")
-        .select("chapter_id, character_id, start_offset, end_offset, matched")
+        .select("id, chapter_id, character_id, start_offset, end_offset, matched")
         .in("chapter_id", chapterIds)
     : { data: [] };
 
@@ -59,6 +59,7 @@ export default async function ManuscriptReaderPage({ params }: { params: Promise
   (spans ?? []).forEach((s) => {
     const list = spansByChapter.get(s.chapter_id) ?? [];
     list.push({
+      id: s.id,
       character_id: s.character_id,
       start_offset: s.start_offset,
       end_offset: s.end_offset,

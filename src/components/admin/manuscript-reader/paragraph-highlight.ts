@@ -1,4 +1,5 @@
 export interface SpanLite {
+  id: string;
   character_id: string | null;
   start_offset: number;
   end_offset: number;

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, Highlighter, X } from "lucide-react";
+import { Download, Highlighter, ListTree, X } from "lucide-react";
 import { splitParagraphs, type SpanLite } from "./paragraph-highlight";
 import { ParagraphText, type CharacterLite } from "./ParagraphText";
+import { isUnnumberedSection } from "@/lib/unnumbered-sections";
 
 /** Reconstructs a plain-text character offset within `root` for a DOM
  *  (node, offset) pair from a Selection Range — walks root's text nodes in
@@ -82,6 +83,25 @@ export function ManuscriptReader({
   // Local, mutable copy — manual span assignment below needs to update this
   // and see the new highlight render immediately, without a full page reload.
   const [chapters, setChapters] = useState<ChapterWithSpans[]>(initialChapters);
+
+  // Display numbering skips front/back matter (Dedication, Author's Note,
+  // Prologue, Epilogue, etc.) — "Chapter N of M" only counts real chapters,
+  // matching how the book itself is numbered, not the section's position in
+  // the array.
+  const chapterMeta = useMemo(() => {
+    const numberedTotal = chapters.filter((ch) => !isUnnumberedSection(ch.title)).length;
+    let n = 0;
+    return chapters.map((ch) => {
+      const unnumbered = isUnnumberedSection(ch.title);
+      if (!unnumbered) n++;
+      return { number: unnumbered ? null : n, total: numberedTotal };
+    });
+  }, [chapters]);
+
+  const jumpToChapter = (chapterId: string) => {
+    document.getElementById(`chapter-${chapterId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const [activeCharacterId, setActiveCharacterId] = useState<string | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
   const handleAssignSelection = async () => {
@@ -136,7 +156,13 @@ export function ManuscriptReader({
                 ...ch,
                 spans: [
                   ...ch.spans,
-                  { character_id: activeCharacterId, start_offset: startOffset, end_offset: endOffset, matched: true },
+                  {
+                    id: json.id,
+                    character_id: activeCharacterId,
+                    start_offset: startOffset,
+                    end_offset: endOffset,
+                    matched: true,
+                  },
                 ],
               }
             : ch
@@ -144,6 +170,69 @@ export function ManuscriptReader({
       );
     } catch (e) {
       setAssignError(e instanceof Error ? e.message : "Failed to assign dialogue.");
+    }
+  };
+
+  // Click-to-edit an already-highlighted span — reassign to a different
+  // character, or delete it entirely. Independent of the create-new flow
+  // above: a plain click produces a collapsed selection, so handleAssignSelection's
+  // onMouseUp handler never fires for it.
+  const [selectedSpan, setSelectedSpan] = useState<{ id: string; chapterId: string; text: string } | null>(null);
+  const [spanActionError, setSpanActionError] = useState<string | null>(null);
+
+  const handleMarkClick = (span: SpanLite, chapterId: string, text: string) => {
+    setSelectedSpan({ id: span.id, chapterId, text });
+    setSpanActionError(null);
+  };
+
+  const handleReassignSpan = async (newCharacterId: string) => {
+    if (!selectedSpan) return;
+    try {
+      const res = await fetch(`/api/admin/manuscripts/${manuscriptId}/spans/${selectedSpan.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ character_id: newCharacterId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Failed to reassign");
+
+      setChapters((prev) =>
+        prev.map((ch) =>
+          ch.id === selectedSpan.chapterId
+            ? {
+                ...ch,
+                spans: ch.spans.map((s) =>
+                  s.id === selectedSpan.id ? { ...s, character_id: newCharacterId, matched: true } : s
+                ),
+              }
+            : ch
+        )
+      );
+      setSelectedSpan(null);
+    } catch (e) {
+      setSpanActionError(e instanceof Error ? e.message : "Failed to reassign.");
+    }
+  };
+
+  const handleDeleteSpan = async () => {
+    if (!selectedSpan) return;
+    try {
+      const res = await fetch(`/api/admin/manuscripts/${manuscriptId}/spans/${selectedSpan.id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Failed to delete");
+
+      setChapters((prev) =>
+        prev.map((ch) =>
+          ch.id === selectedSpan.chapterId
+            ? { ...ch, spans: ch.spans.filter((s) => s.id !== selectedSpan.id) }
+            : ch
+        )
+      );
+      setSelectedSpan(null);
+    } catch (e) {
+      setSpanActionError(e instanceof Error ? e.message : "Failed to delete.");
     }
   };
 
@@ -208,6 +297,15 @@ export function ManuscriptReader({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeCharacterId]);
 
+  useEffect(() => {
+    if (!selectedSpan) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedSpan(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedSpan]);
+
   // Preserve first-appearance order (matches characters' created_at order
   // from the extraction pass) rather than Set iteration order.
   const visibleChars = characters.filter((c) => visibleIds.has(c.id));
@@ -220,15 +318,39 @@ export function ManuscriptReader({
             {title}
             {author ? ` — ${author}` : ""}
           </p>
-          <button
-            type="button"
-            onClick={handleDownloadPdf}
-            disabled={generatingPdf}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full ${border} border bg-[#e7e2d2] px-3 py-1.5 text-xs font-medium ${ink} transition-colors hover:bg-[#ddd8c9] disabled:opacity-50`}
-          >
-            <Download size={13} />
-            {generatingPdf ? "Generating…" : "Download PDF"}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <div className={`relative inline-flex items-center gap-1.5 rounded-full ${border} border bg-[#e7e2d2] px-3 py-1.5 text-xs font-medium ${ink}`}>
+              <ListTree size={13} className="shrink-0" />
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) jumpToChapter(e.target.value);
+                  e.target.value = "";
+                }}
+                className="max-w-[140px] cursor-pointer appearance-none bg-transparent pr-1 outline-none sm:max-w-[200px]"
+                aria-label="Jump to chapter"
+              >
+                <option value="" disabled>
+                  Jump to…
+                </option>
+                {chapters.map((ch, i) => (
+                  <option key={ch.id} value={ch.id}>
+                    {chapterMeta[i].number ? `Ch. ${chapterMeta[i].number}: ` : ""}
+                    {ch.title || "Untitled"}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={generatingPdf}
+              className={`inline-flex items-center gap-1.5 rounded-full ${border} border bg-[#e7e2d2] px-3 py-1.5 text-xs font-medium ${ink} transition-colors hover:bg-[#ddd8c9] disabled:opacity-50`}
+            >
+              <Download size={13} />
+              {generatingPdf ? "Generating…" : "Download PDF"}
+            </button>
+          </div>
         </div>
         <div className="mt-2 flex min-h-[26px] flex-wrap gap-2">
           {visibleChars.length === 0 ? (
@@ -255,14 +377,29 @@ export function ManuscriptReader({
         setAssignError={setAssignError}
       />
 
+      {selectedSpan && (
+        <EditSpanPopover
+          characters={characters}
+          currentCharacterId={chapters
+            .find((ch) => ch.id === selectedSpan.chapterId)
+            ?.spans.find((s) => s.id === selectedSpan.id)?.character_id ?? null}
+          text={selectedSpan.text}
+          error={spanActionError}
+          onReassign={handleReassignSpan}
+          onDelete={handleDeleteSpan}
+          onClose={() => setSelectedSpan(null)}
+        />
+      )}
+
       <div className="mt-8">
         {chapters.map((ch, i) => (
           <ChapterSection
             key={ch.id}
             chapter={ch}
-            index={i}
-            total={chapters.length}
+            displayNumber={chapterMeta[i].number}
+            displayTotal={chapterMeta[i].total}
             charById={charById}
+            onMarkClick={handleMarkClick}
           />
         ))}
       </div>
@@ -365,16 +502,90 @@ function AssignDialogueFab({
   );
 }
 
+function EditSpanPopover({
+  characters,
+  currentCharacterId,
+  text,
+  error,
+  onReassign,
+  onDelete,
+  onClose,
+}: {
+  characters: CharacterLite[];
+  currentCharacterId: string | null;
+  text: string;
+  error: string | null;
+  onReassign: (characterId: string) => void;
+  onDelete: () => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [onClose]);
+
+  return (
+    <div ref={ref} className="fixed bottom-6 left-6 z-20 w-72 rounded-2xl border border-[#ddd8c9] bg-[#f1eee3] p-4 shadow-2xl">
+      <div className="flex items-start justify-between gap-2">
+        <p className={`${label} ${inkFaint}`}>Editing highlight</p>
+        <button type="button" onClick={onClose} className={`shrink-0 ${inkMuted} transition-opacity hover:opacity-70`}>
+          <X size={14} />
+        </button>
+      </div>
+      <p className={`mt-1.5 line-clamp-2 text-[13px] italic ${inkMuted}`}>&ldquo;{text}&rdquo;</p>
+
+      <p className={`mt-3 text-[11px] ${inkFaint}`}>Reassign to:</p>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {characters.map((c) => {
+          const isCurrent = c.id === currentCharacterId;
+          return (
+            <button
+              key={c.id}
+              type="button"
+              disabled={isCurrent}
+              onClick={() => onReassign(c.id)}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                isCurrent ? "cursor-default opacity-50" : `${border} ${ink} hover:bg-[#e7e2d2]`
+              }`}
+              style={isCurrent ? { borderColor: c.color_hex } : undefined}
+            >
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: c.color_hex }} />
+              {c.name}
+            </button>
+          );
+        })}
+      </div>
+
+      {error && <p className="mt-2 text-[11px] text-alert-red">{error}</p>}
+
+      <button
+        type="button"
+        onClick={onDelete}
+        className="mt-3 w-full rounded-lg border border-alert-red/30 py-1.5 text-xs font-medium text-alert-red/80 transition-colors hover:bg-alert-red/10 hover:text-alert-red"
+      >
+        Remove highlight
+      </button>
+    </div>
+  );
+}
+
 function ChapterSection({
   chapter,
-  index,
-  total,
+  displayNumber,
+  displayTotal,
   charById,
+  onMarkClick,
 }: {
   chapter: ChapterWithSpans;
-  index: number;
-  total: number;
+  displayNumber: number | null;
+  displayTotal: number;
   charById: Map<string, CharacterLite>;
+  onMarkClick: (span: SpanLite, chapterId: string, text: string) => void;
 }) {
   const blocks = useMemo(
     () => splitParagraphs(chapter.raw_text, chapter.spans),
@@ -385,9 +596,9 @@ function ChapterSection({
     : undefined;
 
   return (
-    <section className={`mb-16 border-t ${border} pt-10 first:mt-0 first:border-t-0 first:pt-0`}>
+    <section id={`chapter-${chapter.id}`} className={`mb-16 scroll-mt-24 border-t ${border} pt-10 first:mt-0 first:border-t-0 first:pt-0`}>
       <p className={`${label} ${inkFaint}`}>
-        Chapter {index + 1} of {total}
+        {displayNumber ? `Chapter ${displayNumber} of ${displayTotal}` : "Front / back matter"}
       </p>
       <h2 className={`mt-1 text-2xl font-bold leading-tight ${ink}`}>{chapter.title || "Untitled"}</h2>
 
@@ -444,7 +655,11 @@ function ChapterSection({
                 className={`text-[17px] leading-[1.75] ${ink}`}
                 style={{ fontFamily: "Charter, Iowan Old Style, Georgia, ui-serif, serif" }}
               >
-                <ParagraphText block={block} charById={charById} />
+                <ParagraphText
+                  block={block}
+                  charById={charById}
+                  onMarkClick={(span, text) => onMarkClick(span, chapter.id, text)}
+                />
               </p>
             </div>
           );

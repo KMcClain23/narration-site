@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { sanitiseClaudeJson } from "@/lib/sanitize-claude-json";
+import { UNNUMBERED_SECTION_TITLE } from "@/lib/unnumbered-sections";
 
 // SDK retries 429s automatically with exponential backoff
 const anthropic = new Anthropic({ maxRetries: 4 });
@@ -545,8 +546,7 @@ function parseTocFromPages(pageTexts: string[]): TocEntry[] | null {
 
 // ─── Chapter numbering + text assembly ─────────────────────────────────────────
 
-const UNNUMBERED =
-  /^(prologue|epilogue|dedication|preface|afterword|acknowledgements?|acknowledgments?|author'?s?\s+note|content\s*(?:&|and)\s*trigger\s*warnings?|trigger\s*warnings?|content\s*warnings?)$/i;
+const UNNUMBERED = UNNUMBERED_SECTION_TITLE;
 
 export interface ParsedChapter {
   number: number | null;
@@ -616,6 +616,37 @@ function assembleParagraphs(lines: PdfLine[]): string {
 }
 
 /**
+ * PDFs of this genre commonly print the POV character's name as a standalone
+ * heading directly under the chapter number, with no reliable typographic
+ * distinction (font size/weight) from body text to detect it by — but since
+ * povCharacter is already known (from Claude, on the fallback path), any
+ * paragraph consisting of exactly that name, or starting with "{name} ", is
+ * unambiguously the heading bleeding into raw_text rather than real prose
+ * (no line of actual narration starts with a bare name followed by a space
+ * before continuing about someone else). A single leading numeric paragraph
+ * (the printed chapter number) is skipped over, not removed — only the POV
+ * heading is being stripped here.
+ */
+function stripLeadingPovHeading(rawText: string, povCharacter: string | null): string {
+  const name = povCharacter?.trim();
+  if (!name) return rawText;
+
+  const paragraphs = rawText.split("\n\n");
+  let idx = 0;
+  if (paragraphs[idx] && /^\d{1,4}$/.test(paragraphs[idx].trim())) idx++;
+
+  if (paragraphs[idx] === name) {
+    paragraphs.splice(idx, 1);
+    return paragraphs.join("\n\n");
+  }
+  if (paragraphs[idx]?.startsWith(`${name} `)) {
+    paragraphs[idx] = paragraphs[idx].slice(name.length + 1);
+    return paragraphs.join("\n\n");
+  }
+  return rawText;
+}
+
+/**
  * Turns raw {title, startPage} boundaries (from the TOC parser or Claude) into
  * final chapters — assigns sequential numbers (front/back matter stays
  * unnumbered) and reconstructs each chapter's raw_text, paragraphs included,
@@ -633,10 +664,11 @@ function assignChaptersFromLines(
       i + 1 < raw.length
         ? Math.max(start + 1, raw[i + 1].startPage - 1)
         : totalPages;
-    const rawText = assembleParagraphs(linePages.slice(start, end).flat());
+    const povCharacter = ch.povCharacter ?? null;
+    const rawText = stripLeadingPovHeading(assembleParagraphs(linePages.slice(start, end).flat()), povCharacter);
     const wordCount = rawText ? rawText.split(/\s+/).filter(Boolean).length : 0;
     const number = UNNUMBERED.test(ch.title.trim()) ? null : ++chapNum;
-    return { number, title: ch.title, povCharacter: ch.povCharacter ?? null, wordCount, rawText };
+    return { number, title: ch.title, povCharacter, wordCount, rawText };
   });
 }
 
@@ -659,10 +691,11 @@ function assignChaptersFromPages(
       i + 1 < raw.length
         ? Math.max(start + 1, raw[i + 1].startPage - 1)
         : totalPages;
-    const rawText = pageTexts.slice(start, end).join("\n\n").trim();
+    const povCharacter = ch.povCharacter ?? null;
+    const rawText = stripLeadingPovHeading(pageTexts.slice(start, end).join("\n\n").trim(), povCharacter);
     const wordCount = rawText ? rawText.split(/\s+/).filter(Boolean).length : 0;
     const number = UNNUMBERED.test(ch.title.trim()) ? null : ++chapNum;
-    return { number, title: ch.title, povCharacter: ch.povCharacter ?? null, wordCount, rawText };
+    return { number, title: ch.title, povCharacter, wordCount, rawText };
   });
 }
 
