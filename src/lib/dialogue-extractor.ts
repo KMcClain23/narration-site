@@ -86,7 +86,12 @@ export async function extractChapter(rawText: string, knownCharacters: string[])
 
   const msg = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 4000,
+    // 4000 (the original spec value) was silently truncating mid-JSON on a
+    // dialogue-dense chapter of "A Cowboys Runaway" — confirmed via the
+    // stop_reason log below (max_tokens twice in a row, two different
+    // "unterminated JSON" parse errors that were really the same truncation).
+    // Raised with real headroom rather than nudging it up again next time.
+    max_tokens: 8192,
     system,
     messages: [{ role: "user", content: rawText }],
   });

@@ -97,7 +97,15 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("[manuscripts/extract]", msg);
-    await supabaseAdmin.from("manuscripts").update({ status: "failed" }).eq("id", id);
+    // Deliberately does NOT flip manuscripts.status to "failed" — unlike
+    // Phase 2's parse (where a failure means zero chapters exist and the
+    // reader has nothing to show), an extraction failure here is scoped to
+    // one chapter and the design is already resumable (this chapter's
+    // summary just stays null, picked up again on the next /extract call).
+    // Phase 4 gates the whole reader on manuscripts.status !== "ready", so
+    // setting "failed" here would hide every already-extracted chapter over
+    // one transient error (e.g. a truncated Claude response) — worse than
+    // just leaving this one chapter unextracted.
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -14,12 +14,16 @@ export default async function PrepperPage() {
 
   const manuscriptIds = (manuscripts ?? []).map((m) => m.id);
   const { data: chapterRows } = manuscriptIds.length
-    ? await supabaseAdmin.from("chapters").select("manuscript_id").in("manuscript_id", manuscriptIds)
+    ? await supabaseAdmin.from("chapters").select("manuscript_id, summary").in("manuscript_id", manuscriptIds)
     : { data: [] };
 
   const chapterCountByManuscript = new Map<string, number>();
+  const extractedCountByManuscript = new Map<string, number>();
   (chapterRows ?? []).forEach((c) => {
     chapterCountByManuscript.set(c.manuscript_id, (chapterCountByManuscript.get(c.manuscript_id) ?? 0) + 1);
+    if (c.summary !== null) {
+      extractedCountByManuscript.set(c.manuscript_id, (extractedCountByManuscript.get(c.manuscript_id) ?? 0) + 1);
+    }
   });
 
   const rows: ManuscriptRow[] = (manuscripts ?? []).map((m) => ({
@@ -30,6 +34,7 @@ export default async function PrepperPage() {
     source_format: m.source_format as ManuscriptRow["source_format"],
     created_at: m.created_at,
     chapterCount: chapterCountByManuscript.get(m.id) ?? 0,
+    chaptersExtracted: extractedCountByManuscript.get(m.id) ?? 0,
   }));
 
   return (

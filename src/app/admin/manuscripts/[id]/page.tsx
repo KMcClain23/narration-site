@@ -85,6 +85,7 @@ export default async function ManuscriptReaderPage({ params }: { params: Promise
           dark chrome rather than reusing the dark admin tokens. */}
       <div className="mx-auto max-w-[820px] rounded-2xl bg-[#f1eee3] p-8 shadow-2xl sm:p-12">
         <ManuscriptReader
+          manuscriptId={manuscript.id}
           title={manuscript.title}
           author={manuscript.author}
           characters={characters ?? []}

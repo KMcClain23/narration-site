@@ -19,5 +19,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .select("id", { count: "exact", head: true })
     .eq("manuscript_id", id);
 
-  return NextResponse.json({ ...data, chapterCount: count ?? 0 });
+  // summary IS NOT NULL is Phase 3's own resumability signal (see
+  // extract/route.ts) — reused here so callers can tell "chapters parsed"
+  // apart from "dialogue extraction finished too" instead of both reading
+  // as one flat "ready".
+  const { count: extractedCount } = await supabaseAdmin
+    .from("chapters")
+    .select("id", { count: "exact", head: true })
+    .eq("manuscript_id", id)
+    .not("summary", "is", null);
+
+  return NextResponse.json({ ...data, chapterCount: count ?? 0, chaptersExtracted: extractedCount ?? 0 });
 }

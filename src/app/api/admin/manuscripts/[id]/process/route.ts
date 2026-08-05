@@ -44,6 +44,15 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     if (insertError) throw new Error(insertError.message);
 
     await supabaseAdmin.from("manuscripts").update({ status: "ready" }).eq("id", id);
+
+    // Chain straight into Phase 3 — a manuscript with chapters but no
+    // dialogue extraction is a confusing dead end for anyone using Prepper
+    // normally (no highlighting, no reason visible why). Extraction is its
+    // own resumable per-chapter chain (see extract/route.ts), so this just
+    // fires the first hop; nothing here waits on it.
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.dmnarration.com";
+    fetch(`${baseUrl}/api/admin/manuscripts/${id}/extract`, { method: "POST" }).catch(() => {});
+
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";

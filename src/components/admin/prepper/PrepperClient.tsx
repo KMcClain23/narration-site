@@ -13,6 +13,18 @@ export interface ManuscriptRow {
   source_format: "pdf" | "docx";
   created_at: string;
   chapterCount: number;
+  /** Chapters with a non-null summary — Phase 3's own resumability signal,
+   *  reused here to tell "chapters parsed" apart from "dialogue extraction
+   *  finished too" instead of both flattening into one "Ready" badge. */
+  chaptersExtracted: number;
+}
+
+type DisplayStatus = "processing" | "extracting" | "ready" | "failed";
+
+function displayStatus(m: ManuscriptRow): DisplayStatus {
+  if (m.status !== "ready") return m.status;
+  if (m.chapterCount > 0 && m.chaptersExtracted < m.chapterCount) return "extracting";
+  return "ready";
 }
 
 const ALLOWED_EXTENSIONS = [".pdf", ".docx"];
@@ -46,14 +58,17 @@ async function uploadManuscript(file: File, onProgress: (pct: number) => void): 
   return { key, format };
 }
 
-function StatusBadge({ status }: { status: ManuscriptRow["status"] }) {
-  const styles: Record<ManuscriptRow["status"], string> = {
+function StatusBadge({ manuscript }: { manuscript: ManuscriptRow }) {
+  const status = displayStatus(manuscript);
+  const styles: Record<DisplayStatus, string> = {
     processing: "bg-pill-neutral-bg text-pill-neutral-text",
+    extracting: "bg-pill-neutral-bg text-pill-neutral-text",
     ready: "bg-capacity-light/15 text-capacity-light",
     failed: "bg-alert-red/15 text-alert-red",
   };
-  const labels: Record<ManuscriptRow["status"], string> = {
-    processing: "Processing…",
+  const labels: Record<DisplayStatus, string> = {
+    processing: "Parsing chapters…",
+    extracting: `Extracting dialogue… (${manuscript.chaptersExtracted}/${manuscript.chapterCount})`,
     ready: "Ready",
     failed: "Failed",
   };
@@ -125,6 +140,7 @@ function UploadModal({
         source_format: format,
         created_at: new Date().toISOString(),
         chapterCount: 0,
+        chaptersExtracted: 0,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed.");
@@ -232,17 +248,20 @@ function ManuscriptCard({ manuscript }: { manuscript: ManuscriptRow }) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className={`${adminType.title} truncate`}>{manuscript.title}</span>
-          <StatusBadge status={manuscript.status} />
+          <StatusBadge manuscript={manuscript} />
         </div>
         <p className={`${adminType.small} mt-0.5`}>
           {manuscript.author || "Unknown author"}
-          {manuscript.status === "ready" && ` · ${manuscript.chapterCount} chapter${manuscript.chapterCount === 1 ? "" : "s"}`}
+          {manuscript.chapterCount > 0 && ` · ${manuscript.chapterCount} chapter${manuscript.chapterCount === 1 ? "" : "s"}`}
           {` · ${manuscript.source_format.toUpperCase()}`}
         </p>
       </div>
     </div>
   );
 
+  // Clickable as soon as chapters exist — extraction filling in gradually
+  // is a fine degrading experience (plain text where highlighting hasn't
+  // landed yet), not a reason to block the reader entirely.
   if (manuscript.status !== "ready") return inner;
 
   return (
@@ -256,11 +275,12 @@ export function PrepperClient({ initialManuscripts }: { initialManuscripts: Manu
   const [manuscripts, setManuscripts] = useState<ManuscriptRow[]>(initialManuscripts);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Poll any manuscript still in "processing" until it flips to ready/failed
-  // — Phase 2's parse is a single, short-lived job (no per-chapter progress
-  // to show yet), so a plain interval is enough here.
+  // Poll anything still mid-pipeline — parsing (status: "processing") or
+  // extracting (status: "ready" but chaptersExtracted hasn't caught up to
+  // chapterCount yet, now that process/route.ts auto-chains into extraction)
+  // — until both phases finish.
   useEffect(() => {
-    const pending = manuscripts.filter((m) => m.status === "processing");
+    const pending = manuscripts.filter((m) => displayStatus(m) === "processing" || displayStatus(m) === "extracting");
     if (!pending.length) return;
 
     const interval = setInterval(async () => {
@@ -270,13 +290,18 @@ export function PrepperClient({ initialManuscripts }: { initialManuscripts: Manu
             const res = await fetch(`/api/admin/manuscripts/${m.id}`);
             if (!res.ok) return;
             const json = await res.json();
-            if (json.status && json.status !== "processing") {
-              setManuscripts((prev) =>
-                prev.map((row) =>
-                  row.id === m.id ? { ...row, status: json.status, chapterCount: json.chapterCount ?? row.chapterCount } : row
-                )
-              );
-            }
+            setManuscripts((prev) =>
+              prev.map((row) =>
+                row.id === m.id
+                  ? {
+                      ...row,
+                      status: json.status ?? row.status,
+                      chapterCount: json.chapterCount ?? row.chapterCount,
+                      chaptersExtracted: json.chaptersExtracted ?? row.chaptersExtracted,
+                    }
+                  : row
+              )
+            );
           } catch {
             // transient — next tick retries
           }
