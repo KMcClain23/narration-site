@@ -1222,20 +1222,69 @@ function stripLeadingPovHeading(rawText: string, povCharacter: string | null): s
  * unnumbered) and reconstructs each chapter's raw_text, paragraphs included,
  * from linePages[start, end). linePages must already be header/footer-stripped.
  */
+/**
+ * Where a chapter actually begins within its opening page.
+ *
+ * A chapter starts partway down a page: the page carrying its heading also
+ * carries the closing paragraphs of the chapter before it. Taking the whole
+ * page files that trailing prose under the wrong chapter, which splits a
+ * sentence across the boundary and hands a narrator the previous chapter's
+ * ending as this chapter's opening.
+ *
+ * Returns the index of the heading line, backed up over any printed chapter
+ * number sitting above it, or 0 if the heading can't be located.
+ */
+function findChapterStartLine(lines: PdfLine[], title: string): number {
+  const needle = normalizeForMatch(title);
+  if (!needle || !lines.length) return 0;
+
+  let hit = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const t = normalizeForMatch(lines[i].text);
+    if (!t) continue;
+    // Either direction: the heading may carry more than the TOC title (a POV
+    // suffix) or less (the title broken across two lines).
+    if (t.includes(needle) || (t.length >= 6 && needle.includes(t))) {
+      hit = i;
+      break;
+    }
+  }
+  if (hit === -1) return 0;
+
+  let start = hit;
+  while (start > 0 && isChapterHeadingLine(lines[start - 1].text)) start--;
+  return start;
+}
+
 function assignChaptersFromLines(
   raw: Array<{ title: string; startPage: number; povCharacter?: string | null }>,
   linePages: PdfLine[][]
 ): ParsedChapter[] {
   const totalPages = linePages.length;
+
+  // Resolve every chapter to a precise (page, line) start first, so each
+  // chapter can end exactly where the next one begins rather than at the last
+  // page boundary before it.
+  const starts = raw.map((ch) => {
+    const page = Math.max(0, Math.min(totalPages - 1, ch.startPage - 1));
+    return { page, line: findChapterStartLine(linePages[page] ?? [], ch.title) };
+  });
+
   let chapNum = 0;
   return raw.map((ch, i) => {
-    const start = Math.max(0, ch.startPage - 1);
-    const end =
-      i + 1 < raw.length
-        ? Math.max(start + 1, raw[i + 1].startPage - 1)
-        : totalPages;
+    const start = starts[i];
+    const end = i + 1 < raw.length ? starts[i + 1] : { page: totalPages, line: 0 };
+
+    const lines: PdfLine[] = [];
+    for (let p = start.page; p <= Math.min(end.page, totalPages - 1); p++) {
+      const pageLines = linePages[p] ?? [];
+      const from = p === start.page ? start.line : 0;
+      const to = p === end.page ? end.line : pageLines.length;
+      if (to > from) lines.push(...pageLines.slice(from, to));
+    }
+
     const povCharacter = ch.povCharacter ?? null;
-    const rawText = stripLeadingPovHeading(assembleParagraphs(linePages.slice(start, end).flat()), povCharacter);
+    const rawText = stripLeadingPovHeading(assembleParagraphs(lines), povCharacter);
     const wordCount = rawText ? rawText.split(/\s+/).filter(Boolean).length : 0;
     const number = UNNUMBERED.test(ch.title.trim()) ? null : ++chapNum;
     return { number, title: ch.title, povCharacter, wordCount, rawText };
