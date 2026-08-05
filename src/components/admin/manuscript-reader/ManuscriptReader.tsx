@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, Highlighter, ListTree, X } from "lucide-react";
+import { Download, Highlighter, ListTree, Mic, Upload, Volume2, X } from "lucide-react";
 import { splitParagraphs, type SpanLite } from "./paragraph-highlight";
 import { ParagraphText, type CharacterLite } from "./ParagraphText";
 import { isUnnumberedSection } from "@/lib/unnumbered-sections";
@@ -65,7 +65,7 @@ export function ManuscriptReader({
   manuscriptId,
   title,
   author,
-  characters,
+  characters: initialCharacters,
   chapters: initialChapters,
 }: {
   manuscriptId: string;
@@ -74,15 +74,30 @@ export function ManuscriptReader({
   characters: CharacterLite[];
   chapters: ChapterWithSpans[];
 }) {
-  const charById = useMemo(() => new Map(characters.map((c) => [c.id, c])), [characters]);
   const containerRef = useRef<HTMLDivElement>(null);
   const visibilityRef = useRef(new Map<Element, string[]>());
   const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
-  // Local, mutable copy — manual span assignment below needs to update this
-  // and see the new highlight render immediately, without a full page reload.
+  // Local, mutable copies — manual span assignment and voice-sample uploads
+  // below both need to update these and see the change render immediately,
+  // without a full page reload.
   const [chapters, setChapters] = useState<ChapterWithSpans[]>(initialChapters);
+  const [characters, setCharacters] = useState<CharacterLite[]>(initialCharacters);
+  const charById = useMemo(() => new Map(characters.map((c) => [c.id, c])), [characters]);
+
+  // Single shared <audio> instance — clicking a new character's sample stops
+  // whatever's already playing, same single-active-playback convention as
+  // the demos admin's WaveformStrip.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playVoiceSample = (url: string) => {
+    if (!audioRef.current) audioRef.current = new Audio();
+    const audio = audioRef.current;
+    audio.pause();
+    audio.src = url;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  };
 
   // Display numbering skips front/back matter (Dedication, Author's Note,
   // Prologue, Epilogue, etc.) — "Chapter N of M" only counts real chapters,
@@ -348,6 +363,12 @@ export function ManuscriptReader({
           <Download size={16} />
           {generatingPdf ? "Generating…" : "Download PDF"}
         </button>
+        <VoicesControl
+          manuscriptId={manuscriptId}
+          characters={characters}
+          setCharacters={setCharacters}
+          onPlaySample={playVoiceSample}
+        />
         <TagDialogueControl
           characters={characters}
           activeCharacterId={activeCharacterId}
@@ -380,6 +401,7 @@ export function ManuscriptReader({
             displayTotal={chapterMeta[i].total}
             charById={charById}
             onMarkClick={handleMarkClick}
+            onPlaySample={playVoiceSample}
           />
         ))}
       </div>
@@ -481,6 +503,178 @@ function TagDialogueControl({
           Tag Dialogue
         </button>
       )}
+    </div>
+  );
+}
+
+/** Uploads a clip via the same presigned-URL + XHR-progress pattern used
+ *  throughout the app (uploadToR2 in demos-shared.ts, uploadManuscript in
+ *  PrepperClient.tsx), pointed at the per-character voice-sample route, then
+ *  attaches it via PATCH once the PUT to R2 actually finishes. */
+async function uploadVoiceSample(
+  manuscriptId: string,
+  characterId: string,
+  file: File,
+  onProgress: (pct: number) => void
+): Promise<string> {
+  const urlRes = await fetch(`/api/admin/manuscripts/${manuscriptId}/characters/${characterId}/voice-sample`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: file.name, contentType: file.type || "audio/mpeg" }),
+  });
+  const urlJson = await urlRes.json();
+  if (!urlRes.ok) throw new Error(urlJson.error || "Failed to get upload URL");
+  const { uploadUrl, key, publicUrl } = urlJson;
+
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUrl);
+    xhr.setRequestHeader("Content-Type", file.type || "audio/mpeg");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => (xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (HTTP ${xhr.status})`)));
+    xhr.onerror = () => reject(new Error("Upload failed — network error."));
+    xhr.send(file);
+  });
+
+  const attachRes = await fetch(`/api/admin/manuscripts/${manuscriptId}/characters/${characterId}/voice-sample`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key, publicUrl }),
+  });
+  const attachJson = await attachRes.json();
+  if (!attachRes.ok) throw new Error(attachJson.error || "Failed to save voice sample");
+  return attachJson.voice_sample_url as string;
+}
+
+function VoicesControl({
+  manuscriptId,
+  characters,
+  setCharacters,
+  onPlaySample,
+}: {
+  manuscriptId: string;
+  characters: CharacterLite[];
+  setCharacters: (updater: (prev: CharacterLite[]) => CharacterLite[]) => void;
+  onPlaySample: (url: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const handleFile = async (characterId: string, file: File) => {
+    if (!file.name.toLowerCase().endsWith(".mp3") && file.type !== "audio/mpeg") {
+      setError("MP3 files only.");
+      return;
+    }
+    setError(null);
+    setBusyId(characterId);
+    setProgress(0);
+    try {
+      const url = await uploadVoiceSample(manuscriptId, characterId, file, setProgress);
+      setCharacters((prev) => prev.map((c) => (c.id === characterId ? { ...c, voice_sample_url: url } : c)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleRemove = async (characterId: string) => {
+    setError(null);
+    setBusyId(characterId);
+    try {
+      const res = await fetch(`/api/admin/manuscripts/${manuscriptId}/characters/${characterId}/voice-sample`, {
+        method: "DELETE",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Failed to remove");
+      setCharacters((prev) => prev.map((c) => (c.id === characterId ? { ...c, voice_sample_url: null } : c)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to remove.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      {open && (
+        <div className={`absolute bottom-full right-0 mb-2 max-h-80 w-72 overflow-y-auto rounded-2xl border ${border} bg-[#f1eee3] p-3 shadow-2xl`}>
+          <p className={`mb-2 text-[11px] ${inkFaint}`}>Voice samples (10&ndash;30s MP3)</p>
+          <div className="flex flex-col gap-1.5">
+            {characters.map((c) => {
+              const isBusy = busyId === c.id;
+              return (
+                <div key={c.id} className="flex items-center gap-2">
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: c.color_hex }} />
+                  <span className={`flex-1 truncate text-xs ${ink}`}>{c.name}</span>
+
+                  {isBusy ? (
+                    <span className={`text-[11px] ${inkFaint}`}>{progress}%</span>
+                  ) : c.voice_sample_url ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onPlaySample(c.voice_sample_url as string)}
+                        title="Play sample"
+                        className="rounded-full p-1 text-text-muted transition-colors hover:bg-[#e7e2d2]"
+                      >
+                        <Volume2 size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemove(c.id)}
+                        title="Remove sample"
+                        className="rounded-full p-1 text-alert-red/70 transition-colors hover:bg-[#e7e2d2] hover:text-alert-red"
+                      >
+                        <X size={14} />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => inputRefs.current[c.id]?.click()}
+                      title="Upload sample"
+                      className="rounded-full p-1 text-text-muted transition-colors hover:bg-[#e7e2d2]"
+                    >
+                      <Upload size={14} />
+                    </button>
+                  )}
+                  <input
+                    ref={(el) => { inputRefs.current[c.id] = el; }}
+                    type="file"
+                    accept=".mp3,audio/mpeg"
+                    className="sr-only"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(c.id, f); e.target.value = ""; }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          {error && <p className="mt-2 text-[11px] text-alert-red">{error}</p>}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center gap-2 rounded-full ${border} border bg-[#e7e2d2] px-4 py-3 text-sm font-medium ${ink} shadow-2xl transition hover:bg-[#ddd8c9]`}
+      >
+        <Mic size={16} />
+        Voices
+      </button>
     </div>
   );
 }
@@ -618,12 +812,14 @@ function ChapterSection({
   displayTotal,
   charById,
   onMarkClick,
+  onPlaySample,
 }: {
   chapter: ChapterWithSpans;
   displayNumber: number | null;
   displayTotal: number;
   charById: Map<string, CharacterLite>;
   onMarkClick: (span: SpanLite, chapterId: string, text: string) => void;
+  onPlaySample: (url: string) => void;
 }) {
   const blocks = useMemo(
     () => splitParagraphs(chapter.raw_text, chapter.spans),
@@ -675,14 +871,22 @@ function ChapterSection({
                 {speakerIds.map((id) => {
                   const c = charById.get(id);
                   if (!c) return null;
+                  const playable = !!c.voice_sample_url;
                   return (
-                    <span
+                    <button
                       key={id}
-                      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
+                      type="button"
+                      disabled={!playable}
+                      onClick={() => c.voice_sample_url && onPlaySample(c.voice_sample_url)}
+                      title={playable ? `Play ${c.name}'s voice sample` : undefined}
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                        playable ? "cursor-pointer transition-transform hover:scale-105" : "cursor-default"
+                      }`}
                       style={{ background: `${c.color_hex}22`, color: c.color_hex }}
                     >
                       {c.name}
-                    </span>
+                      {playable && <Volume2 size={10} className="shrink-0" />}
+                    </button>
                   );
                 })}
               </div>

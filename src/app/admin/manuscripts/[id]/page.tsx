@@ -42,7 +42,7 @@ export default async function ManuscriptReaderPage({ params }: { params: Promise
       .order("order_index", { ascending: true }),
     supabaseAdmin
       .from("characters")
-      .select("id, name, color_hex")
+      .select("id, name, color_hex, voice_sample_url")
       .eq("manuscript_id", id)
       .order("created_at", { ascending: true }),
   ]);

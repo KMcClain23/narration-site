@@ -5,6 +5,7 @@ export interface CharacterLite {
   id: string;
   name: string;
   color_hex: string;
+  voice_sample_url: string | null;
 }
 
 /**
