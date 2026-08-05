@@ -71,6 +71,7 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
           <MoreSheetItem label="Analytics" href="/tools/analytics" />
           <MoreSheetItem label="Contract Builder" href="/tools/contract-builder" />
           <MoreSheetItem label="Testimonials" href="/tools/testimonials" />
+          <MoreSheetItem label="Prepper" href="/tools/prepper" />
 
           <div className="my-2 h-px bg-surface-border" />
           <MoreSheetItem icon={SettingsIcon} label="Settings" href="/settings" />

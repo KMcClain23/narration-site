@@ -313,45 +313,10 @@ export function ManuscriptReader({
   return (
     <div ref={containerRef} onMouseUp={handleAssignSelection}>
       <div className={`sticky top-0 z-10 ${border} border-b bg-[#f1eee3]/95 py-3 backdrop-blur`}>
-        <div className="flex items-center justify-between gap-3">
-          <p className={`${label} ${inkFaint} truncate`}>
-            {title}
-            {author ? ` — ${author}` : ""}
-          </p>
-          <div className="flex shrink-0 items-center gap-2">
-            <div className={`relative inline-flex items-center gap-1.5 rounded-full ${border} border bg-[#e7e2d2] px-3 py-1.5 text-xs font-medium ${ink}`}>
-              <ListTree size={13} className="shrink-0" />
-              <select
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) jumpToChapter(e.target.value);
-                  e.target.value = "";
-                }}
-                className="max-w-[140px] cursor-pointer appearance-none bg-transparent pr-1 outline-none sm:max-w-[200px]"
-                aria-label="Jump to chapter"
-              >
-                <option value="" disabled>
-                  Jump to…
-                </option>
-                {chapters.map((ch, i) => (
-                  <option key={ch.id} value={ch.id}>
-                    {chapterMeta[i].number ? `Ch. ${chapterMeta[i].number}: ` : ""}
-                    {ch.title || "Untitled"}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="button"
-              onClick={handleDownloadPdf}
-              disabled={generatingPdf}
-              className={`inline-flex items-center gap-1.5 rounded-full ${border} border bg-[#e7e2d2] px-3 py-1.5 text-xs font-medium ${ink} transition-colors hover:bg-[#ddd8c9] disabled:opacity-50`}
-            >
-              <Download size={13} />
-              {generatingPdf ? "Generating…" : "Download PDF"}
-            </button>
-          </div>
-        </div>
+        <p className={`${label} ${inkFaint} truncate`}>
+          {title}
+          {author ? ` — ${author}` : ""}
+        </p>
         <div className="mt-2 flex min-h-[26px] flex-wrap gap-2">
           {visibleChars.length === 0 ? (
             <span className={`text-[13px] ${inkMuted}`}>Scroll to see who&rsquo;s on screen</span>
@@ -369,13 +334,28 @@ export function ManuscriptReader({
         </div>
       </div>
 
-      <AssignDialogueFab
-        characters={characters}
-        activeCharacterId={activeCharacterId}
-        setActiveCharacterId={setActiveCharacterId}
-        assignError={assignError}
-        setAssignError={setAssignError}
-      />
+      {/* Below md, AdminShell renders a 64px BottomTabBar (plus safe-area
+          inset) fixed to the viewport bottom — a plain bottom-6 here would
+          sit underneath it. */}
+      <div className="fixed bottom-[calc(88px+env(safe-area-inset-bottom))] right-6 z-20 flex flex-col items-end gap-2 md:bottom-6">
+        <JumpToChapterControl chapters={chapters} chapterMeta={chapterMeta} onJump={jumpToChapter} />
+        <button
+          type="button"
+          onClick={handleDownloadPdf}
+          disabled={generatingPdf}
+          className={`flex items-center gap-2 rounded-full ${border} border bg-[#e7e2d2] px-4 py-3 text-sm font-medium ${ink} shadow-2xl transition hover:bg-[#ddd8c9] disabled:opacity-50`}
+        >
+          <Download size={16} />
+          {generatingPdf ? "Generating…" : "Download PDF"}
+        </button>
+        <TagDialogueControl
+          characters={characters}
+          activeCharacterId={activeCharacterId}
+          setActiveCharacterId={setActiveCharacterId}
+          assignError={assignError}
+          setAssignError={setAssignError}
+        />
+      </div>
 
       {selectedSpan && (
         <EditSpanPopover
@@ -407,7 +387,10 @@ export function ManuscriptReader({
   );
 }
 
-function AssignDialogueFab({
+/** One item in the bottom-right FAB stack — self-contained trigger button
+ *  plus a popover that opens directly above it (not below, since there's
+ *  no room below a bottom-anchored stack), with its own click-outside close. */
+function TagDialogueControl({
   characters,
   activeCharacterId,
   setActiveCharacterId,
@@ -433,9 +416,9 @@ function AssignDialogueFab({
   }, []);
 
   return (
-    <div ref={ref} className="fixed bottom-6 right-6 z-20 flex flex-col items-end gap-2">
+    <div ref={ref} className="relative">
       {open && (
-        <div className={`w-64 rounded-2xl border ${border} bg-[#f1eee3] p-3 shadow-2xl`}>
+        <div className={`absolute bottom-full right-0 mb-2 w-64 rounded-2xl border ${border} bg-[#f1eee3] p-3 shadow-2xl`}>
           <p className={`mb-2 text-[11px] ${inkFaint}`}>Tag missed dialogue as:</p>
           <div className="flex flex-wrap gap-1.5">
             {characters.map((c) => {
@@ -471,7 +454,7 @@ function AssignDialogueFab({
       )}
 
       {assignError && (
-        <div className="max-w-[220px] rounded-lg border border-alert-red/40 bg-[#f3ddd5] px-3 py-2 text-[11px] text-alert-red shadow-lg">
+        <div className="absolute bottom-full right-0 mb-2 max-w-[220px] rounded-lg border border-alert-red/40 bg-[#f3ddd5] px-3 py-2 text-[11px] text-alert-red shadow-lg">
           {assignError}
         </div>
       )}
@@ -498,6 +481,58 @@ function AssignDialogueFab({
           Tag Dialogue
         </button>
       )}
+    </div>
+  );
+}
+
+function JumpToChapterControl({
+  chapters,
+  chapterMeta,
+  onJump,
+}: {
+  chapters: ChapterWithSpans[];
+  chapterMeta: { number: number | null; total: number }[];
+  onJump: (chapterId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      {open && (
+        <div className={`absolute bottom-full right-0 mb-2 max-h-80 w-72 overflow-y-auto rounded-2xl border ${border} bg-[#f1eee3] p-2 shadow-2xl`}>
+          <p className={`mb-1 px-2 pt-1 text-[11px] ${inkFaint}`}>Jump to&hellip;</p>
+          <div className="flex flex-col gap-0.5">
+            {chapters.map((ch, i) => (
+              <button
+                key={ch.id}
+                type="button"
+                onClick={() => { onJump(ch.id); setOpen(false); }}
+                className={`rounded-lg px-2 py-1.5 text-left text-xs ${ink} transition-colors hover:bg-[#e7e2d2]`}
+              >
+                {chapterMeta[i].number ? `Ch. ${chapterMeta[i].number}: ` : ""}
+                {ch.title || "Untitled"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center gap-2 rounded-full ${border} border bg-[#e7e2d2] px-4 py-3 text-sm font-medium ${ink} shadow-2xl transition hover:bg-[#ddd8c9]`}
+      >
+        <ListTree size={16} />
+        Jump to
+      </button>
     </div>
   );
 }
@@ -530,7 +565,10 @@ function EditSpanPopover({
   }, [onClose]);
 
   return (
-    <div ref={ref} className="fixed bottom-6 left-6 z-20 w-72 rounded-2xl border border-[#ddd8c9] bg-[#f1eee3] p-4 shadow-2xl">
+    <div
+      ref={ref}
+      className="fixed bottom-[calc(88px+env(safe-area-inset-bottom))] left-6 z-20 w-72 rounded-2xl border border-[#ddd8c9] bg-[#f1eee3] p-4 shadow-2xl md:bottom-6"
+    >
       <div className="flex items-start justify-between gap-2">
         <p className={`${label} ${inkFaint}`}>Editing highlight</p>
         <button type="button" onClick={onClose} className={`shrink-0 ${inkMuted} transition-opacity hover:opacity-70`}>
