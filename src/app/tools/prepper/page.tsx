@@ -42,7 +42,7 @@ async function syncMissingWordCountsToBoard(
 export default async function PrepperPage() {
   const { data: manuscripts } = await supabaseAdmin
     .from("manuscripts")
-    .select("id, title, author, status, source_format, created_at")
+    .select("id, title, author, status, source_format, error_message, created_at")
     .order("created_at", { ascending: false });
 
   const manuscriptIds = (manuscripts ?? []).map((m) => m.id);
@@ -71,6 +71,7 @@ export default async function PrepperPage() {
     author: m.author,
     status: m.status as ManuscriptRow["status"],
     source_format: m.source_format as ManuscriptRow["source_format"],
+    error_message: m.error_message ?? null,
     created_at: m.created_at,
     chapterCount: chapterCountByManuscript.get(m.id) ?? 0,
     chaptersExtracted: extractedCountByManuscript.get(m.id) ?? 0,

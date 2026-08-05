@@ -10,7 +10,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const { data, error } = await supabaseAdmin
     .from("manuscripts")
-    .select("id, title, author, status, created_at")
+    .select("id, title, author, status, error_message, created_at")
     .eq("id", id)
     .single();
 

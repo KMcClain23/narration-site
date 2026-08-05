@@ -29,8 +29,18 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const bytes = await obj.Body!.transformToByteArray();
     r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKETS.media.name, Key: manuscript.source_r2_key })).catch(() => {});
 
-    const { chapters } = await parseManuscript(Buffer.from(bytes));
-    if (!chapters.length) throw new Error("No chapters detected");
+    const { chapters, quality } = await parseManuscript(Buffer.from(bytes));
+    if (!chapters.length) throw new Error("No chapters detected in the document");
+
+    // A parse can succeed structurally and still be unreadable if the source
+    // PDF's text layer is corrupt. That is worth surfacing on the row rather
+    // than only in the log — it looks identical to a good parse in the UI, and
+    // the chapters are the thing that gets read aloud.
+    const qualityNote =
+      quality && quality.suspectRatio > 0.25
+        ? `Parsed, but ${quality.suspectPages.length} of ${quality.pageRatios.filter((r) => r !== null).length} pages ` +
+          `look garbled (likely a corrupt text layer needing OCR).`
+        : null;
 
     const rows = chapters.map((ch, i) => ({
       manuscript_id: id,
@@ -43,7 +53,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const { error: insertError } = await supabaseAdmin.from("chapters").insert(rows);
     if (insertError) throw new Error(insertError.message);
 
-    await supabaseAdmin.from("manuscripts").update({ status: "ready" }).eq("id", id);
+    await supabaseAdmin
+      .from("manuscripts")
+      .update({ status: "ready", error_message: qualityNote })
+      .eq("id", id);
 
     // Chain straight into Phase 3 — a manuscript with chapters but no
     // dialogue extraction is a confusing dead end for anyone using Prepper
@@ -56,8 +69,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
-    console.error("[manuscripts/process]", msg);
-    await supabaseAdmin.from("manuscripts").update({ status: "failed" }).eq("id", id);
+    console.error("[manuscripts/process]", msg, e);
+    // Persisted, not just logged: a failed row that can't say why is a dead
+    // end for whoever uploaded it, and the server log isn't reachable from the
+    // app. Truncated because this is display text, not a place for a stack.
+    await supabaseAdmin
+      .from("manuscripts")
+      .update({ status: "failed", error_message: msg.slice(0, 500) })
+      .eq("id", id);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
