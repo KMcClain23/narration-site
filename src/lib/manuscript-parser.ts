@@ -521,8 +521,16 @@ function isChapterHeadingLine(s: string): boolean {
   return /[A-Z]/.test(t) && !/[a-z]/.test(t);
 }
 
-/** How many heading lines may sit between a drop cap and its continuation. */
-const DROP_CAP_LOOKAHEAD = 3;
+/**
+ * How many heading lines may sit between a drop cap and its continuation.
+ *
+ * Three was too few: a chapter number plus a title that wraps to two lines
+ * already fills the gap, and the letter stayed orphaned ("he Great Hall" for
+ * "The Great Hall"). The scan stops at the first line that isn't heading-like
+ * regardless, so this bound only caps how much heading it will tolerate — it
+ * cannot run away into prose.
+ */
+const DROP_CAP_LOOKAHEAD = 6;
 
 function joinDropCaps(lines: PdfLine[]): PdfLine[] {
   const work = lines.map((l) => ({ ...l }));
@@ -1087,10 +1095,25 @@ function resolveToc(
   for (const ch of chapters) {
     ch.pdfPage = ch.printedPage + derived.offset;
     const hits = findTitlePages(ch.title, pageTexts, searchFrom);
-    const near = hits.find((h) => Math.abs(h - ch.pdfPage) <= PAGE_MATCH_TOLERANCE);
-    ch.foundOnPdfPage = near ?? null;
-    if (near === undefined) unconfirmed.push(ch);
-    else ch.pdfPage = near; // trust the sighting over the arithmetic
+
+    // Closest sighting, not the first one within tolerance. A chapter can
+    // share its title with the book — the final chapter often does — and the
+    // book title is also the running header on every page, so such a title
+    // matches almost everywhere. Taking the first hit inside the window then
+    // lands at the earliest edge of it, starting the chapter a page or two
+    // early and swallowing the end of the chapter before it. That still counts
+    // as "confirmed", so the check passes while the boundary is wrong.
+    let near: number | null = null;
+    for (const h of hits) {
+      if (near === null || Math.abs(h - ch.pdfPage) < Math.abs(near - ch.pdfPage)) near = h;
+    }
+
+    ch.foundOnPdfPage = near;
+    if (near !== null && Math.abs(near - ch.pdfPage) <= PAGE_MATCH_TOLERANCE) {
+      ch.pdfPage = near; // trust the sighting over the arithmetic
+    } else {
+      unconfirmed.push(ch);
+    }
   }
 
   return { chapters, offset: derived.offset, agreement: derived.agreement, unconfirmed };
@@ -1647,7 +1670,12 @@ export async function parseManuscript(
     );
   }
 
-  const resolved = tocSource ? resolveToc(tocSource.entries, flatPages, tocSource.lastTocPage) : null;
+  // Titles are confirmed against header-stripped text. The running header is
+  // the book's title on every page, so searching the raw text makes any
+  // chapter sharing that title appear to occur throughout the entire book.
+  const cleanedFlatPages = cleanedLinePages.map((lines) => lines.map((l) => l.text).join(" "));
+
+  const resolved = tocSource ? resolveToc(tocSource.entries, cleanedFlatPages, tocSource.lastTocPage) : null;
 
   if (resolved) {
     const { chapters: tocChapters, offset, agreement, unconfirmed } = resolved;
