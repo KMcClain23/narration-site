@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { ExternalLink, Plus } from "lucide-react";
+import { useDrag } from "@use-gesture/react";
+import { ExternalLink, Plus, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { useModalOpen } from "@/components/admin/AdminModalContext";
+import { useIsDesktop } from "@/components/admin/useIsDesktop";
+import { ArchiveConfirmDialog, ARCHIVE_REASON_LABEL } from "@/components/board/ArchiveConfirmDialog";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { TagsField, PersonForm, EMPTY_PERSON, type Person } from "@/components/admin/PersonForm";
 import { parseCoNarrators } from "@/components/admin/board-card-utils";
@@ -109,8 +112,6 @@ function statusMeta(value: string) {
 }
 
 const NARRATION_FORMATS = ["solo", "dual", "duet", "multicast"] as const;
-const ARCHIVE_REASONS = ["recasted", "canceled", "other"] as const;
-const ARCHIVE_REASON_LABEL: Record<string, string> = { recasted: "Recasted", canceled: "Canceled", other: "Other" };
 
 const PRESET_COMPANIES = [
   "Spotify", "Blue Nose Audio", "Dark Star Romance", "Podium Audio",
@@ -201,6 +202,13 @@ export function CardEditModal(props: CardEditModalProps) {
   // this covers the whole mounted lifetime — including the nested
   // Archive-confirm dialog below, which never outlives this component.
   useModalOpen(true);
+  const isDesktop = useIsDesktop();
+
+  // Mobile-only entrance transition — mounts translated fully off-screen,
+  // then flips one tick later so the sheet slides up. Desktop's centered
+  // dialog has no equivalent and ignores this.
+  const [sheetMounted, setSheetMounted] = useState(false);
+  useEffect(() => { setSheetMounted(true); }, []);
 
   const [loading, setLoading] = useState(mode === "edit");
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -221,9 +229,6 @@ export function CardEditModal(props: CardEditModalProps) {
   const cnInputRef = useRef<HTMLInputElement>(null);
 
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
-  const [archiveReason, setArchiveReason] = useState<typeof ARCHIVE_REASONS[number]>("recasted");
-  const [archiveNotes, setArchiveNotes] = useState("");
-  const [archiving, setArchiving] = useState(false);
 
   const [wordCountFocused, setWordCountFocused] = useState(false);
   const [shareInput, setShareInput] = useState<string | null>(null);
@@ -341,31 +346,6 @@ export function CardEditModal(props: CardEditModalProps) {
     }
   };
 
-  const handleArchive = async () => {
-    if (!form) return;
-    setArchiving(true);
-    try {
-      const res = await fetch("/api/board", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: form.id,
-          archived_at: new Date().toISOString(),
-          archived_reason: archiveReason,
-          archived_notes: archiveNotes.trim() || null,
-        }),
-      });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error || "Failed to archive project.");
-      onSaved(mapToFullBoardCard(d.card));
-      onClose();
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Failed to archive project.");
-      setArchiving(false);
-      setArchiveConfirmOpen(false);
-    }
-  };
-
   const handleRestore = async () => {
     if (!form) return;
     setSaving(true);
@@ -423,6 +403,51 @@ export function CardEditModal(props: CardEditModalProps) {
   };
 
   const handlePersonCancel = () => setViewMode("book");
+
+  // Mobile-only close guard — desktop's Cancel/Escape have never confirmed
+  // before discarding edits, and that stays true; this only gates the new
+  // mobile close paths (X button, swipe-down-to-dismiss).
+  const handleMobileClose = () => {
+    if (isDirty && !window.confirm("Discard unsaved changes?")) return;
+    onClose();
+  };
+
+  const TAB_IDS = TABS.map(t => t.id);
+
+  // Swipe-down-from-the-handle-area dismisses the sheet (mobile only) — bound
+  // to just the handle+header wrapper, not the whole sheet, so it never
+  // fights the body's own vertical scroll or the tab-swipe gesture below.
+  const sheetDismissBind = useDrag(
+    ({ last, movement: [, my], velocity: [, vy] }) => {
+      if (!last) return;
+      const pastThreshold = my > 80;
+      // Sign of cumulative movement, not `direction` — that tuple reflects
+      // instantaneous velocity and is already back to 0 by the time the
+      // pointer has stopped moving on this terminal frame (same fix as
+      // tabSwipeBind below).
+      const fastFlick = vy > 0.5 && my > 0;
+      if (pastThreshold || fastFlick) handleMobileClose();
+    },
+    { axis: "y", filterTaps: true }
+  );
+
+  // Horizontal swipe over the tab body switches tabs (mobile only) — same
+  // horizontal-dominance threshold convention as the public site's
+  // SwipeNav.tsx, adapted to Pointer-based dragging instead of raw touch
+  // events.
+  const tabSwipeBind = useDrag(
+    ({ last, movement: [mx, my] }) => {
+      if (!last) return;
+      if (Math.abs(mx) < 60 || Math.abs(mx) < Math.abs(my) * 1.5) return;
+      // Use the sign of total displacement, not `direction` — that tuple
+      // reflects instantaneous velocity and is already back to [0,0] by the
+      // time the pointer has stopped moving on this terminal frame.
+      const idx = TAB_IDS.indexOf(activeTab);
+      if (mx < 0 && idx < TAB_IDS.length - 1) setActiveTab(TAB_IDS[idx + 1]);
+      else if (mx > 0 && idx > 0) setActiveTab(TAB_IDS[idx - 1]);
+    },
+    { axis: "x", filterTaps: true }
+  );
 
   const renderDetailsTab = () => {
     if (!form) return null;
@@ -931,6 +956,106 @@ export function CardEditModal(props: CardEditModalProps) {
     );
   }
 
+  const tabContent = (
+    <>
+      <div className={activeTab === "details" ? "block" : "hidden"}>{renderDetailsTab()}</div>
+      <div className={activeTab === "production" ? "block" : "hidden"}>{renderProductionTab()}</div>
+      <div className={activeTab === "content" ? "block" : "hidden"}>{renderContentTab()}</div>
+      <div className={activeTab === "links" ? "block" : "hidden"}>{renderLinksTab()}</div>
+    </>
+  );
+
+  if (!isDesktop) {
+    return (
+      <div className="fixed inset-0 z-[300] bg-black/60">
+        <div
+          style={{
+            // dvh, not vh — vh is computed against the browser's largest
+            // possible viewport (chrome collapsed), so on a real phone with
+            // the address bar visible, a vh-sized bottom-anchored sheet
+            // renders taller than the actually-visible area and pushes its
+            // own header above the top of the screen. dvh tracks whatever is
+            // currently visible.
+            height: "94dvh",
+            transform: sheetMounted ? "translateY(0)" : "translateY(100%)",
+            transition: "transform 250ms ease",
+          }}
+          className="fixed inset-x-0 bottom-0 flex flex-col rounded-t-2xl border-t border-surface-border bg-surface shadow-2xl"
+        >
+          {loading ? (
+            <div className="flex h-64 items-center justify-center">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent-amber border-t-transparent" />
+            </div>
+          ) : loadError || !form ? (
+            <div className="p-8 text-center">
+              <p className="text-sm text-alert-red">{loadError ?? "Failed to load card."}</p>
+              <button onClick={onClose} className="mt-4 rounded-full border border-surface-border px-4 py-2 text-sm text-text-body transition-colors hover:text-text-primary">
+                Close
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Drag handle + compact header — swipe down here to dismiss */}
+              <div {...sheetDismissBind()} style={{ touchAction: "pan-x" }} className="shrink-0">
+                <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-surface-border" />
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <button type="button" onClick={handleMobileClose} aria-label="Close" className="shrink-0 text-text-muted hover:text-text-primary">
+                    <X size={22} />
+                  </button>
+                  <h2 className="min-w-0 flex-1 truncate text-center text-[15px] font-bold text-text-primary">
+                    {form.title || (mode === "create" ? "New project" : "Untitled")}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="shrink-0 rounded-full bg-accent-amber px-4 py-1.5 text-sm font-bold text-background transition hover:brightness-110 disabled:opacity-50"
+                  >
+                    {saveButtonLabel}
+                  </button>
+                </div>
+              </div>
+
+              {/* Tab bar */}
+              <div className="flex shrink-0 gap-1 border-b border-t border-surface-border px-2">
+                {TABS.map(t => (
+                  <button key={t.id} type="button" onClick={() => setActiveTab(t.id)}
+                    className={`relative flex-1 px-2 py-3 text-[13px] font-medium transition-colors ${
+                      activeTab === t.id ? "text-accent-amber" : "text-text-muted"
+                    }`}>
+                    {t.label}
+                    {activeTab === t.id && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-accent-amber" />}
+                  </button>
+                ))}
+              </div>
+
+              {saveError && (
+                <div className="mx-4 mt-3 flex shrink-0 items-center justify-between rounded-lg border border-alert-red/30 bg-alert-red/10 px-3 py-2 text-[13px] text-alert-red">
+                  <span>{saveError}</span>
+                  <button onClick={() => setSaveError(null)} className="text-alert-red/60 hover:text-alert-red">✕</button>
+                </div>
+              )}
+
+              {/* Scrollable body — horizontal swipe changes tabs, vertical
+                  scroll behaves natively (touch-action: pan-y) */}
+              <div {...tabSwipeBind()} style={{ touchAction: "pan-y" }} className="admin-scrollbar min-h-0 flex-1 select-none overflow-y-auto p-5">
+                {tabContent}
+              </div>
+            </>
+          )}
+        </div>
+
+        {archiveConfirmOpen && form && (
+          <ArchiveConfirmDialog
+            card={{ id: form.id, title: form.title }}
+            onArchived={raw => { onSaved(mapToFullBoardCard(raw)); onClose(); }}
+            onCancel={() => setArchiveConfirmOpen(false)}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 px-4">
       {/* Form modal — click-outside intentionally disabled (Stage 5 rule);
@@ -995,18 +1120,7 @@ export function CardEditModal(props: CardEditModalProps) {
             {/* Scrollable body — all four tabs render; inactive ones are
                 display:none (not unmounted), so edits survive tab switches. */}
             <div className="admin-scrollbar min-h-0 flex-1 overflow-y-auto p-6">
-              <div className={activeTab === "details" ? "block" : "hidden"}>
-                {renderDetailsTab()}
-              </div>
-              <div className={activeTab === "production" ? "block" : "hidden"}>
-                {renderProductionTab()}
-              </div>
-              <div className={activeTab === "content" ? "block" : "hidden"}>
-                {renderContentTab()}
-              </div>
-              <div className={activeTab === "links" ? "block" : "hidden"}>
-                {renderLinksTab()}
-              </div>
+              {tabContent}
             </div>
 
             {/* Sticky footer */}
@@ -1027,39 +1141,11 @@ export function CardEditModal(props: CardEditModalProps) {
 
       {/* Archive confirmation — confirmation dialog, click-outside dismisses */}
       {archiveConfirmOpen && form && (
-        <div
-          className="fixed inset-0 z-[310] flex items-center justify-center bg-black/60 px-4"
-          onClick={e => { if (e.target === e.currentTarget) setArchiveConfirmOpen(false); }}
-        >
-          <div className="w-full max-w-sm rounded-2xl border border-surface-border bg-surface p-6">
-            <h3 className="mb-2 text-base font-bold text-text-primary">Archive &ldquo;{form.title}&rdquo;?</h3>
-            <p className="mb-4 text-sm text-text-muted">
-              This will be hidden from the board and public site, but kept in the Archive.
-            </p>
-            <div className="mb-4 flex gap-4 text-sm text-text-body">
-              {ARCHIVE_REASONS.map(r => (
-                <label key={r} className="flex items-center gap-1.5 cursor-pointer">
-                  <input type="radio" name="archive-reason" checked={archiveReason === r}
-                    onChange={() => setArchiveReason(r)} className="accent-accent-amber" />
-                  {ARCHIVE_REASON_LABEL[r]}
-                </label>
-              ))}
-            </div>
-            <textarea value={archiveNotes} onChange={e => setArchiveNotes(e.target.value)} rows={3}
-              placeholder="Notes (optional)…"
-              className="mb-5 w-full rounded-lg border border-surface-border bg-background px-3 py-2.5 text-sm text-text-primary placeholder:text-text-dim focus:border-accent-amber-dim focus:outline-none resize-none" />
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setArchiveConfirmOpen(false)}
-                className="flex-1 rounded-full border border-surface-border py-2.5 text-sm text-text-body transition-colors hover:text-text-primary">
-                Cancel
-              </button>
-              <button type="button" onClick={handleArchive} disabled={archiving}
-                className="flex-1 rounded-full bg-surface-raised py-2.5 text-sm font-bold text-text-primary transition hover:brightness-110 disabled:opacity-50">
-                {archiving ? "Archiving…" : "Archive"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ArchiveConfirmDialog
+          card={{ id: form.id, title: form.title }}
+          onArchived={raw => { onSaved(mapToFullBoardCard(raw)); onClose(); }}
+          onCancel={() => setArchiveConfirmOpen(false)}
+        />
       )}
     </div>
   );

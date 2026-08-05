@@ -66,6 +66,25 @@ export function estimatedEarnings(
 // row is a bare non-JSON string. This defensive parse handles both; there is
 // no Postgres-level array operator that can be used against this column as
 // stored today (confirmed empirically — see Stage 4.2 planning notes).
+export type BoardV2Card = {
+  id: string;
+  title: string;
+  author: string;
+  co_narrator: string | null;
+  cover_url: string | null;
+  status: string;
+  deadline: string | null;
+  first15_due: string | null;
+  first_15_complete: boolean;
+  word_count: number | null;
+  pfh_rate: number | null;
+  payment_type: string | null;
+  is_confidential: boolean;
+  narration_format: string | null;
+  narrator_share_percent: number | null;
+  created_at: string;
+};
+
 export function parseCoNarrators(raw: string | null): string[] {
   if (!raw) return [];
   try {

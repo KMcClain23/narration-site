@@ -2,119 +2,36 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import {
-  DndContext, DragOverlay, MouseSensor, useSensor, useSensors, useDroppable,
-  type DragEndEvent, type DragStartEvent, type DragOverEvent,
-} from "@dnd-kit/core";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { BoardCard, type BoardV2Card, parseLocalDate, daysUntil } from "@/components/admin/BoardCard";
-import { SubgroupDivider } from "@/components/admin/SubgroupDivider";
-import { ReleasedDropZone, RELEASED_DROPZONE_ID } from "@/components/admin/ReleasedDropZone";
+import type { BoardV2Card } from "@/components/admin/board-card-utils";
 import { CardEditModal, type FullBoardCard } from "@/components/board/CardEditModal";
+import { ArchiveConfirmDialog } from "@/components/board/ArchiveConfirmDialog";
+import { BoardActionMenu } from "@/components/board/BoardActionMenu";
+import { DesktopBoardColumns } from "@/components/board/desktop/DesktopBoardColumns";
+import { MobileBoardList } from "@/components/board/mobile/MobileBoardList";
 import { useModalOpen } from "@/components/admin/AdminModalContext";
-import { adminType } from "@/lib/design-tokens";
+import { useIsDesktop } from "@/components/admin/useIsDesktop";
+import {
+  bucketPipeline, bucketProduction, passesDateFilter, type DateFilter,
+} from "@/components/board/board-filters";
 
 // Cards on this board only ever show these statuses (see ACTIVE_STATUSES in
 // /api/board-v2/cards) — a save that moves a card off-status (or archives it)
 // makes it vanish from view, same as "released" already does today.
 const VISIBLE_STATUSES = new Set(["contracted", "prepping", "recording", "editing"]);
 
-// ─── constants ────────────────────────────────────────────────────────────────
-
-const PRODUCTION_SUBGROUPS = [
-  { id: "prepping", label: "Prepping" },
-  { id: "recording", label: "Recording" },
-  { id: "editing", label: "Editing" },
-] as const;
-
-type PipelineBucket = "thisWeek" | "thisMonth" | "later";
-const PIPELINE_BUCKETS: { id: PipelineBucket; label: string }[] = [
-  { id: "thisWeek", label: "This Week" },
-  { id: "thisMonth", label: "This Month" },
-  { id: "later", label: "Later" },
-];
-
-type DateFilter = "week" | "month" | null;
-
-const VALID_DROP_TARGETS = new Set<string>([
-  "prepping", "recording", "editing", "thisWeek", "thisMonth", "later", RELEASED_DROPZONE_ID,
-]);
-
-// Dropping on any Pipeline subgroup always resets status to 'contracted' —
-// the subgroup a card lands in afterward is computed from its own
-// completion_date, not from which of the three zones it was dropped on.
-const PIPELINE_DROP_IDS = new Set<string>(["thisWeek", "thisMonth", "later"]);
-
-// ─── pure helpers ─────────────────────────────────────────────────────────────
-
-function pipelineBucketFor(card: BoardV2Card): PipelineBucket {
-  if (!card.deadline) return "later";
-  const days = daysUntil(card.deadline);
-  if (days <= 7) return "thisWeek";
-  if (days <= 30) return "thisMonth";
-  return "later";
-}
-
-// Ascending completion date (no-date sorts last); ties → newest created_at first.
-function compareCards(a: BoardV2Card, b: BoardV2Card): number {
-  const aTime = a.deadline ? parseLocalDate(a.deadline).getTime() : Infinity;
-  const bTime = b.deadline ? parseLocalDate(b.deadline).getTime() : Infinity;
-  if (aTime !== bTime) return aTime - bTime;
-  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-}
-
-// "Due this week/month" chips answer "what needs MY attention" — once a book
-// moves to editing, the remaining deadline is the editor's responsibility,
-// not the narrator's, so editing-stage cards never match these chips (they
-// still render normally in their column, just won't highlight as due-soon).
-const ATTENTION_STATUSES = new Set(["contracted", "prepping", "recording"]);
-
-function passesDateFilter(card: BoardV2Card, filter: DateFilter): boolean {
-  if (!filter) return true;
-  if (!card.deadline || !ATTENTION_STATUSES.has(card.status)) return false;
-  const days = daysUntil(card.deadline);
-  return filter === "week" ? days <= 7 : days <= 30;
-}
-
-// ─── small inline UI helpers (kept local per the approved file-count plan) ────
-
-function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${
-        active
-          ? "bg-accent-amber text-background"
-          : "border border-surface-border text-text-body hover:border-accent-amber-dim"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function DroppableSubgroup({ id, children }: { id: string; children: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
-  return (
-    <div ref={setNodeRef} className={`rounded-lg transition-colors ${isOver ? "bg-surface-raised/40" : ""}`}>
-      {children}
-    </div>
-  );
-}
-
-// ─── page ─────────────────────────────────────────────────────────────────────
-
 export default function BoardV2Page() {
   const router = useRouter();
+  const isDesktop = useIsDesktop();
   const [cards, setCards] = useState<BoardV2Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [releasedCount, setReleasedCount] = useState(0);
   const [dateFilter, setDateFilter] = useState<DateFilter>(null);
-  const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [releaseConfirm, setReleaseConfirm] = useState<BoardV2Card | null>(null);
   useModalOpen(!!releaseConfirm);
+  const [archiveTarget, setArchiveTarget] = useState<BoardV2Card | null>(null);
+  useModalOpen(!!archiveTarget);
   const [actionMenu, setActionMenu] = useState<{ card: BoardV2Card; x: number; y: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [fadingIds, setFadingIds] = useState<Set<string>>(new Set());
@@ -123,8 +40,6 @@ export default function BoardV2Page() {
   const [creatingProject, setCreatingProject] = useState(false);
   const [authorNames, setAuthorNames] = useState<string[]>([]);
   const [coNarratorNames, setCoNarratorNames] = useState<string[]>([]);
-
-  const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 8 } }));
 
   // Deep-linking (?editCard=<id>): open the Edit modal directly on load —
   // used by /board/archive and other pages linking to a specific card that
@@ -198,8 +113,6 @@ export default function BoardV2Page() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const activeCard = useMemo(() => cards.find(c => c.id === activeDragId) ?? null, [cards, activeDragId]);
-
   const pipelineCards = useMemo(
     () => cards.filter(c => !["prepping", "recording", "editing"].includes(c.status)),
     [cards]
@@ -212,21 +125,10 @@ export default function BoardV2Page() {
   const pipelineFiltered = useMemo(() => pipelineCards.filter(c => passesDateFilter(c, dateFilter)), [pipelineCards, dateFilter]);
   const productionFiltered = useMemo(() => productionCards.filter(c => passesDateFilter(c, dateFilter)), [productionCards, dateFilter]);
 
-  const pipelineBuckets = useMemo(() => {
-    const buckets: Record<PipelineBucket, BoardV2Card[]> = { thisWeek: [], thisMonth: [], later: [] };
-    for (const c of pipelineFiltered) buckets[pipelineBucketFor(c)].push(c);
-    (Object.keys(buckets) as PipelineBucket[]).forEach(k => buckets[k].sort(compareCards));
-    return buckets;
-  }, [pipelineFiltered]);
+  const pipelineBuckets = useMemo(() => bucketPipeline(pipelineFiltered), [pipelineFiltered]);
+  const productionBuckets = useMemo(() => bucketProduction(productionFiltered), [productionFiltered]);
 
-  const productionBuckets = useMemo(() => {
-    const buckets: Record<string, BoardV2Card[]> = { prepping: [], recording: [], editing: [] };
-    for (const c of productionFiltered) buckets[c.status]?.push(c);
-    Object.keys(buckets).forEach(k => buckets[k].sort(compareCards));
-    return buckets;
-  }, [productionFiltered]);
-
-  const toggleFilter = (f: "week" | "month") => setDateFilter(prev => (prev === f ? null : f));
+  const toggleDateFilter = (f: "week" | "month") => setDateFilter(prev => (prev === f ? null : f));
 
   const handleToggleFirst15 = useCallback(async (id: string, complete: boolean) => {
     setCards(prev => prev.map(c => (c.id === id ? { ...c, first_15_complete: complete } : c)));
@@ -282,57 +184,11 @@ export default function BoardV2Page() {
     }
   }, [releaseConfirm]);
 
-  const handleDragStart = (e: DragStartEvent) => {
-    setActiveDragId(String(e.active.id));
-    document.body.style.cursor = "not-allowed";
-  };
-
-  const handleDragOver = (e: DragOverEvent) => {
-    const overId = e.over?.id ? String(e.over.id) : null;
-    document.body.style.cursor = overId && VALID_DROP_TARGETS.has(overId) ? "grabbing" : "not-allowed";
-  };
-
-  const handleDragEnd = (e: DragEndEvent) => {
-    document.body.style.cursor = "";
-    setActiveDragId(null);
-    const { active, over } = e;
-    if (!over) return;
-
-    const card = cards.find(c => c.id === active.id);
-    if (!card) return;
-
-    if (over.id === RELEASED_DROPZONE_ID) {
-      setReleaseConfirm(card);
-      return;
-    }
-
-    const overId = String(over.id);
-
-    if (PIPELINE_DROP_IDS.has(overId)) {
-      if (card.status !== "contracted") updateStatus(card.id, "contracted");
-      return;
-    }
-
-    if (VALID_DROP_TARGETS.has(overId) && overId !== card.status) {
-      updateStatus(card.id, overId);
-    }
-  };
-
-  const renderCard = (c: BoardV2Card) => (
-    <div key={c.id} className={`transition-opacity duration-300 ${fadingIds.has(c.id) ? "opacity-0" : "opacity-100"}`}>
-      <BoardCard
-        card={c}
-        onToggleFirst15={handleToggleFirst15}
-        onLongPress={(card, x, y) => setActionMenu({ card, x, y })}
-        onOpen={card => { setEditingCardId(card.id); setEditingViaDeepLink(false); }}
-      />
-    </div>
-  );
-
-  // A save (or archive) can move a card off this board's visible slice —
-  // same handling "released" already gets today, just generalized: if the
-  // resulting row still belongs here, update it in place (or insert it, for
-  // a brand-new project that isn't in `cards` yet); otherwise drop it.
+  // A save (or archive, or the swipe/action-menu archive path below) can move
+  // a card off this board's visible slice — same handling "released" already
+  // gets, just generalized: if the resulting row still belongs here, update
+  // it in place (or insert it, for a brand-new project not yet in `cards`);
+  // otherwise drop it.
   const handleCardSaved = useCallback((updated: FullBoardCard) => {
     const isVisible = !updated.archived_at && VISIBLE_STATUSES.has(updated.status);
     setCards(prev => {
@@ -360,6 +216,15 @@ export default function BoardV2Page() {
     });
   }, []);
 
+  const handleOpenCard = useCallback((card: BoardV2Card) => {
+    setEditingCardId(card.id);
+    setEditingViaDeepLink(false);
+  }, []);
+
+  const handleLongPress = useCallback((card: BoardV2Card, x: number, y: number) => {
+    setActionMenu({ card, x, y });
+  }, []);
+
   if (loading) {
     return (
       <AdminLayout>
@@ -370,111 +235,54 @@ export default function BoardV2Page() {
     );
   }
 
+  const cardsEmpty = cards.length === 0;
+
   return (
     <AdminLayout>
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-        <div className="flex h-[calc(100vh-4rem)] flex-col">
-          {/* Header row — does not scroll */}
-          <div className="mb-4 flex shrink-0 items-center justify-between gap-4">
-            <h1 className={adminType.titleLg}>Board</h1>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setCreatingProject(true)}
-                className="rounded-full bg-accent-amber px-4 py-2 text-sm font-bold text-background transition hover:brightness-110"
-              >
-                + New Project
-              </button>
-              <FilterChip label="Due this week" active={dateFilter === "week"} onClick={() => toggleFilter("week")} />
-              <FilterChip label="Due this month" active={dateFilter === "month"} onClick={() => toggleFilter("month")} />
-            </div>
-          </div>
-
-          {error && (
-            <div className="mb-3 flex shrink-0 items-center justify-between rounded-lg border border-alert-red/30 bg-alert-red/10 px-4 py-2.5 text-sm text-alert-red">
-              <span>{error}</span>
-              <button onClick={() => setError(null)} className="text-alert-red/60 hover:text-alert-red">✕</button>
-            </div>
-          )}
-
-          {/* Columns */}
-          {cards.length === 0 ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-4">
-              <p className={adminType.body}>No active projects</p>
-              <button
-                onClick={() => setCreatingProject(true)}
-                className="rounded-full bg-accent-amber px-5 py-2.5 text-sm font-bold text-background transition hover:brightness-110"
-              >
-                + New Project
-              </button>
-            </div>
-          ) : (
-            <div className="grid min-h-0 flex-1 grid-cols-[1fr_1fr_120px] gap-4">
-              {/* Column 1: Pipeline */}
-              <div className="flex min-h-0 flex-col">
-                <div className="mb-3 flex shrink-0 items-baseline gap-2">
-                  <h2 className={adminType.title}>Pipeline</h2>
-                  <span className="text-sm text-text-muted">
-                    ({pipelineCards.length}){dateFilter ? ` · ${pipelineFiltered.length} shown` : ""}
-                  </span>
-                </div>
-                <div className="admin-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
-                  {PIPELINE_BUCKETS.map(bucket => (
-                    <DroppableSubgroup key={bucket.id} id={bucket.id}>
-                      <div className="mb-5">
-                        <SubgroupDivider label={bucket.label} />
-                        {pipelineBuckets[bucket.id].length === 0 ? (
-                          <p className="text-[13px] text-text-faint">— no books —</p>
-                        ) : (
-                          <div className="space-y-3">{pipelineBuckets[bucket.id].map(renderCard)}</div>
-                        )}
-                      </div>
-                    </DroppableSubgroup>
-                  ))}
-                </div>
-              </div>
-
-              {/* Column 2: In Production */}
-              <div className="flex min-h-0 flex-col">
-                <div className="mb-3 flex shrink-0 items-baseline gap-2">
-                  <h2 className={adminType.title}>In Production</h2>
-                  <span className="text-sm text-text-muted">
-                    ({productionCards.length}){dateFilter ? ` · ${productionFiltered.length} shown` : ""}
-                  </span>
-                </div>
-                <div className="admin-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
-                  {PRODUCTION_SUBGROUPS.map(s => {
-                    const groupCards = productionBuckets[s.id];
-                    return (
-                      <DroppableSubgroup key={s.id} id={s.id}>
-                        <div className="mb-5">
-                          <SubgroupDivider label={s.label} />
-                          {groupCards.length === 0 ? (
-                            <p className="text-[13px] text-text-faint">— no books —</p>
-                          ) : (
-                            <div className="space-y-3">{groupCards.map(renderCard)}</div>
-                          )}
-                        </div>
-                      </DroppableSubgroup>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Released drop-zone */}
-              <ReleasedDropZone releasedCount={releasedCount} isDragActive={activeDragId !== null} />
-            </div>
-          )}
+      {error && (
+        <div className="mb-3 flex shrink-0 items-center justify-between rounded-lg border border-alert-red/30 bg-alert-red/10 px-4 py-2.5 text-sm text-alert-red">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-alert-red/60 hover:text-alert-red">✕</button>
         </div>
+      )}
 
-        <DragOverlay>
-          {activeCard && (
-            <div style={{ opacity: 0.45 }}>
-              <BoardCard card={activeCard} onToggleFirst15={() => {}} />
-            </div>
-          )}
-        </DragOverlay>
-      </DndContext>
+      {isDesktop ? (
+        <DesktopBoardColumns
+          cardsEmpty={cardsEmpty}
+          cards={cards}
+          pipelineCards={pipelineCards}
+          productionCards={productionCards}
+          pipelineFiltered={pipelineFiltered}
+          productionFiltered={productionFiltered}
+          pipelineBuckets={pipelineBuckets}
+          productionBuckets={productionBuckets}
+          releasedCount={releasedCount}
+          dateFilter={dateFilter}
+          onToggleDateFilter={toggleDateFilter}
+          fadingIds={fadingIds}
+          onToggleFirst15={handleToggleFirst15}
+          onLongPress={handleLongPress}
+          onOpenCard={handleOpenCard}
+          onCreateProject={() => setCreatingProject(true)}
+          onUpdateStatus={updateStatus}
+          onRequestRelease={card => setReleaseConfirm(card)}
+        />
+      ) : (
+        <MobileBoardList
+          cardsEmpty={cardsEmpty}
+          pipelineBuckets={pipelineBuckets}
+          productionBuckets={productionBuckets}
+          releasedCount={releasedCount}
+          dateFilter={dateFilter}
+          onToggleDateFilter={toggleDateFilter}
+          fadingIds={fadingIds}
+          onToggleFirst15={handleToggleFirst15}
+          onLongPress={handleLongPress}
+          onOpenCard={handleOpenCard}
+          onSwipeArchive={card => setArchiveTarget(card)}
+          onCreateProject={() => setCreatingProject(true)}
+        />
+      )}
 
       {/* Release confirmation dialog */}
       {releaseConfirm && (
@@ -507,29 +315,29 @@ export default function BoardV2Page() {
         </div>
       )}
 
-      {/* Mobile long-press action menu */}
+      {/* Archive confirmation — reached via swipe (mobile) or the long-press
+          action menu (either platform) */}
+      {archiveTarget && (
+        <ArchiveConfirmDialog
+          card={{ id: archiveTarget.id, title: archiveTarget.title }}
+          onArchived={() => {
+            setCards(prev => prev.filter(c => c.id !== archiveTarget.id));
+            setArchiveTarget(null);
+          }}
+          onCancel={() => setArchiveTarget(null)}
+        />
+      )}
+
+      {/* Long-press action menu */}
       {actionMenu && (
-        <div
-          className="fixed z-[300] w-52 rounded-xl border border-surface-border bg-surface py-1.5 shadow-2xl"
-          style={{ left: actionMenu.x, top: actionMenu.y }}
-          onClick={e => e.stopPropagation()}
-        >
-          {PRODUCTION_SUBGROUPS.map(s => (
-            <button
-              key={s.id}
-              onClick={() => { updateStatus(actionMenu.card.id, s.id); setActionMenu(null); }}
-              className="block w-full px-4 py-2 text-left text-sm text-text-body transition-colors hover:bg-surface-raised hover:text-text-primary"
-            >
-              Move to {s.label}
-            </button>
-          ))}
-          <button
-            onClick={() => { setReleaseConfirm(actionMenu.card); setActionMenu(null); }}
-            className="block w-full px-4 py-2 text-left text-sm text-text-body transition-colors hover:bg-surface-raised hover:text-text-primary"
-          >
-            Mark as Released
-          </button>
-        </div>
+        <BoardActionMenu
+          x={actionMenu.x}
+          y={actionMenu.y}
+          onMoveToStage={status => { updateStatus(actionMenu.card.id, status); setActionMenu(null); }}
+          onMoveToPipeline={() => { updateStatus(actionMenu.card.id, "contracted"); setActionMenu(null); }}
+          onMarkReleased={() => { setReleaseConfirm(actionMenu.card); setActionMenu(null); }}
+          onArchive={() => { setArchiveTarget(actionMenu.card); setActionMenu(null); }}
+        />
       )}
 
       {/* Card Edit modal (Stage 6.1) */}
@@ -560,7 +368,7 @@ export default function BoardV2Page() {
         />
       )}
 
-      {/* Toast (e.g. "+ New Project" placeholder) */}
+      {/* Toast (e.g. deep-link-not-found) */}
       {toast && (
         <div className="fixed bottom-24 right-5 z-[400] flex items-center gap-3 rounded-xl border border-surface-border bg-surface px-4 py-3 text-xs text-text-body shadow-2xl md:bottom-5">
           {toast}

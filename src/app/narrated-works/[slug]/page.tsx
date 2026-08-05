@@ -37,8 +37,17 @@ function titleToSlug(title: string): string {
 // Confidential cards route on an id-based slug, never a title-derived one —
 // a slug based on the real title (or the redacted "Untitled Project") would
 // either leak the title or collide across every confidential card.
-function slugFor(card: { id: string; title: string; is_confidential?: boolean }): string {
-  return card.is_confidential ? `confidential-${card.id}` : titleToSlug(card.title ?? "");
+//
+// Otherwise, prefer the stored board_cards.slug column, falling back to a
+// fresh title-derived slug only when it's unset — this must match /api/books'
+// mapCards() exactly (same priority order), since that's what the listing
+// page's links are actually built from. A card whose title was renamed after
+// its slug was set (slug columns don't auto-update) would otherwise have a
+// listing-page link this page could never find, since recomputing from the
+// current title gives a different string than the one actually linked to.
+function slugFor(card: { id: string; title: string; slug?: string | null; is_confidential?: boolean }): string {
+  if (card.is_confidential) return `confidential-${card.id}`;
+  return card.slug || titleToSlug(card.title ?? "");
 }
 
 const CONFIDENTIAL_TITLE = "Untitled Project";
@@ -82,11 +91,11 @@ function spotifyEmbedUrl(url: string | undefined | null): string | null {
 async function getBook(slug: string) {
   const { data } = await supabaseAdmin
     .from("board_cards")
-    .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status, trigger_warnings, released_at, is_confidential, narration_format")
+    .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status, trigger_warnings, released_at, is_confidential, narration_format, slug")
     .in("status", ["contracted", "recording", "editing", "released"])
     .is("archived_at", null);
   if (!data) return null;
-  const card = data.find((c) => slugFor(c as { id: string; title: string; is_confidential?: boolean }) === slug);
+  const card = data.find((c) => slugFor(c as { id: string; title: string; slug?: string | null; is_confidential?: boolean }) === slug);
   return card ? redactIfConfidential(card) : null;
 }
 
@@ -176,7 +185,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   // title/cover in the nav arrows, and an id-based slug to route to.
   const { data: allBooksRaw } = await supabaseAdmin
     .from("board_cards")
-    .select("id, title, cover_url, is_confidential")
+    .select("id, title, cover_url, is_confidential, slug")
     .in("status", ["contracted", "recording", "editing", "released"])
     .is("archived_at", null)
     .order("sort_order", { ascending: true })
@@ -184,9 +193,9 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   const allBooks = (allBooksRaw ?? [])
     .filter(b => b.title)
     .map(b => b.is_confidential ? { ...b, title: CONFIDENTIAL_TITLE, cover_url: null } : b);
-  const currentIdx = allBooks.findIndex(b => slugFor(b as { id: string; title: string; is_confidential?: boolean }) === slug);
-  const prevSlug  = currentIdx > 0                   ? slugFor(allBooks[currentIdx - 1] as { id: string; title: string; is_confidential?: boolean }) : null;
-  const nextSlug  = currentIdx < allBooks.length - 1 ? slugFor(allBooks[currentIdx + 1] as { id: string; title: string; is_confidential?: boolean }) : null;
+  const currentIdx = allBooks.findIndex(b => slugFor(b as { id: string; title: string; slug?: string | null; is_confidential?: boolean }) === slug);
+  const prevSlug  = currentIdx > 0                   ? slugFor(allBooks[currentIdx - 1] as { id: string; title: string; slug?: string | null; is_confidential?: boolean }) : null;
+  const nextSlug  = currentIdx < allBooks.length - 1 ? slugFor(allBooks[currentIdx + 1] as { id: string; title: string; slug?: string | null; is_confidential?: boolean }) : null;
   const prevTitle = currentIdx > 0                   ? allBooks[currentIdx - 1].title : null;
   const nextTitle = currentIdx < allBooks.length - 1 ? allBooks[currentIdx + 1].title : null;
   const prevCover = currentIdx > 0                   ? (allBooks[currentIdx - 1].cover_url as string | null) : null;

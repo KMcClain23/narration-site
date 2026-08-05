@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutGrid, Calendar, Users, Mail, Menu } from "lucide-react";
 import { useIsAnyModalOpen } from "./AdminModalContext";
 import { useUnreadInquiries } from "./useUnreadInquiries";
+import { useHideOnScrollDown } from "./useHideOnScrollDown";
 import { MoreSheet } from "./MoreSheet";
 
 type Tab = {
@@ -25,15 +26,12 @@ const TABS: Tab[] = [
   { label: "Inquiries", href: "/inquiries", icon: Mail, match: p => p.startsWith("/inquiries") },
 ];
 
-const SCROLL_THRESHOLD = 10;
-
 export function BottomTabBar() {
   const pathname = usePathname();
   const unreadInquiries = useUnreadInquiries();
   const isAnyModalOpen = useIsAnyModalOpen();
+  const scrollHidden = useHideOnScrollDown();
   const [moreOpen, setMoreOpen] = useState(false);
-  const [scrollHidden, setScrollHidden] = useState(false);
-  const lastScrollY = useRef(0);
 
   // Close the sheet on navigation — adjusted during render (not an effect),
   // per React's guidance for resetting state when a prop changes.
@@ -42,21 +40,6 @@ export function BottomTabBar() {
     setPrevPathname(pathname);
     setMoreOpen(false);
   }
-
-  useEffect(() => {
-    lastScrollY.current = window.scrollY;
-    const onScroll = () => {
-      const y = window.scrollY;
-      const delta = y - lastScrollY.current;
-      if (Math.abs(delta) < SCROLL_THRESHOLD) return;
-      // Never hide right at the top — a small downward jitter from y=0
-      // shouldn't hide the bar before the user has actually scrolled.
-      setScrollHidden(delta > 0 && y > 64);
-      lastScrollY.current = y;
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   const hiddenByModal = isAnyModalOpen;
   const hiddenByScroll = scrollHidden && !moreOpen;
