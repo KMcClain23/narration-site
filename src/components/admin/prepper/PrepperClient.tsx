@@ -19,6 +19,8 @@ export interface ManuscriptRow {
    *  reused here to tell "chapters parsed" apart from "dialogue extraction
    *  finished too" instead of both flattening into one "Ready" badge. */
   chaptersExtracted: number;
+  /** Chapters that were attempted and failed extraction, and were skipped. */
+  chaptersFailed: number;
   wordCount: number;
 }
 
@@ -149,6 +151,7 @@ function UploadModal({
         created_at: new Date().toISOString(),
         chapterCount: 0,
         chaptersExtracted: 0,
+        chaptersFailed: 0,
         wordCount: 0,
       });
     } catch (e) {
@@ -284,6 +287,16 @@ function ManuscriptCard({
           {manuscript.error_message}
         </p>
       )}
+      {/* A book with skipped chapters still reads as finished everywhere else:
+          status is "ready" and the extracted count stops short without saying
+          why. This is the only place that gap is visible without a query. */}
+      {manuscript.chaptersFailed > 0 && (
+        <p className="mt-1.5 text-xs leading-snug text-alert-red">
+          {manuscript.chaptersFailed} chapter{manuscript.chaptersFailed === 1 ? "" : "s"} failed
+          extraction and {manuscript.chaptersFailed === 1 ? "was" : "were"} skipped — dialogue is
+          missing {manuscript.chaptersFailed === 1 ? "there" : "in those chapters"}.
+        </p>
+      )}
     </div>
   );
 
@@ -381,6 +394,7 @@ export function PrepperClient({ initialManuscripts }: { initialManuscripts: Manu
                       status: json.status ?? row.status,
                       chapterCount: json.chapterCount ?? row.chapterCount,
                       chaptersExtracted: json.chaptersExtracted ?? row.chaptersExtracted,
+                      chaptersFailed: json.chaptersFailed ?? row.chaptersFailed,
                       // Read as ?? null rather than ?? row.error_message so a
                       // reason that clears server-side clears here too, instead
                       // of a stale failure sticking to a row that has recovered.

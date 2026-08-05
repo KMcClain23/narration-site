@@ -47,16 +47,26 @@ export default async function PrepperPage() {
 
   const manuscriptIds = (manuscripts ?? []).map((m) => m.id);
   const { data: chapterRows } = manuscriptIds.length
-    ? await supabaseAdmin.from("chapters").select("manuscript_id, summary, raw_text").in("manuscript_id", manuscriptIds)
+    ? await supabaseAdmin
+        .from("chapters")
+        .select("manuscript_id, summary, raw_text, extraction_error")
+        .in("manuscript_id", manuscriptIds)
     : { data: [] };
 
   const chapterCountByManuscript = new Map<string, number>();
   const extractedCountByManuscript = new Map<string, number>();
   const wordCountByManuscript = new Map<string, number>();
+  // Chapters that failed extraction. The column existed only in the database
+  // until now, so a book could finish with silently unextracted chapters and
+  // the only way to find out was to go and query for it.
+  const failedCountByManuscript = new Map<string, number>();
   (chapterRows ?? []).forEach((c) => {
     chapterCountByManuscript.set(c.manuscript_id, (chapterCountByManuscript.get(c.manuscript_id) ?? 0) + 1);
     if (c.summary !== null) {
       extractedCountByManuscript.set(c.manuscript_id, (extractedCountByManuscript.get(c.manuscript_id) ?? 0) + 1);
+    }
+    if (c.extraction_error !== null) {
+      failedCountByManuscript.set(c.manuscript_id, (failedCountByManuscript.get(c.manuscript_id) ?? 0) + 1);
     }
     wordCountByManuscript.set(c.manuscript_id, (wordCountByManuscript.get(c.manuscript_id) ?? 0) + countWords(c.raw_text));
   });
@@ -75,6 +85,7 @@ export default async function PrepperPage() {
     created_at: m.created_at,
     chapterCount: chapterCountByManuscript.get(m.id) ?? 0,
     chaptersExtracted: extractedCountByManuscript.get(m.id) ?? 0,
+    chaptersFailed: failedCountByManuscript.get(m.id) ?? 0,
     wordCount: wordCountByManuscript.get(m.id) ?? 0,
   }));
 

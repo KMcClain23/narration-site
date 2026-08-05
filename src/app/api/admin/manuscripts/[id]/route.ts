@@ -31,7 +31,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .eq("manuscript_id", id)
     .not("summary", "is", null);
 
-  return NextResponse.json({ ...data, chapterCount: count ?? 0, chaptersExtracted: extractedCount ?? 0 });
+  // Chapters that were attempted and failed. Extraction skips these so the
+  // chain can finish, which means a book reaches "ready" with gaps in it —
+  // the poller needs to carry that count or the UI shows a clean finish.
+  const { count: failedCount } = await supabaseAdmin
+    .from("chapters")
+    .select("id", { count: "exact", head: true })
+    .eq("manuscript_id", id)
+    .not("extraction_error", "is", null);
+
+  return NextResponse.json({
+    ...data,
+    chapterCount: count ?? 0,
+    chaptersExtracted: extractedCount ?? 0,
+    chaptersFailed: failedCount ?? 0,
+  });
 }
 
 // DELETE: chapters/characters/dialogue_spans cascade from manuscripts (same

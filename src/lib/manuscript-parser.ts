@@ -1312,6 +1312,20 @@ async function askClaude(pageMap: string): Promise<Array<{ title: string; startP
 // ─── Orchestrator ───────────────────────────────────────────────────────────────
 
 /**
+ * Stamped on every line this module logs.
+ *
+ * Deployment state is otherwise invisible from the output: an old parser and a
+ * new one both produce chapters, and telling them apart meant comparing
+ * character counts against a previous run. Bump this whenever parser behaviour
+ * changes, so a production log line names the code that produced it.
+ *
+ * v2 — TOC as primary source, printed-page offset derivation with validation,
+ *      POV parsing, ligature/header/drop-cap/hyphen repairs, quality scoring.
+ */
+export const PARSER_VERSION = "v2";
+const TAG = `[parser ${PARSER_VERSION}]`;
+
+/**
  * A quality problem is never fatal here — a partially garbled book still has
  * readable chapters worth keeping, and refusing the parse would leave the user
  * with nothing and no explanation. It is logged loudly instead, with the page
@@ -1321,14 +1335,14 @@ async function askClaude(pageMap: string): Promise<Array<{ title: string; startP
 function logTextQuality(format: string, q: TextQualityReport): void {
   if (!q.suspectPages.length) {
     console.log(
-      `[manuscript-parser] ${format} text quality OK — median common-word ratio ${q.median.toFixed(3)}`
+      `${TAG} ${format} text quality OK — median common-word ratio ${q.median.toFixed(3)}`
     );
     return;
   }
   const sample = q.suspectPages.slice(0, 20).map((i) => i + 1).join(", ");
   const more = q.suspectPages.length > 20 ? ` …and ${q.suspectPages.length - 20} more` : "";
   console.warn(
-    `[manuscript-parser] ${format} text quality SUSPECT — ` +
+    `${TAG} ${format} text quality SUSPECT — ` +
       `${q.suspectPages.length} of ${q.pageRatios.filter((r) => r !== null).length} judgeable pages ` +
       `(${(q.suspectRatio * 100).toFixed(1)}%) scored below ${q.threshold.toFixed(3)} ` +
       `(document median ${q.median.toFixed(3)}). Likely a corrupt text layer needing OCR. ` +
@@ -1381,6 +1395,11 @@ export async function parseManuscript(
   povRoster?: string[];
 }> {
   const fileType = detectFileType(new Uint8Array(buffer));
+
+  // First line out of the parser, deliberately: it names the running code
+  // before anything can fail, so a log with no v2 line is proof the old build
+  // is still serving rather than proof the new one misbehaved.
+  console.log(`${TAG} parseManuscript start — detected ${fileType}, ${buffer.length} bytes`);
 
   // ── Plain-text path ────────────────────────────────────────────────────────
   // Pages come from form feeds (\f) when present — the convention for a text
@@ -1454,13 +1473,15 @@ export async function parseManuscript(
   if (resolved) {
     const { chapters: tocChapters, offset, agreement, unconfirmed } = resolved;
 
+    const withPov = tocChapters.filter((c) => c.povCharacter).length;
     console.log(
-      `[manuscript-parser] TOC parsed: ${tocChapters.length} entries, ` +
-        `printed→PDF offset ${offset >= 0 ? "+" : ""}${offset} ` +
-        `(${(agreement * 100).toFixed(0)}% of titles agree)`
+      `${TAG} TOC parsed: ${tocChapters.length} entries, ` +
+        `printed→PDF offset ${offset >= 0 ? "+" : ""}${offset}, ` +
+        `${(agreement * 100).toFixed(0)}% of titles agreed, ` +
+        `${withPov}/${tocChapters.length} with POV, ${unconfirmed.length} unconfirmed`
     );
     for (const ch of tocChapters) {
-      if (ch.povNote) console.warn(`[manuscript-parser] ${ch.povNote}`);
+      if (ch.povNote) console.warn(`${TAG} ${ch.povNote}`);
     }
 
     // Loud, not lenient. An unconfirmed chapter means the offset does not hold
