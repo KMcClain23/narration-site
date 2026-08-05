@@ -10,13 +10,17 @@ export interface ManuscriptRow {
   title: string;
   author: string | null;
   status: "processing" | "ready" | "failed";
-  source_format: "pdf" | "docx";
+  source_format: "pdf" | "docx" | "txt";
+  /** Why a parse failed, or a warning about a parse that succeeded poorly. */
+  error_message: string | null;
   created_at: string;
   chapterCount: number;
   /** Chapters with a non-null summary — Phase 3's own resumability signal,
    *  reused here to tell "chapters parsed" apart from "dialogue extraction
    *  finished too" instead of both flattening into one "Ready" badge. */
   chaptersExtracted: number;
+  /** Chapters that were attempted and failed extraction, and were skipped. */
+  chaptersFailed: number;
   wordCount: number;
 }
 
@@ -28,12 +32,16 @@ function displayStatus(m: ManuscriptRow): DisplayStatus {
   return "ready";
 }
 
-const ALLOWED_EXTENSIONS = [".pdf", ".docx"];
+const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt"];
 
-async function uploadManuscript(file: File, onProgress: (pct: number) => void): Promise<{ key: string; format: "pdf" | "docx" }> {
-  const contentType =
-    file.name.toLowerCase().endsWith(".docx")
-      ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+async function uploadManuscript(file: File, onProgress: (pct: number) => void): Promise<{ key: string; format: "pdf" | "docx" | "txt" }> {
+  const name = file.name.toLowerCase();
+  // Sent explicitly rather than trusting file.type, which browsers leave empty
+  // for .txt often enough that relying on it would reject valid uploads.
+  const contentType = name.endsWith(".docx")
+    ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    : name.endsWith(".txt")
+      ? "text/plain"
       : "application/pdf";
 
   const res = await fetch("/api/admin/manuscripts/upload-url", {
@@ -108,13 +116,13 @@ function UploadModal({
   const handleFile = (f: File) => {
     const ok = ALLOWED_EXTENSIONS.some((ext) => f.name.toLowerCase().endsWith(ext));
     if (!ok) {
-      setError("Only .pdf or .docx files are accepted.");
+      setError("Only .pdf, .docx, or .txt files are accepted.");
       return;
     }
     setError(null);
     setFile(f);
     if (!title.trim()) {
-      setTitle(f.name.replace(/\.(pdf|docx)$/i, ""));
+      setTitle(f.name.replace(/\.(pdf|docx|txt)$/i, ""));
     }
   };
 
@@ -139,9 +147,11 @@ function UploadModal({
         author: author.trim() || null,
         status: "processing",
         source_format: format,
+        error_message: null,
         created_at: new Date().toISOString(),
         chapterCount: 0,
         chaptersExtracted: 0,
+        chaptersFailed: 0,
         wordCount: 0,
       });
     } catch (e) {
@@ -191,12 +201,12 @@ function UploadModal({
               {file ? (
                 <span className="text-sm font-medium text-text-body">{file.name}</span>
               ) : (
-                <span className="text-sm text-text-muted">Drag & drop or click to choose a PDF or DOCX</span>
+                <span className="text-sm text-text-muted">Drag &amp; drop or click to choose a PDF, DOCX, or TXT</span>
               )}
               <input
                 ref={inputRef}
                 type="file"
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
                 className="sr-only"
                 disabled={busy}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
@@ -265,6 +275,28 @@ function ManuscriptCard({
         {manuscript.wordCount > 0 && ` · ${manuscript.wordCount.toLocaleString()} words`}
         {` · ${manuscript.source_format.toUpperCase()}`}
       </p>
+      {/* Shown for a warning on an otherwise-successful parse as well as an
+          outright failure — a book that parsed into garbled chapters is the
+          more dangerous of the two, because nothing else about the row says so. */}
+      {manuscript.error_message && (
+        <p
+          className={`mt-1.5 text-xs leading-snug ${
+            manuscript.status === "failed" ? "text-alert-red" : "text-accent-amber-dim"
+          }`}
+        >
+          {manuscript.error_message}
+        </p>
+      )}
+      {/* A book with skipped chapters still reads as finished everywhere else:
+          status is "ready" and the extracted count stops short without saying
+          why. This is the only place that gap is visible without a query. */}
+      {manuscript.chaptersFailed > 0 && (
+        <p className="mt-1.5 text-xs leading-snug text-alert-red">
+          {manuscript.chaptersFailed} chapter{manuscript.chaptersFailed === 1 ? "" : "s"} failed
+          extraction and {manuscript.chaptersFailed === 1 ? "was" : "were"} skipped — dialogue is
+          missing {manuscript.chaptersFailed === 1 ? "there" : "in those chapters"}.
+        </p>
+      )}
     </div>
   );
 
@@ -300,17 +332,36 @@ export function PrepperClient({ initialManuscripts }: { initialManuscripts: Manu
   const [isUploading, setIsUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Which manuscripts still exist, readable synchronously. The poller below
+  // closes over a snapshot of `manuscripts` taken when its effect ran, so it
+  // can't tell that a row was deleted a moment ago — it needs a value it can
+  // re-read at await-time, after its request has already come back.
+  const liveIds = useRef<Set<string>>(new Set(initialManuscripts.map((m) => m.id)));
+  useEffect(() => {
+    liveIds.current = new Set(manuscripts.map((m) => m.id));
+  }, [manuscripts]);
+
   const handleDelete = async (m: ManuscriptRow) => {
     if (!window.confirm(`Delete "${m.title}"? This removes all parsed chapters, characters, and dialogue highlighting. This cannot be undone.`)) {
       return;
     }
     setDeletingId(m.id);
+    // Retired before the request goes out, not after it comes back: clearing
+    // the interval on the next render only stops future ticks, and a tick
+    // already awaiting mid-flight would otherwise still GET this id and take
+    // a 404 for a manuscript that is on its way out.
+    liveIds.current.delete(m.id);
     try {
       const res = await fetch(`/api/admin/manuscripts/${m.id}`, { method: "DELETE" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || "Failed to delete");
       setManuscripts((prev) => prev.filter((row) => row.id !== m.id));
+      setDeletingId(null);
     } catch (e) {
+      // The row is staying, so put it back in rotation — otherwise a failed
+      // delete silently leaves a still-processing manuscript unpolled and its
+      // badge frozen at whatever it last read.
+      liveIds.current.add(m.id);
       alert(e instanceof Error ? e.message : "Failed to delete manuscript.");
       setDeletingId(null);
     }
@@ -327,9 +378,13 @@ export function PrepperClient({ initialManuscripts }: { initialManuscripts: Manu
     const interval = setInterval(async () => {
       await Promise.all(
         pending.map(async (m) => {
+          if (!liveIds.current.has(m.id)) return;
           try {
             const res = await fetch(`/api/admin/manuscripts/${m.id}`);
-            if (!res.ok) return;
+            // Re-checked after the await: this tick may have been in flight
+            // when the manuscript was deleted, and applying its response would
+            // resurrect a row that is already gone from the list.
+            if (!liveIds.current.has(m.id) || !res.ok) return;
             const json = await res.json();
             setManuscripts((prev) =>
               prev.map((row) =>
@@ -339,6 +394,11 @@ export function PrepperClient({ initialManuscripts }: { initialManuscripts: Manu
                       status: json.status ?? row.status,
                       chapterCount: json.chapterCount ?? row.chapterCount,
                       chaptersExtracted: json.chaptersExtracted ?? row.chaptersExtracted,
+                      chaptersFailed: json.chaptersFailed ?? row.chaptersFailed,
+                      // Read as ?? null rather than ?? row.error_message so a
+                      // reason that clears server-side clears here too, instead
+                      // of a stale failure sticking to a row that has recovered.
+                      error_message: json.error_message ?? null,
                     }
                   : row
               )

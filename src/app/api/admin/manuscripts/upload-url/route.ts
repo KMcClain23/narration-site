@@ -5,18 +5,26 @@ import { r2, R2_BUCKETS, R2_PREFIXES } from "@/lib/r2";
 import { sanitizeName } from "@/lib/sanitize-name";
 
 // Same bucket, client, and presigned-PUT pattern as /api/upload-person-photo/upload-url.
-const ALLOWED_TYPES: Record<string, "pdf" | "docx"> = {
+const ALLOWED_TYPES: Record<string, "pdf" | "docx" | "txt"> = {
   "application/pdf": "pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "text/plain": "txt",
 };
 
 export async function POST(req: NextRequest) {
   try {
     const { filename, contentType } = await req.json();
 
-    const format = ALLOWED_TYPES[contentType];
+    // Browsers are inconsistent about the MIME type they report for .txt —
+    // some send text/plain, others fall back to application/octet-stream or an
+    // empty string. Content type alone would reject perfectly valid files, so
+    // a .txt extension is accepted as its own signal. PDF and DOCX still go by
+    // content type, which browsers report reliably for both.
+    const format =
+      ALLOWED_TYPES[contentType] ??
+      (typeof filename === "string" && filename.toLowerCase().endsWith(".txt") ? "txt" : undefined);
     if (!format) {
-      return NextResponse.json({ error: "Only PDF or DOCX files are allowed" }, { status: 400 });
+      return NextResponse.json({ error: "Only PDF, DOCX, or TXT files are allowed" }, { status: 400 });
     }
     if (!filename || typeof filename !== "string") {
       return NextResponse.json({ error: "Missing filename" }, { status: 400 });

@@ -110,9 +110,18 @@ export async function extractChapter(rawText: string, knownCharacters: string[])
         .map((c) => c.trim())
     : [];
 
+  // A missing summary used to throw, which discarded the dialogue that had
+  // already been extracted successfully alongside it and — because summary is
+  // also the resumability signal — left the chapter looking unprocessed
+  // forever. It is a compliance miss on one field, not a failed extraction, so
+  // it gets a placeholder and the real work is kept.
   const summary = typeof parsed.summary === "string" ? parsed.summary.trim() : "";
-  if (!summary) throw new Error("Claude returned no summary");
+  const resolvedSummary = summary || "(no summary returned)";
+  if (!summary) console.warn("[dialogue-extractor] no summary in response; keeping dialogue and continuing");
 
+  // A chapter legitimately containing no dialogue — pure narration, a letter,
+  // an epigraph — is a valid result, not an error. It returns an empty span
+  // list and must still be marked done so the chain moves past it.
   const dialogueRaw = Array.isArray(parsed.dialogue) ? parsed.dialogue : [];
 
   let cursor = 0;
@@ -132,5 +141,5 @@ export async function extractChapter(rawText: string, knownCharacters: string[])
       return { speaker, text: d.text, matched: false, start: fallback?.start ?? 0, end: fallback?.end ?? 0 };
     });
 
-  return { characters, summary, dialogueSpans };
+  return { characters, summary: resolvedSummary, dialogueSpans };
 }

@@ -16,8 +16,8 @@ export async function POST(req: Request) {
     if (!key || typeof key !== "string") {
       return NextResponse.json({ error: "Missing key" }, { status: 400 });
     }
-    if (format !== "pdf" && format !== "docx") {
-      return NextResponse.json({ error: "format must be 'pdf' or 'docx'" }, { status: 400 });
+    if (format !== "pdf" && format !== "docx" && format !== "txt") {
+      return NextResponse.json({ error: "format must be 'pdf', 'docx', or 'txt'" }, { status: 400 });
     }
 
     const { data, error } = await supabaseAdmin

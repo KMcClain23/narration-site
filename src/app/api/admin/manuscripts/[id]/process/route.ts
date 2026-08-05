@@ -3,6 +3,7 @@ import { GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { r2, R2_BUCKETS } from "@/lib/r2";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { parseManuscript } from "@/lib/manuscript-parser";
+import { nextCharacterColor } from "@/lib/character-colors";
 
 export const maxDuration = 60;
 
@@ -29,8 +30,18 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const bytes = await obj.Body!.transformToByteArray();
     r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKETS.media.name, Key: manuscript.source_r2_key })).catch(() => {});
 
-    const { chapters } = await parseManuscript(Buffer.from(bytes));
-    if (!chapters.length) throw new Error("No chapters detected");
+    const { chapters, quality, povRoster } = await parseManuscript(Buffer.from(bytes));
+    if (!chapters.length) throw new Error("No chapters detected in the document");
+
+    // A parse can succeed structurally and still be unreadable if the source
+    // PDF's text layer is corrupt. That is worth surfacing on the row rather
+    // than only in the log — it looks identical to a good parse in the UI, and
+    // the chapters are the thing that gets read aloud.
+    const qualityNote =
+      quality && quality.suspectRatio > 0.25
+        ? `Parsed, but ${quality.suspectPages.length} of ${quality.pageRatios.filter((r) => r !== null).length} pages ` +
+          `look garbled (likely a corrupt text layer needing OCR).`
+        : null;
 
     const rows = chapters.map((ch, i) => ({
       manuscript_id: id,
@@ -43,7 +54,28 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const { error: insertError } = await supabaseAdmin.from("chapters").insert(rows);
     if (insertError) throw new Error(insertError.message);
 
-    await supabaseAdmin.from("manuscripts").update({ status: "ready" }).eq("id", id);
+    // Seed the character roster from the TOC's POV names before extraction
+    // starts. These are authored by the publisher rather than inferred, so
+    // they're the most reliable spellings in the book — and having them in
+    // place for chapter one means the very first extraction call already knows
+    // the leads, instead of the roster only becoming useful partway through.
+    if (povRoster?.length) {
+      const seedRows = povRoster.map((name, i) => ({
+        manuscript_id: id,
+        name,
+        color_hex: nextCharacterColor(i),
+      }));
+      const { error: seedError } = await supabaseAdmin.from("characters").insert(seedRows);
+      // Non-fatal: extraction creates any character it needs anyway, so a
+      // failure here costs match quality on early chapters, not the parse.
+      if (seedError) console.warn("[manuscripts/process] POV roster seed failed:", seedError.message);
+      else console.log(`[manuscripts/process] seeded ${seedRows.length} POV characters from TOC`);
+    }
+
+    await supabaseAdmin
+      .from("manuscripts")
+      .update({ status: "ready", error_message: qualityNote })
+      .eq("id", id);
 
     // Chain straight into Phase 3 — a manuscript with chapters but no
     // dialogue extraction is a confusing dead end for anyone using Prepper
@@ -56,8 +88,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
-    console.error("[manuscripts/process]", msg);
-    await supabaseAdmin.from("manuscripts").update({ status: "failed" }).eq("id", id);
+    console.error("[manuscripts/process]", msg, e);
+    // Persisted, not just logged: a failed row that can't say why is a dead
+    // end for whoever uploaded it, and the server log isn't reachable from the
+    // app. Truncated because this is display text, not a place for a stack.
+    await supabaseAdmin
+      .from("manuscripts")
+      .update({ status: "failed", error_message: msg.slice(0, 500) })
+      .eq("id", id);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
