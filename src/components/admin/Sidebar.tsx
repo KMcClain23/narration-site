@@ -24,6 +24,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Inquiries", href: "/inquiries", icon: Mail, badge: "inquiries" },
   {
     label: "Tools", href: "/tools", icon: Wrench,
+    // Unlike Contacts, clicking Tools should just open the dropdown — there's
+    // no natural "first sub-item" to land on, so deep-linking would silently
+    // pick one (Analytics) that isn't obviously "the" Tools page.
+    deepLinkOnClick: false,
     subItems: [
       { label: "Analytics", href: "/tools/analytics" },
       { label: "Contract Builder", href: "/tools/contract-builder" },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, Highlighter, ListTree, Mic, Upload, Volume2, X } from "lucide-react";
+import { Download, Highlighter, ListTree, Mic, Square, Upload, Volume2, X } from "lucide-react";
 import { splitParagraphs, type SpanLite } from "./paragraph-highlight";
 import { ParagraphText, type CharacterLite } from "./ParagraphText";
 import { isUnnumberedSection } from "@/lib/unnumbered-sections";
@@ -88,15 +88,34 @@ export function ManuscriptReader({
 
   // Single shared <audio> instance — clicking a new character's sample stops
   // whatever's already playing, same single-active-playback convention as
-  // the demos admin's WaveformStrip.
+  // the demos admin's WaveformStrip. Clicking the *same* character again
+  // stops it instead of restarting it — playingCharacterId is what makes
+  // that a toggle rather than a one-way play button, and doubles as the
+  // "which sample is live right now" flag every play button reads to render
+  // its own state (also cleared on natural end, not just manual stop).
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const playVoiceSample = (url: string) => {
-    if (!audioRef.current) audioRef.current = new Audio();
-    const audio = audioRef.current;
+  const [playingCharacterId, setPlayingCharacterId] = useState<string | null>(null);
+
+  const getAudio = () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.addEventListener("ended", () => setPlayingCharacterId(null));
+    }
+    return audioRef.current;
+  };
+
+  const toggleVoiceSample = (characterId: string, url: string) => {
+    const audio = getAudio();
+    if (playingCharacterId === characterId) {
+      audio.pause();
+      setPlayingCharacterId(null);
+      return;
+    }
     audio.pause();
     audio.src = url;
     audio.currentTime = 0;
     audio.play().catch(() => {});
+    setPlayingCharacterId(characterId);
   };
 
   // Display numbering skips front/back matter (Dedication, Author's Note,
@@ -367,7 +386,8 @@ export function ManuscriptReader({
           manuscriptId={manuscriptId}
           characters={characters}
           setCharacters={setCharacters}
-          onPlaySample={playVoiceSample}
+          playingCharacterId={playingCharacterId}
+          onToggleSample={toggleVoiceSample}
         />
         <TagDialogueControl
           characters={characters}
@@ -401,7 +421,8 @@ export function ManuscriptReader({
             displayTotal={chapterMeta[i].total}
             charById={charById}
             onMarkClick={handleMarkClick}
-            onPlaySample={playVoiceSample}
+            playingCharacterId={playingCharacterId}
+            onToggleSample={toggleVoiceSample}
           />
         ))}
       </div>
@@ -552,12 +573,14 @@ function VoicesControl({
   manuscriptId,
   characters,
   setCharacters,
-  onPlaySample,
+  playingCharacterId,
+  onToggleSample,
 }: {
   manuscriptId: string;
   characters: CharacterLite[];
   setCharacters: (updater: (prev: CharacterLite[]) => CharacterLite[]) => void;
-  onPlaySample: (url: string) => void;
+  playingCharacterId: string | null;
+  onToggleSample: (characterId: string, url: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -628,11 +651,13 @@ function VoicesControl({
                     <>
                       <button
                         type="button"
-                        onClick={() => onPlaySample(c.voice_sample_url as string)}
-                        title="Play sample"
-                        className="rounded-full p-1 text-text-muted transition-colors hover:bg-[#e7e2d2]"
+                        onClick={() => onToggleSample(c.id, c.voice_sample_url as string)}
+                        title={playingCharacterId === c.id ? "Stop" : "Play sample"}
+                        className={`rounded-full p-1 transition-colors hover:bg-[#e7e2d2] ${
+                          playingCharacterId === c.id ? ink : "text-text-muted"
+                        }`}
                       >
-                        <Volume2 size={14} />
+                        {playingCharacterId === c.id ? <Square size={14} className="fill-current" /> : <Volume2 size={14} />}
                       </button>
                       <button
                         type="button"
@@ -812,14 +837,16 @@ function ChapterSection({
   displayTotal,
   charById,
   onMarkClick,
-  onPlaySample,
+  playingCharacterId,
+  onToggleSample,
 }: {
   chapter: ChapterWithSpans;
   displayNumber: number | null;
   displayTotal: number;
   charById: Map<string, CharacterLite>;
   onMarkClick: (span: SpanLite, chapterId: string, text: string) => void;
-  onPlaySample: (url: string) => void;
+  playingCharacterId: string | null;
+  onToggleSample: (characterId: string, url: string) => void;
 }) {
   const blocks = useMemo(
     () => splitParagraphs(chapter.raw_text, chapter.spans),
@@ -872,20 +899,24 @@ function ChapterSection({
                   const c = charById.get(id);
                   if (!c) return null;
                   const playable = !!c.voice_sample_url;
+                  const isPlaying = playingCharacterId === id;
                   return (
                     <button
                       key={id}
                       type="button"
                       disabled={!playable}
-                      onClick={() => c.voice_sample_url && onPlaySample(c.voice_sample_url)}
-                      title={playable ? `Play ${c.name}'s voice sample` : undefined}
+                      onClick={() => c.voice_sample_url && onToggleSample(id, c.voice_sample_url)}
+                      title={playable ? `${isPlaying ? "Stop" : "Play"} ${c.name}'s voice sample` : undefined}
                       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
                         playable ? "cursor-pointer transition-transform hover:scale-105" : "cursor-default"
                       }`}
-                      style={{ background: `${c.color_hex}22`, color: c.color_hex }}
+                      style={{
+                        background: isPlaying ? c.color_hex : `${c.color_hex}22`,
+                        color: isPlaying ? readableTextOn(c.color_hex) : c.color_hex,
+                      }}
                     >
                       {c.name}
-                      {playable && <Volume2 size={10} className="shrink-0" />}
+                      {playable && (isPlaying ? <Square size={9} className="shrink-0 fill-current" /> : <Volume2 size={10} className="shrink-0" />)}
                     </button>
                   );
                 })}

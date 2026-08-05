@@ -6,6 +6,39 @@ import { PrepperClient, type ManuscriptRow } from "@/components/admin/prepper/Pr
 // other /tools pages.
 export const dynamic = "force-dynamic";
 
+function countWords(text: string | null): number {
+  return text ? text.split(/\s+/).filter(Boolean).length : 0;
+}
+
+/**
+ * Pushes a manuscript's total word count onto its matching Board card when
+ * the card doesn't have one yet — matched by title the same way the author
+ * profile page matches board_cards to authors (no FK between the two
+ * tables, so exact-match first, trimmed/lowercased fallback). Runs on every
+ * Prepper page load; harmless to repeat since it only ever writes when
+ * word_count is genuinely missing, so it self-converges to a no-op per book
+ * after the first successful sync.
+ */
+async function syncMissingWordCountsToBoard(
+  manuscripts: { id: string; title: string; status: string }[],
+  wordCountByManuscript: Map<string, number>
+) {
+  const ready = manuscripts.filter((m) => m.status === "ready" && (wordCountByManuscript.get(m.id) ?? 0) > 0);
+  if (!ready.length) return;
+
+  const { data: boardCards } = await supabaseAdmin.from("board_cards").select("id, title, word_count");
+  if (!boardCards?.length) return;
+
+  const updates = ready.flatMap((m) => {
+    const target = m.title.trim().toLowerCase();
+    const match = boardCards.find((b) => b.title?.trim().toLowerCase() === target);
+    if (!match || match.word_count) return [];
+    return [supabaseAdmin.from("board_cards").update({ word_count: wordCountByManuscript.get(m.id) }).eq("id", match.id)];
+  });
+
+  if (updates.length) await Promise.all(updates);
+}
+
 export default async function PrepperPage() {
   const { data: manuscripts } = await supabaseAdmin
     .from("manuscripts")
@@ -14,17 +47,23 @@ export default async function PrepperPage() {
 
   const manuscriptIds = (manuscripts ?? []).map((m) => m.id);
   const { data: chapterRows } = manuscriptIds.length
-    ? await supabaseAdmin.from("chapters").select("manuscript_id, summary").in("manuscript_id", manuscriptIds)
+    ? await supabaseAdmin.from("chapters").select("manuscript_id, summary, raw_text").in("manuscript_id", manuscriptIds)
     : { data: [] };
 
   const chapterCountByManuscript = new Map<string, number>();
   const extractedCountByManuscript = new Map<string, number>();
+  const wordCountByManuscript = new Map<string, number>();
   (chapterRows ?? []).forEach((c) => {
     chapterCountByManuscript.set(c.manuscript_id, (chapterCountByManuscript.get(c.manuscript_id) ?? 0) + 1);
     if (c.summary !== null) {
       extractedCountByManuscript.set(c.manuscript_id, (extractedCountByManuscript.get(c.manuscript_id) ?? 0) + 1);
     }
+    wordCountByManuscript.set(c.manuscript_id, (wordCountByManuscript.get(c.manuscript_id) ?? 0) + countWords(c.raw_text));
   });
+
+  if (manuscripts?.length) {
+    await syncMissingWordCountsToBoard(manuscripts, wordCountByManuscript);
+  }
 
   const rows: ManuscriptRow[] = (manuscripts ?? []).map((m) => ({
     id: m.id,
@@ -35,6 +74,7 @@ export default async function PrepperPage() {
     created_at: m.created_at,
     chapterCount: chapterCountByManuscript.get(m.id) ?? 0,
     chaptersExtracted: extractedCountByManuscript.get(m.id) ?? 0,
+    wordCount: wordCountByManuscript.get(m.id) ?? 0,
   }));
 
   return (

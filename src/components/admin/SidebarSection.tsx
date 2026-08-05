@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ChevronDown, type LucideIcon } from "lucide-react";
 
@@ -10,6 +11,11 @@ export type NavItem = {
   icon: LucideIcon;
   subItems?: SubNavItem[];
   badge?: "inquiries";
+  /** Default true (Contacts' existing behavior): clicking the parent row
+   *  deep-links straight to the first sub-item. Set false to make the
+   *  parent row a pure dropdown toggle instead — click just opens/closes
+   *  the sub-item list, no navigation. */
+  deepLinkOnClick?: boolean;
 };
 
 export function SidebarSection({
@@ -25,53 +31,76 @@ export function SidebarSection({
 }) {
   const sectionActive = item.subItems ? pathname.startsWith(item.href) : pathname === item.href;
   const leafActive = sectionActive && !item.subItems;
-  const autoExpanded = !collapsed && !!item.subItems && pathname.startsWith(item.href);
+  const deepLink = item.deepLinkOnClick !== false;
+
+  // Toggle-mode sections (deepLink: false) need real open/closed state —
+  // there's no sub-page to land on that would derive it from the pathname
+  // the way deep-linking sections do.
+  const [manuallyOpen, setManuallyOpen] = useState(false);
+  const expanded = !collapsed && !!item.subItems && (sectionActive || (!deepLink && manuallyOpen));
+
   const Icon = item.icon;
-  // Parent rows with sub-items (Contacts, Tools) deep-link straight to their
-  // first sub-item — item.href itself is a server-redirect page (e.g.
-  // /contacts -> /contacts/authors), and routing a client-side Link through
-  // it causes a visible flash of the previous page while the two hops
-  // resolve. item.href is still used above for active-state matching, since
-  // that needs the parent prefix to cover every sub-item.
+  // Deep-linking parent rows go straight to their first sub-item —
+  // item.href itself is a server-redirect page (e.g. /contacts ->
+  // /contacts/authors), and routing a client-side Link through it causes a
+  // visible flash of the previous page while the two hops resolve.
+  // item.href is still used above for active-state matching, since that
+  // needs the parent prefix to cover every sub-item.
   const linkHref = item.subItems?.[0]?.href ?? item.href;
+
+  const rowClassName = `group relative flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors ${
+    leafActive
+      ? "bg-surface-raised text-text-primary"
+      : sectionActive
+        ? "text-text-primary"
+        : "text-text-muted hover:bg-surface hover:text-text-primary"
+  }`;
+
+  const rowContent = (
+    <>
+      {leafActive && (
+        <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-accent-amber" />
+      )}
+      <Icon
+        size={18}
+        className={`shrink-0 ${sectionActive ? "text-accent-amber" : "text-text-muted group-hover:text-text-primary"}`}
+      />
+      {!collapsed && <span className="flex-1 text-sm truncate">{item.label}</span>}
+      {!collapsed && item.badge === "inquiries" && unreadInquiries > 0 && (
+        <span className="shrink-0 min-w-[18px] text-center rounded-full bg-accent-amber text-background text-[11px] font-bold px-1.5 py-0.5">
+          {unreadInquiries}
+        </span>
+      )}
+      {!collapsed && item.subItems && (
+        <ChevronDown
+          size={14}
+          className={`shrink-0 text-text-dim transition-transform ${expanded ? "" : "-rotate-90"}`}
+        />
+      )}
+    </>
+  );
 
   return (
     <div>
-      <Link
-        href={linkHref}
-        title={collapsed ? item.label : undefined}
-        aria-current={leafActive ? "page" : undefined}
-        className={`group relative flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors ${
-          leafActive
-            ? "bg-surface-raised text-text-primary"
-            : sectionActive
-              ? "text-text-primary"
-              : "text-text-muted hover:bg-surface hover:text-text-primary"
-        }`}
-      >
-        {leafActive && (
-          <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-accent-amber" />
-        )}
-        <Icon
-          size={18}
-          className={`shrink-0 ${sectionActive ? "text-accent-amber" : "text-text-muted group-hover:text-text-primary"}`}
-        />
-        {!collapsed && <span className="flex-1 text-sm truncate">{item.label}</span>}
-        {!collapsed && item.badge === "inquiries" && unreadInquiries > 0 && (
-          <span className="shrink-0 min-w-[18px] text-center rounded-full bg-accent-amber text-background text-[11px] font-bold px-1.5 py-0.5">
-            {unreadInquiries}
-          </span>
-        )}
-        {!collapsed && item.subItems && (
-          <ChevronDown
-            size={14}
-            className={`shrink-0 text-text-dim transition-transform ${autoExpanded ? "" : "-rotate-90"}`}
-          />
-        )}
-      </Link>
+      {deepLink ? (
+        <Link href={linkHref} title={collapsed ? item.label : undefined} aria-current={leafActive ? "page" : undefined} className={rowClassName}>
+          {rowContent}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setManuallyOpen((v) => !v)}
+          title={collapsed ? item.label : undefined}
+          aria-expanded={expanded}
+          className={`w-full ${rowClassName}`}
+        >
+          {rowContent}
+        </button>
+      )}
 
-      {/* Sub-nav — collapsed by default, auto-expands on section routes only */}
-      {!collapsed && item.subItems && autoExpanded && (
+      {/* Sub-nav — collapsed by default, expands on section routes (deep-link
+          sections) or on click (toggle sections). */}
+      {!collapsed && item.subItems && expanded && (
         <div className="ml-[26px] mt-0.5 mb-1 space-y-0.5 border-l border-surface-border pl-3">
           {item.subItems.map(sub => {
             const active = pathname === sub.href;

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 
 export interface ManuscriptRow {
@@ -17,6 +17,7 @@ export interface ManuscriptRow {
    *  reused here to tell "chapters parsed" apart from "dialogue extraction
    *  finished too" instead of both flattening into one "Ready" badge. */
   chaptersExtracted: number;
+  wordCount: number;
 }
 
 type DisplayStatus = "processing" | "extracting" | "ready" | "failed";
@@ -141,6 +142,7 @@ function UploadModal({
         created_at: new Date().toISOString(),
         chapterCount: 0,
         chaptersExtracted: 0,
+        wordCount: 0,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed.");
@@ -242,38 +244,77 @@ function UploadModal({
   );
 }
 
-function ManuscriptCard({ manuscript }: { manuscript: ManuscriptRow }) {
-  const inner = (
-    <div className="flex items-center gap-4 rounded-xl border border-surface-border bg-surface p-4 transition-colors hover:border-accent-amber-dim/50">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={`${adminType.title} truncate`}>{manuscript.title}</span>
-          <StatusBadge manuscript={manuscript} />
-        </div>
-        <p className={`${adminType.small} mt-0.5`}>
-          {manuscript.author || "Unknown author"}
-          {manuscript.chapterCount > 0 && ` · ${manuscript.chapterCount} chapter${manuscript.chapterCount === 1 ? "" : "s"}`}
-          {` · ${manuscript.source_format.toUpperCase()}`}
-        </p>
+function ManuscriptCard({
+  manuscript,
+  onDelete,
+  deleting,
+}: {
+  manuscript: ManuscriptRow;
+  onDelete: () => void;
+  deleting: boolean;
+}) {
+  const details = (
+    <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`${adminType.title} truncate`}>{manuscript.title}</span>
+        <StatusBadge manuscript={manuscript} />
       </div>
+      <p className={`${adminType.small} mt-0.5`}>
+        {manuscript.author || "Unknown author"}
+        {manuscript.chapterCount > 0 && ` · ${manuscript.chapterCount} chapter${manuscript.chapterCount === 1 ? "" : "s"}`}
+        {manuscript.wordCount > 0 && ` · ${manuscript.wordCount.toLocaleString()} words`}
+        {` · ${manuscript.source_format.toUpperCase()}`}
+      </p>
     </div>
   );
 
   // Clickable as soon as chapters exist — extraction filling in gradually
   // is a fine degrading experience (plain text where highlighting hasn't
   // landed yet), not a reason to block the reader entirely.
-  if (manuscript.status !== "ready") return inner;
+  const clickable = manuscript.status === "ready";
 
   return (
-    <Link href={`/admin/manuscripts/${manuscript.id}`} className="block">
-      {inner}
-    </Link>
+    <div className="flex items-center gap-2 rounded-xl border border-surface-border bg-surface p-4 transition-colors hover:border-accent-amber-dim/50">
+      {clickable ? (
+        <Link href={`/admin/manuscripts/${manuscript.id}`} className="flex min-w-0 flex-1 items-center gap-4">
+          {details}
+        </Link>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center gap-4">{details}</div>
+      )}
+      <button
+        type="button"
+        onClick={onDelete}
+        disabled={deleting}
+        title="Delete manuscript"
+        className="shrink-0 rounded-lg p-2 text-text-muted transition-colors hover:bg-alert-red/10 hover:text-alert-red disabled:opacity-40"
+      >
+        <Trash2 size={16} />
+      </button>
+    </div>
   );
 }
 
 export function PrepperClient({ initialManuscripts }: { initialManuscripts: ManuscriptRow[] }) {
   const [manuscripts, setManuscripts] = useState<ManuscriptRow[]>(initialManuscripts);
   const [isUploading, setIsUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (m: ManuscriptRow) => {
+    if (!window.confirm(`Delete "${m.title}"? This removes all parsed chapters, characters, and dialogue highlighting. This cannot be undone.`)) {
+      return;
+    }
+    setDeletingId(m.id);
+    try {
+      const res = await fetch(`/api/admin/manuscripts/${m.id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Failed to delete");
+      setManuscripts((prev) => prev.filter((row) => row.id !== m.id));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to delete manuscript.");
+      setDeletingId(null);
+    }
+  };
 
   // Poll anything still mid-pipeline — parsing (status: "processing") or
   // extracting (status: "ready" but chaptersExtracted hasn't caught up to
@@ -344,7 +385,12 @@ export function PrepperClient({ initialManuscripts }: { initialManuscripts: Manu
         ) : (
           <div className="mt-3 space-y-2">
             {manuscripts.map((m) => (
-              <ManuscriptCard key={m.id} manuscript={m} />
+              <ManuscriptCard
+                key={m.id}
+                manuscript={m}
+                onDelete={() => handleDelete(m)}
+                deleting={deletingId === m.id}
+              />
             ))}
           </div>
         )}
