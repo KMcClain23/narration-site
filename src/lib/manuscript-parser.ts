@@ -43,12 +43,144 @@ function ensureDOMMatrix() {
 
 // ─── File-type detection ──────────────────────────────────────────────────────
 
-function detectFileType(bytes: Uint8Array): "pdf" | "docx" | "unknown" {
+function detectFileType(bytes: Uint8Array): "pdf" | "docx" | "txt" | "unknown" {
   // PDF magic: %PDF  (25 50 44 46)
   if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) return "pdf";
   // DOCX/ZIP magic: PK\x03\x04  (50 4B 03 04)
   if (bytes[0] === 0x50 && bytes[1] === 0x4B && bytes[2] === 0x03 && bytes[3] === 0x04) return "docx";
+  // No magic number for plain text — sniff instead. A UTF-8 BOM is conclusive;
+  // otherwise a leading sample with no NUL bytes and few control characters is
+  // text. Recovered-from-OCR manuscripts arrive as .txt, so this path exists to
+  // let a repaired text layer re-enter the pipeline without being re-wrapped in
+  // a .docx first.
+  if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) return "txt";
+  const sample = bytes.subarray(0, 4096);
+  if (sample.length) {
+    let control = 0;
+    for (const b of sample) {
+      if (b === 0x00) return "unknown";
+      // Allow tab (09), LF (0A), FF (0C — page break), CR (0D)
+      if (b < 0x20 && b !== 0x09 && b !== 0x0A && b !== 0x0C && b !== 0x0D) control++;
+    }
+    if (control / sample.length < 0.02) return "txt";
+  }
   return "unknown";
+}
+
+// ─── Text normalization ────────────────────────────────────────────────────────
+
+/**
+ * Professionally typeset PDFs encode "fi", "fl", "ff" etc. as single Unicode
+ * ligature glyphs (U+FB00–U+FB06). Left alone they silently corrupt every
+ * downstream word-level operation: "fingers" reads as one token no dictionary
+ * or word-frequency check recognises, TOC titles fail to match, and Claude sees
+ * a garbled word. Vellum and InDesign both emit these by default, so this
+ * applies to essentially every retail-typeset manuscript, not just the odd one.
+ *
+ * Runs at the extraction boundary so nothing downstream ever sees a ligature.
+ */
+const LIGATURES: Array<[RegExp, string]> = [
+  [/ﬀ/g, "ff"],
+  [/ﬁ/g, "fi"],
+  [/ﬂ/g, "fl"],
+  [/ﬃ/g, "ffi"],
+  [/ﬄ/g, "ffl"],
+  [/ﬅ/g, "st"], // long s + t
+  [/ﬆ/g, "st"],
+];
+
+function normalizeLigatures(s: string): string {
+  if (!s) return s;
+  let out = s;
+  for (const [re, rep] of LIGATURES) out = out.replace(re, rep);
+  return out;
+}
+
+// ─── Text-layer quality detection ──────────────────────────────────────────────
+//
+// A PDF can carry a text layer that extracts without error and is still
+// garbage — a corrupt/misencoded font maps glyphs to the wrong code points, so
+// getTextContent() returns confident-looking mojibake. Nothing throws; the
+// parse "succeeds" and produces chapters full of unreadable text.
+//
+// The tell is function words. Real English prose is ~32–37% the/and/of/to/a/…
+// by token count, and that ratio is remarkably stable across authors and
+// genres. Mojibake scores near zero because the substitution destroys them.
+//
+// Two things matter about how the threshold is set:
+//  - It is calibrated against the document's own median page, not hardcoded.
+//    Heavy dialect, invented names, or unusual prose shift a book's baseline,
+//    and a fixed cutoff would either miss real corruption or condemn a clean
+//    book with an unusual voice.
+//  - The absolute floor is 0.20, not something lower. A run at 0.06 let pages
+//    scoring 0.06–0.20 through as "clean" when they were in fact garbled —
+//    the gap between corrupt and merely unusual is much narrower than it looks.
+
+const COMMON_WORDS = new Set([
+  "the", "and", "of", "to", "a", "in", "is", "it", "that", "was", "he", "she",
+  "for", "on", "with", "as", "at", "but", "his", "her", "had", "not", "be",
+  "have", "from", "they", "you", "this", "or", "by", "we", "an", "been", "him",
+  "me", "my", "up", "out", "so", "what", "were", "when", "there", "would",
+  "into", "your", "just", "like", "no", "all", "if", "one", "back", "then",
+  "down", "over", "now", "could", "did", "them", "their", "than", "how",
+]);
+
+/** Fewer tokens than this and the ratio is too noisy to judge. */
+const MIN_WORDS_FOR_QUALITY_CHECK = 30;
+const QUALITY_ABSOLUTE_FLOOR = 0.2;
+/** A page this far below the document's own median is an outlier, not a style. */
+const QUALITY_MEDIAN_FRACTION = 0.55;
+
+export interface TextQualityReport {
+  /** Per-page common-word ratio; null for pages too short to judge. */
+  pageRatios: Array<number | null>;
+  /** Median ratio across judgeable pages — this document's own baseline. */
+  median: number;
+  /** The cutoff actually applied, after per-document calibration. */
+  threshold: number;
+  /** 0-based indices of pages scoring below the threshold. */
+  suspectPages: number[];
+  /** suspectPages.length / judgeable page count. */
+  suspectRatio: number;
+}
+
+function commonWordRatio(text: string): number | null {
+  const words = text.toLowerCase().match(/[a-z']+/g);
+  if (!words || words.length < MIN_WORDS_FOR_QUALITY_CHECK) return null;
+  let hits = 0;
+  for (const w of words) if (COMMON_WORDS.has(w)) hits++;
+  return hits / words.length;
+}
+
+export function assessTextQuality(pageTexts: string[]): TextQualityReport {
+  const pageRatios = pageTexts.map(commonWordRatio);
+  const judgeable = pageRatios.filter((r): r is number => r !== null);
+
+  if (!judgeable.length) {
+    return { pageRatios, median: 0, threshold: QUALITY_ABSOLUTE_FLOOR, suspectPages: [], suspectRatio: 0 };
+  }
+
+  const sorted = [...judgeable].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+
+  // Calibrate to this document, but never drop below the absolute floor —
+  // a book that is corrupt end-to-end has a corrupt median too, and a purely
+  // relative threshold would rate it internally consistent and therefore fine.
+  const threshold = Math.max(QUALITY_ABSOLUTE_FLOOR, median * QUALITY_MEDIAN_FRACTION);
+
+  const suspectPages: number[] = [];
+  pageRatios.forEach((r, i) => {
+    if (r !== null && r < threshold) suspectPages.push(i);
+  });
+
+  return {
+    pageRatios,
+    median,
+    threshold,
+    suspectPages,
+    suspectRatio: suspectPages.length / judgeable.length,
+  };
 }
 
 // ─── DOCX extraction ──────────────────────────────────────────────────────────
@@ -160,6 +292,13 @@ async function processDocx(buffer: Buffer): Promise<
 interface PdfLine {
   text: string;
   indent: number;
+  /**
+   * Set when a paragraph break is known structurally rather than inferred from
+   * indentation — currently only by drop-cap joining, where the reconstructed
+   * line is by definition the first line of a paragraph regardless of where the
+   * oversized initial glyph happened to sit.
+   */
+  forceBreak?: boolean;
 }
 
 async function extractPagesFromPdf(buffer: Buffer): Promise<{ flatPages: string[]; linePages: PdfLine[][] }> {
@@ -179,7 +318,10 @@ async function extractPagesFromPdf(buffer: Buffer): Promise<{ flatPages: string[
   await pdfParse(buffer, {
     pagerender(pageData: { getTextContent: () => Promise<{ items: Array<{ str: string; transform: number[] }> }> }) {
       return pageData.getTextContent().then((tc) => {
-        const flat = tc.items.map((i) => i.str).join(" ").replace(/\s+/g, " ").trim();
+        // Ligatures are normalized here, at the single point where glyphs
+        // become strings, so no consumer downstream — TOC matching, quality
+        // scoring, paragraph assembly, Claude — ever has to know they existed.
+        const flat = normalizeLigatures(tc.items.map((i) => i.str).join(" ")).replace(/\s+/g, " ").trim();
         flatPages.push(flat);
 
         const lines: PdfLine[] = [];
@@ -189,13 +331,14 @@ async function extractPagesFromPdf(buffer: Buffer): Promise<{ flatPages: string[
         for (const item of tc.items) {
           const y = item.transform[5];
           const x = item.transform[4];
+          const str = normalizeLigatures(item.str);
           if (lastY === null || y === lastY) {
             if (cur === "") curIndent = x;
-            cur += item.str;
+            cur += str;
           } else {
             const t = cur.trim().replace(/\s+/g, " ");
             if (t) lines.push({ text: t, indent: curIndent });
-            cur = item.str;
+            cur = str;
             curIndent = x;
           }
           lastY = y;
@@ -214,125 +357,183 @@ async function extractPagesFromPdf(buffer: Buffer): Promise<{ flatPages: string[
 
 // ─── Header/footer stripping (PDF only) ────────────────────────────────────────
 //
-// A line is a probable running header/footer if it (a) is short (<40 chars),
-// (b) is either all-caps or purely numeric (a page number), and (c) recurs
-// — identically, or in the numeric case by pattern — across a majority of
-// pages at a consistent position (first or last non-blank line of the page).
-// "Near-identical" is handled by normalizing (lowercase, collapsed whitespace)
-// before comparing; this is not fuzzy/edit-distance matching, just enough to
-// absorb incidental spacing/case drift between page renders.
+// Running headers are identified by *frequency and position*, never by matching
+// against known strings. A line is a running header if it is short (<40 chars),
+// sits within three lines of the top or bottom of the page, and recurs on more
+// than a quarter of the book's pages.
+//
+// Three things this deliberately does not assume:
+//
+//  - Casing. Print layouts commonly set the book title in title case and the
+//    author in small caps; requiring all-caps caught the author line and let
+//    the title line through on every alternating spread.
+//  - Exact repetition. Page numbers frequently extract fused to the header on
+//    the same line ("16AMYRENFROE"), so the digits differ on every page and no
+//    two headers are ever byte-identical. Grouping strips leading/trailing
+//    digits before comparing, which collapses those to one key.
+//  - Position within the zone. A header may extract as line 1 on one page and
+//    line 2 on another depending on what else lands in that band.
+//
+// Alternating recto/verso headers each land near 50% of pages, comfortably
+// above the 25% bar, so both variants are caught by the same single pass —
+// no separate page-parity grouping needed.
 
 const HEADER_FOOTER_MAX_LEN = 40;
+/** How many lines in from each page edge count as header/footer territory. */
+const HEADER_ZONE_LINES = 3;
+/** A line recurring on more than this share of pages is structural, not prose. */
+const RECURRENCE_FRACTION = 0.25;
 
 function isNumericLine(s: string): boolean {
-  return /^\d{1,4}$/.test(s);
-}
-
-function isAllCapsLine(s: string): boolean {
-  return /[A-Z]/.test(s) && s === s.toUpperCase() && !/[a-z]/.test(s);
-}
-
-function qualifiesAsHeaderFooter(s: string): boolean {
-  const t = s.trim();
-  if (!t || t.length >= HEADER_FOOTER_MAX_LEN) return false;
-  return isNumericLine(t) || isAllCapsLine(t);
-}
-
-function firstNonBlankIndex(lines: PdfLine[]): number {
-  return lines.findIndex((l) => l.text.trim().length > 0);
-}
-
-function lastNonBlankIndex(lines: PdfLine[]): number {
-  for (let i = lines.length - 1; i >= 0; i--) {
-    if (lines[i].text.trim().length > 0) return i;
-  }
-  return -1;
+  return /^\d{1,4}$/.test(s.trim());
 }
 
 /**
- * Given the candidate line at a fixed position (first-line or last-line) for
- * a specific set of pages, decide which of those pages' candidate is a
- * recurring header/footer and should be stripped. Numeric candidates recur
- * by *pattern* (the digits differ per page — that's the point, it's a page
- * number); text candidates must recur with (near-)identical normalized text.
+ * Grouping key for a candidate header line: lowercased, whitespace collapsed,
+ * trailing punctuation dropped, and leading/trailing digits removed so a folio
+ * fused onto the header text doesn't make every page look unique.
  */
-function findRecurringInGroup(candidates: (string | null)[], indices: number[]): Set<number> {
-  const threshold = Math.max(2, Math.ceil(indices.length * 0.5));
+function headerKey(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/^[\d\s]+/, "")
+    .replace(/[\d\s]+$/, "")
+    .replace(/[.,;:]+$/, "")
+    .trim();
+}
 
-  const qualifying = indices
-    .map((i) => ({ i, c: candidates[i] }))
-    .filter((x): x is { i: number; c: string } => !!x.c && qualifiesAsHeaderFooter(x.c));
-
-  if (qualifying.length < threshold) return new Set();
-
-  const numeric = qualifying.filter((x) => isNumericLine(x.c.trim()));
-  if (numeric.length >= threshold) return new Set(numeric.map((x) => x.i));
-
-  const groups = new Map<string, number[]>();
-  for (const { i, c } of qualifying) {
-    const norm = c.trim().toLowerCase().replace(/\s+/g, " ").replace(/[.,;:]+$/, "");
-    if (!groups.has(norm)) groups.set(norm, []);
-    groups.get(norm)!.push(i);
-  }
-  for (const idxs of groups.values()) {
-    if (idxs.length >= threshold) return new Set(idxs);
-  }
-  return new Set();
+function nonBlankIndices(lines: PdfLine[]): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < lines.length; i++) if (lines[i].text.trim()) out.push(i);
+  return out;
 }
 
 /**
- * Print layouts commonly alternate running headers by page parity — book
- * title on one side, chapter/POV name on the other (recto/verso). Checked
- * only across all pages, each variant lands under ~50% and neither gets
- * caught. So this checks three groupings — all pages, even indices, odd
- * indices — and strips whatever any of them independently recognize as
- * majority-recurring. A non-alternating header still gets caught by the
- * all-pages pass; an alternating one gets caught by whichever parity it
- * actually lives on.
+ * Line positions within HEADER_ZONE_LINES of either edge of the page.
+ *
+ * The zone is additionally capped at a third of the page's lines. On a normal
+ * 25–35 line body page that cap never binds and the zone is the full three
+ * lines at each edge. On a nearly empty page — a chapter opener, a part title,
+ * a page holding two lines and a folio — an uncapped zone would cover the
+ * entire page, making every line on it a strip candidate. That is how a
+ * frequency rule turns into silent whole-page deletion, so the zone is never
+ * allowed to reach that far in.
  */
-function findRecurringIndices(candidates: (string | null)[]): Set<number> {
-  const allIndices = candidates.map((_, i) => i);
-  const evenIndices = allIndices.filter((i) => i % 2 === 0);
-  const oddIndices = allIndices.filter((i) => i % 2 === 1);
-
-  const result = new Set<number>();
-  for (const group of [allIndices, evenIndices, oddIndices]) {
-    for (const i of findRecurringInGroup(candidates, group)) result.add(i);
-  }
-  return result;
+function zoneIndices(lines: PdfLine[]): number[] {
+  const nb = nonBlankIndices(lines);
+  if (!nb.length) return [];
+  const span = Math.max(1, Math.min(HEADER_ZONE_LINES, Math.floor(nb.length / 3)));
+  const head = nb.slice(0, span);
+  const tail = nb.slice(-span);
+  return Array.from(new Set([...head, ...tail]));
 }
 
-/** Not enough pages to establish a "recurs across a majority" pattern. */
+/** Not enough pages to establish that anything "recurs" at all. */
 const MIN_PAGES_FOR_HEADER_FOOTER_DETECTION = 3;
 
 function stripHeadersFooters(pageLines: PdfLine[][]): PdfLine[][] {
   if (pageLines.length < MIN_PAGES_FOR_HEADER_FOOTER_DETECTION) return pageLines;
 
-  const firstCandidates = pageLines.map((lines) => {
-    const idx = firstNonBlankIndex(lines);
-    return idx === -1 ? null : lines[idx].text;
-  });
-  const lastCandidates = pageLines.map((lines) => {
-    const idx = lastNonBlankIndex(lines);
-    return idx === -1 ? null : lines[idx].text;
+  const threshold = Math.max(2, Math.ceil(pageLines.length * RECURRENCE_FRACTION));
+
+  interface Candidate { page: number; line: number; text: string }
+  const textCandidates: Candidate[] = [];
+  const numericCandidates: Candidate[] = [];
+
+  pageLines.forEach((lines, page) => {
+    for (const line of zoneIndices(lines)) {
+      const text = lines[line].text.trim();
+      if (!text || text.length >= HEADER_FOOTER_MAX_LEN) continue;
+      if (isNumericLine(text)) numericCandidates.push({ page, line, text });
+      else if (headerKey(text)) textCandidates.push({ page, line, text });
+    }
   });
 
-  const stripFirst = findRecurringIndices(firstCandidates);
-  const stripLast = findRecurringIndices(lastCandidates);
+  // A key qualifies on distinct *pages*, not raw occurrences — a header that
+  // somehow extracted twice on one page shouldn't count double toward the bar.
+  const byKey = new Map<string, Candidate[]>();
+  for (const c of textCandidates) {
+    const k = headerKey(c.text);
+    if (!byKey.has(k)) byKey.set(k, []);
+    byKey.get(k)!.push(c);
+  }
 
-  return pageLines.map((lines, pageIdx) => {
-    if (!stripFirst.has(pageIdx) && !stripLast.has(pageIdx)) return lines;
-    const out = lines.slice();
-    if (stripLast.has(pageIdx)) {
-      const idx = lastNonBlankIndex(out);
-      if (idx !== -1) out.splice(idx, 1);
+  const remove = new Map<number, Set<number>>();
+  const pagesWithRunningHeader = new Set<number>();
+
+  for (const group of byKey.values()) {
+    if (new Set(group.map((c) => c.page)).size < threshold) continue;
+    for (const c of group) {
+      if (!remove.has(c.page)) remove.set(c.page, new Set());
+      remove.get(c.page)!.add(c.line);
+      pagesWithRunningHeader.add(c.page);
     }
-    if (stripFirst.has(pageIdx)) {
-      const idx = firstNonBlankIndex(out);
-      if (idx !== -1) out.splice(idx, 1);
+  }
+
+  // Bare numbers are ambiguous: a folio and a printed chapter number are the
+  // same token in the same zone. The distinguisher is the rest of the page —
+  // chapter-opening pages suppress the running header, body pages don't. So a
+  // bare number is only treated as a folio when a running header was found on
+  // that same page; otherwise it is left alone, because on a chapter opener it
+  // is the chapter number and stripping it destroys chapter detection outright.
+  if (pagesWithRunningHeader.size >= threshold) {
+    for (const c of numericCandidates) {
+      if (!pagesWithRunningHeader.has(c.page)) continue;
+      if (!remove.has(c.page)) remove.set(c.page, new Set());
+      remove.get(c.page)!.add(c.line);
     }
-    return out;
+  }
+
+  if (!remove.size) return pageLines;
+
+  return pageLines.map((lines, page) => {
+    const drop = remove.get(page);
+    if (!drop?.size) return lines;
+    return lines.filter((_, i) => !drop.has(i));
   });
+}
+
+// ─── Drop-cap joining (PDF only) ───────────────────────────────────────────────
+
+/**
+ * Vellum and most print layouts open a chapter with a drop cap — an oversized
+ * initial letter set on its own baseline, which extracts as a line containing
+ * nothing but that one letter. The remainder of the word sits on the next line
+ * and therefore starts lowercase.
+ *
+ * Left unjoined, the letter is orphaned: it reads as its own line, gets swept
+ * up by whatever ran before it, and the chapter's first word arrives truncated
+ * ("he mud" instead of "The mud"). Every chapter in the book has one, so this
+ * is not an edge case — it is the first sentence of every chapter.
+ *
+ * The rule is deliberately narrow: exactly one letter alone on a line,
+ * immediately followed by a line beginning with a lowercase letter. A real
+ * one-letter line that is genuinely its own content ("I") is followed by
+ * something that starts with a capital or punctuation, so it is left alone.
+ */
+function joinDropCaps(lines: PdfLine[]): PdfLine[] {
+  const out: PdfLine[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const cur = lines[i];
+    const next = lines[i + 1];
+    if (next && /^[A-Z]$/.test(cur.text.trim()) && /^[a-z]/.test(next.text.trim())) {
+      out.push({
+        text: cur.text.trim() + next.text.trim(),
+        // The drop cap sits at the paragraph's true left margin; the line
+        // beside it is inset to clear the glyph, so the cap's own x-position
+        // is the honest one. forceBreak carries the paragraph boundary, since
+        // that margin position would otherwise read as a wrapped line.
+        indent: cur.indent,
+        forceBreak: true,
+      });
+      i++; // consumed the continuation line
+      continue;
+    }
+    out.push(cur);
+  }
+  return out;
 }
 
 // ─── TOC detection & parsing ────────────────────────────────────────────────────
@@ -603,11 +804,26 @@ function assembleParagraphs(lines: PdfLine[]): string {
   let current = "";
   for (const line of lines) {
     const isIndented = line.indent > bodyMargin + INDENT_THRESHOLD;
-    if (isIndented && current) {
+    if ((line.forceBreak || isIndented) && current) {
       paragraphs.push(current.trim());
       current = line.text;
+    } else if (!current) {
+      current = line.text;
     } else {
-      current = current ? `${current} ${line.text}` : line.text;
+      // Justified text breaks words across lines with a trailing hyphen. Left
+      // in place it survives into raw_text as "acknowl- edge", which corrupts
+      // word counts, dialogue offsets, and anything read aloud from it. A
+      // hyphen at end-of-line followed by a lowercase continuation is a broken
+      // word, so the hyphen is dropped and the halves closed up.
+      //
+      // This does silently damage a genuine compound that happens to wrap at
+      // its own hyphen ("moon-lily" → "moonlily"). That is unavoidable without
+      // a dictionary — the two cases are textually identical — and it is far
+      // rarer than line-break hyphenation, which occurs on most pages.
+      const brokenWord = /\w-$/.test(current) && /^[a-z]/.test(line.text);
+      current = brokenWord
+        ? `${current.slice(0, -1)}${line.text}`
+        : `${current} ${line.text}`;
     }
   }
   if (current.trim()) paragraphs.push(current.trim());
@@ -811,8 +1027,93 @@ async function askClaude(pageMap: string): Promise<Array<{ title: string; startP
 
 // ─── Orchestrator ───────────────────────────────────────────────────────────────
 
-export async function parseManuscript(buffer: Buffer): Promise<{ format: "pdf" | "docx"; chapters: ParsedChapter[] }> {
+/**
+ * A quality problem is never fatal here — a partially garbled book still has
+ * readable chapters worth keeping, and refusing the parse would leave the user
+ * with nothing and no explanation. It is logged loudly instead, with the page
+ * indices named, so the failure is attributable to the source file at a glance
+ * rather than being rediscovered later by spot-checking.
+ */
+function logTextQuality(format: string, q: TextQualityReport): void {
+  if (!q.suspectPages.length) {
+    console.log(
+      `[manuscript-parser] ${format} text quality OK — median common-word ratio ${q.median.toFixed(3)}`
+    );
+    return;
+  }
+  const sample = q.suspectPages.slice(0, 20).map((i) => i + 1).join(", ");
+  const more = q.suspectPages.length > 20 ? ` …and ${q.suspectPages.length - 20} more` : "";
+  console.warn(
+    `[manuscript-parser] ${format} text quality SUSPECT — ` +
+      `${q.suspectPages.length} of ${q.pageRatios.filter((r) => r !== null).length} judgeable pages ` +
+      `(${(q.suspectRatio * 100).toFixed(1)}%) scored below ${q.threshold.toFixed(3)} ` +
+      `(document median ${q.median.toFixed(3)}). Likely a corrupt text layer needing OCR. ` +
+      `Pages: ${sample}${more}`
+  );
+}
+
+/**
+ * Split a plain-text page into paragraphs. Blank lines and leading indentation
+ * are the only reliable paragraph signals in a text file; every other newline
+ * is treated as a hard wrap and closed up (with the same broken-word hyphen
+ * handling the PDF path uses).
+ *
+ * Limitation worth knowing: a source that separates paragraphs with a single
+ * newline and no indentation will come through as one merged paragraph. That
+ * is the deliberate direction to fail in — merged paragraphs are still correct
+ * text that a later pass can re-split, whereas guessing breaks from sentence
+ * punctuation shreds any paragraph containing more than one sentence.
+ */
+function assembleTextParagraphs(pageText: string): string {
+  const paragraphs: string[] = [];
+  let current = "";
+
+  const flush = () => {
+    if (current.trim()) paragraphs.push(current.trim());
+    current = "";
+  };
+
+  for (const rawLine of pageText.split("\n")) {
+    if (!rawLine.trim()) { flush(); continue; }
+    const indented = /^[ \t]{2,}/.test(rawLine);
+    const line = rawLine.trim();
+    if (indented) { flush(); current = line; continue; }
+    if (!current) { current = line; continue; }
+    const brokenWord = /\w-$/.test(current) && /^[a-z]/.test(line);
+    current = brokenWord ? `${current.slice(0, -1)}${line}` : `${current} ${line}`;
+  }
+  flush();
+
+  return paragraphs.join("\n\n");
+}
+
+export async function parseManuscript(
+  buffer: Buffer
+): Promise<{ format: "pdf" | "docx" | "txt"; chapters: ParsedChapter[]; quality?: TextQualityReport }> {
   const fileType = detectFileType(new Uint8Array(buffer));
+
+  // ── Plain-text path ────────────────────────────────────────────────────────
+  // Pages come from form feeds (\f) when present — the convention for a text
+  // file that came out of a page-oriented source and needs its page boundaries
+  // preserved so TOC page numbers still resolve. Without them the whole file is
+  // one page and chapter detection falls to Claude.
+  if (fileType === "txt") {
+    const decoded = normalizeLigatures(
+      buffer.toString("utf8").replace(/^﻿/, "").replace(/\r\n/g, "\n")
+    );
+    const pages = decoded.split("\f").map((p) => assembleTextParagraphs(p));
+    if (!pages.some((p) => p.trim())) throw new Error("Could not extract any text from file");
+
+    const quality = assessTextQuality(pages);
+    logTextQuality("txt", quality);
+
+    const tocEntries = parseTocFromPages(pages);
+    const rawSections = tocEntries
+      ? tocEntries.map((e) => ({ ...e, povCharacter: null }))
+      : await askClaude(buildPageMap(pages));
+
+    return { format: "txt", chapters: assignChaptersFromPages(rawSections, pages), quality };
+  }
 
   // ── DOCX path ──────────────────────────────────────────────────────────────
   if (fileType === "docx") {
@@ -841,11 +1142,21 @@ export async function parseManuscript(buffer: Buffer): Promise<{ format: "pdf" |
   const { flatPages, linePages } = await extractPagesFromPdf(buffer);
   if (!flatPages.length) throw new Error("Could not extract any text from PDF");
 
+  // Quality is assessed before anything is built on top of the text. A PDF with
+  // a corrupt font map extracts without error and parses without error — the
+  // failure only becomes visible when someone reads the output, and by then it
+  // looks like a parser bug rather than a source-file problem.
+  const quality = assessTextQuality(flatPages);
+  logTextQuality("pdf", quality);
+
   // TOC detection runs against the untouched flat text, same as the retired
   // pipeline — stripping happens only when assembling the final raw_text below.
   const tocEntries = parseTocFromPages(flatPages);
 
-  const cleanedLinePages = stripHeadersFooters(linePages);
+  // Order matters here: headers have to go before drop caps, or a stripped
+  // header line sitting between a drop cap and its continuation leaves the two
+  // non-adjacent and the join never fires.
+  const cleanedLinePages = stripHeadersFooters(linePages).map(joinDropCaps);
 
   let rawSections: Array<{ title: string; startPage: number; povCharacter: string | null }>;
   if (tocEntries) {
@@ -857,5 +1168,5 @@ export async function parseManuscript(buffer: Buffer): Promise<{ format: "pdf" |
   }
 
   const chapters = assignChaptersFromLines(rawSections, cleanedLinePages);
-  return { format: "pdf", chapters };
+  return { format: "pdf", chapters, quality };
 }
