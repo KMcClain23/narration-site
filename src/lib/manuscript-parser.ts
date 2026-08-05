@@ -513,27 +513,45 @@ function stripHeadersFooters(pageLines: PdfLine[][]): PdfLine[][] {
  * one-letter line that is genuinely its own content ("I") is followed by
  * something that starts with a capital or punctuation, so it is left alone.
  */
+/** A printed chapter number, or a chapter title as typeset (all caps). */
+function isChapterHeadingLine(s: string): boolean {
+  const t = s.trim();
+  if (!t || t.length > 80) return false;
+  if (/^\d{1,4}$/.test(t)) return true;
+  return /[A-Z]/.test(t) && !/[a-z]/.test(t);
+}
+
+/** How many heading lines may sit between a drop cap and its continuation. */
+const DROP_CAP_LOOKAHEAD = 3;
+
 function joinDropCaps(lines: PdfLine[]): PdfLine[] {
-  const out: PdfLine[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const cur = lines[i];
-    const next = lines[i + 1];
-    if (next && /^[A-Z]$/.test(cur.text.trim()) && /^[a-z]/.test(next.text.trim())) {
-      out.push({
-        text: cur.text.trim() + next.text.trim(),
-        // The drop cap sits at the paragraph's true left margin; the line
-        // beside it is inset to clear the glyph, so the cap's own x-position
-        // is the honest one. forceBreak carries the paragraph boundary, since
-        // that margin position would otherwise read as a wrapped line.
-        indent: cur.indent,
-        forceBreak: true,
-      });
-      i++; // consumed the continuation line
-      continue;
+  const work = lines.map((l) => ({ ...l }));
+  const consumed = new Set<number>();
+
+  for (let i = 0; i < work.length; i++) {
+    if (consumed.has(i) || !/^[A-Z]$/.test(work[i].text.trim())) continue;
+
+    // The continuation is rarely the next line. A drop cap is set large and
+    // high, so it extracts ahead of the chapter number and the chapter title
+    // even though it reads after them — the order on the page is cap, number,
+    // heading, prose. Scanning only the adjacent line left the letter stranded
+    // and every chapter opening truncated ("he mud" for "The mud").
+    //
+    // The scan stops at anything that isn't a heading, so it can never reach
+    // across real prose to steal a letter from an unrelated paragraph.
+    for (let j = i + 1; j < Math.min(i + 1 + DROP_CAP_LOOKAHEAD, work.length); j++) {
+      const t = work[j].text.trim();
+      if (!t) continue;
+      if (/^[a-z]/.test(t)) {
+        work[j] = { ...work[j], text: work[i].text.trim() + t, forceBreak: true };
+        consumed.add(i);
+        break;
+      }
+      if (!isChapterHeadingLine(t)) break;
     }
-    out.push(cur);
   }
-  return out;
+
+  return work.filter((_, i) => !consumed.has(i));
 }
 
 // ─── TOC detection & parsing ────────────────────────────────────────────────────
@@ -596,6 +614,18 @@ const KNOWN_SECTION =
 const PAGE_NUM = "\\d{1,4}|[ivxlcdm]{1,6}";
 
 // Unnumbered section keywords (no "Chapter N" prefix, no number suffix needed)
+/** Section names that appear in a TOC without a chapter number in front. */
+const UNNUMBERED_WORDS =
+  `prologue|epilogue|dedication|preface|afterword|foreword|appendix|introduction|` +
+  `acknowledgements?|acknowledgments?|author'?s?\\s+note`;
+
+/**
+ * Unnumbered TOC rows ("Prologue 1", "Epilogue 335"), matched inside flat page
+ * text. Separate from UNNUMBERED_KW below, which tests a whole segment rather
+ * than searching within one.
+ */
+const UNNUMBERED_ENTRY = new RegExp(`\\b(${UNNUMBERED_WORDS})\\s+(\\d{1,4})\\b`, "gi");
+
 const UNNUMBERED_KW =
   /^(prologue|epilogue|dedication|preface|afterword|foreword|appendix|introduction|acknowledgements?|acknowledgments?|author'?s?\s+note|content\s*(?:&|and)\s*trigger\s*warnings?|trigger\s*warnings?|content\s*warnings?)$/i;
 
@@ -683,9 +713,16 @@ function extractTocEntries(text: string, out: TocEntry[], seen: Set<string>): vo
 
   // ── Strategy A: numbered list "N. Title  pageNum" ────────────────────────
   // Dedup key is title:page so repeated short titles don't collide.
+  // The lookahead marks where one entry ends. It has to stop at an unnumbered
+  // section as well as at the next numbered one: a TOC that closes with
+  // "… 52. Title 405 Epilogue 411" would otherwise let the lazy title run past
+  // its own page number, swallowing "405 Epilogue" into the title and taking
+  // the epilogue's page as the chapter's. That misfiles the last chapter of
+  // every book with back matter listed after the numbered run.
   const reA = new RegExp(
-    `(?:^|\\s)\\d+\\.\\s+([\\s\\S]+?)\\s+(${PAGE_NUM})(?=\\s+\\d+\\.\\s+|\\s*$)`,
-    "g"
+    `(?:^|\\s)\\d+\\.\\s+([\\s\\S]+?)\\s+(${PAGE_NUM})` +
+      `(?=\\s+\\d+\\.\\s+|\\s+(?:${UNNUMBERED_WORDS})\\s+\\d|\\s*$)`,
+    "gi"
   );
   while ((m = reA.exec(text)) !== null) {
     const title = cleanTocTitle(m[1]);
@@ -746,6 +783,31 @@ function parseTocFromPages(pageTexts: string[]): { entries: TocEntry[]; lastTocP
   }
   const ascRatio = asc / (entries.length - 1);
   if (ascRatio < 0.75) return null;
+
+  // Strategy A only matches numbered rows, and returns the moment it finds
+  // any — so on a TOC that mixes "1. Title 5" with unnumbered sections
+  // ("Prologue 1", "Epilogue 335"), Strategy B never runs and every
+  // unnumbered section is silently lost. Those are real chapters someone has
+  // to read, so they are collected in a second targeted pass here rather than
+  // by loosening Strategy A, which would cost precision on the numbered rows.
+  for (let i = 0; i <= lastTocPage && i < pageTexts.length; i++) {
+    UNNUMBERED_ENTRY.lastIndex = 0;
+    let um: RegExpExecArray | null;
+    while ((um = UNNUMBERED_ENTRY.exec(pageTexts[i])) !== null) {
+      const title = cleanTocTitle(um[1]);
+      const page = parsePageNum(um[2]);
+      const key = `${title.toLowerCase()}:${page}`;
+      if (title && page > 0 && !seen.has(key)) {
+        entries.push({ title, startPage: page });
+        seen.add(key);
+      }
+    }
+  }
+
+  // Front matter appended after the numbered rows would otherwise sit out of
+  // order, and chapter ranges are cut from consecutive pairs — an unsorted
+  // list would hand one section another's pages.
+  entries.sort((a, b) => a.startPage - b.startPage);
 
   return { entries, lastTocPage };
 }
@@ -1133,22 +1195,25 @@ function assembleParagraphs(lines: PdfLine[]): string {
  * heading is being stripped here.
  */
 function stripLeadingPovHeading(rawText: string, povCharacter: string | null): string {
-  const name = povCharacter?.trim();
-  if (!name) return rawText;
-
   const paragraphs = rawText.split("\n\n");
-  let idx = 0;
-  if (paragraphs[idx] && /^\d{1,4}$/.test(paragraphs[idx].trim())) idx++;
 
-  if (paragraphs[idx] === name) {
-    paragraphs.splice(idx, 1);
-    return paragraphs.join("\n\n");
+  // Drop the printed chapter number and the typeset chapter title from the
+  // head of the text. Both duplicate what is already in the title column, and
+  // leaving them in means the first thing read off a chapter is a line of
+  // capitals rather than its opening sentence. This runs whether or not a POV
+  // is known, since the heading is there either way. The guard never lets the
+  // loop consume the final paragraph, so a chapter cannot be emptied.
+  let idx = 0;
+  while (idx < paragraphs.length - 1 && isChapterHeadingLine(paragraphs[idx])) idx++;
+  if (idx > 0) paragraphs.splice(0, idx);
+
+  const name = povCharacter?.trim();
+  if (name && paragraphs.length > 1) {
+    if (paragraphs[0] === name) paragraphs.splice(0, 1);
+    else if (paragraphs[0]?.startsWith(`${name} `)) paragraphs[0] = paragraphs[0].slice(name.length + 1);
   }
-  if (paragraphs[idx]?.startsWith(`${name} `)) {
-    paragraphs[idx] = paragraphs[idx].slice(name.length + 1);
-    return paragraphs.join("\n\n");
-  }
-  return rawText;
+
+  return paragraphs.join("\n\n");
 }
 
 /**
