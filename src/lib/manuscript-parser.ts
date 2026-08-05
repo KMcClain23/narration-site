@@ -745,6 +745,290 @@ function parseTocFromPages(pageTexts: string[]): TocEntry[] | null {
   return entries;
 }
 
+// ─── TOC as primary source ─────────────────────────────────────────────────────
+//
+// When a book has a table of contents, it is ground truth: exact chapter count,
+// exact titles, POV character, and start page, all authored rather than
+// inferred. Body-text detection then becomes validation instead of guesswork.
+//
+// Two things have to be solved before it can be trusted.
+//
+// Layout. Print TOCs are typeset in two columns — every title down the left,
+// every page number down the right — and PDF extraction reads them as one block
+// of titles followed by one block of numbers, never as "title … number" lines.
+// So the two blocks are paired positionally.
+//
+// Numbering. TOC page numbers are *printed* page numbers, which do not equal
+// PDF page indices: front matter is unnumbered or numbered in roman, so the
+// arabic sequence starts partway into the file. The gap is constant, and is
+// derived once by finding where a known chapter title actually appears in the
+// body.
+
+interface RawTocEntry {
+  rawTitle: string;
+  printedPage: number;
+}
+
+export interface TocChapter {
+  /** Title with any POV suffix removed. */
+  title: string;
+  /** Exactly as printed in the TOC. */
+  rawTitle: string;
+  /** As printed, which may name more than one ("Kael and Lyra"). */
+  povCharacter: string | null;
+  /** Individual names, split out of povCharacter. */
+  povNames: string[];
+  printedPage: number;
+  /** printedPage + offset, 1-based. */
+  pdfPage: number;
+  /** Where the title was actually found in the body, if it was. */
+  foundOnPdfPage: number | null;
+  /** Set when the POV had to be recovered without a separator. */
+  povNote?: string;
+}
+
+/** Aggressive normalization for comparing a TOC title against body text. */
+function normalizeForMatch(s: string): string {
+  return normalizeLigatures(s).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function stripTocNumbering(s: string): string {
+  return s.replace(/^\d{1,3}\s*[.)]\s*/, "").trim();
+}
+
+function looksLikeTocTitle(s: string): boolean {
+  const t = stripTocNumbering(s);
+  if (t.length < 2 || t.length > 90) return false;
+  if (!/[A-Za-z]/.test(t)) return false;
+  return !/^contents$/i.test(t);
+}
+
+function isAscending(nums: number[]): boolean {
+  for (let i = 1; i < nums.length; i++) if (nums[i] <= nums[i - 1]) return false;
+  return true;
+}
+
+/**
+ * Pair one TOC page's title block against its page-number block. Returns null
+ * unless the two blocks line up, so a page that merely looks list-like doesn't
+ * produce garbage entries.
+ */
+function pairTocColumnsOnPage(lines: PdfLine[]): RawTocEntry[] | null {
+  const titles: string[] = [];
+  let numbers: number[] = [];
+
+  for (const line of lines) {
+    const t = line.text.trim();
+    if (!t) continue;
+    if (/^\d{1,4}$/.test(t)) numbers.push(parseInt(t, 10));
+    else if (looksLikeTocTitle(t)) titles.push(stripTocNumbering(t));
+  }
+
+  if (titles.length < 3) return null;
+
+  // One spare number is the TOC page's own folio. Which end it landed on
+  // depends on the layout, so try both and keep whichever leaves a clean
+  // ascending run of page numbers.
+  if (numbers.length === titles.length + 1) {
+    const dropLast = numbers.slice(0, -1);
+    const dropFirst = numbers.slice(1);
+    numbers = isAscending(dropLast) ? dropLast : isAscending(dropFirst) ? dropFirst : numbers;
+  }
+
+  if (numbers.length !== titles.length) return null;
+  if (!isAscending(numbers)) return null;
+
+  return titles.map((rawTitle, i) => ({ rawTitle, printedPage: numbers[i] }));
+}
+
+/** Collect column-paired entries across however many pages the TOC spans. */
+function parseTocByColumns(
+  linePages: PdfLine[][]
+): { entries: RawTocEntry[]; lastTocPage: number } | null {
+  const entries: RawTocEntry[] = [];
+  let lastTocPage = -1;
+
+  for (let i = 0; i < Math.min(15, linePages.length); i++) {
+    const paired = pairTocColumnsOnPage(linePages[i]);
+    if (!paired) continue;
+    // A continuation page must carry on from the previous one; a later page
+    // that restarts at a lower number is a different list, not more TOC.
+    if (entries.length && paired[0].printedPage <= entries[entries.length - 1].printedPage) continue;
+    entries.push(...paired);
+    lastTocPage = i;
+  }
+
+  return entries.length >= 3 ? { entries, lastTocPage } : null;
+}
+
+// ── POV extraction ────────────────────────────────────────────────────────────
+//
+// Most entries name the POV after a dash. Some don't — the separator is simply
+// missing on the odd line ("The Chosen Sacrifice Lyra"), and a split on " - "
+// would drop the POV there silently. So the dashed entries are read first to
+// learn the cast, and that name set is then used to recover the POV from
+// entries that lack a separator. Every such recovery is recorded rather than
+// applied invisibly, because a missing separator is a typesetting defect and
+// the operator should be able to see where the data was repaired.
+
+const POV_SEPARATOR = /\s*[-–—]\s*/;
+
+function splitPovNames(pov: string): string[] {
+  return pov
+    .split(/\s*(?:,|&|\band\b)\s*/i)
+    .map((n) => n.trim())
+    .filter(Boolean);
+}
+
+function extractPovFromTitles(entries: RawTocEntry[]): TocChapter[] {
+  // Pass 1 — learn the cast from entries that do use a separator.
+  const known = new Set<string>();
+  const dashed = entries.map((e) => {
+    const parts = e.rawTitle.split(POV_SEPARATOR);
+    if (parts.length < 2) return null;
+    const pov = parts[parts.length - 1].trim();
+    // A trailing fragment with many words is part of the title, not a name.
+    if (!pov || splitPovNames(pov).some((n) => n.split(/\s+/).length > 3)) return null;
+    splitPovNames(pov).forEach((n) => known.add(n.toLowerCase()));
+    return { title: parts.slice(0, -1).join(" ").trim(), pov };
+  });
+
+  // Pass 2 — apply the cast to entries with no separator.
+  return entries.map((e, i) => {
+    const d = dashed[i];
+    if (d) {
+      return {
+        title: d.title,
+        rawTitle: e.rawTitle,
+        povCharacter: d.pov,
+        povNames: splitPovNames(d.pov),
+        printedPage: e.printedPage,
+        pdfPage: 0,
+        foundOnPdfPage: null,
+      };
+    }
+
+    // Longest known name that the title ends with wins, so "Kael" can't shadow
+    // a longer name ending in the same word.
+    const words = e.rawTitle.trim().split(/\s+/);
+    for (let take = Math.min(4, words.length - 1); take >= 1; take--) {
+      const candidate = words.slice(-take).join(" ");
+      if (known.has(candidate.toLowerCase())) {
+        return {
+          title: words.slice(0, -take).join(" ").trim(),
+          rawTitle: e.rawTitle,
+          povCharacter: candidate,
+          povNames: splitPovNames(candidate),
+          printedPage: e.printedPage,
+          pdfPage: 0,
+          foundOnPdfPage: null,
+          povNote: `POV "${candidate}" recovered without a separator in TOC entry "${e.rawTitle}"`,
+        };
+      }
+    }
+
+    return {
+      title: e.rawTitle,
+      rawTitle: e.rawTitle,
+      povCharacter: null,
+      povNames: [],
+      printedPage: e.printedPage,
+      pdfPage: 0,
+      foundOnPdfPage: null,
+    };
+  });
+}
+
+// ── Printed page → PDF page ───────────────────────────────────────────────────
+
+/** How far from the predicted page a title may appear and still confirm it. */
+const PAGE_MATCH_TOLERANCE = 2;
+
+/** Pages whose text contains this title, searched only past the TOC itself. */
+function findTitlePages(title: string, pageTexts: string[], searchFrom: number): number[] {
+  const needle = normalizeForMatch(title);
+  if (needle.length < 6) return []; // too short to identify anything reliably
+  const hits: number[] = [];
+  for (let i = searchFrom; i < pageTexts.length; i++) {
+    if (normalizeForMatch(pageTexts[i]).includes(needle)) hits.push(i + 1); // 1-based
+  }
+  return hits;
+}
+
+/**
+ * The constant gap between printed page numbers and PDF page indices.
+ *
+ * Taken as the most common gap across as many chapters as resolve cleanly
+ * rather than from the first chapter alone — one title that happens to also
+ * appear in a foreword, or a chapter whose heading is set as an image, would
+ * otherwise fix the whole book to a wrong offset.
+ */
+function deriveOffset(
+  chapters: TocChapter[],
+  pageTexts: string[],
+  searchFrom: number
+): { offset: number; agreement: number } | null {
+  const votes = new Map<number, number>();
+
+  for (const ch of chapters) {
+    for (const pdfPage of findTitlePages(ch.title, pageTexts, searchFrom)) {
+      const candidate = pdfPage - ch.printedPage;
+      if (candidate < 0) continue; // body can't precede its own printed number
+      votes.set(candidate, (votes.get(candidate) ?? 0) + 1);
+    }
+  }
+
+  if (!votes.size) return null;
+
+  let offset = 0;
+  let best = 0;
+  for (const [value, count] of votes) {
+    if (count > best) { best = count; offset = value; }
+  }
+
+  return { offset, agreement: best / chapters.length };
+}
+
+export interface TocResolution {
+  chapters: TocChapter[];
+  offset: number;
+  agreement: number;
+  unconfirmed: TocChapter[];
+}
+
+/**
+ * Resolve TOC entries to PDF pages and confirm each one against the body.
+ *
+ * Confirmation is the whole point of preferring the TOC: a chapter whose title
+ * cannot be found near its computed page means the offset is wrong for that
+ * chapter, and storing its text anyway would file the wrong pages under the
+ * right title — the one failure mode a narrator cannot catch by reading, since
+ * the text is real prose, just not this chapter's.
+ */
+function resolveToc(
+  rawEntries: RawTocEntry[],
+  pageTexts: string[],
+  lastTocPage: number
+): TocResolution | null {
+  const chapters = extractPovFromTitles(rawEntries);
+  const searchFrom = lastTocPage + 1;
+
+  const derived = deriveOffset(chapters, pageTexts, searchFrom);
+  if (!derived) return null;
+
+  const unconfirmed: TocChapter[] = [];
+  for (const ch of chapters) {
+    ch.pdfPage = ch.printedPage + derived.offset;
+    const hits = findTitlePages(ch.title, pageTexts, searchFrom);
+    const near = hits.find((h) => Math.abs(h - ch.pdfPage) <= PAGE_MATCH_TOLERANCE);
+    ch.foundOnPdfPage = near ?? null;
+    if (near === undefined) unconfirmed.push(ch);
+    else ch.pdfPage = near; // trust the sighting over the arithmetic
+  }
+
+  return { chapters, offset: derived.offset, agreement: derived.agreement, unconfirmed };
+}
+
 // ─── Chapter numbering + text assembly ─────────────────────────────────────────
 
 const UNNUMBERED = UNNUMBERED_SECTION_TITLE;
@@ -1089,7 +1373,13 @@ function assembleTextParagraphs(pageText: string): string {
 
 export async function parseManuscript(
   buffer: Buffer
-): Promise<{ format: "pdf" | "docx" | "txt"; chapters: ParsedChapter[]; quality?: TextQualityReport }> {
+): Promise<{
+  format: "pdf" | "docx" | "txt";
+  chapters: ParsedChapter[];
+  quality?: TextQualityReport;
+  /** POV names read off the TOC, for seeding extraction's character roster. */
+  povRoster?: string[];
+}> {
   const fileType = detectFileType(new Uint8Array(buffer));
 
   // ── Plain-text path ────────────────────────────────────────────────────────
@@ -1149,24 +1439,66 @@ export async function parseManuscript(
   const quality = assessTextQuality(flatPages);
   logTextQuality("pdf", quality);
 
-  // TOC detection runs against the untouched flat text, same as the retired
-  // pipeline — stripping happens only when assembling the final raw_text below.
-  const tocEntries = parseTocFromPages(flatPages);
-
   // Order matters here: headers have to go before drop caps, or a stripped
   // header line sitting between a drop cap and its continuation leaves the two
   // non-adjacent and the join never fires.
   const cleanedLinePages = stripHeadersFooters(linePages).map(joinDropCaps);
 
   let rawSections: Array<{ title: string; startPage: number; povCharacter: string | null }>;
-  if (tocEntries) {
-    rawSections = tocEntries.map((e) => ({ ...e, povCharacter: null }));
+  let povRoster: string[] = [];
+
+  // ── Primary: the book's own table of contents ────────────────────────────
+  const columnToc = parseTocByColumns(linePages);
+  const resolved = columnToc ? resolveToc(columnToc.entries, flatPages, columnToc.lastTocPage) : null;
+
+  if (resolved) {
+    const { chapters: tocChapters, offset, agreement, unconfirmed } = resolved;
+
+    console.log(
+      `[manuscript-parser] TOC parsed: ${tocChapters.length} entries, ` +
+        `printed→PDF offset ${offset >= 0 ? "+" : ""}${offset} ` +
+        `(${(agreement * 100).toFixed(0)}% of titles agree)`
+    );
+    for (const ch of tocChapters) {
+      if (ch.povNote) console.warn(`[manuscript-parser] ${ch.povNote}`);
+    }
+
+    // Loud, not lenient. An unconfirmed chapter means the offset does not hold
+    // there, and proceeding would store one chapter's pages under another
+    // chapter's title — prose that reads perfectly and is simply the wrong
+    // chapter, which no amount of proofreading downstream would catch.
+    if (unconfirmed.length) {
+      const named = unconfirmed
+        .slice(0, 5)
+        .map((c) => `"${c.rawTitle}" (printed p.${c.printedPage} → expected PDF p.${c.pdfPage})`)
+        .join("; ");
+      const more = unconfirmed.length > 5 ? ` …and ${unconfirmed.length - 5} more` : "";
+      throw new Error(
+        `TOC validation failed: ${unconfirmed.length} of ${tocChapters.length} chapter titles ` +
+          `were not found near their computed start page using offset ${offset >= 0 ? "+" : ""}${offset}. ` +
+          `Refusing to store possibly misaligned chapter text. Unconfirmed: ${named}${more}`
+      );
+    }
+
+    rawSections = tocChapters.map((c) => ({
+      title: c.rawTitle,
+      startPage: c.pdfPage,
+      povCharacter: c.povCharacter,
+    }));
+    povRoster = Array.from(new Set(tocChapters.flatMap((c) => c.povNames)));
   } else {
-    const pageMap = buildPageMap(flatPages);
-    if (!pageMap) throw new Error("Could not extract any text from PDF");
-    rawSections = await askClaude(pageMap);
+    // ── Secondary: single-column TOC layouts the flat parser already handles ──
+    const flatToc = parseTocFromPages(flatPages);
+    if (flatToc) {
+      rawSections = flatToc.map((e) => ({ ...e, povCharacter: null }));
+    } else {
+      // ── Last resort: no usable TOC, infer boundaries from the body ────────
+      const pageMap = buildPageMap(flatPages);
+      if (!pageMap) throw new Error("Could not extract any text from PDF");
+      rawSections = await askClaude(pageMap);
+    }
   }
 
   const chapters = assignChaptersFromLines(rawSections, cleanedLinePages);
-  return { format: "pdf", chapters, quality };
+  return { format: "pdf", chapters, quality, povRoster };
 }

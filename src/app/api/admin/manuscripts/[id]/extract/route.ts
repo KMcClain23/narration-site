@@ -15,11 +15,16 @@ export const maxDuration = 60;
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
+  // "Not yet done" is summary IS NULL *and* no recorded failure. Without the
+  // second condition a chapter that fails extraction is selected again on
+  // every subsequent call, and the chain spins on it indefinitely instead of
+  // moving on to the chapters after it.
   const { data: chapter, error: chapterError } = await supabaseAdmin
     .from("chapters")
     .select("id, order_index, raw_text")
     .eq("manuscript_id", id)
     .is("summary", null)
+    .is("extraction_error", null)
     .order("order_index", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -97,6 +102,19 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("[manuscripts/extract]", msg);
+
+    // Record the failure against this chapter and carry on with the next one.
+    // Previously the "fire the next chapter" call lived only on the success
+    // path, so a single bad chapter halted extraction for the entire book and
+    // every chapter after it stayed unprocessed with nothing explaining why.
+    await supabaseAdmin
+      .from("chapters")
+      .update({ extraction_error: msg.slice(0, 500) })
+      .eq("id", chapter.id);
+
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.dmnarration.com";
+    fetch(`${baseUrl}/api/admin/manuscripts/${id}/extract`, { method: "POST" }).catch(() => {});
+
     // Deliberately does NOT flip manuscripts.status to "failed" — unlike
     // Phase 2's parse (where a failure means zero chapters exist and the
     // reader has nothing to show), an extraction failure here is scoped to
