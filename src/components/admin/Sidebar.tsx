@@ -29,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: "Contract Builder", href: "/tools/contract-builder" },
       { label: "Testimonials", href: "/tools/testimonials" },
       { label: "Demos", href: "/tools/demos" },
+      { label: "Prepper", href: "/tools/prepper" },
     ],
   },
   { label: "Settings", href: "/settings", icon: SettingsIcon },
