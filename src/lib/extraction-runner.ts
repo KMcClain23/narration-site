@@ -16,7 +16,29 @@ export const MAX_ATTEMPTS = 3;
 export type ChapterOutcome =
   | { status: "processed"; orderIndex: number; spans: number; matched: number; elapsedMs: number }
   | { status: "complete"; exhausted: number }
-  | { status: "failed"; orderIndex: number; message: string; attempt: number };
+  | { status: "failed"; orderIndex: number; message: string; attempt: number }
+  | { status: "blocked"; orderIndex: number; message: string };
+
+/**
+ * Whether a failure is about the account rather than the chapter.
+ *
+ * An exhausted credit balance or a bad API key fails every chapter equally and
+ * identically, and no amount of retrying changes that. Treating it as an
+ * ordinary chapter failure burned all three attempts on each remaining
+ * chapter and then marked them permanently failed — chapters that would have
+ * succeeded untouched the moment the account was topped up, now needing manual
+ * repair to be picked up again.
+ */
+function isAccountLevelError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("credit balance is too low") ||
+    m.includes("authentication_error") ||
+    m.includes("invalid x-api-key") ||
+    m.includes("permission_error") ||
+    m.includes("billing")
+  );
+}
 
 /**
  * Process the single lowest-numbered chapter of a manuscript that is still
@@ -170,6 +192,21 @@ export async function processNextChapter(manuscriptId: string): Promise<ChapterO
       message
     );
 
+    if (isAccountLevelError(message)) {
+      // Give the attempt back. Nothing about this chapter caused the failure
+      // and nothing about it needs to change, so consuming its retry budget
+      // would penalise it for the account's state. Left untouched — no error
+      // recorded, no attempt spent — it is simply picked up again on a later
+      // run, which means extraction resumes by itself once the account is
+      // fixed rather than needing anything reset by hand.
+      await supabaseAdmin
+        .from("chapters")
+        .update({ extraction_attempts: attempt - 1 })
+        .eq("id", chapter.id);
+      console.error(`${EXTRACT_TAG} account-level failure, stopping this run: ${message}`);
+      return { status: "blocked", orderIndex: chapter.order_index, message };
+    }
+
     // Only give up once the retry budget is spent. A truncated response or a
     // transient API error is worth another go; recording a permanent failure
     // on the first stumble would strand a chapter that would have succeeded.
@@ -214,7 +251,7 @@ export async function runExtractionBudget(
   manuscriptId: string,
   budgetMs: number,
   firstChapterEstimateMs = 40_000
-): Promise<{ processed: number; failed: number; complete: boolean }> {
+): Promise<{ processed: number; failed: number; complete: boolean; blocked?: string }> {
   const startedAt = Date.now();
   let processed = 0;
   let failed = 0;
@@ -236,6 +273,13 @@ export async function runExtractionBudget(
   while (Date.now() - startedAt + estimateMs < budgetMs) {
     const outcome = await processNextChapter(manuscriptId);
     if (outcome.status === "complete") return { processed, failed, complete: true };
+
+    // Stop the whole run rather than marching through the remaining chapters
+    // failing each one identically. Nothing later in this book will fare any
+    // better while the account is in this state.
+    if (outcome.status === "blocked") {
+      return { processed, failed, complete: false, blocked: outcome.message };
+    }
 
     if (outcome.status === "failed") {
       failed++;

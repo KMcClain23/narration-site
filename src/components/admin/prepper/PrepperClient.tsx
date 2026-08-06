@@ -292,10 +292,14 @@ function ManuscriptCard({
   manuscript,
   onDelete,
   deleting,
+  onRetry,
+  retrying,
 }: {
   manuscript: ManuscriptRow;
   onDelete: () => void;
   deleting: boolean;
+  onRetry: () => void;
+  retrying: boolean;
 }) {
   const details = (
     <div className="min-w-0 flex-1">
@@ -326,10 +330,23 @@ function ManuscriptCard({
           status is "ready" and the extracted count stops short without saying
           why. This is the only place that gap is visible without a query. */}
       {manuscript.chaptersFailed > 0 && (
-        <p className="mt-1.5 text-xs leading-snug text-alert-red">
-          {manuscript.chaptersFailed} chapter{manuscript.chaptersFailed === 1 ? "" : "s"} failed
-          extraction and {manuscript.chaptersFailed === 1 ? "was" : "were"} skipped — dialogue is
-          missing {manuscript.chaptersFailed === 1 ? "there" : "in those chapters"}.
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-snug text-alert-red">
+          <span>
+            {manuscript.chaptersFailed} chapter{manuscript.chaptersFailed === 1 ? "" : "s"} failed
+            extraction and {manuscript.chaptersFailed === 1 ? "was" : "were"} skipped — dialogue is
+            missing {manuscript.chaptersFailed === 1 ? "there" : "in those chapters"}.
+          </span>
+          {/* Retrying only the failed chapters, rather than re-uploading the
+              book, keeps every chapter that already succeeded and avoids
+              paying the API cost of the whole manuscript again. */}
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={retrying}
+            className="shrink-0 rounded-full border border-alert-red/40 px-2 py-0.5 font-medium text-alert-red transition-colors hover:bg-alert-red/10 disabled:opacity-40"
+          >
+            {retrying ? "Retrying…" : "Retry those chapters"}
+          </button>
         </p>
       )}
     </div>
@@ -366,6 +383,7 @@ export function PrepperClient({ initialManuscripts }: { initialManuscripts: Manu
   const [manuscripts, setManuscripts] = useState<ManuscriptRow[]>(initialManuscripts);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   // Which manuscripts still exist, readable synchronously. The poller below
   // closes over a snapshot of `manuscripts` taken when its effect ran, so it
@@ -375,6 +393,26 @@ export function PrepperClient({ initialManuscripts }: { initialManuscripts: Manu
   useEffect(() => {
     liveIds.current = new Set(manuscripts.map((m) => m.id));
   }, [manuscripts]);
+
+  // Clears the recorded failures so extraction picks those chapters up again.
+  // Nothing is scheduled here — the cron finds them within a minute. The row
+  // is updated optimistically so the red line disappears immediately rather
+  // than lingering until the next poll.
+  const handleRetryFailed = async (m: ManuscriptRow) => {
+    setRetryingId(m.id);
+    try {
+      const res = await fetch(`/api/admin/manuscripts/${m.id}/retry-failed`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Failed to queue retry");
+      setManuscripts((prev) =>
+        prev.map((row) => (row.id === m.id ? { ...row, chaptersFailed: 0 } : row))
+      );
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not queue those chapters again.");
+    } finally {
+      setRetryingId(null);
+    }
+  };
 
   const handleDelete = async (m: ManuscriptRow) => {
     if (!window.confirm(`Delete "${m.title}"? This removes all parsed chapters, characters, and dialogue highlighting. This cannot be undone.`)) {
@@ -486,6 +524,8 @@ export function PrepperClient({ initialManuscripts }: { initialManuscripts: Manu
                 manuscript={m}
                 onDelete={() => handleDelete(m)}
                 deleting={deletingId === m.id}
+                onRetry={() => handleRetryFailed(m)}
+                retrying={retryingId === m.id}
               />
             ))}
           </div>
