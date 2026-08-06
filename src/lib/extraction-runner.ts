@@ -221,20 +221,43 @@ export async function processNextChapter(manuscriptId: string): Promise<ChapterO
   }
 }
 
-/** A manuscript with chapters still awaiting extraction, or null if none. */
+/**
+ * The manuscript that should be worked on next, or null if there is nothing
+ * outstanding.
+ *
+ * Oldest upload first. Several books can be queued at once and they are drained
+ * one at a time, so the order decides which one finishes first — and it used to
+ * be decided by sorting on the manuscript's UUID, which is effectively random.
+ * A book uploaded second could take the whole queue ahead of one uploaded an
+ * hour earlier, with no way to tell which would win beforehand.
+ *
+ * Two queries rather than a join: PostgREST orders an embedded resource within
+ * each parent row, not the parent rows by an embedded column, so ordering
+ * chapters by their manuscript's date is not expressible in one call.
+ */
 export async function findManuscriptWithPendingWork(): Promise<string | null> {
-  const { data, error } = await supabaseAdmin
+  const { data: pending, error: pendingError } = await supabaseAdmin
     .from("chapters")
     .select("manuscript_id")
     .is("summary", null)
     .is("extraction_error", null)
-    .lt("extraction_attempts", MAX_ATTEMPTS)
-    .order("manuscript_id", { ascending: true })
+    .lt("extraction_attempts", MAX_ATTEMPTS);
+
+  if (pendingError) throw new Error(pendingError.message);
+  if (!pending?.length) return null;
+
+  const pendingIds = Array.from(new Set(pending.map((c) => c.manuscript_id)));
+
+  const { data: oldest, error: manuscriptError } = await supabaseAdmin
+    .from("manuscripts")
+    .select("id")
+    .in("id", pendingIds)
+    .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 
-  if (error) throw new Error(error.message);
-  return data?.manuscript_id ?? null;
+  if (manuscriptError) throw new Error(manuscriptError.message);
+  return oldest?.id ?? null;
 }
 
 /**
