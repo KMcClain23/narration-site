@@ -1,0 +1,230 @@
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { extractChapter } from "@/lib/dialogue-extractor";
+import { nextCharacterColor } from "@/lib/character-colors";
+
+export const EXTRACT_TAG = "[extract v4]";
+
+/**
+ * How many times a chapter may be picked up before it is given up on.
+ *
+ * Counted *before* the Claude call, not after: an invocation killed mid-flight
+ * never reaches any error handling, so the only durable evidence it ran at all
+ * is a write that happened first.
+ */
+export const MAX_ATTEMPTS = 3;
+
+export type ChapterOutcome =
+  | { status: "processed"; orderIndex: number; spans: number; matched: number; elapsedMs: number }
+  | { status: "complete"; exhausted: number }
+  | { status: "failed"; orderIndex: number; message: string; attempt: number };
+
+/**
+ * Process the single lowest-numbered chapter of a manuscript that is still
+ * awaiting extraction.
+ *
+ * Deliberately does no scheduling of its own. Earlier versions ended by
+ * invoking the route again for the next chapter, and that self-invocation
+ * failed three separate ways on a serverless runtime — a dropped floating
+ * promise, a nested call stack that collapsed at the time limit, and an
+ * `after()` registered from inside another `after()` that silently did
+ * nothing. Each fix was right about its own fault and the chain still died in
+ * the same place. Who calls this next is now somebody else's problem, which is
+ * the point: a scheduled job cannot fail to be scheduled.
+ */
+export async function processNextChapter(manuscriptId: string): Promise<ChapterOutcome> {
+  // "Still to do" is: no summary, no recorded failure, and not already over
+  // its retry budget. Each condition exists because of a way this previously
+  // stalled — a completed chapter being re-selected, a failed one retried
+  // forever, and an invocation that died silently leaving a chapter that could
+  // never be got past.
+  const { data: chapter, error: selectError } = await supabaseAdmin
+    .from("chapters")
+    .select("id, order_index, raw_text, extraction_attempts")
+    .eq("manuscript_id", manuscriptId)
+    .is("summary", null)
+    .is("extraction_error", null)
+    .lt("extraction_attempts", MAX_ATTEMPTS)
+    .order("order_index", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (selectError) throw new Error(selectError.message);
+
+  if (!chapter) {
+    // Nothing selectable: either genuinely finished, or everything left has
+    // exhausted its retries. The second case means chapters are missing from
+    // the book, so it gets a visible reason rather than staying
+    // indistinguishable from unprocessed work.
+    const { count: stuck } = await supabaseAdmin
+      .from("chapters")
+      .select("id", { count: "exact", head: true })
+      .eq("manuscript_id", manuscriptId)
+      .is("summary", null)
+      .is("extraction_error", null)
+      .gte("extraction_attempts", MAX_ATTEMPTS);
+
+    if (stuck && stuck > 0) {
+      await supabaseAdmin
+        .from("chapters")
+        .update({
+          extraction_error: `Gave up after ${MAX_ATTEMPTS} attempts — the extraction call did not complete.`,
+        })
+        .eq("manuscript_id", manuscriptId)
+        .is("summary", null)
+        .is("extraction_error", null)
+        .gte("extraction_attempts", MAX_ATTEMPTS);
+      console.warn(`${EXTRACT_TAG} ${stuck} chapter(s) of ${manuscriptId} exhausted their retry budget`);
+    }
+
+    return { status: "complete", exhausted: stuck ?? 0 };
+  }
+
+  // Written before any slow work, so an invocation that dies partway through
+  // still leaves proof it happened.
+  const attempt = (chapter.extraction_attempts ?? 0) + 1;
+  await supabaseAdmin
+    .from("chapters")
+    .update({ extraction_attempts: attempt })
+    .eq("id", chapter.id);
+
+  const startedAt = Date.now();
+  console.log(
+    `${EXTRACT_TAG} chapter ${chapter.order_index} of ${manuscriptId}, attempt ${attempt}/${MAX_ATTEMPTS}, ${chapter.raw_text?.length ?? 0} chars`
+  );
+
+  try {
+    const { data: existingCharacters, error: charFetchError } = await supabaseAdmin
+      .from("characters")
+      .select("id, name")
+      .eq("manuscript_id", manuscriptId);
+    if (charFetchError) throw new Error(charFetchError.message);
+
+    const characterMap = new Map<string, string>();
+    (existingCharacters ?? []).forEach((c) => characterMap.set(c.name, c.id));
+    let colorCount = characterMap.size;
+
+    const result = chapter.raw_text?.trim()
+      ? await extractChapter(chapter.raw_text, Array.from(characterMap.keys()))
+      : { characters: [], summary: "(no extractable text)", dialogueSpans: [] };
+
+    // Every name Claude surfaced — whether via "characters" or only as a
+    // dialogue speaker — gets a roster row, matched or not: the correction UI
+    // needs the character to already exist to reassign an unmatched span to it.
+    const allNames = new Set<string>(result.characters);
+    result.dialogueSpans.forEach((d) => allNames.add(d.speaker));
+
+    for (const name of allNames) {
+      if (!name || characterMap.has(name)) continue;
+      const { data: created, error: createError } = await supabaseAdmin
+        .from("characters")
+        .insert({ manuscript_id: manuscriptId, name, color_hex: nextCharacterColor(colorCount) })
+        .select("id")
+        .single();
+      if (createError) throw new Error(createError.message);
+      characterMap.set(name, created.id);
+      colorCount++;
+    }
+
+    if (result.dialogueSpans.length) {
+      const spanRows = result.dialogueSpans.map((d) => ({
+        chapter_id: chapter.id,
+        character_id: d.matched ? (characterMap.get(d.speaker) ?? null) : null,
+        start_offset: d.start,
+        end_offset: d.end,
+        matched: d.matched,
+        // Stored for every span, not just unmatched ones — cheap audit trail:
+        // what Claude actually said vs. where it landed, without re-running
+        // extraction to find out if a highlight ever looks wrong later.
+        extracted_text: d.text,
+      }));
+      const { error: spanError } = await supabaseAdmin.from("dialogue_spans").insert(spanRows);
+      if (spanError) throw new Error(spanError.message);
+    }
+
+    const { error: summaryError } = await supabaseAdmin
+      .from("chapters")
+      .update({ summary: result.summary })
+      .eq("id", chapter.id);
+    if (summaryError) throw new Error(summaryError.message);
+
+    const matched = result.dialogueSpans.filter((d) => d.matched).length;
+    const elapsedMs = Date.now() - startedAt;
+    // Elapsed is logged on every chapter so the margin against the function
+    // limit stays visible before chapters start failing rather than after.
+    console.log(
+      `${EXTRACT_TAG} chapter ${chapter.order_index} done in ${(elapsedMs / 1000).toFixed(1)}s — ` +
+        `${result.dialogueSpans.length} spans (${matched} matched), ${characterMap.size} characters known`
+    );
+
+    return {
+      status: "processed",
+      orderIndex: chapter.order_index,
+      spans: result.dialogueSpans.length,
+      matched,
+      elapsedMs,
+    };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Unknown error";
+    console.error(
+      `${EXTRACT_TAG} chapter ${chapter.order_index} failed after ${((Date.now() - startedAt) / 1000).toFixed(1)}s:`,
+      message
+    );
+
+    // Only give up once the retry budget is spent. A truncated response or a
+    // transient API error is worth another go; recording a permanent failure
+    // on the first stumble would strand a chapter that would have succeeded.
+    if (attempt >= MAX_ATTEMPTS) {
+      await supabaseAdmin
+        .from("chapters")
+        .update({ extraction_error: message.slice(0, 500) })
+        .eq("id", chapter.id);
+    }
+
+    return { status: "failed", orderIndex: chapter.order_index, message, attempt };
+  }
+}
+
+/** A manuscript with chapters still awaiting extraction, or null if none. */
+export async function findManuscriptWithPendingWork(): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("chapters")
+    .select("manuscript_id")
+    .is("summary", null)
+    .is("extraction_error", null)
+    .lt("extraction_attempts", MAX_ATTEMPTS)
+    .order("manuscript_id", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data?.manuscript_id ?? null;
+}
+
+/**
+ * Process chapters back to back until there isn't room for another within the
+ * time budget.
+ *
+ * A chapter takes roughly 35s and the function limit is 60s, so in practice
+ * this does one per run — the loop exists so that raising maxDuration is the
+ * only change needed to do several, rather than a restructure. Stopping while
+ * there is still headroom is deliberate: a chapter cut off at the limit costs
+ * an attempt from its retry budget and leaves nothing behind.
+ */
+export async function runExtractionBudget(
+  manuscriptId: string,
+  budgetMs: number,
+  typicalChapterMs = 40_000
+): Promise<{ processed: number; failed: number; complete: boolean }> {
+  const startedAt = Date.now();
+  let processed = 0;
+  let failed = 0;
+
+  while (Date.now() - startedAt + typicalChapterMs < budgetMs) {
+    const outcome = await processNextChapter(manuscriptId);
+    if (outcome.status === "complete") return { processed, failed, complete: true };
+    if (outcome.status === "failed") failed++;
+    else processed++;
+  }
+
+  return { processed, failed, complete: false };
+}

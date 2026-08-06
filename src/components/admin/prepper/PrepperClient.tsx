@@ -34,6 +34,19 @@ function displayStatus(m: ManuscriptRow): DisplayStatus {
 
 const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt"];
 
+/**
+ * How often to re-check a manuscript that is still processing.
+ *
+ * A chapter takes roughly 35 seconds, so polling every 3 seconds showed the
+ * same number ten times over and bought no extra visibility. It was also
+ * actively harmful: each poll writes a request line to the platform log, and
+ * at that rate a single open Prepper tab filled the whole 100-line log window
+ * in about three minutes. Anything worth investigating had already scrolled
+ * away by the time anyone looked — which is exactly what happened when we
+ * tried to find out why a manuscript had disappeared.
+ */
+const POLL_INTERVAL_MS = 12_000;
+
 async function uploadManuscript(file: File, onProgress: (pct: number) => void): Promise<{ key: string; format: "pdf" | "docx" | "txt" }> {
   const name = file.name.toLowerCase();
   // Sent explicitly rather than trusting file.type, which browsers leave empty
@@ -408,7 +421,7 @@ export function PrepperClient({ initialManuscripts }: { initialManuscripts: Manu
           }
         })
       );
-    }, 3000);
+    }, POLL_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, [manuscripts]);
