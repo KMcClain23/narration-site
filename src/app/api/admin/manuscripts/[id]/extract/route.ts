@@ -20,32 +20,34 @@ const MAX_ATTEMPTS = 3;
 /**
  * Queue the next chapter.
  *
- * Two things had to be true for this to work, and fixing one exposed the
- * other.
+ * Called from inside the `after()` callback below and deliberately not wrapped
+ * in an `after()` of its own. `after()` registers work against an active
+ * request; from within an already-running after-callback the response is long
+ * since sent, so the nested registration silently does nothing and the chain
+ * stops dead. That produced exactly the symptom it was meant to cure — a
+ * chapter finishing cleanly, and the next one showing zero attempts and no
+ * error, as though it had never been reached.
  *
- * It runs under `after()` because a promise left floating when the handler
- * returns has no guarantee of completing on a serverless runtime — the
- * invocation is torn down once the response is sent and the request may never
- * leave the process, silently.
- *
- * It also depends on the receiving route answering immediately rather than
- * when its chapter is finished. This awaits the child's response, and while
- * the child only replied after doing its work, every invocation stayed open
- * for the whole remainder of the book: the first call could not return until
- * the last chapter completed. The outermost invocation then hit its time limit
- * and took every in-flight descendant with it — the chain died a few chapters
- * in, and the chapter it died on recorded zero attempts, because its request
- * was aborted before it could write one.
+ * Awaiting the response is safe here only because the receiving route
+ * acknowledges before doing its work. While it replied on completion instead,
+ * every invocation stayed open for the whole remainder of the book: the first
+ * call could not return until the last chapter finished, and the outermost one
+ * hit its time limit and took every in-flight descendant with it.
  */
-function queueNextChapter(manuscriptId: string): void {
+async function queueNextChapter(manuscriptId: string): Promise<void> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.dmnarration.com";
-  after(async () => {
-    try {
-      await fetch(`${baseUrl}/api/admin/manuscripts/${manuscriptId}/extract`, { method: "POST" });
-    } catch (e) {
-      console.error(`${TAG} failed to queue next chapter for ${manuscriptId}`, e);
-    }
-  });
+  try {
+    const res = await fetch(`${baseUrl}/api/admin/manuscripts/${manuscriptId}/extract`, {
+      method: "POST",
+    });
+    // Logged so a broken handoff is visible as a broken handoff. Twice now the
+    // symptom has been a chapter with zero attempts and no error anywhere,
+    // which reads like the chapter was never reached rather than like the
+    // request that should have reached it was never sent.
+    console.log(`${TAG} queued next chapter for ${manuscriptId} (${res.status})`);
+  } catch (e) {
+    console.error(`${TAG} failed to queue next chapter for ${manuscriptId}`, e);
+  }
 }
 
 // POST: acknowledges immediately, then processes exactly one chapter — the
@@ -194,7 +196,7 @@ async function processOneChapter(id: string): Promise<void> {
       `${TAG} chapter ${chapter.order_index} done in ${elapsed}s — ${result.dialogueSpans.length} spans (${matched} matched), ${characterMap.size} characters known`
     );
 
-    queueNextChapter(id);
+    await queueNextChapter(id);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
@@ -220,6 +222,6 @@ async function processOneChapter(id: string): Promise<void> {
     // show, this is scoped to one chapter. Phase 4 gates the reader on
     // status !== "ready", so failing the manuscript would hide every
     // already-extracted chapter over one transient error.
-    queueNextChapter(id);
+    await queueNextChapter(id);
   }
 }
