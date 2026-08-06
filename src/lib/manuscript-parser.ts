@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { sanitiseClaudeJson } from "@/lib/sanitize-claude-json";
-import { UNNUMBERED_SECTION_TITLE } from "@/lib/unnumbered-sections";
+import { computeChapterNumbers } from "@/lib/unnumbered-sections";
 
 // SDK retries 429s automatically with exponential backoff
 const anthropic = new Anthropic({ maxRetries: 4 });
@@ -552,6 +552,65 @@ function isChapterHeadingLine(s: string): boolean {
  * cannot run away into prose.
  */
 const DROP_CAP_LOOKAHEAD = 6;
+
+/**
+ * Reattach a drop cap that optical recognition moved onto a later line.
+ *
+ * An oversized initial spans two lines of body text, so its vertical centre
+ * sits beside the *second* one. OCR reads by row and emits it there, leaving a
+ * chapter that opens like this:
+ *
+ *     Y MANICURED NAILS CLACK against my keyboard as I fire off
+ *     M the last words.
+ *
+ * The letter is never alone on a line, so joinDropCaps — which looks for
+ * exactly that — cannot see this shape at all.
+ *
+ * Three things have to hold at once, because a line beginning "I " or "A " is
+ * unremarkable in prose and must never be treated as a stray initial:
+ *
+ *   - the previous line opens with the tail of a decapitated word — a short
+ *     run of capitals — followed by more capitals from the small-caps opening
+ *     ("Y MANICURED"), which ordinary prose does not produce;
+ *   - that tail is not itself the word "A" or "I", so "A MANIFESTO lay open."
+ *     followed by "I said nothing." is left alone;
+ *   - it happens near the top of a page, which is the only place a chapter —
+ *     and therefore a drop cap — can begin.
+ */
+/**
+ * How far into a page the rule may look, counted in lines that carry text.
+ *
+ * Blank lines are not counted. A recovered page separates its heading, its POV
+ * line and its opening lines with blanks, which doubles a raw line count and
+ * put the real drop cap one position outside a raw-index window that looked
+ * generous on paper.
+ */
+const FRAGMENT_DROP_CAP_ZONE = 10;
+
+function joinFragmentDropCaps(lines: PdfLine[]): PdfLine[] {
+  const out = lines.map((l) => ({ ...l }));
+
+  let seen = 0;
+  for (let i = 1; i < out.length; i++) {
+    if (!out[i].text.trim()) continue;
+    if (++seen > FRAGMENT_DROP_CAP_ZONE) break;
+
+    const moved = out[i].text.match(/^([A-Z]) (.+)$/);
+    if (!moved) continue;
+
+    let prev = i - 1;
+    while (prev >= 0 && !out[prev].text.trim()) prev--;
+    if (prev < 0) continue;
+
+    const tail = out[prev].text.trim().match(/^([A-Z]{1,4})\s+[A-Z]{2,}/);
+    if (!tail || tail[1] === "A" || tail[1] === "I") continue;
+
+    out[prev] = { ...out[prev], text: moved[1] + out[prev].text.trim() };
+    out[i] = { ...out[i], text: moved[2] };
+  }
+
+  return out;
+}
 
 function joinDropCaps(lines: PdfLine[]): PdfLine[] {
   const work = lines.map((l) => ({ ...l }));
@@ -1167,8 +1226,6 @@ function resolveToc(
 
 // ─── Chapter numbering + text assembly ─────────────────────────────────────────
 
-const UNNUMBERED = UNNUMBERED_SECTION_TITLE;
-
 export interface ParsedChapter {
   number: number | null;
   title: string;
@@ -1263,7 +1320,11 @@ function assembleParagraphs(lines: PdfLine[]): string {
  * (the printed chapter number) is skipped over, not removed — only the POV
  * heading is being stripped here.
  */
-function stripLeadingPovHeading(rawText: string, povCharacter: string | null): string {
+function stripLeadingPovHeading(
+  rawText: string,
+  povCharacter: string | null,
+  title?: string
+): string {
   const paragraphs = rawText.split("\n\n");
 
   // Drop the printed chapter number and the typeset chapter title from the
@@ -1272,8 +1333,17 @@ function stripLeadingPovHeading(rawText: string, povCharacter: string | null): s
   // capitals rather than its opening sentence. This runs whether or not a POV
   // is known, since the heading is there either way. The guard never lets the
   // loop consume the final paragraph, so a chapter cannot be emptied.
+  //
+  // The chapter's own title is matched as well as the all-caps shape, because
+  // a heading set in title case — "Chapter One" — has lowercase letters in it
+  // and so never looked like a heading at all, which left it sitting in the
+  // prose of every chapter of any book that titles them that way.
+  const titleKey = title ? normalizeForMatch(title) : "";
+  const isHeading = (p: string) =>
+    isChapterHeadingLine(p) || (titleKey.length >= 3 && normalizeForMatch(p) === titleKey);
+
   let idx = 0;
-  while (idx < paragraphs.length - 1 && isChapterHeadingLine(paragraphs[idx])) idx++;
+  while (idx < paragraphs.length - 1 && isHeading(paragraphs[idx])) idx++;
   if (idx > 0) paragraphs.splice(0, idx);
 
   const name = povCharacter?.trim();
@@ -1339,7 +1409,8 @@ function assignChaptersFromLines(
     return { page, line: findChapterStartLine(linePages[page] ?? [], ch.title) };
   });
 
-  let chapNum = 0;
+  const numbers = computeChapterNumbers(raw.map((ch) => ch.title));
+
   return raw.map((ch, i) => {
     const start = starts[i];
     const end = i + 1 < raw.length ? starts[i + 1] : { page: totalPages, line: 0 };
@@ -1353,10 +1424,9 @@ function assignChaptersFromLines(
     }
 
     const povCharacter = ch.povCharacter ?? null;
-    const rawText = stripLeadingPovHeading(assembleParagraphs(lines), povCharacter);
+    const rawText = stripLeadingPovHeading(assembleParagraphs(lines), povCharacter, ch.title);
     const wordCount = rawText ? rawText.split(/\s+/).filter(Boolean).length : 0;
-    const number = UNNUMBERED.test(ch.title.trim()) ? null : ++chapNum;
-    return { number, title: ch.title, povCharacter, wordCount, rawText };
+    return { number: numbers[i], title: ch.title, povCharacter, wordCount, rawText };
   });
 }
 
@@ -1372,7 +1442,8 @@ function assignChaptersFromPages(
   pageTexts: string[]
 ): ParsedChapter[] {
   const totalPages = pageTexts.length;
-  let chapNum = 0;
+  const numbers = computeChapterNumbers(raw.map((ch) => ch.title));
+
   return raw.map((ch, i) => {
     const start = Math.max(0, ch.startPage - 1);
     const end =
@@ -1380,10 +1451,13 @@ function assignChaptersFromPages(
         ? Math.max(start + 1, raw[i + 1].startPage - 1)
         : totalPages;
     const povCharacter = ch.povCharacter ?? null;
-    const rawText = stripLeadingPovHeading(pageTexts.slice(start, end).join("\n\n").trim(), povCharacter);
+    const rawText = stripLeadingPovHeading(
+      pageTexts.slice(start, end).join("\n\n").trim(),
+      povCharacter,
+      ch.title
+    );
     const wordCount = rawText ? rawText.split(/\s+/).filter(Boolean).length : 0;
-    const number = UNNUMBERED.test(ch.title.trim()) ? null : ++chapNum;
-    return { number, title: ch.title, povCharacter, wordCount, rawText };
+    return { number: numbers[i], title: ch.title, povCharacter, wordCount, rawText };
   });
 }
 
@@ -1510,7 +1584,7 @@ async function askClaude(pageMap: string): Promise<Array<{ title: string; startP
  * v2 — TOC as primary source, printed-page offset derivation with validation,
  *      POV parsing, ligature/header/drop-cap/hyphen repairs, quality scoring.
  */
-export const PARSER_VERSION = "v2";
+export const PARSER_VERSION = "v3";
 const TAG = `[parser ${PARSER_VERSION}]`;
 
 /**
@@ -1550,7 +1624,7 @@ function logTextQuality(format: string, q: TextQualityReport): void {
  * text that a later pass can re-split, whereas guessing breaks from sentence
  * punctuation shreds any paragraph containing more than one sentence.
  */
-function assembleTextParagraphs(pageText: string): string {
+function assembleTextParagraphs(lines: PdfLine[]): string {
   const paragraphs: string[] = [];
   let current = "";
 
@@ -1559,18 +1633,34 @@ function assembleTextParagraphs(pageText: string): string {
     current = "";
   };
 
-  for (const rawLine of pageText.split("\n")) {
-    if (!rawLine.trim()) { flush(); continue; }
-    const indented = /^[ \t]{2,}/.test(rawLine);
-    const line = rawLine.trim();
-    if (indented) { flush(); current = line; continue; }
-    if (!current) { current = line; continue; }
-    const brokenWord = /\w-$/.test(current) && /^[a-z]/.test(line);
-    current = brokenWord ? `${current.slice(0, -1)}${line}` : `${current} ${line}`;
+  for (const line of lines) {
+    if (!line.text.trim()) { flush(); continue; }
+    // Two columns of leading whitespace is a first-line indent. Unlike the PDF
+    // path there is no glyph jitter to vote a body margin out of, so the
+    // character count is taken at face value.
+    if (line.forceBreak || line.indent >= 2) { flush(); current = line.text; continue; }
+    if (!current) { current = line.text; continue; }
+    const brokenWord = /\w-$/.test(current) && /^[a-z]/.test(line.text);
+    current = brokenWord ? `${current.slice(0, -1)}${line.text}` : `${current} ${line.text}`;
   }
   flush();
 
   return paragraphs.join("\n\n");
+}
+
+/**
+ * A plain-text page as lines, in the same shape the PDF cleaners consume.
+ *
+ * Blank lines are kept as empty entries rather than dropped: they are the
+ * primary paragraph signal in a text file, and the header stripper addresses
+ * lines by index, so removing them here would both lose the breaks and shift
+ * every index out from under it.
+ */
+function toTextLines(pageText: string): PdfLine[] {
+  return pageText.split("\n").map((raw) => {
+    const expanded = raw.replace(/\t/g, "    ");
+    return { text: expanded.trim(), indent: expanded.length - expanded.trimStart().length };
+  });
 }
 
 export async function parseManuscript(
@@ -1600,11 +1690,27 @@ export async function parseManuscript(
     const decoded = normalizeLigatures(
       buffer.toString("utf8").replace(/^﻿/, "").replace(/\r\n/g, "\n")
     );
-    const pages = decoded.split("\f").map((p) => assembleTextParagraphs(p));
-    if (!pages.some((p) => p.trim())) throw new Error("Could not extract any text from file");
+    const rawPages = decoded.split("\f");
+    if (!rawPages.some((p) => p.trim())) throw new Error("Could not extract any text from file");
 
-    const quality = assessTextQuality(pages);
+    // Quality is read off the untouched text, before anything is stripped from
+    // it, for the same reason as the PDF path — the point is to describe the
+    // source, not the parser's clean-up of it.
+    const quality = assessTextQuality(rawPages);
     logTextQuality("txt", quality);
+
+    // Same pipeline as the PDF path, and in the same order — headers before
+    // drop caps, so a stripped running header can't sit between a drop cap and
+    // its continuation and prevent the join.
+    //
+    // A recovered manuscript is not a lesser input than a PDF: it carries the
+    // identical running headers, folios and drop caps, because it came off the
+    // same printed pages. Handing it a thinner pipeline just moved every one of
+    // those defects into the stored text, where they read as parser bugs.
+    const txtLinePages = stripHeadersFooters(rawPages.map(toTextLines))
+      .map(joinDropCaps)
+      .map(joinFragmentDropCaps);
+    const pages = txtLinePages.map(assembleTextParagraphs);
 
     // Same resolution path as the PDF branch: a plaintext manuscript recovered
     // from OCR still carries printed page numbers in its TOC, so its entries
@@ -1654,11 +1760,14 @@ export async function parseManuscript(
     const docx = await processDocx(buffer);
 
     if (docx.kind === "headings") {
-      let chapNum = 0;
-      const chapters: ParsedChapter[] = docx.sections.map((s) => {
-        const number = UNNUMBERED.test(s.title.trim()) ? null : ++chapNum;
-        return { number, title: s.title, povCharacter: null, wordCount: s.wordCount, rawText: s.rawText };
-      });
+      const numbers = computeChapterNumbers(docx.sections.map((s) => s.title));
+      const chapters: ParsedChapter[] = docx.sections.map((s, i) => ({
+        number: numbers[i],
+        title: s.title,
+        povCharacter: null,
+        wordCount: s.wordCount,
+        rawText: s.rawText,
+      }));
       return { format: "docx", chapters };
     }
 

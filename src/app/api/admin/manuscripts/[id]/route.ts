@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { r2, R2_BUCKETS } from "@/lib/r2";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { isUnnumberedSection } from "@/lib/unnumbered-sections";
+import { countNumberedChapters } from "@/lib/unnumbered-sections";
 
 // GET: poll status — the manuscripts.status column plus a chapter count,
 // same role as the retired board-pdf-status/route.ts.
@@ -19,15 +19,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   // Titles are needed to tell numbered chapters from front/back matter, so
   // this reads the rows rather than issuing three separate count queries —
-  // fewer round trips, and the counts can't disagree with one another.
+  // fewer round trips, and the counts can't disagree with one another. Ordered
+  // because front matter is identified partly by position (see
+  // computeChapterNumbers), which an arbitrary row order would scramble.
   const { data: chapterRows } = await supabaseAdmin
     .from("chapters")
     .select("title, summary, extraction_error")
-    .eq("manuscript_id", id);
+    .eq("manuscript_id", id)
+    .order("order_index", { ascending: true });
 
   const rows = chapterRows ?? [];
-  const sectionCount = rows.filter((c) => isUnnumberedSection(c.title)).length;
-  const count = rows.length - sectionCount;
+  const count = countNumberedChapters(rows.map((c) => c.title));
+  const sectionCount = rows.length - count;
 
   // A non-null summary is extraction's own resumability signal (see
   // extraction-runner.ts) — reused here so callers can tell "chapters parsed"

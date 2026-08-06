@@ -1,7 +1,7 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PrepperClient, type ManuscriptRow } from "@/components/admin/prepper/PrepperClient";
-import { isUnnumberedSection } from "@/lib/unnumbered-sections";
+import { countNumberedChapters } from "@/lib/unnumbered-sections";
 
 // Admin data changes constantly — always read fresh, same convention as the
 // other /tools pages.
@@ -50,15 +50,20 @@ export default async function PrepperPage() {
   const { data: chapterRows } = manuscriptIds.length
     ? await supabaseAdmin
         .from("chapters")
-        .select("manuscript_id, title, summary, raw_text, extraction_error")
+        .select("manuscript_id, order_index, title, summary, raw_text, extraction_error")
         .in("manuscript_id", manuscriptIds)
+        .order("manuscript_id", { ascending: true })
+        .order("order_index", { ascending: true })
     : { data: [] };
 
   // Numbered chapters and front/back matter are counted apart. Every section
   // is a chapters row, but "41 chapters" for a book with 39 of them matches
   // neither the spine nor the reader's own chapter list.
-  const sectionCountByManuscript = new Map<string, number>();
-  const chapterCountByManuscript = new Map<string, number>();
+  //
+  // Titles are gathered per book in reading order rather than tallied as they
+  // arrive, because front matter is identified partly by what precedes the
+  // first labelled chapter — a per-row test cannot see that.
+  const titlesByManuscript = new Map<string, Array<string | null>>();
   const extractedCountByManuscript = new Map<string, number>();
   const wordCountByManuscript = new Map<string, number>();
   // Chapters that failed extraction. The column existed only in the database
@@ -66,11 +71,9 @@ export default async function PrepperPage() {
   // the only way to find out was to go and query for it.
   const failedCountByManuscript = new Map<string, number>();
   (chapterRows ?? []).forEach((c) => {
-    if (isUnnumberedSection(c.title)) {
-      sectionCountByManuscript.set(c.manuscript_id, (sectionCountByManuscript.get(c.manuscript_id) ?? 0) + 1);
-    } else {
-      chapterCountByManuscript.set(c.manuscript_id, (chapterCountByManuscript.get(c.manuscript_id) ?? 0) + 1);
-    }
+    const titles = titlesByManuscript.get(c.manuscript_id) ?? [];
+    titles.push(c.title);
+    titlesByManuscript.set(c.manuscript_id, titles);
     if (c.summary !== null) {
       extractedCountByManuscript.set(c.manuscript_id, (extractedCountByManuscript.get(c.manuscript_id) ?? 0) + 1);
     }
@@ -78,6 +81,14 @@ export default async function PrepperPage() {
       failedCountByManuscript.set(c.manuscript_id, (failedCountByManuscript.get(c.manuscript_id) ?? 0) + 1);
     }
     wordCountByManuscript.set(c.manuscript_id, (wordCountByManuscript.get(c.manuscript_id) ?? 0) + countWords(c.raw_text));
+  });
+
+  const chapterCountByManuscript = new Map<string, number>();
+  const sectionCountByManuscript = new Map<string, number>();
+  titlesByManuscript.forEach((titles, manuscriptId) => {
+    const numbered = countNumberedChapters(titles);
+    chapterCountByManuscript.set(manuscriptId, numbered);
+    sectionCountByManuscript.set(manuscriptId, titles.length - numbered);
   });
 
   if (manuscripts?.length) {

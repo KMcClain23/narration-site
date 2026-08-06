@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Highlighter, ListTree, Mic, Square, Upload, Volume2, X } from "lucide-react";
 import { splitParagraphs, type SpanLite } from "./paragraph-highlight";
 import { ParagraphText, type CharacterLite } from "./ParagraphText";
-import { isUnnumberedSection } from "@/lib/unnumbered-sections";
+import { computeChapterNumbers } from "@/lib/unnumbered-sections";
 
 /** Reconstructs a plain-text character offset within `root` for a DOM
  *  (node, offset) pair from a Selection Range — walks root's text nodes in
@@ -123,13 +123,9 @@ export function ManuscriptReader({
   // matching how the book itself is numbered, not the section's position in
   // the array.
   const chapterMeta = useMemo(() => {
-    const numberedTotal = chapters.filter((ch) => !isUnnumberedSection(ch.title)).length;
-    let n = 0;
-    return chapters.map((ch) => {
-      const unnumbered = isUnnumberedSection(ch.title);
-      if (!unnumbered) n++;
-      return { number: unnumbered ? null : n, total: numberedTotal };
-    });
+    const numbers = computeChapterNumbers(chapters.map((ch) => ch.title));
+    const total = numbers.filter((n) => n !== null).length;
+    return numbers.map((number) => ({ number, total }));
   }, [chapters]);
 
   const jumpToChapter = (chapterId: string) => {
