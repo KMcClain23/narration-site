@@ -800,7 +800,15 @@ function parseTocFromPages(pageTexts: string[]): { entries: TocEntry[]; lastTocP
     if (!pageTexts[i].trim()) continue;
     const before = entries.length;
     extractTocEntries(pageTexts[i], entries, seen);
-    if (entries.length > before) lastTocPage = i;
+    // Only a page that yielded several entries counts as part of the contents.
+    // A single match is far more likely to be a chapter opening that happens
+    // to read like a TOC row — "CHAPTER ONE" sitting near its folio produces
+    // exactly the "title then number" shape the keyword strategy looks for.
+    // Letting one of those advance the marker pushes the end of the contents
+    // deep into the body, and title confirmation then starts its search past
+    // the opening chapters, so they cannot be confirmed no matter how cleanly
+    // they parsed.
+    if (entries.length - before >= 2) lastTocPage = i;
   }
 
   if (entries.length < 3) return null;
@@ -1039,6 +1047,23 @@ function extractPovFromTitles(entries: RawTocEntry[]): TocChapter[] {
 
 /** How far from the predicted page a title may appear and still confirm it. */
 const PAGE_MATCH_TOLERANCE = 2;
+
+/**
+ * How much unconfirmed the parse will accept before refusing the book.
+ *
+ * A handful of chapters failing to confirm against an offset that the rest of
+ * the book agrees on is a different situation from the offset being wrong. The
+ * first is usually one damaged page or one misread TOC entry, and rejecting an
+ * otherwise-correct 34-chapter parse over it helps nobody. The second means
+ * every boundary is suspect.
+ *
+ * So a small minority is placed by arithmetic and reported on the manuscript
+ * by name, which keeps the property that actually matters — misalignment is
+ * never silent — without making it all or nothing. Both a fraction and an
+ * absolute cap, so a very long book cannot quietly accept dozens of them.
+ */
+const MAX_UNCONFIRMED_FRACTION = 0.15;
+const MAX_UNCONFIRMED_ABSOLUTE = 5;
 
 /** Pages whose text contains this title, searched only past the TOC itself. */
 function findTitlePages(title: string, pageTexts: string[], searchFrom: number): number[] {
@@ -1556,6 +1581,8 @@ export async function parseManuscript(
   quality?: TextQualityReport;
   /** POV names read off the TOC, for seeding extraction's character roster. */
   povRoster?: string[];
+  /** Non-fatal problems worth showing on the manuscript row. */
+  warnings?: string[];
 }> {
   const fileType = detectFileType(new Uint8Array(buffer));
 
@@ -1663,6 +1690,9 @@ export async function parseManuscript(
 
   let rawSections: Array<{ title: string; startPage: number; povCharacter: string | null }>;
   let povRoster: string[] = [];
+  // Non-fatal problems worth surfacing on the manuscript row rather than only
+  // in a log nobody reads until something has already gone wrong.
+  const warnings: string[] = [];
 
   // ── Primary: the book's own table of contents ────────────────────────────
   //
@@ -1712,10 +1742,13 @@ export async function parseManuscript(
       if (ch.povNote) console.warn(`${TAG} ${ch.povNote}`);
     }
 
-    // Loud, not lenient. An unconfirmed chapter means the offset does not hold
-    // there, and proceeding would store one chapter's pages under another
-    // chapter's title — prose that reads perfectly and is simply the wrong
-    // chapter, which no amount of proofreading downstream would catch.
+    // An unconfirmed chapter means the offset does not hold there, and placing
+    // it anyway risks storing one chapter's pages under another chapter's
+    // title — prose that reads perfectly and is simply the wrong chapter,
+    // which no amount of proofreading downstream would catch. A few of those
+    // among many confirmed ones are placed by arithmetic and named on the
+    // manuscript; a lot of them means the offset itself is wrong and the book
+    // is refused.
     if (unconfirmed.length) {
       // Where the title *was* seen, if anywhere, is the difference between two
       // very different problems. A sighting some distance away means the
@@ -1733,11 +1766,25 @@ export async function parseManuscript(
         })
         .join("; ");
       const more = unconfirmed.length > 5 ? ` …and ${unconfirmed.length - 5} more` : "";
-      throw new Error(
-        `TOC validation failed: ${unconfirmed.length} of ${tocChapters.length} chapter titles ` +
-          `were not found near their computed start page using offset ${offset >= 0 ? "+" : ""}${offset}. ` +
-          `Refusing to store possibly misaligned chapter text. Unconfirmed: ${named}${more}`
+      const detail =
+        `${unconfirmed.length} of ${tocChapters.length} chapter titles were not found near their ` +
+        `computed start page using offset ${offset >= 0 ? "+" : ""}${offset}. Unconfirmed: ${named}${more}`;
+
+      const tolerable =
+        unconfirmed.length / tocChapters.length <= MAX_UNCONFIRMED_FRACTION &&
+        unconfirmed.length <= MAX_UNCONFIRMED_ABSOLUTE;
+
+      if (!tolerable) {
+        throw new Error(`TOC validation failed: ${detail} Refusing to store possibly misaligned chapter text.`);
+      }
+
+      const plural = unconfirmed.length === 1 ? "" : "s";
+      warnings.push(
+        `${unconfirmed.length} chapter${plural} could not be confirmed against the body and ` +
+          `${unconfirmed.length === 1 ? "was" : "were"} placed by offset arithmetic — worth checking ` +
+          `${unconfirmed.length === 1 ? "its" : "their"} opening text. ${named}${more}`
       );
+      console.warn(`${TAG} ${detail} — within tolerance, placed by arithmetic`);
     }
 
     rawSections = tocChapters.map((c) => ({
@@ -1755,5 +1802,5 @@ export async function parseManuscript(
   }
 
   const chapters = assignChaptersFromLines(rawSections, cleanedLinePages);
-  return { format: "pdf", chapters, quality, povRoster };
+  return { format: "pdf", chapters, quality, povRoster, warnings };
 }

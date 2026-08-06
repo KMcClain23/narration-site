@@ -30,18 +30,25 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const bytes = await obj.Body!.transformToByteArray();
     r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKETS.media.name, Key: manuscript.source_r2_key })).catch(() => {});
 
-    const { chapters, quality, povRoster } = await parseManuscript(Buffer.from(bytes));
+    const { chapters, quality, povRoster, warnings } = await parseManuscript(Buffer.from(bytes));
     if (!chapters.length) throw new Error("No chapters detected in the document");
 
     // A parse can succeed structurally and still be unreadable if the source
     // PDF's text layer is corrupt. That is worth surfacing on the row rather
     // than only in the log — it looks identical to a good parse in the UI, and
     // the chapters are the thing that gets read aloud.
-    const qualityNote =
+    //
+    // Parser warnings join it: a chapter placed by arithmetic because its
+    // heading could not be confirmed is exactly the kind of thing that reads
+    // fine and is quietly wrong, so it belongs where someone will see it.
+    const notes = [
       quality && quality.suspectRatio > 0.25
         ? `Parsed, but ${quality.suspectPages.length} of ${quality.pageRatios.filter((r) => r !== null).length} pages ` +
           `look garbled (likely a corrupt text layer needing OCR).`
-        : null;
+        : null,
+      ...(warnings ?? []),
+    ].filter(Boolean);
+    const qualityNote = notes.length ? notes.join(" ").slice(0, 1000) : null;
 
     const rows = chapters.map((ch, i) => ({
       manuscript_id: id,
