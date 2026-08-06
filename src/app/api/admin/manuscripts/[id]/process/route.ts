@@ -2,10 +2,46 @@ import { NextResponse } from "next/server";
 import { GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { r2, R2_BUCKETS } from "@/lib/r2";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { parseManuscript } from "@/lib/manuscript-parser";
+import { parseManuscript, PARSE_BUDGET_MS } from "@/lib/manuscript-parser";
 import { nextCharacterColor } from "@/lib/character-colors";
 
 export const maxDuration = 60;
+
+/**
+ * A parse that outruns this is abandoned so the row can be marked failed.
+ *
+ * The failure this exists for is not a slow parse — it is a silent one. When a
+ * parse runs past maxDuration the platform kills the invocation outright, and
+ * none of the code below ever runs: no catch, no status write, no error
+ * message. The manuscript stays at "processing" indefinitely, and from the UI
+ * there is no way to tell that apart from a parse still in progress. Every
+ * report of an upload "stuck in parsing" is this.
+ *
+ * So the work is raced against a deadline comfortably inside maxDuration,
+ * leaving room to write the failure and respond. The parser also enforces its
+ * own budget between stages (PARSE_BUDGET_MS) and names the stage it stopped
+ * at, which is the more useful error of the two — this is the backstop for a
+ * stage that hangs internally and never returns to be checked.
+ */
+const PARSE_DEADLINE_MS = PARSE_BUDGET_MS + 5_000;
+
+function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `Parsing timed out after ${Math.round(ms / 1000)}s and was abandoned. ` +
+              `Check the function log for the last "[parser …]" stage line — that names ` +
+              `the step that did not finish.`
+          )
+        ),
+      ms
+    );
+  });
+  return Promise.race([work, deadline]).finally(() => clearTimeout(timer)) as Promise<T>;
+}
 
 // POST: the actual parse job, fired-and-forgotten by /api/admin/manuscripts.
 // Downloads the source file from R2, deletes it (it's a temp upload, not a
@@ -30,7 +66,15 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const bytes = await obj.Body!.transformToByteArray();
     r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKETS.media.name, Key: manuscript.source_r2_key })).catch(() => {});
 
-    const { chapters, quality, povRoster, warnings } = await parseManuscript(Buffer.from(bytes));
+    const started = Date.now();
+    console.log(`[manuscripts/process] ${id} — parsing ${bytes.length} bytes`);
+    const { chapters, quality, povRoster, warnings } = await withDeadline(
+      parseManuscript(Buffer.from(bytes)),
+      PARSE_DEADLINE_MS
+    );
+    console.log(
+      `[manuscripts/process] ${id} — parsed ${chapters.length} chapters in ${Date.now() - started}ms`
+    );
     if (!chapters.length) throw new Error("No chapters detected in the document");
 
     // A parse can succeed structurally and still be unreadable if the source

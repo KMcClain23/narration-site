@@ -1124,15 +1124,86 @@ const PAGE_MATCH_TOLERANCE = 2;
 const MAX_UNCONFIRMED_FRACTION = 0.15;
 const MAX_UNCONFIRMED_ABSOLUTE = 5;
 
-/** Pages whose text contains this title, searched only past the TOC itself. */
-function findTitlePages(title: string, pageTexts: string[], searchFrom: number): number[] {
+/**
+ * A title short enough that finding it in prose proves nothing on its own.
+ *
+ * This used to be a hard floor: anything shorter returned no hits at all. That
+ * silently disqualified every chapter of a book whose chapters are titled with
+ * a POV name — "Seth" is four characters, so all twenty-four of its chapters
+ * produced zero sightings, failed confirmation, and took the whole book down
+ * with a TOC-validation error that named the offset rather than the real cause.
+ *
+ * Short titles are now searched like any other; what changes is *where* they
+ * are allowed to match. See findTitlePages.
+ */
+const MIN_DISTINCTIVE_TITLE_LEN = 6;
+
+/**
+ * How far into a page a heading may sit, in normalized characters.
+ *
+ * Headers and folios are stripped before this runs, so a chapter's heading is
+ * at or within a few characters of the start of its opening page — the only
+ * thing that can precede it is a printed chapter number. Prose mentioning the
+ * same name is not.
+ *
+ * Kept tight deliberately. A window wide enough to feel safe (48 characters)
+ * still admits "The afternoon went on, Brooke did not look up" and matches
+ * every page of narration she appears on, which is the exact failure this is
+ * meant to prevent.
+ */
+const TITLE_HEADING_WINDOW = 12;
+
+/**
+ * Pages whose text contains this title, searched only past the TOC itself.
+ *
+ * `headingOnly` restricts a match to the top of a page. It is used for titles
+ * that cannot identify a chapter by themselves — ones too short to be
+ * distinctive, and ones the book reuses for many chapters. "Brooke" as a
+ * free-text search matches 247 of 500 pages, because she is the narrator and
+ * her name is all over the prose; as a heading search it matches the twenty-five
+ * pages that actually open her chapters.
+ *
+ * Takes pre-normalized pages: the same page was previously re-normalized once
+ * per chapter per pass, which on a fifty-chapter, five-hundred-page book is
+ * fifty thousand full-page regex rewrites.
+ */
+function findTitlePages(
+  title: string,
+  normalizedPages: string[],
+  searchFrom: number,
+  headingOnly = false
+): number[] {
   const needle = normalizeForMatch(title);
-  if (needle.length < 6) return []; // too short to identify anything reliably
+  if (!needle) return [];
   const hits: number[] = [];
-  for (let i = searchFrom; i < pageTexts.length; i++) {
-    if (normalizeForMatch(pageTexts[i]).includes(needle)) hits.push(i + 1); // 1-based
+  for (let i = searchFrom; i < normalizedPages.length; i++) {
+    const at = normalizedPages[i].indexOf(needle);
+    if (at === -1) continue;
+    if (headingOnly && at > TITLE_HEADING_WINDOW) continue;
+    hits.push(i + 1); // 1-based
   }
   return hits;
+}
+
+/**
+ * Titles that cannot single out a chapter on their own.
+ *
+ * Two ways that happens: the title is too short to be distinctive, or the book
+ * uses it for more than one chapter. A book alternating "Brooke" and "Seth"
+ * across forty-nine chapters is both at once — there is no title-level
+ * information to tell chapter 3 from chapter 47, so position has to carry it.
+ */
+function ambiguousTitles(chapters: TocChapter[]): Set<string> {
+  const uses = new Map<string, number>();
+  for (const ch of chapters) {
+    const k = normalizeForMatch(ch.title);
+    uses.set(k, (uses.get(k) ?? 0) + 1);
+  }
+  const out = new Set<string>();
+  for (const [k, n] of uses) {
+    if (n > 1 || k.length < MIN_DISTINCTIVE_TITLE_LEN) out.add(k);
+  }
+  return out;
 }
 
 /**
@@ -1145,13 +1216,15 @@ function findTitlePages(title: string, pageTexts: string[], searchFrom: number):
  */
 function deriveOffset(
   chapters: TocChapter[],
-  pageTexts: string[],
-  searchFrom: number
+  normalizedPages: string[],
+  searchFrom: number,
+  ambiguous: Set<string>
 ): { offset: number; agreement: number } | null {
   const votes = new Map<number, number>();
 
   for (const ch of chapters) {
-    for (const pdfPage of findTitlePages(ch.title, pageTexts, searchFrom)) {
+    const headingOnly = ambiguous.has(normalizeForMatch(ch.title));
+    for (const pdfPage of findTitlePages(ch.title, normalizedPages, searchFrom, headingOnly)) {
       const candidate = pdfPage - ch.printedPage;
       if (candidate < 0) continue; // body can't precede its own printed number
       votes.set(candidate, (votes.get(candidate) ?? 0) + 1);
@@ -1193,13 +1266,37 @@ function resolveToc(
   const chapters = extractPovFromTitles(rawEntries);
   const searchFrom = lastTocPage + 1;
 
-  const derived = deriveOffset(chapters, pageTexts, searchFrom);
+  // Normalize each page once. This was previously redone per chapter per pass.
+  const normalizedPages = pageTexts.map(normalizeForMatch);
+  const ambiguous = ambiguousTitles(chapters);
+  if (ambiguous.size) {
+    console.log(
+      `${TAG} ${ambiguous.size} title(s) cannot identify a chapter alone ` +
+        `(${[...ambiguous].slice(0, 4).join(", ")}) — matching those as headings only`
+    );
+  }
+
+  const derived = deriveOffset(chapters, normalizedPages, searchFrom, ambiguous);
   if (!derived) return null;
 
+  // Chapters are resolved in reading order, and a chapter may never be placed
+  // at or before the one before it.
+  //
+  // Without that, each chapter is matched independently, and a book whose
+  // chapters are titled only "Brooke" and "Seth" has no title-level information
+  // to tell its third chapter from its forty-seventh — every sighting of a name
+  // is a candidate for every chapter bearing it. Independent matching then
+  // picks whichever happens to be nearest the arithmetic guess, which can sit
+  // behind the previous chapter's start and produce a negative-length chapter
+  // or duplicated text. Reading order is the one thing about a book that is
+  // never in doubt, so it is enforced rather than hoped for.
   const unconfirmed: TocChapter[] = [];
+  let floor = searchFrom; // 1-based; nothing may start at or before this
+
   for (const ch of chapters) {
-    ch.pdfPage = ch.printedPage + derived.offset;
-    const hits = findTitlePages(ch.title, pageTexts, searchFrom);
+    const expected = ch.printedPage + derived.offset;
+    const headingOnly = ambiguous.has(normalizeForMatch(ch.title));
+    const hits = findTitlePages(ch.title, normalizedPages, searchFrom, headingOnly);
 
     // Closest sighting, not the first one within tolerance. A chapter can
     // share its title with the book — the final chapter often does — and the
@@ -1210,15 +1307,18 @@ function resolveToc(
     // as "confirmed", so the check passes while the boundary is wrong.
     let near: number | null = null;
     for (const h of hits) {
-      if (near === null || Math.abs(h - ch.pdfPage) < Math.abs(near - ch.pdfPage)) near = h;
+      if (h <= floor) continue; // would place this chapter inside an earlier one
+      if (near === null || Math.abs(h - expected) < Math.abs(near - expected)) near = h;
     }
 
     ch.foundOnPdfPage = near;
-    if (near !== null && Math.abs(near - ch.pdfPage) <= PAGE_MATCH_TOLERANCE) {
+    if (near !== null && Math.abs(near - expected) <= PAGE_MATCH_TOLERANCE) {
       ch.pdfPage = near; // trust the sighting over the arithmetic
     } else {
+      ch.pdfPage = Math.max(expected, floor + 1); // arithmetic, but still after the last one
       unconfirmed.push(ch);
     }
+    floor = ch.pdfPage;
   }
 
   return { chapters, offset: derived.offset, agreement: derived.agreement, unconfirmed };
@@ -1526,6 +1626,15 @@ function buildPageMap(pageTexts: string[]): string {
 }
 
 async function askClaude(pageMap: string): Promise<Array<{ title: string; startPage: number; povCharacter: string | null }>> {
+  console.log(`${TAG} askClaude — page map ${pageMap.length} chars, ${pageMap.split("\n").length} pages`);
+
+  // Bounded, and with retries capped for this call only.
+  //
+  // The client default of four retries with exponential backoff is right for a
+  // transient 429 on a short call. On a five-hundred-page page map it is the
+  // difference between failing at thirty seconds with a message and being
+  // killed at sixty by the platform, which writes no status at all and leaves
+  // the manuscript sitting at "processing" with nothing to explain it.
   const msg = await anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",
     // 1024 was silently truncating mid-array on real books (~30+ sections) —
@@ -1552,7 +1661,7 @@ async function askClaude(pageMap: string): Promise<Array<{ title: string; startP
           `No markdown fences. No explanation. Only the JSON array.`,
       },
     ],
-  });
+  }, { timeout: CLAUDE_CALL_TIMEOUT_MS, maxRetries: 1 });
 
   const raw = msg.content[0].type === "text" ? msg.content[0].text : "";
   console.log(`[manuscript-parser] askClaude stop_reason=${msg.stop_reason} output_tokens=${msg.usage.output_tokens} raw_len=${raw.length}`);
@@ -1663,6 +1772,62 @@ function toTextLines(pageText: string): PdfLine[] {
   });
 }
 
+// ─── Stage tracing and the parse budget ──────────────────────────────────────
+
+/**
+ * How long a parse may take before it gives up and says so.
+ *
+ * Sized to fit inside the route's own 60s maxDuration with room to write a
+ * status. That margin is the entire point: when the platform kills an
+ * invocation for running long, no code of ours gets to run afterwards, so
+ * nothing marks the manuscript failed and it sits at "processing" forever with
+ * no error anywhere. A book that stops with a message naming the stage it died
+ * in is recoverable; one that stops silently is not.
+ *
+ * Checked between stages, so it catches a parse that is slow overall. A stage
+ * that hangs internally is caught by the route's own timeout instead — the two
+ * are complementary, not redundant.
+ */
+export const PARSE_BUDGET_MS = 45_000;
+
+/** How long the chapter-detection model call may take, retries included. */
+const CLAUDE_CALL_TIMEOUT_MS = 25_000;
+
+/**
+ * Per-stage timing, logged as the parse runs rather than summarised at the end.
+ *
+ * A parse that dies partway leaves no summary, so a log that only prints on
+ * success tells you nothing about the run that actually needs explaining. This
+ * prints as each stage completes, which means the last line in the log names
+ * the stage that did not finish.
+ */
+function makeTrace(label: string, budgetMs = PARSE_BUDGET_MS) {
+  const start = Date.now();
+  let last = start;
+
+  return {
+    /** Record a completed stage, then fail if the budget is already spent. */
+    stage(name: string, detail = "") {
+      const now = Date.now();
+      console.log(
+        `${TAG} ${label} · ${name}${detail ? ` — ${detail}` : ""} ` +
+          `(+${now - last}ms, ${now - start}ms total)`
+      );
+      last = now;
+
+      const elapsed = now - start;
+      if (elapsed > budgetMs) {
+        throw new Error(
+          `Parse exceeded its ${Math.round(budgetMs / 1000)}s budget — reached "${name}" ` +
+            `after ${(elapsed / 1000).toFixed(1)}s and stopped. The document is likely far ` +
+            `larger or more damaged than the pipeline can handle in one pass.`
+        );
+      }
+    },
+    elapsed: () => Date.now() - start,
+  };
+}
+
 export async function parseManuscript(
   buffer: Buffer
 ): Promise<{
@@ -1687,17 +1852,22 @@ export async function parseManuscript(
   // preserved so TOC page numbers still resolve. Without them the whole file is
   // one page and chapter detection falls to Claude.
   if (fileType === "txt") {
+    const trace = makeTrace("txt");
+    const txtWarnings: string[] = [];
+
     const decoded = normalizeLigatures(
       buffer.toString("utf8").replace(/^﻿/, "").replace(/\r\n/g, "\n")
     );
     const rawPages = decoded.split("\f");
     if (!rawPages.some((p) => p.trim())) throw new Error("Could not extract any text from file");
+    trace.stage("decode", `${rawPages.length} pages, ${decoded.length} chars`);
 
     // Quality is read off the untouched text, before anything is stripped from
     // it, for the same reason as the PDF path — the point is to describe the
     // source, not the parser's clean-up of it.
     const quality = assessTextQuality(rawPages);
     logTextQuality("txt", quality);
+    trace.stage("quality", `${(quality.suspectRatio * 100).toFixed(0)}% suspect`);
 
     // Same pipeline as the PDF path, and in the same order — headers before
     // drop caps, so a stripped running header can't sit between a drop cap and
@@ -1710,13 +1880,23 @@ export async function parseManuscript(
     const txtLinePages = stripHeadersFooters(rawPages.map(toTextLines))
       .map(joinDropCaps)
       .map(joinFragmentDropCaps);
+    trace.stage("clean");
     const pages = txtLinePages.map(assembleTextParagraphs);
+    trace.stage("assemble");
 
     // Same resolution path as the PDF branch: a plaintext manuscript recovered
     // from OCR still carries printed page numbers in its TOC, so its entries
     // need the same POV parsing, offset derivation and confirmation rather
     // than being trusted as PDF indices.
+    //
+    // Both work in the same units — a position in the page array — so nothing
+    // here assumes PDF page indices. What the text path does lack is the PDF
+    // path's line-level resolution: a chapter starting mid-page is rounded to
+    // the page boundary, because a text file carries no glyph positions to
+    // locate the heading within the page. See assignChaptersFromPages.
     const txtToc = parseTocFromPages(pages);
+    trace.stage("toc", txtToc ? `${txtToc.entries.length} entries` : "none found");
+
     const txtResolved = txtToc
       ? resolveToc(
           txtToc.entries.map((e) => ({ rawTitle: e.title, printedPage: e.startPage })),
@@ -1724,34 +1904,69 @@ export async function parseManuscript(
           txtToc.lastTocPage
         )
       : null;
+    if (txtToc) {
+      trace.stage(
+        "resolve",
+        txtResolved
+          ? `offset ${txtResolved.offset >= 0 ? "+" : ""}${txtResolved.offset}, ` +
+              `${(txtResolved.agreement * 100).toFixed(0)}% agreement, ` +
+              `${txtResolved.unconfirmed.length} unconfirmed`
+          : "no offset could be derived"
+      );
+    }
 
     let rawSections: Array<{ title: string; startPage: number; povCharacter: string | null }>;
     let txtPovRoster: string[] = [];
 
     if (txtResolved) {
-      if (txtResolved.unconfirmed.length) {
-        throw new Error(
-          `TOC validation failed: ${txtResolved.unconfirmed.length} of ${txtResolved.chapters.length} ` +
-            `chapter titles were not found near their computed start page using offset ` +
-            `${txtResolved.offset >= 0 ? "+" : ""}${txtResolved.offset}. Refusing to store possibly ` +
-            `misaligned chapter text.`
+      // Same tolerance policy as the PDF path rather than all-or-nothing. The
+      // text path used to reject a book over a single unconfirmed chapter,
+      // which on a fifty-chapter book is a 2% doubt thrown away entirely.
+      const { unconfirmed, chapters: tocChapters, offset } = txtResolved;
+      if (unconfirmed.length) {
+        const named = unconfirmed.slice(0, 5).map((c) => `"${c.rawTitle}"`).join(", ");
+        const more = unconfirmed.length > 5 ? ` (+${unconfirmed.length - 5} more)` : "";
+        const detail =
+          `${unconfirmed.length} of ${tocChapters.length} chapter titles were not found near their ` +
+          `computed start page using offset ${offset >= 0 ? "+" : ""}${offset}. Unconfirmed: ${named}${more}`;
+
+        const tolerable =
+          unconfirmed.length / tocChapters.length <= MAX_UNCONFIRMED_FRACTION &&
+          unconfirmed.length <= MAX_UNCONFIRMED_ABSOLUTE;
+
+        if (!tolerable) {
+          throw new Error(`TOC validation failed: ${detail} Refusing to store possibly misaligned chapter text.`);
+        }
+
+        const plural = unconfirmed.length === 1 ? "" : "s";
+        txtWarnings.push(
+          `${unconfirmed.length} chapter${plural} could not be confirmed against the body and ` +
+            `${unconfirmed.length === 1 ? "was" : "were"} placed by offset arithmetic — worth checking ` +
+            `${unconfirmed.length === 1 ? "its" : "their"} first page. ${detail}`
         );
       }
-      rawSections = txtResolved.chapters.map((c) => ({
+
+      rawSections = tocChapters.map((c) => ({
         title: c.rawTitle,
         startPage: c.pdfPage,
         povCharacter: c.povCharacter,
       }));
-      txtPovRoster = Array.from(new Set(txtResolved.chapters.flatMap((c) => c.povNames)));
+      txtPovRoster = Array.from(new Set(tocChapters.flatMap((c) => c.povNames)));
     } else {
       rawSections = await askClaude(buildPageMap(pages));
+      trace.stage("claude-fallback", `${rawSections.length} sections`);
     }
+
+    const chapters = assignChaptersFromPages(rawSections, pages);
+    trace.stage("assign", `${chapters.length} chapters`);
+    console.log(`${TAG} txt parse complete in ${trace.elapsed()}ms`);
 
     return {
       format: "txt",
-      chapters: assignChaptersFromPages(rawSections, pages),
+      chapters,
       quality,
       povRoster: txtPovRoster,
+      warnings: txtWarnings,
     };
   }
 
