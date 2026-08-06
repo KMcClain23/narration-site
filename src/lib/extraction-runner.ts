@@ -213,17 +213,36 @@ export async function findManuscriptWithPendingWork(): Promise<string | null> {
 export async function runExtractionBudget(
   manuscriptId: string,
   budgetMs: number,
-  typicalChapterMs = 40_000
+  firstChapterEstimateMs = 40_000
 ): Promise<{ processed: number; failed: number; complete: boolean }> {
   const startedAt = Date.now();
   let processed = 0;
   let failed = 0;
 
-  while (Date.now() - startedAt + typicalChapterMs < budgetMs) {
+  // Estimate how long the next chapter will take, so a chapter is never begun
+  // that probably cannot finish. Starting one that gets cut off at the limit
+  // costs an attempt from its retry budget and produces nothing.
+  //
+  // The first estimate has to be a guess, and it is deliberately pessimistic.
+  // After that it uses what this book actually did: chapter length varies by
+  // an order of magnitude between titles — a dialogue-heavy 15k-character
+  // chapter takes ~35s while a short one takes ~7s — so a single fixed figure
+  // either wastes most of the budget on quick books or overruns on slow ones.
+  // Measured against the slowest chapter seen so far, with half again as
+  // headroom, since the risk is asymmetric: stopping early costs a minute of
+  // waiting, overrunning costs a retry.
+  let estimateMs = firstChapterEstimateMs;
+
+  while (Date.now() - startedAt + estimateMs < budgetMs) {
     const outcome = await processNextChapter(manuscriptId);
     if (outcome.status === "complete") return { processed, failed, complete: true };
-    if (outcome.status === "failed") failed++;
-    else processed++;
+
+    if (outcome.status === "failed") {
+      failed++;
+    } else {
+      processed++;
+      estimateMs = Math.max(estimateMs === firstChapterEstimateMs ? 0 : estimateMs, outcome.elapsedMs * 1.5);
+    }
   }
 
   return { processed, failed, complete: false };
