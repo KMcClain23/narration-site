@@ -1561,6 +1561,63 @@ function assignChaptersFromPages(
   });
 }
 
+/**
+ * A chapter's raw_text has no upper bound from either assignment function
+ * above — the last entry in any TOC- or Claude-derived list runs to literal
+ * end-of-document, because there is no "next chapter" left to stop it at
+ * (assignChaptersFromLines line ~1516, assignChaptersFromPages line ~1550).
+ * If detection under-counted the true chapter list — a TOC row for the real
+ * final chapter never extracted, say — the last entry silently absorbs
+ * everything after it: every remaining chapter, any back matter, all of it,
+ * into one giant chapter that reads as a normal parse succeeding.
+ *
+ * Nothing about that failure looks wrong from the outside: chapters.length
+ * matches what was detected, every earlier chapter is correctly sized, and
+ * the oversized one still has a real title and starts in a real place. Size
+ * is the only signal, which is why this checks it explicitly rather than
+ * trusting the boundary logic to have caught its own mistake — and why it
+ * has to run after assignment rather than during it, once every chapter's
+ * wordCount actually exists to compare.
+ *
+ * Thresholds are relative to this book's own median chapter, not a fixed
+ * word count, because "how long is normal" varies by an order of magnitude
+ * between titles — but never below an absolute floor, so a short-chapter
+ * book doesn't get flagged over an outlier that is still objectively small.
+ */
+const CHAPTER_SIZE_WARN_MULTIPLE = 4;
+const CHAPTER_SIZE_WARN_FLOOR = 8_000;
+const CHAPTER_SIZE_FAIL_MULTIPLE = 8;
+const CHAPTER_SIZE_FAIL_FLOOR = 20_000;
+
+function validateChapterSizes(chapters: ParsedChapter[]): string[] {
+  const counts = chapters.map((c) => c.wordCount).filter((n) => n > 0).sort((a, b) => a - b);
+  if (counts.length < 3) return []; // too few chapters for "median" to mean anything
+
+  const median = counts[Math.floor(counts.length / 2)];
+  const warnThreshold = Math.max(median * CHAPTER_SIZE_WARN_MULTIPLE, CHAPTER_SIZE_WARN_FLOOR);
+  const failThreshold = Math.max(median * CHAPTER_SIZE_FAIL_MULTIPLE, CHAPTER_SIZE_FAIL_FLOOR);
+
+  const offenders = chapters.filter((c) => c.wordCount >= failThreshold);
+  if (offenders.length) {
+    const named = offenders.map((c) => `"${c.title}" (${c.wordCount.toLocaleString()} words)`).join(", ");
+    throw new Error(
+      `${offenders.length === 1 ? "A chapter is" : `${offenders.length} chapters are`} implausibly large ` +
+        `relative to this book's ${median.toLocaleString()}-word median chapter — ${named}. This is almost ` +
+        `always a missed chapter boundary (a table-of-contents row that was never detected, so the chapter ` +
+        `after it absorbed everything to the end of the document) rather than a genuinely long chapter. ` +
+        `Refusing to store it.`
+    );
+  }
+
+  const warnable = chapters.filter((c) => c.wordCount >= warnThreshold);
+  if (!warnable.length) return [];
+  const named = warnable.map((c) => `"${c.title}" (${c.wordCount.toLocaleString()} words)`).join(", ");
+  return [
+    `${warnable.length === 1 ? "One chapter is" : `${warnable.length} chapters are`} unusually large next to ` +
+      `this book's ${median.toLocaleString()}-word median chapter — worth a quick check: ${named}.`,
+  ];
+}
+
 // ─── Claude fallback ─────────────────────────────────────────────────────────
 // Unchanged from board-pdf-process/route.ts except the prompt/schema now also
 // asks for povCharacter — new to this feature, not something the old chapter-
@@ -1692,8 +1749,11 @@ async function askClaude(pageMap: string): Promise<Array<{ title: string; startP
  *
  * v2 — TOC as primary source, printed-page offset derivation with validation,
  *      POV parsing, ligature/header/drop-cap/hyphen repairs, quality scoring.
+ * v4 — validateChapterSizes: refuse a chapter that is implausibly large next
+ *      to this book's own median (almost always a missed final TOC entry
+ *      silently absorbing the rest of the document), rather than storing it.
  */
-export const PARSER_VERSION = "v3";
+export const PARSER_VERSION = "v4";
 const TAG = `[parser ${PARSER_VERSION}]`;
 
 /**
@@ -1959,6 +2019,7 @@ export async function parseManuscript(
 
     const chapters = assignChaptersFromPages(rawSections, pages);
     trace.stage("assign", `${chapters.length} chapters`);
+    txtWarnings.push(...validateChapterSizes(chapters));
     console.log(`${TAG} txt parse complete in ${trace.elapsed()}ms`);
 
     return {
@@ -1983,7 +2044,8 @@ export async function parseManuscript(
         wordCount: s.wordCount,
         rawText: s.rawText,
       }));
-      return { format: "docx", chapters };
+      const docxWarnings = validateChapterSizes(chapters);
+      return { format: "docx", chapters, warnings: docxWarnings.length ? docxWarnings : undefined };
     }
 
     // Fallback: pseudo-pages → Claude (unformatted docx without heading styles)
@@ -1991,7 +2053,8 @@ export async function parseManuscript(
     if (!pageMap) throw new Error("Could not extract any text from document");
     const rawSections = await askClaude(pageMap);
     const chapters = assignChaptersFromPages(rawSections, docx.pages);
-    return { format: "docx", chapters };
+    const fallbackWarnings = validateChapterSizes(chapters);
+    return { format: "docx", chapters, warnings: fallbackWarnings.length ? fallbackWarnings : undefined };
   }
 
   // ── PDF path ───────────────────────────────────────────────────────────────
@@ -2126,5 +2189,6 @@ export async function parseManuscript(
   }
 
   const chapters = assignChaptersFromLines(rawSections, cleanedLinePages);
+  warnings.push(...validateChapterSizes(chapters));
   return { format: "pdf", chapters, quality, povRoster, warnings };
 }
