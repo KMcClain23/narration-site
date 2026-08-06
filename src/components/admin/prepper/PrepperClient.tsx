@@ -14,7 +14,17 @@ export interface ManuscriptRow {
   /** Why a parse failed, or a warning about a parse that succeeded poorly. */
   error_message: string | null;
   created_at: string;
+  /**
+   * Numbered chapters only. A parsed book also contains front and back matter
+   * — prologue, acknowledgements and the like — which are chapters as far as
+   * the database is concerned but are not chapters as far as anyone reading
+   * the book is concerned. Counting the rows reported 41 for a 39-chapter
+   * book, which does not match the spine, the TOC, or the reader's own
+   * chapter list.
+   */
   chapterCount: number;
+  /** Front/back matter sections, counted separately from real chapters. */
+  sectionCount: number;
   /** Chapters with a non-null summary — Phase 3's own resumability signal,
    *  reused here to tell "chapters parsed" apart from "dialogue extraction
    *  finished too" instead of both flattening into one "Ready" badge. */
@@ -26,9 +36,19 @@ export interface ManuscriptRow {
 
 type DisplayStatus = "processing" | "extracting" | "ready" | "failed";
 
+/**
+ * Everything extraction has to get through — chapters plus front/back matter.
+ * Distinct from chapterCount, which is what a reader would call a chapter;
+ * extraction processes every section regardless.
+ */
+function totalSections(m: ManuscriptRow): number {
+  return m.chapterCount + m.sectionCount;
+}
+
 function displayStatus(m: ManuscriptRow): DisplayStatus {
   if (m.status !== "ready") return m.status;
-  if (m.chapterCount > 0 && m.chaptersExtracted < m.chapterCount) return "extracting";
+  const total = totalSections(m);
+  if (total > 0 && m.chaptersExtracted < total) return "extracting";
   return "ready";
 }
 
@@ -90,7 +110,7 @@ function StatusBadge({ manuscript }: { manuscript: ManuscriptRow }) {
   };
   const labels: Record<DisplayStatus, string> = {
     processing: "Parsing chapters…",
-    extracting: `Extracting dialogue… (${manuscript.chaptersExtracted}/${manuscript.chapterCount})`,
+    extracting: `Extracting dialogue… (${manuscript.chaptersExtracted}/${totalSections(manuscript)})`,
     ready: "Ready",
     failed: "Failed",
   };
@@ -163,6 +183,7 @@ function UploadModal({
         error_message: null,
         created_at: new Date().toISOString(),
         chapterCount: 0,
+        sectionCount: 0,
         chaptersExtracted: 0,
         chaptersFailed: 0,
         wordCount: 0,
@@ -285,6 +306,7 @@ function ManuscriptCard({
       <p className={`${adminType.small} mt-0.5`}>
         {manuscript.author || "Unknown author"}
         {manuscript.chapterCount > 0 && ` · ${manuscript.chapterCount} chapter${manuscript.chapterCount === 1 ? "" : "s"}`}
+        {manuscript.sectionCount > 0 && ` (+${manuscript.sectionCount} front/back matter)`}
         {manuscript.wordCount > 0 && ` · ${manuscript.wordCount.toLocaleString()} words`}
         {` · ${manuscript.source_format.toUpperCase()}`}
       </p>
@@ -406,6 +428,7 @@ export function PrepperClient({ initialManuscripts }: { initialManuscripts: Manu
                       ...row,
                       status: json.status ?? row.status,
                       chapterCount: json.chapterCount ?? row.chapterCount,
+                      sectionCount: json.sectionCount ?? row.sectionCount,
                       chaptersExtracted: json.chaptersExtracted ?? row.chaptersExtracted,
                       chaptersFailed: json.chaptersFailed ?? row.chaptersFailed,
                       // Read as ?? null rather than ?? row.error_message so a

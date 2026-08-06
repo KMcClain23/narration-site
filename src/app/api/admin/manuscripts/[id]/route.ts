@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { r2, R2_BUCKETS } from "@/lib/r2";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { isUnnumberedSection } from "@/lib/unnumbered-sections";
 
 // GET: poll status — the manuscripts.status column plus a chapter count,
 // same role as the retired board-pdf-status/route.ts.
@@ -16,35 +17,33 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   if (error || !data) return NextResponse.json({ error: "Manuscript not found" }, { status: 404 });
 
-  const { count } = await supabaseAdmin
+  // Titles are needed to tell numbered chapters from front/back matter, so
+  // this reads the rows rather than issuing three separate count queries —
+  // fewer round trips, and the counts can't disagree with one another.
+  const { data: chapterRows } = await supabaseAdmin
     .from("chapters")
-    .select("id", { count: "exact", head: true })
+    .select("title, summary, extraction_error")
     .eq("manuscript_id", id);
 
-  // summary IS NOT NULL is Phase 3's own resumability signal (see
-  // extract/route.ts) — reused here so callers can tell "chapters parsed"
-  // apart from "dialogue extraction finished too" instead of both reading
-  // as one flat "ready".
-  const { count: extractedCount } = await supabaseAdmin
-    .from("chapters")
-    .select("id", { count: "exact", head: true })
-    .eq("manuscript_id", id)
-    .not("summary", "is", null);
+  const rows = chapterRows ?? [];
+  const sectionCount = rows.filter((c) => isUnnumberedSection(c.title)).length;
+  const count = rows.length - sectionCount;
 
-  // Chapters that were attempted and failed. Extraction skips these so the
-  // chain can finish, which means a book reaches "ready" with gaps in it —
-  // the poller needs to carry that count or the UI shows a clean finish.
-  const { count: failedCount } = await supabaseAdmin
-    .from("chapters")
-    .select("id", { count: "exact", head: true })
-    .eq("manuscript_id", id)
-    .not("extraction_error", "is", null);
+  // A non-null summary is extraction's own resumability signal (see
+  // extraction-runner.ts) — reused here so callers can tell "chapters parsed"
+  // apart from "dialogue extraction finished too" instead of both reading as
+  // one flat "ready". Failed chapters are skipped so extraction can finish,
+  // which means a book reaches "ready" with gaps in it; the poller carries
+  // that count or the UI shows a clean finish over missing dialogue.
+  const extractedCount = rows.filter((c) => c.summary !== null).length;
+  const failedCount = rows.filter((c) => c.extraction_error !== null).length;
 
   return NextResponse.json({
     ...data,
-    chapterCount: count ?? 0,
-    chaptersExtracted: extractedCount ?? 0,
-    chaptersFailed: failedCount ?? 0,
+    chapterCount: count,
+    sectionCount,
+    chaptersExtracted: extractedCount,
+    chaptersFailed: failedCount,
   });
 }
 
