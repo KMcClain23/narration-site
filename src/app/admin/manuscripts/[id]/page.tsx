@@ -8,6 +8,50 @@ import { ManuscriptReader, type ChapterWithSpans } from "@/components/admin/manu
 // contacts profile pages.
 export const dynamic = "force-dynamic";
 
+/**
+ * Every dialogue span for a manuscript, fetched in pages.
+ *
+ * PostgREST caps a response at a fixed number of rows — a thousand by default
+ * — and returns the first page silently rather than erroring. A single
+ * unbounded select therefore looked correct on a book with fewer spans than
+ * the cap and quietly dropped most of them on a longer one: two of three books
+ * here are over it. With no ordering imposed, the surviving rows arrived in
+ * arbitrary order, so highlighting vanished from nearly every chapter while
+ * the data itself was perfectly intact.
+ *
+ * Ordered by id purely so the pages tile without gaps or repeats.
+ */
+async function fetchAllSpans(chapterIds: string[]) {
+  const PAGE_SIZE = 1000;
+  type SpanRow = {
+    id: string;
+    chapter_id: string;
+    character_id: string | null;
+    start_offset: number;
+    end_offset: number;
+    matched: boolean;
+  };
+
+  const all: SpanRow[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabaseAdmin
+      .from("dialogue_spans")
+      .select("id, chapter_id, character_id, start_offset, end_offset, matched")
+      .in("chapter_id", chapterIds)
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) {
+      console.error("[manuscript-reader] failed to load dialogue spans:", error.message);
+      break;
+    }
+    if (!data?.length) break;
+    all.push(...(data as SpanRow[]));
+    if (data.length < PAGE_SIZE) break;
+  }
+  return all;
+}
+
 export default async function ManuscriptReaderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -48,15 +92,10 @@ export default async function ManuscriptReaderPage({ params }: { params: Promise
   ]);
 
   const chapterIds = (chapters ?? []).map((c) => c.id);
-  const { data: spans } = chapterIds.length
-    ? await supabaseAdmin
-        .from("dialogue_spans")
-        .select("id, chapter_id, character_id, start_offset, end_offset, matched")
-        .in("chapter_id", chapterIds)
-    : { data: [] };
+  const spans = chapterIds.length ? await fetchAllSpans(chapterIds) : [];
 
   const spansByChapter = new Map<string, ChapterWithSpans["spans"]>();
-  (spans ?? []).forEach((s) => {
+  spans.forEach((s) => {
     const list = spansByChapter.get(s.chapter_id) ?? [];
     list.push({
       id: s.id,
