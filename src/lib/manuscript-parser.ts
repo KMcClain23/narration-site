@@ -461,29 +461,50 @@ function stripHeadersFooters(pageLines: PdfLine[][]): PdfLine[][] {
   }
 
   const remove = new Map<number, Set<number>>();
-  const pagesWithRunningHeader = new Set<number>();
 
   for (const group of byKey.values()) {
     if (new Set(group.map((c) => c.page)).size < threshold) continue;
     for (const c of group) {
       if (!remove.has(c.page)) remove.set(c.page, new Set());
       remove.get(c.page)!.add(c.line);
-      pagesWithRunningHeader.add(c.page);
     }
   }
 
-  // Bare numbers are ambiguous: a folio and a printed chapter number are the
-  // same token in the same zone. The distinguisher is the rest of the page —
-  // chapter-opening pages suppress the running header, body pages don't. So a
-  // bare number is only treated as a folio when a running header was found on
-  // that same page; otherwise it is left alone, because on a chapter opener it
-  // is the chapter number and stripping it destroys chapter detection outright.
-  if (pagesWithRunningHeader.size >= threshold) {
-    for (const c of numericCandidates) {
-      if (!pagesWithRunningHeader.has(c.page)) continue;
-      if (!remove.has(c.page)) remove.set(c.page, new Set());
-      remove.get(c.page)!.add(c.line);
+  // Bare numbers are ambiguous: a page folio and a printed chapter number are
+  // the same token sitting in the same place. They are told apart by whether
+  // the number tracks the page it is on. Folios run in sequence, so the
+  // printed number differs from the page's position in the file by a constant
+  // — front matter only shifts where the numbering starts. A chapter number
+  // has no such relationship: "31" on the two-hundredth page is off by a
+  // wildly different amount than the folio printed beside it. So the offset
+  // shared by many pages belongs to the folio, and every number sharing it can
+  // go while chapter numbers stay.
+  //
+  // This replaces a rule that stripped a bare number only when a text running
+  // header was also found on the same page. That protected chapter numbers,
+  // but failed silently on any book whose pages carry a folio and no header
+  // text — nothing qualified, nothing was stripped, and every page number
+  // dropped into the prose mid-sentence.
+  const byOffset = new Map<number, Candidate[]>();
+  for (const c of numericCandidates) {
+    const offset = parseInt(c.text, 10) - c.page;
+    if (!byOffset.has(offset)) byOffset.set(offset, []);
+    byOffset.get(offset)!.push(c);
+  }
+
+  let folios: Candidate[] = [];
+  let folioPages = 0;
+  for (const group of byOffset.values()) {
+    const pages = new Set(group.map((c) => c.page)).size;
+    if (pages >= threshold && pages > folioPages) {
+      folios = group;
+      folioPages = pages;
     }
+  }
+
+  for (const c of folios) {
+    if (!remove.has(c.page)) remove.set(c.page, new Set());
+    remove.get(c.page)!.add(c.line);
   }
 
   if (!remove.size) return pageLines;
