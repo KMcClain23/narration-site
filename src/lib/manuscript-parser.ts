@@ -1717,9 +1717,20 @@ export async function parseManuscript(
     // chapter's title — prose that reads perfectly and is simply the wrong
     // chapter, which no amount of proofreading downstream would catch.
     if (unconfirmed.length) {
+      // Where the title *was* seen, if anywhere, is the difference between two
+      // very different problems. A sighting some distance away means the
+      // offset does not hold there — inserted matter, or a misread page number
+      // in the TOC. No sighting at all means the heading is unreadable on that
+      // page, which points at the source file rather than the arithmetic.
       const named = unconfirmed
         .slice(0, 5)
-        .map((c) => `"${c.rawTitle}" (printed p.${c.printedPage} → expected PDF p.${c.pdfPage})`)
+        .map((c) => {
+          const seen =
+            c.foundOnPdfPage === null
+              ? "title not found anywhere in the body"
+              : `nearest sighting p.${c.foundOnPdfPage}`;
+          return `"${c.rawTitle}" (printed p.${c.printedPage} → expected PDF p.${c.pdfPage}; ${seen})`;
+        })
         .join("; ");
       const more = unconfirmed.length > 5 ? ` …and ${unconfirmed.length - 5} more` : "";
       throw new Error(
