@@ -896,17 +896,32 @@ function parseTocFromPages(pageTexts: string[]): { entries: TocEntry[]; lastTocP
 
   for (let i = 0; i < Math.min(15, pageTexts.length); i++) {
     if (!pageTexts[i].trim()) continue;
-    const before = entries.length;
-    extractTocEntries(pageTexts[i], entries, seen);
-    // Only a page that yielded several entries counts as part of the contents.
-    // A single match is far more likely to be a chapter opening that happens
-    // to read like a TOC row — "CHAPTER ONE" sitting near its folio produces
-    // exactly the "title then number" shape the keyword strategy looks for.
-    // Letting one of those advance the marker pushes the end of the contents
-    // deep into the body, and title confirmation then starts its search past
-    // the opening chapters, so they cannot be confirmed no matter how cleanly
-    // they parsed.
-    if (entries.length - before >= 2) lastTocPage = i;
+
+    // Only a page that yielded several entries counts as part of the contents,
+    // and its entries are only kept if it did.
+    //
+    // A single match is far more likely to be a chapter opening that happens to
+    // read like a TOC row: "Chapter 1" at the head of a chapter is exactly the
+    // "keyword then number" shape the keyword strategy looks for, and reads as
+    // a row titled "Chapter" pointing at page 1. Three chapter openings in the
+    // first fifteen pages therefore manufactured a three-row table of contents
+    // for a book that has none, which then failed its own validation and took
+    // the book down with it.
+    //
+    // A real contents page lists many entries; a page of prose that mentions a
+    // chapter number lists one. That difference is the whole test, and it needs
+    // no knowledge of which words a title may contain.
+    const pageEntries: TocEntry[] = [];
+    const pageSeen = new Set(seen);
+    extractTocEntries(pageTexts[i], pageEntries, pageSeen);
+
+    if (pageEntries.length >= 2) {
+      for (const e of pageEntries) {
+        entries.push(e);
+        seen.add(`${e.title.toLowerCase()}:${e.startPage}`);
+      }
+      lastTocPage = i;
+    }
   }
 
   if (entries.length < 3) return null;
@@ -1171,6 +1186,26 @@ function cleanHeadingTitle(raw: string): string {
 }
 
 /**
+ * A POV name with its typeset decoration removed.
+ *
+ * Layouts bracket the name — "-Mia-", "~Hades~", "* Nate *" — and a footnote
+ * marker can ride along on the end. That decoration has to come off before the
+ * name reaches the character roster, because the roster is matched against
+ * speaker names found in the prose: seeded as "-Mia-" it matches nothing the
+ * extraction pass ever says, so every line she speaks arrives unattributed and
+ * the roster is worse than useless — it is a second character for the same
+ * person.
+ *
+ * Only leading and trailing runs are stripped, so a genuinely hyphenated name
+ * ("Mary-Anne") survives intact.
+ */
+const NAME_DECORATION = /^[\s\-–—_*~•·]+|[\s\-–—_*~•·]+$/g;
+
+function cleanPovName(raw: string): string {
+  return cleanHeadingTitle(raw).replace(NAME_DECORATION, "").trim();
+}
+
+/**
  * Find chapter openings from how the page is set rather than what it says.
  *
  * A print interior marks a chapter opening unmistakably and never in words the
@@ -1237,7 +1272,7 @@ function detectChaptersByTypography(
         next.text.trim().length <= HEADING_MAX_LEN &&
         !SECTION_WORD.test(next.text.trim())
       ) {
-        povCharacter = cleanHeadingTitle(next.text) || null;
+        povCharacter = cleanPovName(next.text) || null;
       }
 
       sections.push({
@@ -1600,8 +1635,34 @@ function stripLeadingPovHeading(
 
   const name = povCharacter?.trim();
   if (name && paragraphs.length > 1) {
-    if (paragraphs[0] === name) paragraphs.splice(0, 1);
-    else if (paragraphs[0]?.startsWith(`${name} `)) paragraphs[0] = paragraphs[0].slice(name.length + 1);
+    // Compared with its decoration removed, because the name reaching here has
+    // already had its own stripped. The layout prints "-Mia-" and the roster
+    // holds "Mia"; matched literally the heading no longer looks like the POV
+    // name and stays in the prose, so every chapter opens by announcing its own
+    // narrator.
+    const bare = (s: string) => s.replace(NAME_DECORATION, "").trim();
+    const first = paragraphs[0] ?? "";
+
+    if (bare(first) === name) {
+      paragraphs.splice(0, 1);
+    } else if (/^[\s\-–—_*~•·]/.test(first)) {
+      // "-Mia- My Trip to the Underworld" — the heading kept its decoration and
+      // ran into the subtitle. Only entered when decoration is actually present,
+      // so ordinary prose can never reach it.
+      const lead = first.match(/^[\s\-–—_*~•·]*([^\s\-–—_*~•·][^\n]*?)[\s\-–—_*~•·]+/);
+      if (lead && lead[1] === name) paragraphs[0] = first.slice(lead[0].length).trim();
+    } else if (first.startsWith(`${name} `) && /^[A-Z"“']/.test(first.slice(name.length + 1))) {
+      // An undecorated heading fused with the body: "Mia The path was rough."
+      //
+      // The capital is what makes this safe. A narrator's name is also an
+      // ordinary word in her own chapter, and "Mia had never seen the river"
+      // opens a great many of them — stripping there costs a word of real prose
+      // and shifts every dialogue offset after it, which is far worse than
+      // leaving a heading in view. Nothing in English continues a sentence with
+      // a capitalised verb, so requiring one separates the two cases.
+      paragraphs[0] = first.slice(name.length + 1);
+    }
+    if (!paragraphs[0]?.trim()) paragraphs.splice(0, 1);
   }
 
   return paragraphs.join("\n\n");
@@ -2457,7 +2518,43 @@ export async function parseManuscript(
         unconfirmed.length <= MAX_UNCONFIRMED_ABSOLUTE;
 
       if (!tolerable) {
-        throw new Error(`TOC validation failed: ${detail} Refusing to store possibly misaligned chapter text.`);
+        // A failed TOC disqualifies the TOC, not the book.
+        //
+        // Refusing to store misaligned text is the right instinct and it still
+        // holds — what was wrong was treating "this table of contents cannot be
+        // trusted" as the end of the road when a more reliable reading of the
+        // same file was available and untried. A book whose chapter openings
+        // are legible in type does not need the contents page at all, and
+        // preferring it in that case is strictly better than failing.
+        const fallback = detectChaptersByTypography(cleanedLinePages);
+        if (!fallback) {
+          throw new Error(`TOC validation failed: ${detail} Refusing to store possibly misaligned chapter text.`);
+        }
+
+        console.warn(`${TAG} ${detail} — discarding the TOC, reading chapter openings from typography instead`);
+        warnings.push(
+          `The table of contents did not agree with the book (${detail}), so it was discarded and ` +
+            `chapter openings were read from the page layout instead — ${fallback.length} found.`
+        );
+
+        const firstStart = fallback[0].startPage - 1;
+        const hasFrontMatter = cleanedLinePages
+          .slice(0, firstStart)
+          .some((lines) => lines.some((l) => l.text.trim()));
+
+        rawSections = [
+          ...(hasFrontMatter
+            ? [{ title: "Front Matter", startPage: 1, startLine: 0, povCharacter: null }]
+            : []),
+          ...fallback,
+        ];
+        povRoster = Array.from(
+          new Set(fallback.map((s) => s.povCharacter).filter((n): n is string => !!n))
+        );
+
+        const assignedAlt = assignChaptersFromLines(rawSections, cleanedLinePages);
+        warnings.push(...validateChapterSizes(assignedAlt));
+        return { format: "pdf", chapters: assignedAlt, quality, povRoster, warnings };
       }
 
       const plural = unconfirmed.length === 1 ? "" : "s";
