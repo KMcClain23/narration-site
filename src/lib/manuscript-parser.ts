@@ -299,6 +299,18 @@ interface PdfLine {
    * oversized initial glyph happened to sit.
    */
   forceBreak?: boolean;
+  /**
+   * Glyph height of the line's first run, in PDF user units.
+   *
+   * The one piece of typography that survives text extraction, and the only
+   * thing that distinguishes a chapter heading from a sentence in a print
+   * layout — a paperback interior sets "CHAPTER TWELVE" at 15pt and the POV
+   * name under it at 25pt against 11pt body text. Discarding it meant chapter
+   * openings had to be recognised from wording alone, which fails on any book
+   * that does not print the word "Chapter" in reading order at the top of the
+   * page. See detectChaptersByTypography.
+   */
+  size?: number;
 }
 
 async function extractPagesFromPdf(buffer: Buffer): Promise<{ flatPages: string[]; linePages: PdfLine[][] }> {
@@ -318,34 +330,61 @@ async function extractPagesFromPdf(buffer: Buffer): Promise<{ flatPages: string[
   await pdfParse(buffer, {
     pagerender(pageData: { getTextContent: () => Promise<{ items: Array<{ str: string; transform: number[] }> }> }) {
       return pageData.getTextContent().then((tc) => {
-        // Ligatures are normalized here, at the single point where glyphs
-        // become strings, so no consumer downstream — TOC matching, quality
-        // scoring, paragraph assembly, Claude — ever has to know they existed.
-        const flat = normalizeLigatures(tc.items.map((i) => i.str).join(" ")).replace(/\s+/g, " ").trim();
-        flatPages.push(flat);
-
-        const lines: PdfLine[] = [];
+        const built: Array<PdfLine & { y: number }> = [];
         let lastY: number | null = null;
         let cur = "";
         let curIndent = 0;
+        let curSize = 0;
+        let curY = 0;
         for (const item of tc.items) {
           const y = item.transform[5];
           const x = item.transform[4];
+          // transform[0] is the horizontal scale of the text matrix, which for
+          // unrotated text is the rendered glyph height.
+          const size = Math.abs(item.transform[0]);
           const str = normalizeLigatures(item.str);
           if (lastY === null || y === lastY) {
-            if (cur === "") curIndent = x;
+            if (cur === "") { curIndent = x; curSize = size; curY = y; }
             cur += str;
           } else {
             const t = cur.trim().replace(/\s+/g, " ");
-            if (t) lines.push({ text: t, indent: curIndent });
+            if (t) built.push({ text: t, indent: curIndent, size: curSize, y: curY });
             cur = str;
             curIndent = x;
+            curSize = size;
+            curY = y;
           }
           lastY = y;
         }
         const tail = cur.trim().replace(/\s+/g, " ");
-        if (tail) lines.push({ text: tail, indent: curIndent });
+        if (tail) built.push({ text: tail, indent: curIndent, size: curSize, y: curY });
+
+        // Sorted down the page, because the order glyphs are emitted in is not
+        // the order they are read in.
+        //
+        // A PDF's content stream may lay text down in any order it likes. This
+        // book's chapter-opening pages emit the folio, then the whole body of
+        // the page, and only then the heading block that sits visually above
+        // all of it — so "CHAPTER TWELVE" arrives at index 19 of 22, after the
+        // text it introduces. Every consumer downstream inherited that: the
+        // page map showed a sentence where the heading was, paragraph assembly
+        // ran the page out of order, and slicing a chapter at its heading line
+        // handed the first half of its own opening page to the chapter before.
+        //
+        // PDF y increases upward, so descending y is top-to-bottom. Ties keep
+        // their original order, which for same-line runs is left to right.
+        built.sort((a, b) => b.y - a.y);
+
+        const lines: PdfLine[] = built.map(({ text, indent, size }) => ({ text, indent, size }));
         linePages.push(lines);
+
+        // Ligatures are normalized here, at the single point where glyphs
+        // become strings, so no consumer downstream — TOC matching, quality
+        // scoring, paragraph assembly, Claude — ever has to know they existed.
+        // Built from the sorted lines so the flat text reads in the same order
+        // as everything else.
+        const flat = lines.map((l) => l.text).join(" ").replace(/\s+/g, " ").trim();
+        flatPages.push(flat);
 
         return flat;
       });
@@ -1102,6 +1141,119 @@ function extractPovFromTitles(entries: RawTocEntry[]): TocChapter[] {
   });
 }
 
+// ── Chapter openings by typography ───────────────────────────────────────────
+
+/** How much larger than body text a line must be set to count as a heading. */
+const HEADING_SIZE_MULTIPLE = 1.25;
+
+/** A heading is a few words, not a paragraph that happens to be emphasised. */
+const HEADING_MAX_LEN = 60;
+
+/** Section words a heading may open with, for a heading to start a section. */
+const SECTION_WORD =
+  /^(chapter|prologue|epilogue|part|book|interlude|acknowledge?ments?|acknowledgments?|afterword|foreword|preface|introduction|author'?s?\s+note)\b/i;
+
+/** Fewest sections a typographic read must find before it is trusted. */
+const MIN_TYPOGRAPHIC_SECTIONS = 3;
+
+/**
+ * Tidy a heading as printed into a title as displayed.
+ *
+ * Print layouts hyphenate and letterspace headings, so "CHAPTER TWENTY- ONE"
+ * arrives with the break still in it, and everything is set in capitals.
+ */
+function cleanHeadingTitle(raw: string): string {
+  const joined = raw.replace(/-\s+/g, "-").replace(/\s+/g, " ").trim();
+  if (/[a-z]/.test(joined)) return joined; // already mixed case — leave it alone
+  return joined
+    .toLowerCase()
+    .replace(/(^|[\s-])([a-z])/g, (_, sep: string, c: string) => sep + c.toUpperCase());
+}
+
+/**
+ * Find chapter openings from how the page is set rather than what it says.
+ *
+ * A print interior marks a chapter opening unmistakably and never in words the
+ * text layer presents in reading order: "Swing and a Kiss" sets CHAPTER TWELVE
+ * at 15pt with the POV name "Nate" at 25pt beneath it, against 11pt body — but
+ * extracts those glyphs *after* the body text of the page, so every approach
+ * that reads the start of a page sees a sentence and concludes the page is not
+ * a chapter opening. That book has no table of contents either, which left
+ * body-text inference as the only strategy, and it produced 87 one-page
+ * chapters on a 34-chapter novel.
+ *
+ * Size is the signal that survives extraction intact, and it is unambiguous:
+ * body text is one size across the whole book, and a heading is visibly larger.
+ * A second oversized line immediately after the first is the POV name, which
+ * this gets for free and correct — the same names the extraction pass would
+ * otherwise have to infer chapter by chapter.
+ *
+ * Returns null unless it finds a real book's worth of sections, so a document
+ * with occasional large text cannot be mistaken for a well-set one.
+ */
+function detectChaptersByTypography(
+  linePages: PdfLine[][]
+): Array<{ title: string; startPage: number; startLine: number; povCharacter: string | null }> | null {
+  const sizes = new Map<number, number>();
+  for (const lines of linePages) {
+    for (const l of lines) {
+      if (!l.size) continue;
+      const bucket = Math.round(l.size * 2) / 2;
+      sizes.set(bucket, (sizes.get(bucket) ?? 0) + 1);
+    }
+  }
+  if (!sizes.size) return null;
+
+  // Body size is the most common, by a wide margin, in any book.
+  let bodySize = 0;
+  let best = 0;
+  for (const [size, count] of sizes) {
+    if (count > best) { best = count; bodySize = size; }
+  }
+  if (!bodySize) return null;
+
+  const threshold = bodySize * HEADING_SIZE_MULTIPLE;
+  const sections: Array<{ title: string; startPage: number; startLine: number; povCharacter: string | null }> = [];
+
+  linePages.forEach((lines, page) => {
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      if (!l.size || l.size < threshold) continue;
+      const text = l.text.trim();
+      if (!text || text.length > HEADING_MAX_LEN) continue;
+      if (!SECTION_WORD.test(text.replace(/\s+/g, " "))) continue;
+
+      // Only the first section heading on a page — a running head set large, or
+      // a heading wrapped across two lines, must not open a second chapter.
+      if (sections.length && sections[sections.length - 1].startPage === page + 1) break;
+
+      // The line under it, if also oversized and not itself a section word, is
+      // the POV name this layout prints beneath the chapter number.
+      let povCharacter: string | null = null;
+      const next = lines[i + 1];
+      if (
+        next?.size &&
+        next.size >= threshold &&
+        next.text.trim().length <= HEADING_MAX_LEN &&
+        !SECTION_WORD.test(next.text.trim())
+      ) {
+        povCharacter = cleanHeadingTitle(next.text) || null;
+      }
+
+      sections.push({
+        title: cleanHeadingTitle(text),
+        startPage: page + 1, // 1-based, matching the TOC path
+        startLine: i,
+        povCharacter,
+      });
+      break;
+    }
+  });
+
+  if (sections.length < MIN_TYPOGRAPHIC_SECTIONS) return null;
+  return sections;
+}
+
 // ── Printed page → PDF page ───────────────────────────────────────────────────
 
 /** How far from the predicted page a title may appear and still confirm it. */
@@ -1496,7 +1648,7 @@ function findChapterStartLine(lines: PdfLine[], title: string): number {
 }
 
 function assignChaptersFromLines(
-  raw: Array<{ title: string; startPage: number; povCharacter?: string | null }>,
+  raw: Array<{ title: string; startPage: number; povCharacter?: string | null; startLine?: number }>,
   linePages: PdfLine[][]
 ): ParsedChapter[] {
   const totalPages = linePages.length;
@@ -1504,9 +1656,18 @@ function assignChaptersFromLines(
   // Resolve every chapter to a precise (page, line) start first, so each
   // chapter can end exactly where the next one begins rather than at the last
   // page boundary before it.
+  //
+  // A caller that already knows the line — typographic detection, which found
+  // the heading itself rather than inferring the page from a TOC — passes it,
+  // and it is used as given. Searching for the title again would be strictly
+  // worse: the heading may not read as its own title once extracted, and a
+  // failed search silently falls back to the top of the page.
   const starts = raw.map((ch) => {
     const page = Math.max(0, Math.min(totalPages - 1, ch.startPage - 1));
-    return { page, line: findChapterStartLine(linePages[page] ?? [], ch.title) };
+    return {
+      page,
+      line: ch.startLine ?? findChapterStartLine(linePages[page] ?? [], ch.title),
+    };
   });
 
   const numbers = computeChapterNumbers(raw.map((ch) => ch.title));
@@ -2139,7 +2300,11 @@ export async function parseManuscript(
     }
 
     const assigned = assignChaptersFromPages(rawSections, pages);
-    const { chapters, warnings: mergeWarnings } = mergeContinuationChapters(assigned);
+    // As on the PDF path: repair guessed boundaries only, never ones the book
+    // stated itself.
+    const { chapters, warnings: mergeWarnings } = txtResolved
+      ? { chapters: assigned, warnings: [] as string[] }
+      : mergeContinuationChapters(assigned);
     trace.stage("assign", `${chapters.length} chapters`);
     txtWarnings.push(...mergeWarnings, ...validateChapterSizes(chapters));
     console.log(`${TAG} txt parse complete in ${trace.elapsed()}ms`);
@@ -2198,8 +2363,15 @@ export async function parseManuscript(
   // non-adjacent and the join never fires.
   const cleanedLinePages = stripHeadersFooters(linePages).map(joinDropCaps);
 
-  let rawSections: Array<{ title: string; startPage: number; povCharacter: string | null }>;
+  let rawSections: Array<{
+    title: string;
+    startPage: number;
+    povCharacter: string | null;
+    startLine?: number;
+  }>;
   let povRoster: string[] = [];
+  /** True only when boundaries came from body-text inference rather than the page. */
+  let boundariesInferred = false;
   // Non-fatal problems worth surfacing on the manuscript row rather than only
   // in a log nobody reads until something has already gone wrong.
   const warnings: string[] = [];
@@ -2304,27 +2476,70 @@ export async function parseManuscript(
     }));
     povRoster = Array.from(new Set(tocChapters.flatMap((c) => c.povNames)));
   } else {
-    // ── Last resort: no usable TOC, infer boundaries from the body ──────────
+    // ── Second: how the book is set ────────────────────────────────────────
     //
-    // Built from header-stripped pages, not the raw ones.
-    //
-    // The page map is the first sixty characters of each page, which on a book
-    // with running headers is the running header and nothing else. Every page
-    // then reads as a section start, and the model dutifully reports one — on
-    // "Swing and a Kiss" that produced 87 one-page "chapters" for a 34-chapter
-    // book, and put the author's name into povCharacter for every other
-    // chapter, because that was the verso header it was shown.
-    //
-    // Stripping first means the map carries the opening words of each page's
-    // actual text, which is the thing a chapter opening can be recognised from.
-    console.log(`${TAG} no usable TOC — falling back to body-text detection`);
-    const pageMap = buildPageMap(cleanedFlatPages);
-    if (!pageMap) throw new Error("Could not extract any text from PDF");
-    rawSections = await askClaude(pageMap);
+    // Plenty of books simply have no table of contents — a print interior
+    // often omits one entirely — and that is not a reason to fall back to
+    // inference. Such a book still marks every chapter opening in type, and
+    // reading that is both cheaper and more reliable than asking a model to
+    // guess from page-opening text.
+    const typographic = detectChaptersByTypography(cleanedLinePages);
+
+    if (typographic) {
+      console.log(
+        `${TAG} no TOC — chapter openings read from typography: ${typographic.length} sections, ` +
+          `${typographic.filter((s) => s.povCharacter).length} with a POV name`
+      );
+
+      // Anything before the first heading is front matter — a title page, a
+      // copyright notice, a dedication. It is kept as one section rather than
+      // dropped, since the dedication is real content someone may want, and
+      // rather than several, since none of it is a chapter.
+      const firstStart = typographic[0].startPage - 1;
+      const hasFrontMatter = cleanedLinePages
+        .slice(0, firstStart)
+        .some((lines) => lines.some((l) => l.text.trim()));
+
+      rawSections = [
+        ...(hasFrontMatter
+          ? [{ title: "Front Matter", startPage: 1, startLine: 0, povCharacter: null }]
+          : []),
+        ...typographic,
+      ];
+      povRoster = Array.from(
+        new Set(typographic.map((s) => s.povCharacter).filter((n): n is string => !!n))
+      );
+    } else {
+      // ── Last resort: infer boundaries from the body ──────────────────────
+      //
+      // Built from header-stripped pages, not the raw ones.
+      //
+      // The page map is the first sixty characters of each page, which on a
+      // book with running headers is the running header and nothing else.
+      // Every page then reads as a section start, and the model dutifully
+      // reports one — on "Swing and a Kiss" that produced 87 one-page
+      // "chapters" for a 34-chapter book, and put the author's name into
+      // povCharacter for every other chapter, because that was the verso
+      // header it was shown.
+      //
+      // Stripping first means the map carries the opening words of each page's
+      // actual text, which is what a chapter opening can be recognised from.
+      console.log(`${TAG} no TOC and no typographic headings — falling back to body-text detection`);
+      const pageMap = buildPageMap(cleanedFlatPages);
+      if (!pageMap) throw new Error("Could not extract any text from PDF");
+      rawSections = await askClaude(pageMap);
+      boundariesInferred = true;
+    }
   }
 
   const assigned = assignChaptersFromLines(rawSections, cleanedLinePages);
-  const { chapters, warnings: mergeWarnings } = mergeContinuationChapters(assigned);
+  // Only guessed boundaries get repaired. A boundary read off the page — from
+  // the book's own contents, or from the heading itself — is not a guess, and
+  // running the repair over one can only do harm: on this book, before line
+  // ordering was fixed, it merged 16 correctly-detected chapters away.
+  const { chapters, warnings: mergeWarnings } = boundariesInferred
+    ? mergeContinuationChapters(assigned)
+    : { chapters: assigned, warnings: [] as string[] };
   warnings.push(...mergeWarnings, ...validateChapterSizes(chapters));
   return { format: "pdf", chapters, quality, povRoster, warnings };
 }
