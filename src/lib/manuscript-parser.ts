@@ -1697,13 +1697,16 @@ async function askClaude(pageMap: string): Promise<Array<{ title: string; startP
     // 1024 was silently truncating mid-array on real books (~30+ sections) —
     // confirmed via stop_reason="max_tokens" against the Ruined test file.
     //
-    // 4096 was not enough either. A 336-page book whose running headers made
-    // nearly every page read as a section start produced 87 sections at roughly
-    // 45 tokens each and ran out of room around page 87 of 336, which is the
-    // shape of the "Swing and a Kiss" failure. Haiku 4.5 has far more headroom
-    // than this, and the cost of a ceiling that is too low is a wrong book
-    // rather than a slow one.
-    max_tokens: 16_384,
+    // A section is roughly 30-45 tokens, so a normal book's whole list is
+    // 1,000-2,500 — 4096 was never the real problem, and with the page map now
+    // built from header-stripped text it is not close to binding. This is pure
+    // margin for an unusually long book, sized against the call timeout rather
+    // than the model's limit: at Haiku's output rate, CLAUDE_CALL_TIMEOUT_MS
+    // caps a reply near 5,000 tokens no matter what is set here, so a much
+    // larger ceiling would be decorative. 8192 covers ~180 sections, which no
+    // real manuscript reaches, and keeps a runaway from spending four times the
+    // tokens before the truncation check below catches it.
+    max_tokens: 8192,
     messages: [
       {
         role: "user",
