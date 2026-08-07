@@ -1589,6 +1589,97 @@ const CHAPTER_SIZE_WARN_FLOOR = 8_000;
 const CHAPTER_SIZE_FAIL_MULTIPLE = 8;
 const CHAPTER_SIZE_FAIL_FLOOR = 20_000;
 
+/**
+ * Trailing scene-break ornament — asterisks, bullets, a centred rule.
+ *
+ * Deliberately excludes dashes and quotation marks: a chapter that ends on
+ * interrupted dialogue ("But I—") ends legitimately, and stripping those would
+ * make it look like a chapter cut in half.
+ */
+const SCENE_BREAK_TAIL = /[\s*#~•·]+$/;
+
+/** A chapter ends where a sentence ends — including on an interruption. */
+function endsCleanly(text: string): boolean {
+  return /[.!?…—–][)\]"'”’»]*$/.test(text.replace(SCENE_BREAK_TAIL, "").trimEnd());
+}
+
+/**
+ * Merge back any "chapter" that is really the tail of the one before it.
+ *
+ * findChapterStartLine looks for the chapter's heading on its claimed opening
+ * page and, finding none, returns line 0 — the top of the page. That is the
+ * right default when a heading is merely unrecognisable. It is badly wrong when
+ * the page never was a chapter opening, because the section then starts
+ * wherever the previous page happened to break, which is usually mid-sentence.
+ *
+ * Body-text detection produces exactly that: asked which pages begin a section,
+ * it can nominate a page in the middle of a chapter, and nothing downstream
+ * disagrees. On "Swing and a Kiss" this split one chapter across the phrase
+ * "approaching my / complex", and because the detector numbers sections
+ * sequentially as it goes, the result read as a clean 36-chapter book rather
+ * than a 34-chapter one with two chapters cut in half.
+ *
+ * Two independent proofs that a boundary is false, either sufficient:
+ *
+ *   - the previous chapter does not end a sentence — a real chapter always
+ *     does, so its ending has been taken by whatever follows;
+ *   - this chapter opens on a lowercase letter, which no chapter does.
+ *
+ * The merge is reported, not silent: a boundary the parser had to repair is
+ * worth someone's eye on it.
+ */
+function mergeContinuationChapters(
+  chapters: ParsedChapter[]
+): { chapters: ParsedChapter[]; warnings: string[] } {
+  if (chapters.length < 2) return { chapters, warnings: [] };
+
+  const merged: ParsedChapter[] = [];
+  const repaired: string[] = [];
+
+  for (const ch of chapters) {
+    const prev = merged[merged.length - 1];
+    const brokenTail = prev && prev.rawText.trim() && !endsCleanly(prev.rawText);
+    const brokenHead = /^[a-z]/.test(ch.rawText.trimStart());
+
+    if (prev && ch.rawText.trim() && (brokenTail || brokenHead)) {
+      // Joined with a space, not a paragraph break: this is one sentence that
+      // was cut, so re-forming the paragraph is the whole point.
+      prev.rawText = `${prev.rawText.trimEnd()} ${ch.rawText.trimStart()}`;
+      prev.wordCount = prev.rawText.split(/\s+/).filter(Boolean).length;
+      repaired.push(ch.title);
+      continue;
+    }
+    merged.push({ ...ch });
+  }
+
+  if (repaired.length) {
+    // Numbering is assigned before this runs, so it has to be redone — leaving
+    // it would skip the numbers of the sections that no longer exist.
+    const numbers = computeChapterNumbers(merged.map((c) => c.title));
+    merged.forEach((c, i) => { c.number = numbers[i]; });
+
+    const named = repaired.slice(0, 5).map((t) => `"${t}"`).join(", ");
+    const more = repaired.length > 5 ? ` (+${repaired.length - 5} more)` : "";
+    const plural = repaired.length === 1 ? "" : "s";
+    warnRepairedBoundaries(repaired.length, chapters.length);
+    return {
+      chapters: merged,
+      warnings: [
+        `${repaired.length} detected chapter${plural} began mid-sentence and ${
+          repaired.length === 1 ? "was" : "were"
+        } merged into the chapter before ${repaired.length === 1 ? "it" : "them"} — ` +
+          `the detector split a real chapter. Merged: ${named}${more}. Worth checking those joins.`,
+      ],
+    };
+  }
+
+  return { chapters: merged, warnings: [] };
+}
+
+function warnRepairedBoundaries(count: number, before: number): void {
+  console.log(`${TAG} merged ${count} mid-sentence chapter start(s); ${before} → ${before - count} sections`);
+}
+
 function validateChapterSizes(chapters: ParsedChapter[]): string[] {
   const counts = chapters.map((c) => c.wordCount).filter((n) => n > 0).sort((a, b) => a - b);
   if (counts.length < 3) return []; // too few chapters for "median" to mean anything
@@ -2047,9 +2138,10 @@ export async function parseManuscript(
       trace.stage("claude-fallback", `${rawSections.length} sections`);
     }
 
-    const chapters = assignChaptersFromPages(rawSections, pages);
+    const assigned = assignChaptersFromPages(rawSections, pages);
+    const { chapters, warnings: mergeWarnings } = mergeContinuationChapters(assigned);
     trace.stage("assign", `${chapters.length} chapters`);
-    txtWarnings.push(...validateChapterSizes(chapters));
+    txtWarnings.push(...mergeWarnings, ...validateChapterSizes(chapters));
     console.log(`${TAG} txt parse complete in ${trace.elapsed()}ms`);
 
     return {
@@ -2082,8 +2174,9 @@ export async function parseManuscript(
     const pageMap = buildPageMap(docx.pages);
     if (!pageMap) throw new Error("Could not extract any text from document");
     const rawSections = await askClaude(pageMap);
-    const chapters = assignChaptersFromPages(rawSections, docx.pages);
-    const fallbackWarnings = validateChapterSizes(chapters);
+    const assigned = assignChaptersFromPages(rawSections, docx.pages);
+    const { chapters, warnings: mergeWarnings } = mergeContinuationChapters(assigned);
+    const fallbackWarnings = [...mergeWarnings, ...validateChapterSizes(chapters)];
     return { format: "docx", chapters, warnings: fallbackWarnings.length ? fallbackWarnings : undefined };
   }
 
@@ -2230,7 +2323,8 @@ export async function parseManuscript(
     rawSections = await askClaude(pageMap);
   }
 
-  const chapters = assignChaptersFromLines(rawSections, cleanedLinePages);
-  warnings.push(...validateChapterSizes(chapters));
+  const assigned = assignChaptersFromLines(rawSections, cleanedLinePages);
+  const { chapters, warnings: mergeWarnings } = mergeContinuationChapters(assigned);
+  warnings.push(...mergeWarnings, ...validateChapterSizes(chapters));
   return { format: "pdf", chapters, quality, povRoster, warnings };
 }

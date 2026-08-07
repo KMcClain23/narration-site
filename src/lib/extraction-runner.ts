@@ -53,6 +53,40 @@ function isAccountLevelError(message: string): boolean {
  * the same place. Who calls this next is now somebody else's problem, which is
  * the point: a scheduled job cannot fail to be scheduled.
  */
+/** Longest a quote-free section can be and still be assumed to be matter. */
+const MATTER_MAX_WORDS = 300;
+
+/**
+ * A section with nothing to extract from.
+ *
+ * A title page, a copyright notice, an "Also By" list — short, and containing
+ * no quotation mark of any kind, so there is no dialogue in it by definition.
+ * Sending one for dialogue extraction spends an API call to be told so, and
+ * worse: asked to find dialogue in "A N D A KISS", the model answers in prose
+ * rather than JSON, which reads as a parse failure and burns the chapter's
+ * entire retry budget before showing up as "1 chapter failed extraction".
+ *
+ * Both conditions are required. Length alone would skip a genuinely short
+ * chapter, and quote-free alone would skip a long passage of unquoted
+ * narration, which is a real chapter that deserves a summary.
+ */
+function hasNoDialogue(text: string): boolean {
+  if (/["'“”‘’«»]/.test(text)) return false;
+  return text.trim().split(/\s+/).filter(Boolean).length <= MATTER_MAX_WORDS;
+}
+
+/**
+ * A failure that repeating the same call cannot fix.
+ *
+ * The retry budget exists for transient trouble — a truncated response, a
+ * blip. A reply that is not JSON at all is the model declining the task, and
+ * an identical prompt gets an identical non-answer, so retrying only delays
+ * the same outcome by two more calls and two more charges.
+ */
+function isDeterministicError(message: string): boolean {
+  return /is not valid JSON|Unexpected token|JSON at position|Unexpected end of JSON/i.test(message);
+}
+
 export async function processNextChapter(manuscriptId: string): Promise<ChapterOutcome> {
   // "Still to do" is: no summary, no recorded failure, and not already over
   // its retry budget. Each condition exists because of a way this previously
@@ -125,9 +159,11 @@ export async function processNextChapter(manuscriptId: string): Promise<ChapterO
     (existingCharacters ?? []).forEach((c) => characterMap.set(c.name, c.id));
     let colorCount = characterMap.size;
 
-    const result = chapter.raw_text?.trim()
-      ? await extractChapter(chapter.raw_text, Array.from(characterMap.keys()))
-      : { characters: [], summary: "(no extractable text)", dialogueSpans: [] };
+    const result = !chapter.raw_text?.trim()
+      ? { characters: [], summary: "(no extractable text)", dialogueSpans: [] }
+      : hasNoDialogue(chapter.raw_text)
+        ? { characters: [], summary: "(front/back matter — no dialogue)", dialogueSpans: [] }
+        : await extractChapter(chapter.raw_text, Array.from(characterMap.keys()));
 
     // Every name Claude surfaced — whether via "characters" or only as a
     // dialogue speaker — gets a roster row, matched or not: the correction UI
@@ -210,7 +246,12 @@ export async function processNextChapter(manuscriptId: string): Promise<ChapterO
     // Only give up once the retry budget is spent. A truncated response or a
     // transient API error is worth another go; recording a permanent failure
     // on the first stumble would strand a chapter that would have succeeded.
-    if (attempt >= MAX_ATTEMPTS) {
+    //
+    // A non-JSON reply is the exception: it is not a stumble, it is the model
+    // answering in prose, and the next two attempts send the identical prompt
+    // for the identical answer. Recorded immediately so the chapter shows its
+    // real reason instead of three charges later.
+    if (attempt >= MAX_ATTEMPTS || isDeterministicError(message)) {
       await supabaseAdmin
         .from("chapters")
         .update({ extraction_error: message.slice(0, 500) })

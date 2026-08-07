@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { r2, R2_BUCKETS } from "@/lib/r2";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { parseManuscript, PARSE_BUDGET_MS } from "@/lib/manuscript-parser";
@@ -127,18 +127,19 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       .update({ status: "ready", error_message: qualityNote })
       .eq("id", id);
 
-    // The upload is a temp file, not a permanent asset, so it goes — but only
-    // now that its chapters are safely stored.
+    // The source is kept, not deleted.
     //
-    // This used to run the moment the bytes were read, before parsing. Every
-    // failed parse therefore destroyed its own source, which is why no failure
-    // in this pipeline has ever been retryable: the only copy was gone before
-    // the error was known, and the only recovery was to re-upload by hand.
-    // Deleting after the insert costs a few seconds of storage and makes a
-    // failed parse something that can be run again.
-    r2.send(
-      new DeleteObjectCommand({ Bucket: R2_BUCKETS.media.name, Key: manuscript.source_r2_key })
-    ).catch((err) => console.warn("[manuscripts/process] source cleanup failed:", err?.message));
+    // It used to be deleted the moment its bytes were read, before parsing even
+    // began. That made every parse a one-shot: a failure destroyed its own
+    // evidence, and a parse that succeeded but produced wrong boundaries could
+    // not be re-run against a fixed parser without a fresh upload by hand.
+    // Both have cost real time — a book had to be re-uploaded to answer "why
+    // was the table of contents rejected", and the answer was lost again the
+    // moment the next parse succeeded.
+    //
+    // A manuscript PDF is a couple of megabytes and there are a handful of
+    // them. Keeping it until the manuscript itself is deleted (see the DELETE
+    // handler, which now removes it) is far cheaper than the alternative.
 
     // Chain straight into Phase 3 — a manuscript with chapters but no
     // dialogue extraction is a confusing dead end for anyone using Prepper
