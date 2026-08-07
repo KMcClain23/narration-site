@@ -1,5 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+
+// The parse runs inside this invocation, after the response has been sent, so
+// the box has to stay alive as long as the parse route itself may take.
+export const maxDuration = 60;
 
 // POST: register an uploaded manuscript and kick off background processing.
 // The file itself is already sitting in R2 at `key` (see upload-url/route.ts) —
@@ -34,8 +38,34 @@ export async function POST(req: Request) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+    // Kicked off with after(), not a floating promise.
+    //
+    // This was a bare fetch(...).catch(() => {}) followed immediately by the
+    // return below. Nothing kept the invocation alive to see it through, so
+    // whether the request ever left the box was a race against the platform
+    // tearing the function down — one this won often enough to look correct and
+    // then lost, leaving a manuscript sitting at "processing" with no parse ever
+    // started and nothing in the log to say so. It is the same shape that
+    // stalled the extraction chain three times.
+    //
+    // after() runs the callback once the response is sent and holds the
+    // invocation open until it settles, which is exactly the guarantee that was
+    // missing. The upload still returns immediately.
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.dmnarration.com";
-    fetch(`${baseUrl}/api/admin/manuscripts/${data.id}/process`, { method: "POST" }).catch(() => {});
+    after(async () => {
+      try {
+        const res = await fetch(`${baseUrl}/api/admin/manuscripts/${data.id}/process`, {
+          method: "POST",
+        });
+        if (!res.ok) {
+          console.error(`[manuscripts POST] parse trigger returned ${res.status} for ${data.id}`);
+        }
+      } catch (e) {
+        // The cron's stuck-manuscript sweep is the backstop; log so the reason
+        // is recoverable rather than inferred from a row that never moved.
+        console.error(`[manuscripts POST] parse trigger failed for ${data.id}:`, e);
+      }
+    });
 
     return NextResponse.json({ id: data.id });
   } catch (e) {

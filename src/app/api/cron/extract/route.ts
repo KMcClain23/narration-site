@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   EXTRACT_TAG,
   findManuscriptWithPendingWork,
@@ -6,6 +7,78 @@ import {
 } from "@/lib/extraction-runner";
 
 export const maxDuration = 60;
+
+/**
+ * How long a manuscript may sit at "processing" before the parse is re-fired.
+ *
+ * Long enough that a parse genuinely in flight is never restarted — the parse
+ * route abandons itself at 50s and always writes a status — and short enough
+ * that a lost trigger costs a minute rather than the rest of the day.
+ */
+const STUCK_PARSE_MS = 3 * 60_000;
+
+/**
+ * Re-fire the parse for any manuscript whose trigger never arrived.
+ *
+ * Uploading creates the row and then asks the parse route to do the work. That
+ * hand-off is a network call between two invocations, and a network call can be
+ * lost: when it is, the row sits at "processing" with no chapters, no error, and
+ * nothing in the log, indistinguishable from a parse still running. The upload
+ * side now holds its invocation open to make the call reliably, but "reliably"
+ * is not "always", and the failure is invisible precisely when it matters.
+ *
+ * Re-firing is safe because the source file is kept until the manuscript is
+ * deleted, and because a parse writes its chapters in one insert at the end —
+ * so a duplicate that loses the race adds nothing, and one that wins finds the
+ * work already done.
+ */
+async function retriggerStuckParses(): Promise<number> {
+  const cutoff = new Date(Date.now() - STUCK_PARSE_MS).toISOString();
+
+  const { data: stalled, error } = await supabaseAdmin
+    .from("manuscripts")
+    .select("id, title, created_at")
+    .eq("status", "processing")
+    .lt("created_at", cutoff)
+    .limit(3);
+
+  if (error) {
+    console.error(`${EXTRACT_TAG} stuck-parse sweep failed:`, error.message);
+    return 0;
+  }
+  if (!stalled?.length) return 0;
+
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.dmnarration.com";
+  let fired = 0;
+
+  for (const m of stalled) {
+    // A row can be "processing" with chapters already written only in the
+    // moments before the status flips, so this checks rather than assumes.
+    const { count } = await supabaseAdmin
+      .from("chapters")
+      .select("id", { count: "exact", head: true })
+      .eq("manuscript_id", m.id);
+    if (count && count > 0) continue;
+
+    console.warn(
+      `${EXTRACT_TAG} "${m.title}" has been processing since ${m.created_at} with no chapters — re-firing the parse`
+    );
+    try {
+      // Deliberately not awaited to completion: the parse is its own invocation
+      // with its own deadline and always records a status, so this run does not
+      // need to survive to see the outcome.
+      await fetch(`${baseUrl}/api/admin/manuscripts/${m.id}/process`, {
+        method: "POST",
+        signal: AbortSignal.timeout(5_000),
+      }).catch(() => {});
+      fired++;
+    } catch {
+      // The next sweep tries again.
+    }
+  }
+
+  return fired;
+}
 
 /**
  * Stop before the function limit rather than at it. A chapter cut off mid-call
@@ -48,9 +121,13 @@ export async function GET(req: Request) {
   }
 
   try {
+    // Before extraction, because a manuscript with no chapters has no
+    // extraction work to find and would otherwise never be looked at again.
+    const reFired = await retriggerStuckParses();
+
     const manuscriptId = await findManuscriptWithPendingWork();
     if (!manuscriptId) {
-      return NextResponse.json({ idle: true });
+      return NextResponse.json({ idle: true, reFired });
     }
 
     const result = await runExtractionBudget(manuscriptId, RUN_BUDGET_MS);
