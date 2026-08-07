@@ -57,17 +57,25 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const { data: characters } = await supabaseAdmin
-    .from("characters")
-    .select("voice_sample_key")
-    .eq("manuscript_id", id);
+  const [{ data: characters }, { data: manuscript }] = await Promise.all([
+    supabaseAdmin.from("characters").select("voice_sample_key").eq("manuscript_id", id),
+    supabaseAdmin.from("manuscripts").select("source_r2_key").eq("id", id).single(),
+  ]);
+
+  // The source upload is included now. Processing used to delete it before
+  // parsing, so by the time anything reached here there was never a source file
+  // left to clean up; it survives a failed parse on purpose (so the parse can
+  // be retried), which means deleting the manuscript has to take it with it or
+  // every failed upload leaves a file in the bucket permanently.
+  const keys = [
+    ...(characters ?? []).map((c) => c.voice_sample_key),
+    manuscript?.source_r2_key,
+  ].filter((k): k is string => !!k);
 
   await Promise.all(
-    (characters ?? [])
-      .filter((c): c is { voice_sample_key: string } => !!c.voice_sample_key)
-      .map((c) =>
-        r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKETS.media.name, Key: c.voice_sample_key })).catch(() => {})
-      )
+    keys.map((Key) =>
+      r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKETS.media.name, Key })).catch(() => {})
+    )
   );
 
   const { error } = await supabaseAdmin.from("manuscripts").delete().eq("id", id);

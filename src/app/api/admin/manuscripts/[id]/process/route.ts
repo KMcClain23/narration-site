@@ -64,7 +64,6 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       new GetObjectCommand({ Bucket: R2_BUCKETS.media.name, Key: manuscript.source_r2_key })
     );
     const bytes = await obj.Body!.transformToByteArray();
-    r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKETS.media.name, Key: manuscript.source_r2_key })).catch(() => {});
 
     const started = Date.now();
     console.log(`[manuscripts/process] ${id} — parsing ${bytes.length} bytes`);
@@ -127,6 +126,19 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       .from("manuscripts")
       .update({ status: "ready", error_message: qualityNote })
       .eq("id", id);
+
+    // The upload is a temp file, not a permanent asset, so it goes — but only
+    // now that its chapters are safely stored.
+    //
+    // This used to run the moment the bytes were read, before parsing. Every
+    // failed parse therefore destroyed its own source, which is why no failure
+    // in this pipeline has ever been retryable: the only copy was gone before
+    // the error was known, and the only recovery was to re-upload by hand.
+    // Deleting after the insert costs a few seconds of storage and makes a
+    // failed parse something that can be run again.
+    r2.send(
+      new DeleteObjectCommand({ Bucket: R2_BUCKETS.media.name, Key: manuscript.source_r2_key })
+    ).catch((err) => console.warn("[manuscripts/process] source cleanup failed:", err?.message));
 
     // Chain straight into Phase 3 — a manuscript with chapters but no
     // dialogue extraction is a confusing dead end for anyone using Prepper

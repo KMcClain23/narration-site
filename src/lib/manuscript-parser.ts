@@ -1696,9 +1696,14 @@ async function askClaude(pageMap: string): Promise<Array<{ title: string; startP
     model: "claude-haiku-4-5-20251001",
     // 1024 was silently truncating mid-array on real books (~30+ sections) —
     // confirmed via stop_reason="max_tokens" against the Ruined test file.
-    // 4096 gives headroom; the stop_reason log below stays so a future book
-    // long enough to blow through even that isn't a silent chapter-count bug.
-    max_tokens: 4096,
+    //
+    // 4096 was not enough either. A 336-page book whose running headers made
+    // nearly every page read as a section start produced 87 sections at roughly
+    // 45 tokens each and ran out of room around page 87 of 336, which is the
+    // shape of the "Swing and a Kiss" failure. Haiku 4.5 has far more headroom
+    // than this, and the cost of a ceiling that is too low is a wrong book
+    // rather than a slow one.
+    max_tokens: 16_384,
     messages: [
       {
         role: "user",
@@ -1721,7 +1726,29 @@ async function askClaude(pageMap: string): Promise<Array<{ title: string; startP
   }, { timeout: CLAUDE_CALL_TIMEOUT_MS, maxRetries: 1 });
 
   const raw = msg.content[0].type === "text" ? msg.content[0].text : "";
-  console.log(`[manuscript-parser] askClaude stop_reason=${msg.stop_reason} output_tokens=${msg.usage.output_tokens} raw_len=${raw.length}`);
+  console.log(
+    `${TAG} askClaude stop_reason=${msg.stop_reason} ` +
+      `output_tokens=${msg.usage.output_tokens} raw_len=${raw.length}`
+  );
+
+  // A truncated section list is unusable, and it is unusable in the worst
+  // possible way: it looks complete.
+  //
+  // This used to be logged and nothing more. parseClaudeJson repairs a
+  // half-written array by design — that resilience is right for a stray
+  // trailing comma and wrong here, because it turns "the model ran out of room
+  // at page 87 of 336" into a clean-looking list of 87 sections. The last one
+  // then absorbs every remaining page, and the book is stored with a chapter
+  // twenty times the size of any other and no error anywhere.
+  //
+  // The list is either complete or it is not a list of the book's chapters.
+  if (msg.stop_reason === "max_tokens") {
+    throw new Error(
+      `Chapter detection was cut off by the output limit after ${msg.usage.output_tokens} tokens. ` +
+        `The section list is incomplete, so the remaining pages would all be filed under the last ` +
+        `section detected. Refusing to store a truncated chapter list.`
+    );
+  }
 
   try {
     const parsed = parseClaudeJson(raw);
@@ -2182,8 +2209,20 @@ export async function parseManuscript(
     povRoster = Array.from(new Set(tocChapters.flatMap((c) => c.povNames)));
   } else {
     // ── Last resort: no usable TOC, infer boundaries from the body ──────────
+    //
+    // Built from header-stripped pages, not the raw ones.
+    //
+    // The page map is the first sixty characters of each page, which on a book
+    // with running headers is the running header and nothing else. Every page
+    // then reads as a section start, and the model dutifully reports one — on
+    // "Swing and a Kiss" that produced 87 one-page "chapters" for a 34-chapter
+    // book, and put the author's name into povCharacter for every other
+    // chapter, because that was the verso header it was shown.
+    //
+    // Stripping first means the map carries the opening words of each page's
+    // actual text, which is the thing a chapter opening can be recognised from.
     console.log(`${TAG} no usable TOC — falling back to body-text detection`);
-    const pageMap = buildPageMap(flatPages);
+    const pageMap = buildPageMap(cleanedFlatPages);
     if (!pageMap) throw new Error("Could not extract any text from PDF");
     rawSections = await askClaude(pageMap);
   }
