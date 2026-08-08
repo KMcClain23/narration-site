@@ -7,6 +7,17 @@
 // Parses "YYYY-MM-DD" as a LOCAL date (matching the existing board/page.tsx
 // convention) — `new Date("YYYY-MM-DD")` parses as UTC midnight, which can
 // silently shift a day in negative-UTC-offset timezones.
+/**
+ * Parse a date-only column ("2026-08-15") without a timezone conversion.
+ *
+ * Deliberately not `new Date(s)`, which reads a bare date as UTC midnight and
+ * then displays it a day early anywhere west of Greenwich. A `date` column has
+ * no timezone: that day is that day everywhere, so it is built field by field
+ * and formatted in the same zone it was parsed in. Callers of this must not add
+ * an explicit timeZone when formatting — that would reintroduce exactly the
+ * shift this avoids. Instants (timestamptz) are the opposite case and go
+ * through src/lib/timezone.ts.
+ */
 export function parseLocalDate(s: string): Date {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d);

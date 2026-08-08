@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { adminType } from "@/lib/design-tokens";
 import { CardEditModal, type FullBoardCard } from "@/components/board/CardEditModal";
+import { formatMonthYear } from "@/lib/timezone";
 
 type ReleasedCard = {
   id: string;
@@ -17,15 +18,8 @@ type ReleasedCard = {
   is_confidential: boolean | null;
 };
 
-const SITE_TIMEZONE = "America/Los_Angeles";
-
 function releasedLabel(iso: string | null): string {
-  if (!iso) return "No release date";
-  return new Date(iso).toLocaleDateString("en-US", {
-    timeZone: SITE_TIMEZONE,
-    month: "short",
-    year: "numeric",
-  });
+  return iso ? formatMonthYear(iso) : "No release date";
 }
 
 /**

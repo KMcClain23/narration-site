@@ -1,4 +1,5 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { dateOnlyToPacificNoon, formatFullDate } from "@/lib/timezone";
 
 export interface ContractData {
   contractDate: string;
@@ -40,9 +41,7 @@ export interface ContractData {
 const fmtDate = (d: string) => {
   if (!d) return "";
   try {
-    return new Date(d + "T12:00:00").toLocaleDateString("en-US", {
-      month: "long", day: "numeric", year: "numeric",
-    });
+    return formatFullDate(dateOnlyToPacificNoon(d) ?? d);
   } catch { return d; }
 };
 const fmtRate = (r: string, unit: string) => r ? `$${r} ${unit}` : "___";

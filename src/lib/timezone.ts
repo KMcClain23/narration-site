@@ -53,6 +53,16 @@ export function formatMonthYear(value: string | Date): string {
   return new Date(value).toLocaleDateString("en-US", { ...base, month: "long", year: "numeric" });
 }
 
+/** "October 24, 2026" */
+export function formatFullDate(value: string | Date): string {
+  return new Date(value).toLocaleDateString("en-US", {
+    ...base,
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 /** "Sat, October 24, 2026" */
 export function formatLongDate(value: string | Date): string {
   return new Date(value).toLocaleDateString("en-US", {
