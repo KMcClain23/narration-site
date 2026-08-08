@@ -84,7 +84,7 @@ function ymd(d: Date): string {
 async function query<T>(
   path: "visits/count" | "visits/aggregate" | "events/count" | "events/aggregate",
   params: Record<string, string | number | undefined>,
-  onFail: (reason: string) => void
+  onFail: (reason: string, status?: number) => void
 ): Promise<T | null> {
   const url = new URL(`${API}/${path}`);
   url.searchParams.set("projectId", PROJECT_ID);
@@ -101,7 +101,7 @@ async function query<T>(
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      onFail(`${res.status} ${body.slice(0, 200)}`);
+      onFail(`${res.status} ${body.slice(0, 200)}`, res.status);
       return null;
     }
     const json = (await res.json()) as { data?: T };
@@ -153,9 +153,18 @@ export async function getVercelAnalytics(days: number): Promise<VercelAnalyticsR
   const since = new Date(until.getTime() - span * 86_400_000);
   const window = { since: ymd(since), until: ymd(until) };
 
+  // Split by cause, because they call for different things. A dimension the
+  // plan does not include will fail identically forever and there is nothing to
+  // act on, so naming it on the page is a permanent nag about a feature that
+  // cannot be turned on. Anything else is a real fault and worth surfacing.
   const unavailable: string[] = [];
-  const fail = (name: string) => (reason: string) => {
-    unavailable.push(name);
+  const planGated: string[] = [];
+  let failedCount = 0;
+
+  const fail = (name: string) => (reason: string, status?: number) => {
+    failedCount++;
+    if (status === 402) planGated.push(name);
+    else unavailable.push(name);
     console.warn(`[vercel-analytics] ${name} unavailable: ${reason}`);
   };
 
@@ -198,7 +207,7 @@ export async function getVercelAnalytics(days: number): Promise<VercelAnalyticsR
 
   // A single 401 means the token is wrong, not that every dimension is
   // individually unsupported — worth saying plainly rather than as a dozen rows.
-  if (unavailable.length >= 12) {
+  if (failedCount >= 12) {
     return {
       status: "error",
       message:
@@ -214,7 +223,7 @@ export async function getVercelAnalytics(days: number): Promise<VercelAnalyticsR
   console.log(
     `[vercel-analytics] ${window.since}..${window.until} — ` +
       `${(daily ?? []).length} days, lifetime ${lifetime ? lifetime.pageviews : "n/a"}, ` +
-      `${unavailable.length} dimension(s) unavailable`
+      `${unavailable.length} unavailable, ${planGated.length} not included in plan`
   );
 
   const dailyRows: DailyRow[] = (daily ?? []).map((r) => ({

@@ -178,10 +178,13 @@ export function VercelAnalyticsSection({
         </div>
       )}
 
+      {/* Plan-gated dimensions are deliberately not mentioned — they answer 402
+          every time and will until the plan changes, so a line naming them is a
+          standing complaint about something that cannot be fixed from here. It
+          is logged server-side instead. This only fires for real faults. */}
       {a.unavailable.length > 0 && (
         <p className={`${adminType.small} mt-4`}>
-          Vercel did not return: {a.unavailable.join(", ")}. These are usually dimensions the current
-          plan does not expose; the server log has the exact response.
+          Vercel did not return: {a.unavailable.join(", ")}. The server log has the exact response.
         </p>
       )}
 
