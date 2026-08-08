@@ -5,6 +5,8 @@ import { VerticalBarChart } from "./VerticalBarChart";
 import { HorizontalBarChart } from "./HorizontalBarChart";
 import { FrequentCollaborators } from "./FrequentCollaborators";
 import { SiteAnalyticsSection, type AnalyticsEvent } from "./SiteAnalyticsSection";
+import { VercelAnalyticsSection } from "./VercelAnalyticsSection";
+import { getVercelAnalytics } from "@/lib/vercel-analytics";
 import {
   computeCareerTotals,
   computeEarnings,
@@ -36,7 +38,7 @@ export default async function ToolsAnalyticsPage({
   const activeDays = [7, 30, 90, 0].includes(rawDays) ? rawDays : 30;
   const since = sinceDate(activeDays);
 
-  const [cardsRes, authorsRes, eventsRes] = await Promise.all([
+  const [cardsRes, authorsRes, eventsRes, vercel] = await Promise.all([
     supabaseAdmin
       .from("board_cards")
       .select("status, released_at, word_count, payment_type, pfh_rate, narration_format, narrator_share_percent, tags, author"),
@@ -50,6 +52,12 @@ export default async function ToolsAnalyticsPage({
       if (since) q = q.gte("created_at", since);
       return q;
     })(),
+    // Never allowed to break the page: the career metrics below do not depend
+    // on Vercel being reachable, and an outage there should not blank them.
+    getVercelAnalytics(activeDays).catch((e) => ({
+      status: "error" as const,
+      message: e instanceof Error ? e.message : "Vercel Analytics request failed",
+    })),
   ]);
 
   const cards = (cardsRes.data ?? []) as AnalyticsCard[];
@@ -126,6 +134,9 @@ export default async function ToolsAnalyticsPage({
           <h2 className={`${adminType.label} mb-4`}>Frequent Collaborators</h2>
           <FrequentCollaborators collaborators={collaborators} />
         </section>
+
+        {/* Traffic as Vercel measures it — who arrived, from where, on what */}
+        <VercelAnalyticsSection result={vercel} activeDays={activeDays} />
 
         {/* Site Analytics — preserved marketing/traffic dashboard */}
         <SiteAnalyticsSection events={events} activeDays={activeDays} />
