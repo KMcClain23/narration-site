@@ -3,6 +3,44 @@
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { ChartDatum } from "./lib";
 
+/**
+ * The tooltip, drawn here rather than configured.
+ *
+ * Recharts' default prints `name : value`, and with the series name blank that
+ * rendered as a stray colon in front of every figure — "​: 22 events" — on a
+ * panel whose background (#232b3f) sat close enough to the chart's own that it
+ * barely separated from it, at 12px.
+ *
+ * Each of those has a prop to fix it, but the props are the problem: LabelList,
+ * the documented way to put a value on a bar, renders nothing at all in this
+ * version. Owning the markup means the result is whatever this file says it is.
+ */
+function ChartTooltip({
+  active,
+  payload,
+  label,
+  format,
+  unit,
+}: {
+  active?: boolean;
+  payload?: Array<{ value?: number | string }>;
+  label?: string;
+  format: "count" | "currency";
+  unit?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  const value = Number(payload[0]?.value ?? 0);
+
+  return (
+    <div className="rounded-[10px] border border-[#4a5470] bg-[#2f3750] px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.55)]">
+      <div className="text-[11px] uppercase tracking-wider text-[#aeb4c7]">{label}</div>
+      <div className="mt-0.5 text-[15px] font-bold text-[#f5f6fa] tabular-nums">
+        {formatValue(value, format, unit)}
+      </div>
+    </div>
+  );
+}
+
 /** Compact axis ticks — "1.2k" rather than "1,200" in a narrow gutter. */
 function axisTick(value: number, format: "count" | "currency"): string {
   const compact =
@@ -67,15 +105,8 @@ export function VerticalBarChart({
           tickFormatter={(v: number) => axisTick(v, format)}
         />
         <Tooltip
-          contentStyle={{
-            background: "var(--color-surface-raised)",
-            border: "1px solid var(--color-surface-border)",
-            borderRadius: 8,
-            color: "var(--color-text-primary)",
-            fontSize: 12,
-          }}
-          labelStyle={{ color: "var(--color-text-muted)" }}
-          formatter={value => [formatValue(Number(value), format, unit), ""]}
+          cursor={{ fill: "var(--color-surface-border)", opacity: 0.35 }}
+          content={<ChartTooltip format={format} unit={unit} />}
         />
         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
           {data.map((_, i) => (
