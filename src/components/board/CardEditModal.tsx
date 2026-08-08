@@ -8,6 +8,7 @@ import { adminType } from "@/lib/design-tokens";
 import { useModalOpen } from "@/components/admin/AdminModalContext";
 import { useIsDesktop } from "@/components/admin/useIsDesktop";
 import { ArchiveConfirmDialog, ARCHIVE_REASON_LABEL } from "@/components/board/ArchiveConfirmDialog";
+import { AmazonRefetchButton, type AmazonPreview } from "@/components/board/AmazonRefetchButton";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { TagsField, PersonForm, EMPTY_PERSON, type Person } from "@/components/admin/PersonForm";
 import { parseCoNarrators } from "@/components/admin/board-card-utils";
@@ -858,7 +859,18 @@ export function CardEditModal(props: CardEditModalProps) {
     return (
       <div className="space-y-8">
         <div>
-          <label className={`${adminType.label} mb-1.5 block`}>Description (public)</label>
+          <div className="mb-1.5 flex items-end justify-between gap-3">
+            <label className={adminType.label}>Description (public)</label>
+            <AmazonRefetchButton
+              url={form.audible_link}
+              onResult={(r: AmazonPreview) => setForm(p => p && {
+                ...p,
+                description: r.description || p.description,
+                tags: r.tags.length ? r.tags : p.tags,
+                trigger_warnings: r.triggerWarnings.length ? r.triggerWarnings : p.trigger_warnings,
+              })}
+            />
+          </div>
           <div className="relative">
             <textarea
               value={form.description}
@@ -871,7 +883,11 @@ export function CardEditModal(props: CardEditModalProps) {
             </span>
           </div>
           <p className={`${adminType.small} mt-1.5`}>
-            Shown on the public book page. Amazon description auto-fills this field on save if empty and the Amazon/Audible link is set.
+            Shown on the public book page. On save, Amazon fills this in only when it is
+            empty, so anything written here is never overwritten. Use Refetch to replace it
+            deliberately. Reading requires an <strong>amazon.com</strong> link specifically:
+            an audible.com link cannot be read, and for those cards the auto-fill silently
+            does nothing.
           </p>
         </div>
 

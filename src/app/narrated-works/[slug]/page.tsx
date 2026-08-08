@@ -237,7 +237,6 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   const statusStyle = STATUS_TO_STYLE[book.status] ?? "bg-white/10 text-white/50 border-white/10";
   const tags: string[] = Array.isArray(book.tags) ? book.tags : [];
   const triggerWarnings: string[] = Array.isArray(book.trigger_warnings) ? book.trigger_warnings : [];
-  const isReleased = book.status === "released";
 
   // Release date — formatted for display
   const releasedAt = (book as Record<string, unknown>).released_at as string | null ?? null;
@@ -343,12 +342,14 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
                   spotifyUrl={book.spotify_link}
                   arUrl={book.ar_link}
                 />
-                {!isReleased && (
-                  <Link href="/contact"
-                    className="inline-flex items-center gap-2 border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 font-semibold px-6 py-3 rounded-full transition-colors text-sm">
-                    Request a quote
-                  </Link>
-                )}
+                {/* On every book page, released or not. A finished title is the
+                    strongest proof on the site, so it is the worst page to have
+                    no way to act from — and appearing on some books but not
+                    others read as a bug rather than a decision. */}
+                <Link href="/#contact"
+                  className="inline-flex items-center gap-2 border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 font-semibold px-6 py-3 rounded-full transition-colors text-sm">
+                  Request a quote
+                </Link>
               </div>
             </div>
           </div>
@@ -452,16 +453,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
         )}
         </FullCastProvider>
 
-        {/* Bottom CTA — hidden for completed books */}
-        {!isReleased && (
-          <div className="mt-16 border-t border-white/8 pt-8 sm:pt-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-white/35 text-sm">Interested in having your book narrated?</p>
-            <Link href="/contact"
-              className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] text-black px-6 py-2.5 text-sm font-semibold hover:bg-[#E0C15A] transition">
-              Get in touch
-            </Link>
-          </div>
-        )}
+
       </div>
       </PageTransition>
     </main>

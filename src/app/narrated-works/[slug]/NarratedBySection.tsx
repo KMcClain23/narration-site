@@ -31,7 +31,7 @@ export type CoNarratorDetail = { name: string; photo_url: string | null; bio: st
 function PopupShell({ children }: { children: ReactNode }) {
   return (
     <div
-      className="w-64 rounded-xl overflow-hidden"
+      className="w-72 sm:w-80 rounded-xl overflow-hidden"
       style={{
         background: "rgba(8, 12, 60, 0.97)",
         border: "1px solid rgba(100, 120, 255, 0.2)",
@@ -115,8 +115,12 @@ function AuthorPopup({ name, bio, photoUrl }: { name: string; bio: string | null
           <p className="text-sm font-bold text-white leading-tight">{name}</p>
         </div>
       </div>
+      {/* Was line-clamp-5, which cut every bio over ~200 characters and offered
+          no way to see the rest. Bios here run to 580, so they are shown in
+          full; the height cap is a safety valve for an unusually long one
+          rather than the normal case. */}
       {bio ? (
-        <p className="text-xs text-white/55 leading-relaxed line-clamp-5">{bio}</p>
+        <p className="max-h-64 overflow-y-auto text-xs text-white/55 leading-relaxed">{bio}</p>
       ) : (
         <p className="text-xs text-white/30 italic">No bio available.</p>
       )}
@@ -165,8 +169,12 @@ function CoNarratorPopup({ name, photo_url, bio }: CoNarratorDetail) {
           <p className="text-[11px] text-[#D4AF37]">Co-Narrator</p>
         </div>
       </div>
+      {/* Was line-clamp-5, which cut every bio over ~200 characters and offered
+          no way to see the rest. Bios here run to 580, so they are shown in
+          full; the height cap is a safety valve for an unusually long one
+          rather than the normal case. */}
       {bio ? (
-        <p className="text-xs text-white/55 leading-relaxed line-clamp-5">{bio}</p>
+        <p className="max-h-64 overflow-y-auto text-xs text-white/55 leading-relaxed">{bio}</p>
       ) : (
         <p className="text-xs text-white/30 italic">No bio available.</p>
       )}
