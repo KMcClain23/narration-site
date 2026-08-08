@@ -154,6 +154,8 @@ interface Testimonial {
   cover_url?: string;
   /** Where the review was originally published, when there is a public one. */
   source_url?: string;
+  /** This book's page in the portfolio, when the title matches one. */
+  book_href?: string;
 }
 
 // Hardcoded seed testimonials — always shown even if API is down
@@ -273,24 +275,59 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
         </a>
       )}
 
+      {/* The cover and title link to the book when it is in the portfolio.
+          Someone reading praise for a specific title is already curious about
+          that title, and the card was a dead end — a cover sitting there
+          looking clickable and doing nothing. Only wrapped when a page exists,
+          so a testimonial about a book that is not listed stays plain text
+          rather than becoming a broken link. */}
       <div className="border-t border-white/6 pt-4 flex items-center gap-3">
-        {testimonial.cover_url ? (
-          <img
-            src={testimonial.cover_url}
-            alt={testimonial.book || ""}
-            className="h-14 w-9 object-cover rounded-md shrink-0 shadow-lg"
-          />
-        ) : testimonial.book ? (
-          <div className="h-14 w-9 rounded-md shrink-0 bg-white/5 border border-white/10 flex items-center justify-center">
-            <span className="text-[8px] font-bold text-white/30 text-center leading-tight px-0.5">
-              {testimonial.book.split(/\s+/).slice(0, 3).map(w => w[0]?.toUpperCase() ?? "").join("")}
-            </span>
-          </div>
-        ) : null}
+        {(() => {
+          const art = testimonial.cover_url ? (
+            <img
+              src={testimonial.cover_url}
+              alt={testimonial.book || ""}
+              className="h-14 w-9 object-cover rounded-md shrink-0 shadow-lg"
+            />
+          ) : testimonial.book ? (
+            <div className="h-14 w-9 rounded-md shrink-0 bg-white/5 border border-white/10 flex items-center justify-center">
+              <span className="text-[8px] font-bold text-white/30 text-center leading-tight px-0.5">
+                {testimonial.book.split(/\s+/).slice(0, 3).map(w => w[0]?.toUpperCase() ?? "").join("")}
+              </span>
+            </div>
+          ) : null;
+
+          if (!art) return null;
+          return testimonial.book_href ? (
+            <Link
+              href={testimonial.book_href}
+              aria-label={`View ${testimonial.book} in the portfolio`}
+              className="shrink-0 rounded-md transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60"
+            >
+              {art}
+            </Link>
+          ) : art;
+        })()}
+
         <div>
           <p className="font-semibold text-white text-sm">{testimonial.author}</p>
           <p className="text-xs text-white/40 mt-0.5">
-            {testimonial.title}{testimonial.book ? ` · ${testimonial.book}` : ""}
+            {testimonial.title}
+            {testimonial.book && (
+              <>
+                {" · "}
+                {testimonial.book_href ? (
+                  <Link
+                    href={testimonial.book_href}
+                    className="text-white/60 underline decoration-[#D4AF37]/40 underline-offset-2 transition-colors hover:text-[#D4AF37]"
+                  >
+                    {testimonial.book}
+                  </Link>
+                ) : (
+                  testimonial.book
+                )}
+              </>
+            )}
           </p>
         </div>
       </div>
@@ -312,18 +349,23 @@ function TestimonialsCarousel() {
       fetch("/api/testimonials").then(r => r.json()),
       fetch("/api/books").then(r => r.json()).catch(() => ({ books: [] })),
     ]).then(([testimonialData, booksData]) => {
-      if (!testimonialData.testimonials?.length) return;
       // Build slug→cover and lowercase-title→cover maps for fast lookup
       const slugMap = new Map<string, string>();
       const titleMap = new Map<string, string>();
+      // Title → portfolio path. Mirrors slugFor() in narrated-works/[slug]:
+      // the stored slug when there is one, a title-derived slug otherwise.
+      const hrefMap = new Map<string, string>();
       for (const b of (booksData.books ?? []) as Array<{ title: string; cover_url?: string; slug?: string }>) {
+        const path = `/narrated-works/${b.slug || toSlug(b.title)}`;
+        hrefMap.set(toSlug(b.title), path);
+        hrefMap.set(b.title.trim().toLowerCase(), path);
         if (!b.cover_url) continue;
         if (b.slug) slugMap.set(b.slug, b.cover_url);
         slugMap.set(toSlug(b.title), b.cover_url);
         titleMap.set(b.title.trim().toLowerCase(), b.cover_url);
       }
       const seedAuthors = new Set(SEED_TESTIMONIALS.map(t => t.author.toLowerCase()));
-      const apiOnes: Testimonial[] = testimonialData.testimonials
+      const apiOnes: Testimonial[] = (testimonialData.testimonials ?? [])
         .filter((t: { reviewer_name: string }) => !seedAuthors.has(t.reviewer_name.toLowerCase()))
         .map((t: { reviewer_name: string; reviewer_role: string; book_title: string; quote: string; source_url?: string | null }) => {
           const bookKey = (t.book_title || "").trim();
@@ -337,10 +379,23 @@ function TestimonialsCarousel() {
             title: role ? (role.charAt(0).toUpperCase() + role.slice(1)) : "Author",
             book: bookKey || undefined,
             cover_url,
+            book_href: bookKey
+              ? (hrefMap.get(toSlug(bookKey)) ?? hrefMap.get(bookKey.toLowerCase()))
+              : undefined,
             source_url: t.source_url || undefined,
           };
         });
-      if (apiOnes.length) setTestimonials([...SEED_TESTIMONIALS, ...apiOnes]);
+      // Seeds go through the same lookup. They carry a hardcoded book and
+      // cover but no href, so without this the three oldest testimonials —
+      // including the ones for Blood on the Asphalt and Whiskey & Lies, both
+      // of which have portfolio pages — would be the only ones that did not
+      // link anywhere.
+      const seedsWithLinks = SEED_TESTIMONIALS.map(t => {
+        if (!t.book || t.book_href) return t;
+        const href = hrefMap.get(toSlug(t.book)) ?? hrefMap.get(t.book.trim().toLowerCase());
+        return href ? { ...t, book_href: href } : t;
+      });
+      setTestimonials([...seedsWithLinks, ...apiOnes]);
     }).catch(() => {});
   }, []);
 
