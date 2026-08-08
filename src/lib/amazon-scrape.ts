@@ -193,7 +193,23 @@ function parseTropesAndWarnings(text: string): { tags: string[]; triggerWarnings
 
 // ─── main entry point ────────────────────────────────────────────────────────
 
+/** Why a fetch produced nothing, for callers that can act on the difference. */
+export type AmazonFailure = "blocked" | "not-found" | "no-description" | "network";
+
+export type AmazonFetchResult =
+  | { ok: true; data: AmazonBookResult }
+  | { ok: false; reason: AmazonFailure; detail: string };
+
+/**
+ * Unchanged signature for the save-time auto-fill, which only needs to know
+ * whether it got anything.
+ */
 export async function fetchAmazonBook(url: string): Promise<AmazonBookResult | null> {
+  const result = await fetchAmazonBookResult(url);
+  return result.ok ? result.data : null;
+}
+
+export async function fetchAmazonBookResult(url: string): Promise<AmazonFetchResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -223,12 +239,16 @@ export async function fetchAmazonBook(url: string): Promise<AmazonBookResult | n
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.log(`[amazon-scrape] failed: ${url} -> ${reason}`);
-      return null;
+      return { ok: false, reason: "network", detail: reason };
     }
 
     if (!res.ok) {
       console.log(`[amazon-scrape] failed: ${url} -> HTTP ${res.status}`);
-      return null;
+      return {
+        ok: false,
+        reason: res.status === 404 ? "not-found" : "blocked",
+        detail: `HTTP ${res.status}`,
+      };
     }
 
     const rawHtml = await res.text();
@@ -239,11 +259,11 @@ export async function fetchAmazonBook(url: string): Promise<AmazonBookResult | n
     // wording for this varies and doesn't always match either literally).
     if (/enter the characters you see below/i.test(rawHtml) || /robotcheck/i.test(rawHtml)) {
       console.log(`[amazon-scrape] failed: ${url} -> captcha challenge page`);
-      return null;
+      return { ok: false, reason: "blocked", detail: "captcha challenge" };
     }
     if (/click the button below to continue shopping/i.test(rawHtml) || /validateCaptcha/i.test(rawHtml)) {
       console.log(`[amazon-scrape] failed: ${url} -> soft-block (interstitial detected)`);
-      return null;
+      return { ok: false, reason: "blocked", detail: "bot interstitial" };
     }
 
     // Strip <noscript> blocks first — Amazon duplicates the full description
@@ -254,22 +274,22 @@ export async function fetchAmazonBook(url: string): Promise<AmazonBookResult | n
     const rawDescription = extractJsonLdDescription(html) ?? extractDescriptionDiv(html);
     if (!rawDescription) {
       console.log(`[amazon-scrape] failed: ${url} -> no description found`);
-      return null;
+      return { ok: false, reason: "no-description", detail: "no description in page" };
     }
 
     const description = htmlToText(rawDescription);
     if (!description) {
       console.log(`[amazon-scrape] failed: ${url} -> empty description after cleaning`);
-      return null;
+      return { ok: false, reason: "no-description", detail: "description was empty after cleaning" };
     }
 
     const { tags, triggerWarnings } = parseTropesAndWarnings(description);
     console.log(`[amazon-scrape] fetched: ${url} -> description=yes, tags=${tags.length}, tw=${triggerWarnings.length}`);
-    return { description, tags, triggerWarnings };
+    return { ok: true, data: { description, tags, triggerWarnings } };
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.log(`[amazon-scrape] failed: ${url} -> ${reason}`);
-    return null;
+    return { ok: false, reason: "network", detail: reason };
   } finally {
     clearTimeout(timer);
   }

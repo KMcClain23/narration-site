@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchAmazonBook } from "@/lib/amazon-scrape";
+import { fetchAmazonBookResult } from "@/lib/amazon-scrape";
 
 /**
  * Fetch what Amazon says about a book, without saving anything.
@@ -25,18 +25,32 @@ export async function POST(req: Request) {
       );
     }
 
-    const scraped = await fetchAmazonBook(url.trim());
-    if (!scraped) {
+    const result = await fetchAmazonBookResult(url.trim());
+
+    if (!result.ok) {
+      // The reason matters. A block is Amazon refusing this server, which no
+      // amount of correcting the URL will fix and which the save-time
+      // auto-fill hits silently for the same reason. Saying "did not return a
+      // readable page" made it look like a bad link.
+      const message: Record<typeof result.reason, string> = {
+        blocked:
+          "Amazon blocked the request. It serves a bot check to datacentre addresses, " +
+          "so this will keep failing from the server regardless of the link. Copy the " +
+          "description across by hand for now.",
+        "not-found": "Amazon returned 404 for that link. Check the URL on the card.",
+        "no-description": "Amazon loaded, but the page had no description to read.",
+        network: "Could not reach Amazon.",
+      };
       return NextResponse.json(
-        { error: "Amazon did not return a readable page for that link." },
-        { status: 502 }
+        { error: message[result.reason], reason: result.reason },
+        { status: result.reason === "not-found" ? 400 : 502 }
       );
     }
 
     return NextResponse.json({
-      description: scraped.description ?? "",
-      tags: scraped.tags,
-      triggerWarnings: scraped.triggerWarnings,
+      description: result.data.description ?? "",
+      tags: result.data.tags,
+      triggerWarnings: result.data.triggerWarnings,
     });
   } catch (e) {
     console.error("[POST /api/board/amazon-preview]", e);

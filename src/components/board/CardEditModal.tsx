@@ -883,11 +883,11 @@ export function CardEditModal(props: CardEditModalProps) {
             </span>
           </div>
           <p className={`${adminType.small} mt-1.5`}>
-            Shown on the public book page. On save, Amazon fills this in only when it is
-            empty, so anything written here is never overwritten. Use Refetch to replace it
-            deliberately. Reading requires an <strong>amazon.com</strong> link specifically:
-            an audible.com link cannot be read, and for those cards the auto-fill silently
-            does nothing.
+            Shown on the public book page. Amazon fills this in on save only when it is
+            empty, so anything written here is never overwritten. Reading requires an{" "}
+            <strong>amazon.com</strong> link, and Amazon frequently blocks the request with a
+            bot check regardless — when that happens the auto-fill does nothing and Refetch
+            reports it. Pasting the description in by hand always works.
           </p>
         </div>
 
