@@ -96,7 +96,7 @@ export default function WelcomePage() {
 
       {/* Hero */}
       <section className="bg-[radial-gradient(circle_at_top,rgba(212,175,55,0.15),transparent_35%)]">
-        <div className="mx-auto max-w-5xl px-5 pt-4 pb-16 sm:px-6 sm:pt-12 sm:pb-20">
+        <div className="mx-auto max-w-7xl px-5 pt-4 pb-16 sm:px-6 sm:pt-12 sm:pb-20">
           <p className="text-xs uppercase tracking-[0.24em] text-[#D4AF37]">Dean Miller Narration</p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">Working together</h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-white/70">
@@ -164,8 +164,12 @@ export default function WelcomePage() {
       </section>
 
       {/* Body */}
-      <div className="mx-auto max-w-5xl px-5 py-10 sm:px-6 sm:py-14">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_250px] xl:grid-cols-[minmax(0,1fr)_270px]">
+      <div className="mx-auto max-w-7xl px-5 py-10 sm:px-6 sm:py-14">
+        {/* The sidebar is fixed, so every pixel the frame gained went to the
+            text column. Capping it in ch keeps line length in the readable
+            band at every width, and centring stops the leftover room becoming
+            a lopsided gutter. */}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,68ch)_250px] lg:justify-center xl:grid-cols-[minmax(0,72ch)_320px]">
           <div className="grid gap-6">
 
             {/* What I handle */}
