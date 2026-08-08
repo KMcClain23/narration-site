@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
-import { Analytics } from "@vercel/analytics/next";
+import { SiteAnalytics } from "@/app/components/SiteAnalytics";
 import Header from "./components/Header";
 import CartDrawer from "./components/CartDrawer";
 import { CartProvider } from "@/context/CartContext";
@@ -145,7 +145,7 @@ export default function RootLayout({
           {children}
           <CartDrawer />
         </CartProvider>
-        <Analytics />
+        <SiteAnalytics />
       </body>
     </html>
   );

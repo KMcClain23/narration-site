@@ -2,6 +2,7 @@ import { adminType } from "@/lib/design-tokens";
 import type { VercelAnalyticsResult, VisitRow } from "@/lib/vercel-analytics";
 import { VerticalBarChart } from "./VerticalBarChart";
 import { HorizontalBarChart } from "./HorizontalBarChart";
+import { OwnTrafficToggle, OwnTrafficNote } from "./OwnTrafficToggle";
 import type { ChartDatum } from "./lib";
 
 // Traffic as Vercel measures it, alongside the career metrics and the
@@ -66,7 +67,12 @@ export function VercelAnalyticsSection({
   result: VercelAnalyticsResult;
   activeDays: number;
 }) {
-  const heading = <h2 className={`${adminType.label} mb-4`}>Site Traffic (Vercel)</h2>;
+  const heading = (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <h2 className={adminType.label}>Site Traffic (Vercel)</h2>
+      <OwnTrafficToggle />
+    </div>
+  );
 
   if (result.status === "unconfigured") {
     return (
@@ -178,6 +184,8 @@ export function VercelAnalyticsSection({
           plan does not expose; the server log has the exact response.
         </p>
       )}
+
+      <OwnTrafficNote />
     </section>
   );
 }
