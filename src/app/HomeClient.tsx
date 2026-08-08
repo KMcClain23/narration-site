@@ -415,19 +415,41 @@ const SEED_TESTIMONIALS: Testimonial[] = [
   },
 ];
 
-const TRUNCATE_LENGTH = 320;
+/**
+ * Longest a pull quote runs before the rest goes behind "Read more".
+ *
+ * Praise is not read at length. One testimonial ran to seven paragraphs on the
+ * card, which is a reading task rather than a recommendation, and the card was
+ * cutting the others mid-sentence with an ellipsis. A quote that stops on a
+ * full stop reads as something the person said; one that stops on "…" reads as
+ * something a script did to it.
+ */
+const TRUNCATE_LENGTH = 240;
+
+/** Cut at the last sentence end that fits, so the quote closes cleanly. */
+function toPullQuote(text: string): { quote: string; truncated: boolean } {
+  if (text.length <= TRUNCATE_LENGTH) return { quote: text, truncated: false };
+  const window = text.slice(0, TRUNCATE_LENGTH);
+  const end = Math.max(window.lastIndexOf(". "), window.lastIndexOf("! "), window.lastIndexOf("? "));
+  // No sentence break to land on, so fall back to the hard cut rather than
+  // returning the whole thing.
+  if (end < 60) return { quote: window.trimEnd() + "…", truncated: true };
+  return { quote: text.slice(0, end + 1), truncated: true };
+}
 
 function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
   const [expanded, setExpanded] = useState(false);
   const hasParagraphs = Boolean(testimonial.paragraphs?.length);
   const fullText = hasParagraphs ? "" : (testimonial.quote || "");
-  const isLong = !hasParagraphs && fullText.length > TRUNCATE_LENGTH;
-  const displayQuote = isLong && !expanded
-    ? fullText.slice(0, TRUNCATE_LENGTH).trimEnd() + "…"
-    : fullText;
+  const pull = toPullQuote(fullText);
+  const isLong = !hasParagraphs && pull.truncated;
+  const displayQuote = isLong && !expanded ? pull.quote : fullText;
   const paragraphs = testimonial.paragraphs || [];
-  const visibleParagraphs = hasParagraphs && !expanded ? paragraphs.slice(0, 2) : paragraphs;
-  const hasMoreParagraphs = hasParagraphs && paragraphs.length > 2;
+  // One paragraph, not two: the opening line is the recommendation and
+  // everything after it is the supporting detail someone reads only if the
+  // opening earned it.
+  const visibleParagraphs = hasParagraphs && !expanded ? paragraphs.slice(0, 1) : paragraphs;
+  const hasMoreParagraphs = hasParagraphs && paragraphs.length > 1;
 
   return (
     <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6 flex flex-col gap-4 hover:border-[#D4AF37]/20 transition-colors">
@@ -441,7 +463,7 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
             {hasMoreParagraphs && (
               <button type="button" onClick={(e) => { e.stopPropagation(); setExpanded(v => !v); }}
                 className="mt-1 text-xs font-semibold text-[#D4AF37] hover:text-[#E0C15A] transition-colors inline-flex items-center gap-1">
-                {expanded ? "Show less" : `Read more (${paragraphs.length - 2} more paragraphs)`}
+                {expanded ? "Show less" : "Read the full review"}
                 <svg className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
@@ -862,7 +884,7 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
           <div className="grid gap-3 sm:grid-cols-2">
             {[
               "Character voice list sent for approval before recording",
-              "First-15 review — lock tone and voices early",
+              "First-15 review to lock tone and voices early",
               "Milestone updates throughout production",
               "ACX-ready masters, delivered to spec",
               "Fast pickups and clear communication",
@@ -885,8 +907,8 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
         </section>
 
         {/* ── TESTIMONIALS ── */}
-        <section id="testimonials" className="mt-16 scroll-mt-24 -mx-5 sm:-mx-6 px-5 sm:px-6 bg-white/[0.02]" aria-label="Author testimonials">
-          <SectionLabel variant="primary">Author testimonials</SectionLabel>
+        <section id="testimonials" className="mt-16 scroll-mt-24 -mx-5 sm:-mx-6 px-5 sm:px-6 bg-white/[0.02]" aria-label="Testimonials">
+          <SectionLabel variant="primary">Testimonials</SectionLabel>
           <TestimonialsCarousel />
         </section>
 
@@ -904,7 +926,7 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
               </h2>
               <p className="text-white/70 text-base leading-relaxed">
                 I'm a professional audiobook narrator with a background in music and theatre. My focus is
-                immersive, character-forward performance — finding the emotional truth in every scene and
+                immersive, character-forward performance that finds the emotional truth in every scene and
                 making each voice distinct enough that the listener never loses the thread.
               </p>
 <p className="text-white/60 text-base leading-relaxed">
@@ -1039,8 +1061,8 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
                 <ul className="space-y-2.5">
                   {[
                     { label: "ACX narrator profile", href: "https://www.acx.com/narrator?p=A3DYAXR7JFPXPE" },
-                    { label: "TikTok — @deanmillernarration", href: "https://www.tiktok.com/@deanmillernarration" },
-                    { label: "Instagram — @deanmillernarrator", href: "https://www.instagram.com/deanmillernarrator" },
+                    { label: "TikTok · @deanmillernarration", href: "https://www.tiktok.com/@deanmillernarration" },
+                    { label: "Instagram · @deanmillernarrator", href: "https://www.instagram.com/deanmillernarrator" },
                   ].map(l => (
                     <li key={l.href}>
                       <a href={l.href} target="_blank" rel="noopener noreferrer"
