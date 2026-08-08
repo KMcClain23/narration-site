@@ -39,16 +39,21 @@ function Stat({ value, label }: { value: string; label: string }) {
   );
 }
 
+/**
+ * A breakdown, or nothing at all.
+ *
+ * An empty panel is not information — it is a card saying "no data" in a grid
+ * of them, and on a site with modest traffic that is most of the section. Rows
+ * only exist for values Vercel actually recorded, so a panel with none has
+ * nothing to tell you and does not appear.
+ */
 function Panel({ title, rows, label }: { title: string; rows: VisitRow[]; label?: (s: string) => string }) {
+  if (!rows.length) return null;
   return (
     <div>
       <h3 className={`${adminType.label} mb-3`}>{title}</h3>
       <div className={card}>
-        {rows.length ? (
-          <HorizontalBarChart data={toChart(rows, label)} />
-        ) : (
-          <p className={adminType.small}>No data in this range.</p>
-        )}
+        <HorizontalBarChart data={toChart(rows, label)} />
       </div>
     </div>
   );
@@ -99,6 +104,27 @@ export function VercelAnalyticsSection({
     value: d.pageviews,
   }));
 
+  const hasBreakdowns = [
+    a.countries, a.devices, a.operatingSystems, a.browsers,
+    a.pages, a.routes, a.referrers,
+    a.sources, a.mediums, a.campaigns, a.events,
+  ].some((rows) => rows.length > 0);
+
+  // Nothing recorded at all is one sentence, not a page of empty cards.
+  if (!a.range.pageviews && !hasBreakdowns) {
+    return (
+      <section>
+        {heading}
+        <div className={card}>
+          <p className={adminType.small}>
+            No traffic recorded in the {rangeLabel}. Vercel aggregates hourly, so a very recent visit
+            may not have landed yet.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section>
       {heading}
@@ -116,34 +142,33 @@ export function VercelAnalyticsSection({
         />
       </div>
 
-      <div className="mt-5">
-        <h3 className={`${adminType.label} mb-3`}>Daily page views</h3>
-        <div className={card}>
-          {daily.length ? (
+      {daily.length > 0 && (
+        <div className="mt-5">
+          <h3 className={`${adminType.label} mb-3`}>Daily page views</h3>
+          <div className={card}>
             <VerticalBarChart data={daily} height={200} unit="views" sparseLabels={daily.length > 21} />
-          ) : (
-            <p className={adminType.small}>No traffic recorded in this range.</p>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <Panel title="Top routes" rows={a.routes} />
-        <Panel title="Top pages" rows={a.pages} />
-        <Panel title="Referrers" rows={a.referrers} />
-        <Panel title="Countries" rows={a.countries} label={countryLabel} />
-        <Panel title="Devices" rows={a.devices} />
-        <Panel title="Browsers" rows={a.browsers} />
-      </div>
-
-      {/* Shown only when there is something in them. Campaign traffic needs
-          UTM-tagged links, and custom events need @vercel/analytics' track() —
-          this site's own track() writes to Supabase instead — so an empty card
-          for either would be permanent furniture rather than information. */}
-      {(a.campaigns.length > 0 || a.events.length > 0) && (
+      {/* One grid, every panel self-hiding. Audience first, because countries,
+          devices and operating systems are the three the Vercel dashboard leads
+          with; then where they came from; then the UTM breakdowns, which stay
+          empty until links are tagged, and custom events, which stay empty
+          until something calls @vercel/analytics' track(). */}
+      {hasBreakdowns && (
         <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {a.campaigns.length > 0 && <Panel title="UTM campaigns" rows={a.campaigns} />}
-          {a.events.length > 0 && <Panel title="Custom events" rows={a.events} />}
+          <Panel title="Countries" rows={a.countries} label={countryLabel} />
+          <Panel title="Devices" rows={a.devices} />
+          <Panel title="Operating systems" rows={a.operatingSystems} />
+          <Panel title="Browsers" rows={a.browsers} />
+          <Panel title="Top pages" rows={a.pages} />
+          <Panel title="Top routes" rows={a.routes} />
+          <Panel title="Referrers" rows={a.referrers} />
+          <Panel title="UTM sources" rows={a.sources} />
+          <Panel title="UTM mediums" rows={a.mediums} />
+          <Panel title="UTM campaigns" rows={a.campaigns} />
+          <Panel title="Custom events" rows={a.events} />
         </div>
       )}
 

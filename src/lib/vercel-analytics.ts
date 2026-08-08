@@ -50,6 +50,9 @@ export type VercelAnalytics = {
   referrers: VisitRow[];
   devices: VisitRow[];
   browsers: VisitRow[];
+  operatingSystems: VisitRow[];
+  sources: VisitRow[];
+  mediums: VisitRow[];
   campaigns: VisitRow[];
   events: VisitRow[];
   /** Dimensions the API rejected, so a partial page can say what is missing. */
@@ -168,6 +171,9 @@ export async function getVercelAnalytics(days: number): Promise<VercelAnalyticsR
     referrers,
     devices,
     browsers,
+    operatingSystems,
+    sources,
+    mediums,
     campaigns,
     events,
   ] = await Promise.all([
@@ -179,7 +185,10 @@ export async function getVercelAnalytics(days: number): Promise<VercelAnalyticsR
     dim("referrers", "referrerHostname", 10),
     dim("devices", "deviceType", 6),
     dim("browsers", "browserName", 8),
-    dim("campaigns", "utmCampaign", 6),
+    dim("operating systems", "osName", 8),
+    dim("UTM sources", "utmSource", 6),
+    dim("UTM mediums", "utmMedium", 6),
+    dim("UTM campaigns", "utmCampaign", 6),
     query<Array<Record<string, unknown>>>(
       "events/aggregate",
       { ...window, by: "eventName", limit: 10 },
@@ -187,9 +196,9 @@ export async function getVercelAnalytics(days: number): Promise<VercelAnalyticsR
     ),
   ]);
 
-  // A single 401 means the token is wrong, not that nine dimensions are all
-  // individually unsupported — worth saying plainly rather than as nine rows.
-  if (unavailable.length >= 9) {
+  // A single 401 means the token is wrong, not that every dimension is
+  // individually unsupported — worth saying plainly rather than as a dozen rows.
+  if (unavailable.length >= 12) {
     return {
       status: "error",
       message:
@@ -197,6 +206,16 @@ export async function getVercelAnalytics(days: number): Promise<VercelAnalyticsR
         "this project, or Web Analytics not being enabled on it. See the server log for the exact response.",
     };
   }
+
+  // One line per fetch saying what came back. Whether this panel is working
+  // cannot be seen from outside — the page is behind admin auth, and the
+  // unconfigured path makes no API calls, so silence in the log means either
+  // "fine" or "never ran". This makes the difference visible.
+  console.log(
+    `[vercel-analytics] ${window.since}..${window.until} — ` +
+      `${(daily ?? []).length} days, lifetime ${lifetime ? lifetime.pageviews : "n/a"}, ` +
+      `${unavailable.length} dimension(s) unavailable`
+  );
 
   const dailyRows: DailyRow[] = (daily ?? []).map((r) => ({
     date: String(r.timestamp ?? "").slice(0, 10),
@@ -221,6 +240,9 @@ export async function getVercelAnalytics(days: number): Promise<VercelAnalyticsR
       referrers: toRows(referrers),
       devices: toRows(devices),
       browsers: toRows(browsers),
+      operatingSystems: toRows(operatingSystems),
+      sources: toRows(sources),
+      mediums: toRows(mediums),
       campaigns: toRows(campaigns),
       events: toRows(events),
       unavailable,
