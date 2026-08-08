@@ -119,6 +119,11 @@ async function query<T>(
  * country grouping, `eventData` for an event-data grouping — so the key is
  * taken from whichever property is not a metric rather than assumed.
  */
+/** Paths only the site owner can reach, so never a visitor's page view. */
+function isOwnerPath(path: string): boolean {
+  return /^\/(admin|tools)(\/|$)/.test(path);
+}
+
 function toRows(raw: Array<Record<string, unknown>> | null): VisitRow[] {
   if (!raw) return [];
   return raw
@@ -243,8 +248,13 @@ export async function getVercelAnalytics(days: number): Promise<VercelAnalyticsR
         visitors: dailyRows.reduce((n, r) => n + r.visitors, 0),
       },
       daily: dailyRows,
-      routes: toRows(routes),
-      pages: toRows(pages),
+      // Owner-only paths are dropped here as well as at collection time.
+      // beforeSend stops them being recorded from now on, but everything logged
+      // before that is still in Vercel and cannot be deleted — which left
+      // /tools/analytics as the most-viewed page on the site, and a handful of
+      // admin manuscript URLs showing as raw ids beneath it. Neither is traffic.
+      routes: toRows(routes).filter((r) => !isOwnerPath(r.label)),
+      pages: toRows(pages).filter((r) => !isOwnerPath(r.label)),
       countries: toRows(countries),
       referrers: toRows(referrers),
       devices: toRows(devices),

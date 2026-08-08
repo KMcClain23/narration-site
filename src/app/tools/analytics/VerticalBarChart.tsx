@@ -3,6 +3,15 @@
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { ChartDatum } from "./lib";
 
+/** Compact axis ticks — "1.2k" rather than "1,200" in a narrow gutter. */
+function axisTick(value: number, format: "count" | "currency"): string {
+  const compact =
+    Math.abs(value) >= 1000
+      ? `${(value / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}k`
+      : value.toLocaleString();
+  return format === "currency" ? `$${compact}` : compact;
+}
+
 // Shared by Release Pace, Earnings, and the Site Analytics daily-activity
 // chart — all three are single-series, category-labeled bar charts that only
 // differ in bar count, color, tooltip formatting, and label density.
@@ -46,7 +55,17 @@ export function VerticalBarChart({
             sparseLabels && index !== 0 && index !== data.length - 1 ? "" : value
           }
         />
-        <YAxis hide />
+        {/* Was hidden, which left the bars with no scale at all — you could see
+            that one day beat another and never how many either was without
+            hovering it. */}
+        <YAxis
+          width={44}
+          allowDecimals={false}
+          tick={{ fill: "var(--color-text-muted)", fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+          tickFormatter={(v: number) => axisTick(v, format)}
+        />
         <Tooltip
           contentStyle={{
             background: "var(--color-surface-raised)",
