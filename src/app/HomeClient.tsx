@@ -1017,64 +1017,43 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
 
             {/* Right column */}
             <div className="flex flex-col gap-4">
-              {/* Book a call */}
+              {/* One card, not three.
+                  The form is the route that captures a project; the rest of
+                  this column was competing with it at equal weight. "Find me
+                  on" is deleted rather than merged: ACX, TikTok and Instagram
+                  are all already in the footer a few inches below, so it was
+                  the same three links twice on one screen.
+
+                  Email keeps its click-to-reveal, which exists to keep the
+                  address away from scrapers, but it is a line inside this card
+                  now rather than a card of its own. */}
               <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6">
                 <div className="flex items-center gap-2 mb-3">
                   <svg className="h-4 w-4 text-[#D4AF37] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                   </svg>
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37]">Book a call</p>
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37]">Prefer to talk first?</p>
                 </div>
                 <p className="text-sm text-white/55 leading-relaxed mb-5">
-                  Prefer to talk through your project first? Check availability and book a free 15-minute call.
+                  Book a free 15-minute call and we can talk the project through before anything is written down.
                 </p>
                 <a href={BOOKINGS_URL} target="_blank" rel="noopener noreferrer"
                   className="inline-flex w-full items-center justify-center rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white/70 transition hover:border-[#D4AF37]/50 hover:text-white">
                   Check availability
                 </a>
-              </div>
 
-              {/* Direct email */}
-              <div className="rounded-2xl border border-[#D4AF37]/30 bg-[#0A0D3A]/60 p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <svg className="h-4 w-4 text-[#D4AF37] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                  </svg>
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37]">Direct email</p>
+                <div className="mt-6 border-t border-white/8 pt-5">
+                  <p className="text-sm text-white/55">
+                    Or email{" "}
+                    <button
+                      onClick={() => { if (!showEmail) setShowEmail(true); else window.location.href = "mailto:Dean@DMNarration.com"; }}
+                      className="font-semibold text-white underline decoration-[#D4AF37]/40 underline-offset-4 hover:text-[#D4AF37] transition-colors">
+                      {showEmail ? "Dean@DMNarration.com" : "click to reveal"}
+                    </button>
+                    {" "}directly.
+                  </p>
+                  <p className="mt-1 text-xs text-white/30">Response within 24 to 48 hours.</p>
                 </div>
-                <button
-                  onClick={() => { if (!showEmail) setShowEmail(true); else window.location.href = "mailto:Dean@DMNarration.com"; }}
-                  className="text-base font-semibold text-white hover:text-[#D4AF37] transition-colors">
-                  {showEmail ? "Dean@DMNarration.com" : "Click to reveal"}
-                </button>
-                <p className="mt-1 text-xs text-white/30">Response within 24–48 hours.</p>
-              </div>
-
-              {/* Find me on */}
-              <div className="rounded-2xl border border-white/8 bg-[#0A0D3A]/60 p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <svg className="h-4 w-4 text-[#D4AF37] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
-                  </svg>
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37]">Find me on</p>
-                </div>
-                <ul className="space-y-2.5">
-                  {[
-                    { label: "ACX narrator profile", href: "https://www.acx.com/narrator?p=A3DYAXR7JFPXPE" },
-                    { label: "TikTok · @deanmillernarration", href: "https://www.tiktok.com/@deanmillernarration" },
-                    { label: "Instagram · @deanmillernarrator", href: "https://www.instagram.com/deanmillernarrator" },
-                  ].map(l => (
-                    <li key={l.href}>
-                      <a href={l.href} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center justify-between text-sm text-white/50 hover:text-[#D4AF37] transition-colors group">
-                        {l.label}
-                        <svg className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
               </div>
             </div>
           </div>
