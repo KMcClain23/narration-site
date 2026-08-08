@@ -20,8 +20,12 @@ export type DemoRecord = {
   duration_seconds: number | null;
   sort_order: number;
   active: boolean;
+  featured: boolean;
   created_at: string;
 };
+
+/** How many demos the homepage shows. Mirrors HOMEPAGE_DEMO_LIMIT in page.tsx. */
+export const FEATURED_LIMIT = 6;
 
 // Decorative "abstract audio" bar heights (percent of strip height) — not
 // derived from any real waveform, per the design brief.
@@ -294,7 +298,7 @@ function AddDemoModal({ onAdded, onCancel }: { onAdded: (demo: DemoRecord) => vo
 
 function DemoRow({
   demo, expanded, onToggleExpand, busy, knownBroken, playingId, setPlayingId,
-  onUpdate, onToggleActive, onDelete,
+  onUpdate, onToggleActive, onToggleFeatured, featuredFull, onDelete,
 }: {
   demo: DemoRecord;
   expanded: boolean;
@@ -305,6 +309,8 @@ function DemoRow({
   setPlayingId: (id: string | null) => void;
   onUpdate: (updated: DemoRecord) => void;
   onToggleActive: () => void;
+  onToggleFeatured: () => void;
+  featuredFull: boolean;
   onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({ id: demo.id });
@@ -402,6 +408,32 @@ function DemoRow({
             <p className="mt-0.5 text-[11px] font-medium text-alert-red">⚠ Audio not loading — use Fix URLs to repair.</p>
           )}
         </div>
+
+        {/* Featured — which demos the homepage shows, separate from the order
+            the full page lists them in. Disabled once six are chosen so the
+            limit is visible here rather than silently applied by the query. */}
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); onToggleFeatured(); }}
+          disabled={busy || (!demo.featured && featuredFull) || !demo.active}
+          title={
+            !demo.active
+              ? "Hidden demos cannot be featured"
+              : demo.featured
+                ? "On the homepage — click to remove"
+                : featuredFull
+                  ? `Homepage is full (${FEATURED_LIMIT}) — remove one first`
+                  : "Add to the homepage"
+          }
+          aria-pressed={demo.featured}
+          className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-30 ${
+            demo.featured
+              ? "bg-[#D4AF37] text-black"
+              : "border border-surface-border text-text-muted hover:text-text-primary"
+          }`}
+        >
+          {demo.featured ? "★ Home" : "☆ Home"}
+        </button>
 
         <button
           type="button"
@@ -546,6 +578,25 @@ export function DemosV2Client({ initialDemos }: { initialDemos: DemoRecord[] }) 
     }
   };
 
+  const featuredCount = demos.filter(d => d.featured).length;
+
+  const handleToggleFeatured = async (demo: DemoRecord) => {
+    setBusyFor(demo.id, true);
+    try {
+      const res = await fetch("/api/demos", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: demo.id, featured: !demo.featured }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      handleUpdate(await res.json());
+    } catch (e) {
+      alert("Failed: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setBusyFor(demo.id, false);
+    }
+  };
+
   const handleDelete = async (demo: DemoRecord) => {
     if (!window.confirm(`Delete "${demo.title}"? The R2 file will also be removed.`)) return;
     setBusyFor(demo.id, true);
@@ -678,6 +729,8 @@ export function DemosV2Client({ initialDemos }: { initialDemos: DemoRecord[] }) 
                 setPlayingId={setPlayingId}
                 onUpdate={handleUpdate}
                 onToggleActive={() => handleToggleActive(demo)}
+                onToggleFeatured={() => handleToggleFeatured(demo)}
+                featuredFull={featuredCount >= FEATURED_LIMIT}
                 onDelete={() => handleDelete(demo)}
               />
             ))}

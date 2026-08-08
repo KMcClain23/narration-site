@@ -26,17 +26,39 @@ export default async function Page() {
     if (monthsRow?.value) bookingWindow = formatBookingWindow(JSON.parse(monthsRow.value));
   } catch {}
 
-  // Featured demos — active, sorted, max 9
+  // Homepage demos — the ones explicitly marked featured.
+  //
+  // This used to be "the first nine by sort_order", which had two problems: it
+  // tied homepage curation to the order the full /demos page lists everything
+  // in, and four demos shared sort_order 9999, so which of them made the cut
+  // was arbitrary and three could never appear at all. `featured` is a separate
+  // decision from ordering, which is what it always was in practice.
+  const HOMEPAGE_DEMO_LIMIT = 6;
   type DbDemo = { id: string; title: string; genre: string | null; description: string | null; file_url: string; duration_seconds: number | null; sort_order: number };
   let featuredDemos: DbDemo[] = [];
   try {
+    const cols = "id,title,genre,description,file_url,duration_seconds,sort_order";
     const { data: demoRows } = await supabaseAdmin
       .from("demos")
-      .select("id,title,genre,description,file_url,duration_seconds,sort_order")
+      .select(cols)
       .eq("active", true)
+      .eq("featured", true)
       .order("sort_order", { ascending: true })
-      .limit(9);
-    if (demoRows) featuredDemos = demoRows as DbDemo[];
+      .limit(HOMEPAGE_DEMO_LIMIT);
+
+    // Nothing featured yet is a configuration state, not an empty site — fall
+    // back to the first few so the section never silently disappears.
+    if (demoRows?.length) {
+      featuredDemos = demoRows as DbDemo[];
+    } else {
+      const { data: fallback } = await supabaseAdmin
+        .from("demos")
+        .select(cols)
+        .eq("active", true)
+        .order("sort_order", { ascending: true })
+        .limit(HOMEPAGE_DEMO_LIMIT);
+      featuredDemos = (fallback ?? []) as DbDemo[];
+    }
   } catch { /* table may not exist yet — show nothing */ }
 
   // The hero stat pills are gone, and so is the query that fed them. They sat

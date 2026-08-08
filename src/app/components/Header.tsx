@@ -48,7 +48,7 @@ export default function Header() {
   const navLinks = useMemo(
     () => [
       { name: "Narrated Works", href: "/narrated-works" },
-      { name: "Demos", href: "/#demos" },
+      { name: "Demos", href: "/demos" },
       { name: "Merch", href: "/merch" },
       { name: "About", href: "/#about" },
       { name: "Contact", href: "/#contact" },
@@ -303,8 +303,7 @@ export default function Header() {
 
             <div className="mt-4 grid gap-3">
               <a
-                href="/#demos"
-                onClick={() => handleHashScroll("/#demos")}
+                href="/demos"
                 className="inline-flex items-center justify-center rounded-md bg-[#D4AF37] text-black px-4 py-3 font-semibold transition hover:bg-[#E0C15A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06082E]"
               >
                 Listen to demos

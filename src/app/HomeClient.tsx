@@ -780,7 +780,19 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
             ))}
           </div>
 
-          <div className="mt-8 text-center">
+          {/* Two different intents, and until now only the second was offered:
+              the one link out of the demos section went to /narrated-works,
+              which is books. Anyone who wanted to hear more had nowhere to go,
+              even though /demos already listed every one of them. Hearing more
+              is the closer match to what someone is doing here, so it leads. */}
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/demos"
+              className="inline-flex items-center gap-2 bg-[#D4AF37] text-black hover:bg-[#E0C15A] px-5 py-2 rounded-full text-sm font-semibold transition-colors">
+              Hear all demos
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
             <Link href="/narrated-works"
               className="inline-flex items-center gap-2 border border-[#D4AF37]/50 text-[#D4AF37] hover:bg-[#D4AF37]/10 px-5 py-2 rounded-full text-sm transition-colors">
               Browse the full portfolio
