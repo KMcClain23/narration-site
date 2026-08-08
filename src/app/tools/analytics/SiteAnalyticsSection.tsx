@@ -45,9 +45,13 @@ function bucketDaily(events: AnalyticsEvent[], days: number): ChartDatum[] {
   });
 }
 
+// The author portal was retired, so author_token_viewed is not listed here and
+// gets no stat card or panel. Historic rows are still in analytics_events and
+// still counted in the range total and the daily chart; they simply show under
+// their raw event name in the recent list rather than being given a label for a
+// feature that no longer exists.
 const labelFor: Record<string, string> = {
   book_page_viewed: "📖 Book viewed",
-  author_token_viewed: "🔑 Author portal",
   demo_played: "🎧 Demo played",
   audible_link_clicked: "🔊 Audible click",
   spotify_link_clicked: "🎵 Spotify click",
@@ -69,16 +73,6 @@ export function SiteAnalyticsSection({ events, activeDays }: { events: Analytics
       return acc;
     }, {});
 
-  const authorViews = events
-    .filter(e => e.event === "author_token_viewed")
-    .reduce<Record<string, { title: string; count: number }>>((acc, e) => {
-      const id = (e.metadata?.card_id as string) ?? "unknown";
-      const title = (e.metadata?.title as string) ?? id;
-      if (!acc[id]) acc[id] = { title, count: 0 };
-      acc[id].count++;
-      return acc;
-    }, {});
-
   const demosPlayed = events
     .filter(e => e.event === "demo_played")
     .reduce<Record<string, { title: string; count: number }>>((acc, e) => {
@@ -89,7 +83,6 @@ export function SiteAnalyticsSection({ events, activeDays }: { events: Analytics
     }, {});
 
   const sortedBooks = Object.values(bookViews).sort((a, b) => b.count - a.count).slice(0, 10);
-  const sortedAuthors = Object.values(authorViews).sort((a, b) => b.count - a.count).slice(0, 10);
   const sortedDemos = Object.values(demosPlayed).sort((a, b) => b.count - a.count).slice(0, 8);
   const maxBookViews = sortedBooks[0]?.count ?? 1;
   const maxDemoPlays = sortedDemos[0]?.count ?? 1;
@@ -101,7 +94,6 @@ export function SiteAnalyticsSection({ events, activeDays }: { events: Analytics
 
   const stats = [
     { label: "Book pages viewed", value: countBy("book_page_viewed") },
-    { label: "Author portals visited", value: countBy("author_token_viewed") },
     { label: "Demo plays", value: countBy("demo_played") },
     { label: "Audible clicks", value: audibleClicks },
     { label: "Spotify clicks", value: spotifyClicks },
@@ -147,7 +139,7 @@ export function SiteAnalyticsSection({ events, activeDays }: { events: Analytics
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
         {stats.map(s => (
           <div key={s.label} className="rounded-2xl border border-surface-border bg-surface p-5">
             <p className={adminType.titleLg}>{s.value.toLocaleString()}</p>
@@ -156,9 +148,11 @@ export function SiteAnalyticsSection({ events, activeDays }: { events: Analytics
         ))}
       </div>
 
-      {/* Platform breakdown */}
+      {/* Platform breakdown, books and demos share one row on a wide screen —
+          three short lists that each used a full-width band of their own. */}
+      <div className="grid gap-8 mb-8 md:grid-cols-2 xl:grid-cols-3">
       {audibleClicks + spotifyClicks + arClicks > 0 && (
-        <div className="mb-8 rounded-2xl border border-surface-border bg-surface p-6">
+        <div className="rounded-2xl border border-surface-border bg-surface p-6">
           <h3 className={`${adminType.label} mb-5`}>Platform breakdown</h3>
           <div className="space-y-3">
             {[
@@ -182,7 +176,6 @@ export function SiteAnalyticsSection({ events, activeDays }: { events: Analytics
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-8 mb-8">
         {sortedBooks.length > 0 && (
           <div>
             <h3 className={`${adminType.label} mb-5`}>Most viewed books</h3>
@@ -223,21 +216,6 @@ export function SiteAnalyticsSection({ events, activeDays }: { events: Analytics
           </div>
         )}
       </div>
-
-      {sortedAuthors.length > 0 && (
-        <div className="mb-8">
-          <h3 className={`${adminType.label} mb-5`}>Author portal views</h3>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {sortedAuthors.map((a, i) => (
-              <div key={i} className="flex items-center gap-3 rounded-xl border border-surface-border bg-surface px-4 py-2.5">
-                <span className={`${adminType.small} w-4 shrink-0`}>{i + 1}</span>
-                <p className="flex-1 text-sm text-text-body truncate">{a.title}</p>
-                <span className="text-sm font-bold text-text-primary shrink-0">{a.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {recentEvents.length > 0 && (
         <div>

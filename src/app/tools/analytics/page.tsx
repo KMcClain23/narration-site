@@ -73,13 +73,18 @@ export default async function ToolsAnalyticsPage({
 
   return (
     <AdminLayout>
-      <div className="max-w-5xl space-y-12">
+      {/* Full width, no max-w: the shell already pads, and on a wide monitor a
+          fixed column meant most of the screen was empty while the page ran to
+          several times its own height. Everything below is laid out in rows
+          that fill across rather than sections stacked one per screenful. */}
+      <div className="space-y-10">
         <h1 className={adminType.titleLg}>Analytics</h1>
 
-        {/* Metric 1: Career Totals */}
+        {/* Career and earnings headline figures share one strip — four numbers
+            with no chart between them do not need three separate sections. */}
         <section>
-          <h2 className={`${adminType.label} mb-4`}>Career Totals</h2>
-          <div className="grid grid-cols-2 gap-6">
+          <h2 className={`${adminType.label} mb-4`}>Career &amp; Earnings</h2>
+          <div className="grid grid-cols-2 gap-5 xl:grid-cols-4">
             <div className="rounded-2xl border border-surface-border bg-surface p-6">
               <p className={adminType.titleLg}>{careerTotals.booksReleased.toLocaleString()}</p>
               <p className={`${adminType.small} mt-1`}>Books released</p>
@@ -88,21 +93,6 @@ export default async function ToolsAnalyticsPage({
               <p className={adminType.titleLg}>{numberFmt(careerTotals.hoursNarrated)}</p>
               <p className={`${adminType.small} mt-1`}>Hours narrated (share-adjusted)</p>
             </div>
-          </div>
-        </section>
-
-        {/* Metric 2: Release Pace */}
-        <section>
-          <h2 className={`${adminType.label} mb-4`}>Release Pace</h2>
-          <div className="rounded-2xl border border-surface-border bg-surface p-5">
-            <VerticalBarChart data={releasePace} height={220} unit="released" />
-          </div>
-        </section>
-
-        {/* Metric 3: Earnings */}
-        <section>
-          <h2 className={`${adminType.label} mb-4`}>Earnings</h2>
-          <div className="grid grid-cols-2 gap-6 mb-5">
             <div className="rounded-2xl border border-surface-border bg-surface p-6">
               <p className={adminType.titleLg}>{earnings.avgPerBook != null ? currency(earnings.avgPerBook) : "—"}</p>
               <p className={`${adminType.small} mt-1`}>Average earnings per book</p>
@@ -112,27 +102,40 @@ export default async function ToolsAnalyticsPage({
               <p className={`${adminType.small} mt-1`}>Earnings this quarter</p>
             </div>
           </div>
-          <div className="rounded-2xl border border-surface-border bg-surface p-5">
-            <VerticalBarChart data={earnings.quarterly} height={200} format="currency" />
+        </section>
+
+        {/* The two quarterly charts are the same shape and read naturally side
+            by side — pace against the money it produced. */}
+        <section className="grid gap-6 xl:grid-cols-2">
+          <div>
+            <h2 className={`${adminType.label} mb-4`}>Release Pace</h2>
+            <div className="rounded-2xl border border-surface-border bg-surface p-5">
+              <VerticalBarChart data={releasePace} height={220} unit="released" />
+            </div>
+          </div>
+          <div>
+            <h2 className={`${adminType.label} mb-4`}>Earnings by Quarter</h2>
+            <div className="rounded-2xl border border-surface-border bg-surface p-5">
+              <VerticalBarChart data={earnings.quarterly} height={220} format="currency" />
+            </div>
           </div>
         </section>
 
-        {/* Metric 4: Genres */}
-        <section>
-          <h2 className={`${adminType.label} mb-4`}>Genres</h2>
-          <div className="rounded-2xl border border-surface-border bg-surface p-5">
-            {genres.length > 0 ? (
-              <HorizontalBarChart data={genres} />
-            ) : (
-              <p className={adminType.small}>No genre tags recorded on released books yet.</p>
-            )}
+        <section className="grid gap-6 xl:grid-cols-2">
+          <div>
+            <h2 className={`${adminType.label} mb-4`}>Genres</h2>
+            <div className="rounded-2xl border border-surface-border bg-surface p-5">
+              {genres.length > 0 ? (
+                <HorizontalBarChart data={genres} />
+              ) : (
+                <p className={adminType.small}>No genre tags recorded on released books yet.</p>
+              )}
+            </div>
           </div>
-        </section>
-
-        {/* Metric 5: Frequent Collaborators */}
-        <section>
-          <h2 className={`${adminType.label} mb-4`}>Frequent Collaborators</h2>
-          <FrequentCollaborators collaborators={collaborators} />
+          <div>
+            <h2 className={`${adminType.label} mb-4`}>Frequent Collaborators</h2>
+            <FrequentCollaborators collaborators={collaborators} />
+          </div>
         </section>
 
         {/* Traffic as Vercel measures it — who arrived, from where, on what */}

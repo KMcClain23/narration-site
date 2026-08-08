@@ -127,7 +127,7 @@ export function VercelAnalyticsSection({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-5 md:grid-cols-2">
+      <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         <Panel title="Top routes" rows={a.routes} />
         <Panel title="Top pages" rows={a.pages} />
         <Panel title="Referrers" rows={a.referrers} />
@@ -141,7 +141,7 @@ export function VercelAnalyticsSection({
           this site's own track() writes to Supabase instead — so an empty card
           for either would be permanent furniture rather than information. */}
       {(a.campaigns.length > 0 || a.events.length > 0) && (
-        <div className="mt-5 grid gap-5 md:grid-cols-2">
+        <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {a.campaigns.length > 0 && <Panel title="UTM campaigns" rows={a.campaigns} />}
           {a.events.length > 0 && <Panel title="Custom events" rows={a.events} />}
         </div>
