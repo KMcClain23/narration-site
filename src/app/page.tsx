@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import HomeClient from "./HomeClient";
+import { HashScroll } from "./HashScroll";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { formatBookingWindow } from "@/lib/format-booking-window";
 
@@ -69,8 +70,13 @@ export default async function Page() {
   // knows how to interpret.
 
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#050814]" />}>
-      <HomeClient acceptingProjects={acceptingProjects} bookingWindow={bookingWindow} demos={featuredDemos} />
-    </Suspense>
+    <>
+      {/* Outside the Suspense boundary so it is mounted and waiting before the
+          content it needs to scroll to has finished streaming. */}
+      <HashScroll />
+      <Suspense fallback={<div className="min-h-screen bg-[#050814]" />}>
+        <HomeClient acceptingProjects={acceptingProjects} bookingWindow={bookingWindow} demos={featuredDemos} />
+      </Suspense>
+    </>
   );
 }
