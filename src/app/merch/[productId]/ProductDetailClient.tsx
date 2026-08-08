@@ -234,7 +234,7 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
   return (
     <>
       <main className="min-h-screen bg-[#06082E] text-white px-6 pt-28 pb-28 md:pb-20">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-7xl mx-auto">
 
           {/* Top bar */}
           <div className="flex items-center justify-between mb-8">
@@ -450,7 +450,7 @@ export default function ProductDetailClient({ product }: { product: PrintifyProd
       <div
         className={`fixed bottom-0 inset-x-0 z-30 px-5 py-4 bg-[#0A0D3A]/95 backdrop-blur-md border-t border-[#D4AF37]/20 transition-transform duration-300 ${showStickyBar && !cartOpen ? "translate-y-0" : "translate-y-full"}`}
       >
-        <div className="max-w-5xl mx-auto flex items-center gap-4">
+        <div className="max-w-7xl mx-auto flex items-center gap-4">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-white truncate">{product.title}</p>
             <p className="text-[#D4AF37] font-bold text-sm">${((selectedVariant?.price ?? 0) / 100).toFixed(0)}</p>

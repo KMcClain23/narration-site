@@ -240,7 +240,7 @@ export default function MerchClient({ products }: { products: PrintifyProduct[] 
         <div className="absolute inset-0 bg-gradient-to-b from-[#0D1040]/80 to-transparent pointer-events-none" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full bg-[#D4AF37]/[0.04] blur-3xl pointer-events-none" />
 
-        <div className="relative max-w-5xl mx-auto flex items-start justify-between gap-4">
+        <div className="relative max-w-7xl mx-auto flex items-start justify-between gap-4">
           <div className="flex flex-col gap-3">
             <span className="text-xs font-bold text-[#D4AF37]/50 uppercase tracking-widest">
               Dean Miller Narration
@@ -272,7 +272,7 @@ export default function MerchClient({ products }: { products: PrintifyProduct[] 
 
       {/* Product grid */}
       <div className="px-4 sm:px-6 pb-32 sm:pb-24">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           {products.length === 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
               <ComingSoonCard />

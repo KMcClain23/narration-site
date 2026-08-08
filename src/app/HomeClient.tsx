@@ -851,7 +851,7 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
 
         {/* ── FOOTER ── */}
         <footer className="relative border-t border-white/6 pt-12 pb-8">
-          <div className="max-w-4xl mx-auto px-8">
+          <div className="max-w-7xl mx-auto px-8">
             {/* Wordmark */}
             <div className="flex flex-col items-center gap-2 mb-10">
               <div className="h-10 w-10 rounded-full border border-white/15 bg-white/5 overflow-hidden">

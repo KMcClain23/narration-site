@@ -25,7 +25,7 @@ export default async function DemosPage() {
 
   return (
     <main className="min-h-screen bg-[#06082E] text-white pt-28 pb-24 px-5 sm:px-6">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="mb-10">
           <div className="flex items-center gap-3 mb-5">
             <div className="h-px w-8 bg-[#D4AF37]" />
