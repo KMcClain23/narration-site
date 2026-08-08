@@ -101,6 +101,16 @@ async function query<T>(
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
+
+      // A rejected filter must not cost the whole panel. If the expression is
+      // what Vercel objected to, the same query without it still answers the
+      // question — just including back-office views — and that is far better
+      // than an empty card. Retried once, never in a loop.
+      if (res.status === 400 && params.filter) {
+        console.warn(`[vercel-analytics] filter rejected, retrying unfiltered: ${body.slice(0, 160)}`);
+        return query<T>(path, { ...params, filter: undefined }, onFail);
+      }
+
       onFail(`${res.status} ${body.slice(0, 200)}`, res.status);
       return null;
     }
@@ -123,6 +133,21 @@ async function query<T>(
 function isOwnerPath(path: string): boolean {
   return /^\/(admin|tools)(\/|$)/.test(path);
 }
+
+/**
+ * Excludes the back office from every figure, not just the page lists.
+ *
+ * beforeSend stops admin and tools views being recorded from now on, but
+ * everything logged before that is still in Vercel and cannot be deleted.
+ * Filtering only the top-pages panel left those views inflating the totals, the
+ * daily chart, and every audience breakdown — a browser count that is mostly
+ * the owner's own admin session is worse than no browser count, because it
+ * looks like an answer.
+ *
+ * OData, per the API's filter syntax.
+ */
+const PUBLIC_ONLY_FILTER =
+  "not startswith(requestPath, '/admin') and not startswith(requestPath, '/tools')";
 
 function toRows(raw: Array<Record<string, unknown>> | null): VisitRow[] {
   if (!raw) return [];
@@ -156,7 +181,7 @@ export async function getVercelAnalytics(days: number): Promise<VercelAnalyticsR
   const span = days === 0 ? MAX_LOOKBACK_DAYS : days;
   const until = new Date();
   const since = new Date(until.getTime() - span * 86_400_000);
-  const window = { since: ymd(since), until: ymd(until) };
+  const window = { since: ymd(since), until: ymd(until), filter: PUBLIC_ONLY_FILTER };
 
   // Split by cause, because they call for different things. A dimension the
   // plan does not include will fail identically forever and there is nothing to
@@ -191,7 +216,11 @@ export async function getVercelAnalytics(days: number): Promise<VercelAnalyticsR
     campaigns,
     events,
   ] = await Promise.all([
-    query<{ pageviews: number; visitors: number }>("visits/count", {}, fail("lifetime totals")),
+    query<{ pageviews: number; visitors: number }>(
+      "visits/count",
+      { filter: PUBLIC_ONLY_FILTER },
+      fail("lifetime totals")
+    ),
     query<Array<Record<string, unknown>>>("visits/aggregate", { ...window, by: "day" }, fail("daily trend")),
     dim("top routes", "route", 10),
     dim("top pages", "requestPath", 10),
@@ -203,9 +232,11 @@ export async function getVercelAnalytics(days: number): Promise<VercelAnalyticsR
     dim("UTM sources", "utmSource", 6),
     dim("UTM mediums", "utmMedium", 6),
     dim("UTM campaigns", "utmCampaign", 6),
+    // No path filter: the events dataset is keyed on eventName, not requestPath,
+    // and this site sends no Vercel custom events anyway.
     query<Array<Record<string, unknown>>>(
       "events/aggregate",
-      { ...window, by: "eventName", limit: 10 },
+      { since: window.since, until: window.until, by: "eventName", limit: 10 },
       fail("custom events")
     ),
   ]);
@@ -265,7 +296,8 @@ export async function getVercelAnalytics(days: number): Promise<VercelAnalyticsR
       campaigns: toRows(campaigns),
       events: toRows(events),
       unavailable,
-      ...window,
+      since: window.since,
+      until: window.until,
     },
   };
 }
