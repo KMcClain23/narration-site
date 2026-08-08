@@ -39,39 +39,16 @@ export default async function Page() {
     if (demoRows) featuredDemos = demoRows as DbDemo[];
   } catch { /* table may not exist yet — show nothing */ }
 
-  let stats = { titles: 0, authors: 0, co_narrators: 0, genres: 0, words: 0 };
-  try {
-    const { data } = await supabaseAdmin
-      .from("board_cards")
-      .select("author, tags, co_narrator, word_count")
-      .eq("status", "released")
-      .is("archived_at", null);
-    const rows = data ?? [];
-    const coNarratorSet = new Set<string>();
-    for (const row of rows) {
-      if (!row.co_narrator) continue;
-      try {
-        const p = JSON.parse(row.co_narrator as string);
-        const names: string[] = Array.isArray(p) ? p : p ? [String(p)] : [];
-        names.filter(Boolean).forEach((n: string) => coNarratorSet.add(n.trim().toLowerCase()));
-      } catch {
-        coNarratorSet.add(String(row.co_narrator).trim().toLowerCase());
-      }
-    }
-    stats = {
-      titles:       rows.length,
-      authors:      new Set(rows.map(r => (r.author ?? "").trim().toLowerCase()).filter(Boolean)).size,
-      co_narrators: coNarratorSet.size,
-      genres:       new Set(rows.flatMap(r => (Array.isArray(r.tags) ? r.tags : []) as string[])).size,
-      words:        rows.reduce((sum, r) => sum + (Number(r.word_count) || 0), 0),
-    };
-  } catch {
-    // Stats unavailable — StatsBar stays hidden
-  }
+  // The hero stat pills are gone, and so is the query that fed them. They sat
+  // on the same line as the only call to action, so the one click worth making
+  // competed with five numbers of equal weight — and the numbers did not hold
+  // up: "genres" counted distinct tags across released titles, which read as 37
+  // genres for 11 books, and "co-narrators" is a figure only another narrator
+  // knows how to interpret.
 
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#050814]" />}>
-      <HomeClient acceptingProjects={acceptingProjects} stats={stats} bookingWindow={bookingWindow} demos={featuredDemos} />
+      <HomeClient acceptingProjects={acceptingProjects} bookingWindow={bookingWindow} demos={featuredDemos} />
     </Suspense>
   );
 }

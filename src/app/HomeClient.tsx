@@ -61,7 +61,13 @@ function formatTime(seconds: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function LogoCard({ logo }: { logo: { name: string; src: string; href: string; filter?: string } }) {
+function LogoCard({
+  logo,
+  duplicate = false,
+}: {
+  logo: { name: string; src: string; href: string; filter?: string };
+  duplicate?: boolean;
+}) {
   const [imgError, setImgError] = useState(false);
   return (
     <a
@@ -69,6 +75,10 @@ function LogoCard({ logo }: { logo: { name: string; src: string; href: string; f
       target="_blank"
       rel="noopener noreferrer"
       aria-label={logo.name}
+      // The seamless-loop copy is decorative and unreachable by keyboard, so it
+      // is announced and tabbed to once, not twice.
+      aria-hidden={duplicate || undefined}
+      tabIndex={duplicate ? -1 : undefined}
       className="shrink-0 w-44 h-20 rounded-xl border border-white/20 bg-white/5 px-5 py-3 flex items-center justify-center transition-all duration-200 hover:border-white/50 hover:scale-105"
     >
       {imgError ? (
@@ -326,28 +336,6 @@ function DemoPlayer({
 }
 
 
-function StatsBar({ stats }: { stats: { titles: number; authors: number; co_narrators: number; genres: number; words: number } }) {
-  if (!stats.titles) return null;
-
-  const items = [
-    { value: stats.titles,       label: "titles narrated" },
-    { value: stats.authors,      label: "authors worked with" },
-    { value: stats.co_narrators, label: "co-narrators" },
-    { value: stats.genres,       label: "genres" },
-  ];
-
-  return (
-    <div className="fade-up-3 mt-8 flex flex-wrap gap-2 justify-start">
-      {items.map(({ value, label }) => (
-        <div key={label} className="flex items-baseline gap-1.5 px-4 py-2 rounded-full border border-white/10 bg-white/[0.04]">
-          <span className="text-base font-bold text-[#D4AF37] leading-none">{value}</span>
-          <span className="text-[11px] text-white/45 leading-none whitespace-nowrap">{label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 interface Testimonial {
   quote?: string;
   paragraphs?: string[];
@@ -598,7 +586,7 @@ function TestimonialsCarousel() {
   );
 }
 
-function HomeContent({ acceptingProjects = true, stats, bookingWindow, demos: rawDemos = [] }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number; words: number }; bookingWindow?: string; demos?: DbDemo[] }) {
+function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos = [] }: { acceptingProjects?: boolean; bookingWindow?: string; demos?: DbDemo[] }) {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -715,26 +703,14 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow, demos: ra
               dark romance, romantasy, and multi-character drama.
             </p>
 
-            {/* CTA + stats in one row */}
-            <div className="fade-up-3 mt-10 flex flex-wrap items-center gap-4">
+            {/* The call to action, alone.
+                It used to share this row with five stat pills, so the one click
+                worth making sat at the same visual weight as "37 genres". */}
+            <div className="fade-up-3 mt-10">
               <a href="/#contact"
                 className="inline-flex items-center gap-2 rounded-full bg-[#D4AF37] text-black px-7 py-3.5 text-sm font-bold tracking-wide transition hover:bg-[#E0C15A] hover:scale-[1.02] active:scale-[0.98]">
                 Get in touch
               </a>
-              {stats && stats.titles > 0 && (
-                [
-                  { value: stats.titles,       label: "titles narrated" },
-                  { value: stats.authors,      label: "authors worked with" },
-                  { value: stats.co_narrators, label: "co-narrators" },
-                  { value: stats.genres,       label: "genres" },
-                  ...(stats.words > 0 ? [{ value: `${Math.round(stats.words / 1000)}k`, label: "words recorded" }] : []),
-                ].map(({ value, label }) => (
-                  <div key={label} className="flex items-baseline gap-1.5 px-4 py-2 rounded-full border border-white/10 bg-white/[0.04]">
-                    <span className="text-base font-bold text-[#D4AF37] leading-none">{value}</span>
-                    <span className="text-[11px] text-white/45 leading-none whitespace-nowrap">{label}</span>
-                  </div>
-                ))
-              )}
             </div>
           </div>
 
@@ -754,7 +730,10 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow, demos: ra
       </section>
 
       {/* ── LOGO CAROUSEL ── */}
-      <div className="border-t border-white/10 pt-10 pb-10" aria-hidden="true">
+      {/* Was aria-hidden, which hid the only third-party credibility on the
+          page from anyone using a screen reader. The logos are real links to
+          real platforms; they belong in the accessibility tree. */}
+      <section className="border-t border-white/10 pt-10 pb-10" aria-label="Platforms and publishers Dean works with">
         <div className="max-w-5xl mx-auto px-5 sm:px-6">
           <div className="flex justify-center mb-7">
             <div className="flex items-center gap-4">
@@ -771,13 +750,16 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow, demos: ra
             }}
           >
             <div className="logo-track flex gap-4 w-max">
+              {/* The list is duplicated so the scroll loops seamlessly. Only the
+                  first copy is announced — the second is the same seven links
+                  again, and a screen reader reading them twice is noise. */}
               {[...LOGO_ITEMS, ...LOGO_ITEMS].map((logo, i) => (
-                <LogoCard key={i} logo={logo} />
+                <LogoCard key={i} logo={logo} duplicate={i >= LOGO_ITEMS.length} />
               ))}
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <div className="max-w-5xl mx-auto px-5 sm:px-6">
 
@@ -1090,6 +1072,6 @@ function HomeContent({ acceptingProjects = true, stats, bookingWindow, demos: ra
   );
 }
 
-export default function HomeClient({ acceptingProjects = true, stats, bookingWindow, demos }: { acceptingProjects?: boolean; stats?: { titles: number; authors: number; co_narrators: number; genres: number; words: number }; bookingWindow?: string; demos?: DbDemo[] }) {
-  return <HomeContent acceptingProjects={acceptingProjects} stats={stats} bookingWindow={bookingWindow} demos={demos} />;
+export default function HomeClient({ acceptingProjects = true, bookingWindow, demos }: { acceptingProjects?: boolean; bookingWindow?: string; demos?: DbDemo[] }) {
+  return <HomeContent acceptingProjects={acceptingProjects} bookingWindow={bookingWindow} demos={demos} />;
 }
