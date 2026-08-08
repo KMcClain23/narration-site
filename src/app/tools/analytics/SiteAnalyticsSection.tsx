@@ -2,6 +2,7 @@ import Link from "next/link";
 import { adminType } from "@/lib/design-tokens";
 import { VerticalBarChart } from "./VerticalBarChart";
 import type { ChartDatum } from "./lib";
+import { formatDateTime, formatDayLabel, pacificDateKey } from "./timezone";
 
 // Preserved from the retired /admin/analytics — website engagement/marketing
 // tracking (analytics_events table), a completely separate data domain from
@@ -22,10 +23,7 @@ const DATE_RANGES = [
   { label: "All", days: 0 },
 ] as const;
 
-function fmtTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
-}
+const fmtTime = formatDateTime;
 
 function bucketDaily(events: AnalyticsEvent[], days: number): ChartDatum[] {
   const bucketDays = days === 0 ? 90 : days;
@@ -33,16 +31,19 @@ function bucketDaily(events: AnalyticsEvent[], days: number): ChartDatum[] {
   const buckets: Record<string, number> = {};
   for (let i = bucketDays - 1; i >= 0; i--) {
     const d = new Date(now - i * 86_400_000);
-    buckets[d.toISOString().slice(0, 10)] = 0;
+    buckets[pacificDateKey(d)] = 0;
   }
   for (const e of events) {
-    const key = e.created_at.slice(0, 10);
+    // Pacific calendar day, not the UTC date in the timestamp: anything
+    // recorded after 4pm Pacific carries tomorrow's UTC date.
+    const key = pacificDateKey(e.created_at);
     if (key in buckets) buckets[key]++;
   }
-  return Object.entries(buckets).map(([key, value]) => {
-    const d = new Date(key + "T00:00:00");
-    return { label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }), value };
-  });
+  return Object.entries(buckets).map(([key, value]) => ({
+    // Noon UTC, so the label cannot slip a day either side when re-formatted.
+    label: formatDayLabel(`${key}T12:00:00Z`),
+    value,
+  }));
 }
 
 // The author portal was retired, so author_token_viewed is not listed here and

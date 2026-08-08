@@ -4,6 +4,7 @@ import { VerticalBarChart } from "./VerticalBarChart";
 import { HorizontalBarChart } from "./HorizontalBarChart";
 import { OwnTrafficToggle, OwnTrafficNote } from "./OwnTrafficToggle";
 import type { ChartDatum } from "./lib";
+import { formatDayLabel } from "./timezone";
 
 // Traffic as Vercel measures it, alongside the career metrics and the
 // self-hosted event tracking already on this page. Three sources, three
@@ -106,7 +107,9 @@ export function VercelAnalyticsSection({
   const perVisitor = a.range.visitors ? a.range.pageviews / a.range.visitors : 0;
 
   const daily: ChartDatum[] = a.daily.map((d) => ({
-    label: new Date(`${d.date}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    // Vercel returns a UTC calendar date; noon avoids the label slipping a
+    // day when it is rendered in Pacific.
+    label: formatDayLabel(`${d.date}T12:00:00Z`),
     value: d.pageviews,
   }));
 
