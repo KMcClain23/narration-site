@@ -6,6 +6,7 @@ import { useRef, useEffect, useState, useTransition, useCallback, useMemo } from
 import { sendEmail } from "@/app/actions/sendEmail";
 import { sendGAEvent } from "@next/third-parties/google";
 import { DemoPlayer, DEMO_COLORS, titleToSlug } from "@/components/demos/DemoPlayer";
+import { UpcomingEvents, type SiteEvent } from "@/app/components/UpcomingEvents";
 // Demos now come from Supabase via page.tsx — no hardcoded config needed
 
 const BOOKINGS_URL =
@@ -151,6 +152,8 @@ interface Testimonial {
   title: string;
   book?: string;
   cover_url?: string;
+  /** Where the review was originally published, when there is a public one. */
+  source_url?: string;
 }
 
 // Hardcoded seed testimonials — always shown even if API is down
@@ -256,6 +259,20 @@ function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
           </>
         )}
       </div>
+      {testimonial.source_url && (
+        <a
+          href={testimonial.source_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 self-start text-xs font-semibold text-[#D4AF37] hover:text-[#E0C15A] transition-colors"
+        >
+          Read the full review
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </a>
+      )}
+
       <div className="border-t border-white/6 pt-4 flex items-center gap-3">
         {testimonial.cover_url ? (
           <img
@@ -308,7 +325,7 @@ function TestimonialsCarousel() {
       const seedAuthors = new Set(SEED_TESTIMONIALS.map(t => t.author.toLowerCase()));
       const apiOnes: Testimonial[] = testimonialData.testimonials
         .filter((t: { reviewer_name: string }) => !seedAuthors.has(t.reviewer_name.toLowerCase()))
-        .map((t: { reviewer_name: string; reviewer_role: string; book_title: string; quote: string }) => {
+        .map((t: { reviewer_name: string; reviewer_role: string; book_title: string; quote: string; source_url?: string | null }) => {
           const bookKey = (t.book_title || "").trim();
           const cover_url = bookKey
             ? (slugMap.get(toSlug(bookKey)) ?? titleMap.get(bookKey.toLowerCase()))
@@ -320,6 +337,7 @@ function TestimonialsCarousel() {
             title: role ? (role.charAt(0).toUpperCase() + role.slice(1)) : "Author",
             book: bookKey || undefined,
             cover_url,
+            source_url: t.source_url || undefined,
           };
         });
       if (apiOnes.length) setTestimonials([...SEED_TESTIMONIALS, ...apiOnes]);
@@ -416,7 +434,7 @@ function TestimonialsCarousel() {
   );
 }
 
-function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos = [] }: { acceptingProjects?: boolean; bookingWindow?: string; demos?: DbDemo[] }) {
+function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos = [], events = [] }: { acceptingProjects?: boolean; bookingWindow?: string; demos?: DbDemo[]; events?: SiteEvent[] }) {
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -501,7 +519,7 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
         {/* Grid rather than an absolutely-positioned portrait: the photo needs
             to sit *above* the copy on a phone rather than vanish, and an
             absolute element cannot participate in that stacking. */}
-        <div className="relative max-w-5xl mx-auto px-5 sm:px-6 pt-4 sm:pt-10 pb-6 w-full">
+        <div className="relative max-w-7xl mx-auto px-5 sm:px-6 pt-4 sm:pt-10 pb-6 w-full">
           <div className="flex flex-col-reverse gap-8 md:grid md:grid-cols-12 md:items-center md:gap-10">
           <div className="md:col-span-8">
             {/* Eyebrow now carries the name.
@@ -582,7 +600,7 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
           page from anyone using a screen reader. The logos are real links to
           real platforms; they belong in the accessibility tree. */}
       <section className="border-t border-white/10 pt-10 pb-10" aria-label="Platforms and publishers Dean works with">
-        <div className="max-w-5xl mx-auto px-5 sm:px-6">
+        <div className="max-w-7xl mx-auto px-5 sm:px-6">
           <SectionLabel variant="quiet" align="center">Works With</SectionLabel>
           <div
             className="overflow-hidden logo-carousel-wrapper"
@@ -603,7 +621,7 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
         </div>
       </section>
 
-      <div className="max-w-5xl mx-auto px-5 sm:px-6">
+      <div className="max-w-7xl mx-auto px-5 sm:px-6">
 
         {/* ── DEMOS ── */}
         <section id="demos" className="pt-2 scroll-mt-24" aria-label="Audio demos">
@@ -825,6 +843,8 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
                   <p className="mt-1 text-xs text-white/30">Response within 24 to 48 hours.</p>
                 </div>
               </div>
+
+              <UpcomingEvents events={events} />
             </div>
           </div>
         </section>
@@ -893,6 +913,6 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
   );
 }
 
-export default function HomeClient({ acceptingProjects = true, bookingWindow, demos }: { acceptingProjects?: boolean; bookingWindow?: string; demos?: DbDemo[] }) {
-  return <HomeContent acceptingProjects={acceptingProjects} bookingWindow={bookingWindow} demos={demos} />;
+export default function HomeClient({ acceptingProjects = true, bookingWindow, demos, events }: { acceptingProjects?: boolean; bookingWindow?: string; demos?: DbDemo[]; events?: SiteEvent[] }) {
+  return <HomeContent acceptingProjects={acceptingProjects} bookingWindow={bookingWindow} demos={demos} events={events} />;
 }

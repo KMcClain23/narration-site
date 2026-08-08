@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import HomeClient from "./HomeClient";
 import { HashScroll } from "./HashScroll";
+import type { SiteEvent } from "./components/UpcomingEvents";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { formatBookingWindow } from "@/lib/format-booking-window";
 
@@ -69,13 +70,28 @@ export default async function Page() {
   // genres for 11 books, and "co-narrators" is a figure only another narrator
   // knows how to interpret.
 
+  // Only what has not happened yet. Filtering in the query rather than in the
+  // component means a finished event stops being fetched, not just hidden.
+  let events: SiteEvent[] = [];
+  try {
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+    const { data } = await supabaseAdmin
+      .from("events")
+      .select("id,name,starts_on,venue,city,url")
+      .eq("active", true)
+      .gte("starts_on", today)
+      .order("starts_on", { ascending: true })
+      .limit(4);
+    if (data) events = data as SiteEvent[];
+  } catch { /* table may not exist yet */ }
+
   return (
     <>
       {/* Outside the Suspense boundary so it is mounted and waiting before the
           content it needs to scroll to has finished streaming. */}
       <HashScroll />
       <Suspense fallback={<div className="min-h-screen bg-[#050814]" />}>
-        <HomeClient acceptingProjects={acceptingProjects} bookingWindow={bookingWindow} demos={featuredDemos} />
+        <HomeClient acceptingProjects={acceptingProjects} bookingWindow={bookingWindow} demos={featuredDemos} events={events} />
       </Suspense>
     </>
   );
