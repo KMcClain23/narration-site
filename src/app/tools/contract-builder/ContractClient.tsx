@@ -1,4 +1,5 @@
 "use client";
+import { formatTimeOfDay } from "@/lib/timezone";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
@@ -164,7 +165,7 @@ export default function ContractClient() {
   useEffect(() => {
     const t = setTimeout(() => {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(form));
-      setSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      setSavedAt(formatTimeOfDay(new Date()));
     }, 1000);
     return () => clearTimeout(t);
   }, [form]);

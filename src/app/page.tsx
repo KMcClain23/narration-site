@@ -4,6 +4,7 @@ import { HashScroll } from "./HashScroll";
 import type { SiteEvent } from "./components/UpcomingEvents";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { formatBookingWindow } from "@/lib/format-booking-window";
+import { pacificToday } from "@/lib/timezone";
 
 // Always fetch fresh data so admin booking changes appear immediately
 export const dynamic = "force-dynamic";
@@ -74,7 +75,7 @@ export default async function Page() {
   // component means a finished event stops being fetched, not just hidden.
   let events: SiteEvent[] = [];
   try {
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+    const today = pacificToday();
     const { data } = await supabaseAdmin
       .from("events")
       .select("id,name,starts_on,venue,city,url")

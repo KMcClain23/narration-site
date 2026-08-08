@@ -2,7 +2,7 @@ import Link from "next/link";
 import { adminType } from "@/lib/design-tokens";
 import { VerticalBarChart } from "./VerticalBarChart";
 import type { ChartDatum } from "./lib";
-import { formatDateTime, formatDayLabel, pacificDateKey } from "./timezone";
+import { formatDateTime, formatDayLabel, pacificDateKey } from "@/lib/timezone";
 
 // Preserved from the retired /admin/analytics — website engagement/marketing
 // tracking (analytics_events table), a completely separate data domain from

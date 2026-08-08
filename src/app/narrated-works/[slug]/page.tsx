@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Metadata } from "next";
+import { formatMonthYear } from "@/lib/timezone";
 import Link from "next/link";
 import { AuthorHoverName, NarratedBySection } from "./NarratedBySection";
 import type { CoNarratorDetail } from "./NarratedBySection";
@@ -241,7 +242,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   // Release date — formatted for display
   const releasedAt = (book as Record<string, unknown>).released_at as string | null ?? null;
   const formattedDate = releasedAt
-    ? new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date(releasedAt))
+    ? formatMonthYear(releasedAt)
     : null;
 
   // Spotify embed URL

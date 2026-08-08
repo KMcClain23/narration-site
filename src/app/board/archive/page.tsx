@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/timezone";
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -111,7 +112,7 @@ export default function ArchivePage() {
                 {/* Archived date */}
                 <span className="shrink-0 text-xs text-white/30 w-24 text-right">
                   {card.archived_at
-                    ? new Date(card.archived_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                    ? formatDate(card.archived_at)
                     : ""}
                 </span>
               </Link>

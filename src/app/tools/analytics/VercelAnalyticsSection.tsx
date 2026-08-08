@@ -4,7 +4,7 @@ import { VerticalBarChart } from "./VerticalBarChart";
 import { HorizontalBarChart } from "./HorizontalBarChart";
 import { OwnTrafficToggle, OwnTrafficNote } from "./OwnTrafficToggle";
 import type { ChartDatum } from "./lib";
-import { formatDayLabel } from "./timezone";
+import { formatDayLabel } from "@/lib/timezone";
 
 // Traffic as Vercel measures it, alongside the career metrics and the
 // self-hosted event tracking already on this page. Three sources, three

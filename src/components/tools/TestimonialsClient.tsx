@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/timezone";
 
 import { useCallback, useEffect, useState } from "react";
 import { adminType } from "@/lib/design-tokens";
@@ -155,7 +156,7 @@ export function TestimonialsClient() {
                   </div>
                   <div className="mt-1 flex flex-wrap gap-3 text-[12px] text-text-faint">
                     {t.book_title && <span>{t.book_title}</span>}
-                    <span>{new Date(t.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                    <span>{formatDate(t.created_at)}</span>
                   </div>
                 </div>
               </div>

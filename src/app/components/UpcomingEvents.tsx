@@ -1,4 +1,4 @@
-import { SITE_TIMEZONE } from "@/app/tools/analytics/timezone";
+import { formatLongDate } from "@/lib/timezone";
 
 export type SiteEvent = {
   id: string;
@@ -18,15 +18,9 @@ export type SiteEvent = {
  * today, so the strip empties itself and then disappears.
  */
 function formatEventDate(ymd: string): string {
-  // Parsed at noon UTC so the date cannot slip either side when formatted in
-  // Pacific — the same trap the analytics day labels hit.
-  return new Date(`${ymd}T12:00:00Z`).toLocaleDateString("en-US", {
-    timeZone: SITE_TIMEZONE,
-    weekday: "short",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  // The column is a date, so it is anchored to mid-afternoon Pacific before
+  // formatting — otherwise a midnight instant can slip a day.
+  return formatLongDate(`${ymd}T20:00:00Z`);
 }
 
 export function UpcomingEvents({ events }: { events: SiteEvent[] }) {

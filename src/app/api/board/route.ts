@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { dateOnlyToPacificNoon } from "@/lib/timezone";
 import { fetchAmazonBook } from "@/lib/amazon-scrape";
 
 function isAmazonUrl(url: unknown): url is string {
@@ -176,18 +177,18 @@ export async function PUT(req: Request) {
     ];
     const DATE_FIELDS = new Set(["deadline", "first15_due", "first_15_due", "released_at", "archived_at"]);
 
-    // A date input sends "2026-07-17", which Postgres stores as midnight UTC in
-    // a timestamptz. The public book page formats that month-and-year, so a
-    // date one hour the wrong side of a month boundary would print the previous
-    // month. Noon has no such edge in any timezone.
-    const atNoonUTC = (v: unknown) =>
-      typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T12:00:00.000Z` : v;
+    // A date input sends "2026-07-17", which Postgres would store as midnight
+    // UTC in a timestamptz — 5pm the previous day in Pacific. Anchored to
+    // mid-afternoon Pacific instead, so the stored instant falls on the day it
+    // says wherever it is read.
+    const atPacificMidday = (v: unknown) =>
+      typeof v === "string" ? (dateOnlyToPacificNoon(v) ?? v) : v;
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
       if (key in fields) {
         // Date columns must be null (not "") — Supabase rejects empty strings for date/timestamptz
         update[key] = DATE_FIELDS.has(key)
-          ? (key === "released_at" ? (atNoonUTC(fields[key]) || null) : (fields[key] || null))
+          ? (key === "released_at" ? (atPacificMidday(fields[key]) || null) : (fields[key] || null))
           : fields[key];
       }
     }
