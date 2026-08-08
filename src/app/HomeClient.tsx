@@ -842,7 +842,7 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
                     "Character voice list sent for approval before recording",
                     "First-15 review — lock tone and voices early",
                     "Milestone updates throughout production",
-                    "ACX-ready masters, no outsourced mastering",
+                    "ACX-ready masters, delivered to spec",
                     "Fast pickups and clear communication",
                     "Option to livestream sessions for promo content",
                   ].map((item) => (
