@@ -97,6 +97,43 @@ function LogoCard({
   );
 }
 
+/**
+ * Section label, in two weights.
+ *
+ * Every section used to carry the identical gold rule and tracked caps —
+ * six of them, top to bottom, so nothing told the eye which section mattered.
+ * Six equal signals read the same as none.
+ *
+ * "primary" keeps the full treatment for the sections a visitor is actually
+ * deciding on. "quiet" drops the rules and keeps the label, which preserves the
+ * motif without every band on the page shouting at the same volume.
+ */
+function SectionLabel({
+  children,
+  variant = "primary",
+  align = "left",
+}: {
+  children: React.ReactNode;
+  variant?: "primary" | "quiet";
+  align?: "left" | "center";
+}) {
+  const label = (
+    <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37] whitespace-nowrap">{children}</p>
+  );
+
+  if (variant === "quiet") {
+    return <div className={`mb-6 ${align === "center" ? "text-center" : ""}`}>{label}</div>;
+  }
+
+  return (
+    <div className={`flex items-center gap-4 mb-10 ${align === "center" ? "justify-center" : ""}`}>
+      <div className="h-px w-6 bg-[#D4AF37]" />
+      {label}
+      {align === "center" ? <div className="h-px w-6 bg-[#D4AF37]" /> : <div className="flex-1 h-px bg-[#D4AF37]/20" />}
+    </div>
+  );
+}
+
 // Demo data shape coming from Supabase
 type DbDemo = {
   id: string;
@@ -754,13 +791,7 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
           real platforms; they belong in the accessibility tree. */}
       <section className="border-t border-white/10 pt-10 pb-10" aria-label="Platforms and publishers Dean works with">
         <div className="max-w-5xl mx-auto px-5 sm:px-6">
-          <div className="flex justify-center mb-7">
-            <div className="flex items-center gap-4">
-              <div className="h-px w-6 bg-[#D4AF37]" />
-              <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Works With</p>
-              <div className="h-px w-6 bg-[#D4AF37]" />
-            </div>
-          </div>
+          <SectionLabel variant="quiet" align="center">Works With</SectionLabel>
           <div
             className="overflow-hidden logo-carousel-wrapper"
             style={{
@@ -785,11 +816,7 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
         {/* ── DEMOS ── */}
         <section id="demos" className="pt-2 scroll-mt-24" aria-label="Audio demos">
           {/* Section label */}
-          <div className="flex items-center gap-4 mb-10">
-            <div className="h-px w-6 bg-[#D4AF37]" />
-            <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Featured demos</p>
-            <div className="flex-1 h-px bg-[#D4AF37]/20" />
-          </div>
+          <SectionLabel variant="primary">Featured demos</SectionLabel>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {demos.map((demo, index) => (
@@ -823,26 +850,51 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
         </section>
 
 
+        {/* ── WHAT TO EXPECT ── */}
+        {/* Promoted out of the About sidebar. This is the most reassuring
+            content on the page for an author who has been burned by a narrator
+            before, and it was sitting in a right-hand column four sections
+            down. It belongs immediately after the demos, at the point where
+            someone has heard the voice and is deciding whether to work with
+            the person attached to it. */}
+        <section id="process" className="mt-16 scroll-mt-24" aria-label="What to expect">
+          <SectionLabel>What to expect</SectionLabel>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[
+              "Character voice list sent for approval before recording",
+              "First-15 review — lock tone and voices early",
+              "Milestone updates throughout production",
+              "ACX-ready masters, delivered to spec",
+              "Fast pickups and clear communication",
+              "Option to livestream sessions for promo content",
+            ].map((item) => (
+              <div key={item} className="rounded-xl border border-white/8 bg-white/[0.02] px-5 py-4">
+                <span className="block border-l-2 border-[#D4AF37] pl-3 text-sm text-white/70">{item}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6">
+            <Link href="/welcome"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#D4AF37] border border-[#D4AF37]/40 px-4 py-2 rounded-full hover:bg-[#D4AF37]/10 hover:border-[#D4AF37]/70 transition-colors">
+              Full process &amp; welcome packet
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+        </section>
+
         {/* ── TESTIMONIALS ── */}
         <section id="testimonials" className="mt-16 scroll-mt-24 -mx-5 sm:-mx-6 px-5 sm:px-6 bg-white/[0.02]" aria-label="Author testimonials">
-          <div className="flex items-center gap-4 mb-10">
-            <div className="h-px w-6 bg-[#D4AF37]" />
-            <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Author testimonials</p>
-            <div className="flex-1 h-px bg-[#D4AF37]/20" />
-          </div>
+          <SectionLabel variant="primary">Author testimonials</SectionLabel>
           <TestimonialsCarousel />
         </section>
 
         {/* ── ABOUT ── */}
         <section id="about" className="mt-16 scroll-mt-24" aria-label="About Dean Miller">
-          <div className="flex items-center gap-4 mb-12">
-            <div className="h-px w-6 bg-[#D4AF37]" />
-            <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">About</p>
-            <div className="flex-1 h-px bg-[#D4AF37]/20" />
-          </div>
+          <SectionLabel variant="quiet">About</SectionLabel>
 
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-10 lg:gap-16 items-start">
-            <div className="md:col-span-7 space-y-5">
+          <div className="max-w-3xl space-y-5">
               {/* Plainer than it was, because the line that used to live here
                   — "listeners forget there's a narrator at all" — is now the
                   hero headline, and repeating it twice on one page spends the
@@ -864,49 +916,12 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
                 My home studio delivers ACX-ready, broadcast-quality audio on a Shure MV7+ in a
                 custom-treated acoustic space. Milestone updates throughout. Pickups handled promptly.
               </p>
-            </div>
-
-            {/* What to expect sidebar */}
-            <aside id="process" className="md:col-span-5 scroll-mt-24">
-              <div className="rounded-2xl overflow-hidden border border-white/8">
-                <div className="px-5 py-4 border-b border-white/8">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-[#D4AF37]">What to expect</p>
-                </div>
-                <ul className="divide-y divide-white/6">
-                  {[
-                    "Character voice list sent for approval before recording",
-                    "First-15 review — lock tone and voices early",
-                    "Milestone updates throughout production",
-                    "ACX-ready masters, delivered to spec",
-                    "Fast pickups and clear communication",
-                    "Option to livestream sessions for promo content",
-                  ].map((item) => (
-                    <li key={item} className="px-5 py-3.5 text-sm text-white/65 hover:bg-white/[0.02] transition-colors">
-                      <span className="block border-l-2 border-[#D4AF37] pl-3">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="px-5 py-4 border-t border-white/8">
-                  <Link href="/welcome"
-                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#D4AF37] border border-[#D4AF37]/40 px-4 py-2 rounded-full hover:bg-[#D4AF37]/10 hover:border-[#D4AF37]/70 transition-colors">
-                    Full process & welcome packet
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </Link>
-                </div>
-              </div>
-            </aside>
           </div>
         </section>
 
         {/* ── CONTACT ── */}
         <section id="contact" className="mt-16 mb-16 scroll-mt-24 -mx-5 sm:-mx-6 px-5 sm:px-6 bg-white/[0.02]" aria-label="Contact and booking">
-          <div className="flex items-center gap-4 mb-12">
-            <div className="h-px w-6 bg-[#D4AF37]" />
-            <p className="text-[11px] uppercase tracking-[0.28em] text-[#D4AF37]">Get in touch</p>
-            <div className="flex-1 h-px bg-[#D4AF37]/20" />
-          </div>
+          <SectionLabel variant="primary">Get in touch</SectionLabel>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Form / Success */}
