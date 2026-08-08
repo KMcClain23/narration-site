@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  LayoutGrid, Calendar, Users, Mail, Wrench, Settings as SettingsIcon,
+  LayoutGrid, Calendar, CheckCircle2, Users, Mail, Wrench, Settings as SettingsIcon,
   ChevronLeft, ChevronRight, LogOut,
 } from "lucide-react";
 import { SidebarSection, type NavItem } from "./SidebarSection";
@@ -12,6 +12,10 @@ import { useLogout } from "./useLogout";
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Board", href: "/board", icon: LayoutGrid },
+  // The board filters released cards out, so this is the only route to a
+  // shipped title. It was reachable only by the board's drop zone, which meant
+  // a released book could not be found again once it had left the board.
+  { label: "Released", href: "/released", icon: CheckCircle2 },
   { label: "Schedule", href: "/schedule", icon: Calendar },
   {
     label: "Contacts", href: "/contacts", icon: Users,
