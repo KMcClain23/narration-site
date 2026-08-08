@@ -12,6 +12,8 @@ export type AmazonBookResult = {
   description: string | null;
   tags: string[];
   triggerWarnings: string[];
+  /** Publication date as YYYY-MM-DD, when the page states one. */
+  releaseDate: string | null;
 };
 
 // ─── HTML helpers ───────────────────────────────────────────────────────────
@@ -92,6 +94,48 @@ function htmlToText(html: string): string {
 }
 
 // ─── description extraction ─────────────────────────────────────────────────
+
+/**
+ * Publication date, as YYYY-MM-DD.
+ *
+ * Two sources, because Amazon is inconsistent about which it renders. The
+ * JSON-LD datePublished is already an ISO date when present; the product detail
+ * row is human text like "Publication date ‏ : ‎ July 17, 2026" and has to be
+ * parsed. Anything that does not resolve to a real date is discarded rather
+ * than guessed at — a wrong release date on the public page is worse than none.
+ */
+function extractReleaseDate(html: string): string | null {
+  const scriptRe = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = scriptRe.exec(html))) {
+    let parsed: unknown;
+    try { parsed = JSON.parse(m[1].trim()); } catch { continue; }
+    const candidates = Array.isArray(parsed) ? parsed : [parsed];
+    for (const obj of candidates) {
+      if (!obj || typeof obj !== "object") continue;
+      const record = obj as Record<string, unknown>;
+      const items = Array.isArray(record["@graph"]) ? (record["@graph"] as Record<string, unknown>[]) : [record];
+      for (const item of items) {
+        const raw = item.datePublished ?? item.dateCreated;
+        if (typeof raw === "string" && raw.trim()) {
+          const d = new Date(raw.trim());
+          if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+        }
+      }
+    }
+  }
+
+  // "Publication date" / "Release date" / "Audible.com Release Date", followed
+  // by Amazon's separator characters and then the date itself.
+  const rowRe = /(?:publication date|release date)[^A-Za-z0-9]{0,40}([A-Z][a-z]+ \d{1,2},? \d{4})/i;
+  const row = rowRe.exec(html.replace(/<[^>]+>/g, " "));
+  if (row) {
+    const d = new Date(row[1]);
+    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+
+  return null;
+}
 
 function extractJsonLdDescription(html: string): string | null {
   const scriptRe = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
@@ -284,8 +328,12 @@ export async function fetchAmazonBookResult(url: string): Promise<AmazonFetchRes
     }
 
     const { tags, triggerWarnings } = parseTropesAndWarnings(description);
-    console.log(`[amazon-scrape] fetched: ${url} -> description=yes, tags=${tags.length}, tw=${triggerWarnings.length}`);
-    return { ok: true, data: { description, tags, triggerWarnings } };
+    const releaseDate = extractReleaseDate(html);
+    console.log(
+      `[amazon-scrape] fetched: ${url} -> description=yes, tags=${tags.length}, ` +
+      `tw=${triggerWarnings.length}, released=${releaseDate ?? "none"}`
+    );
+    return { ok: true, data: { description, tags, triggerWarnings, releaseDate } };
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.log(`[amazon-scrape] failed: ${url} -> ${reason}`);

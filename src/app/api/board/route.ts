@@ -175,11 +175,20 @@ export async function PUT(req: Request) {
       "archived_at", "archived_reason", "archived_notes",
     ];
     const DATE_FIELDS = new Set(["deadline", "first15_due", "first_15_due", "released_at", "archived_at"]);
+
+    // A date input sends "2026-07-17", which Postgres stores as midnight UTC in
+    // a timestamptz. The public book page formats that month-and-year, so a
+    // date one hour the wrong side of a month boundary would print the previous
+    // month. Noon has no such edge in any timezone.
+    const atNoonUTC = (v: unknown) =>
+      typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T12:00:00.000Z` : v;
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
       if (key in fields) {
         // Date columns must be null (not "") — Supabase rejects empty strings for date/timestamptz
-        update[key] = DATE_FIELDS.has(key) ? (fields[key] || null) : fields[key];
+        update[key] = DATE_FIELDS.has(key)
+          ? (key === "released_at" ? (atNoonUTC(fields[key]) || null) : (fields[key] || null))
+          : fields[key];
       }
     }
 

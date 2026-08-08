@@ -51,6 +51,7 @@ export async function POST(req: Request) {
       description: result.data.description ?? "",
       tags: result.data.tags,
       triggerWarnings: result.data.triggerWarnings,
+      releaseDate: result.data.releaseDate ?? "",
     });
   } catch (e) {
     console.error("[POST /api/board/amazon-preview]", e);

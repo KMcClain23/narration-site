@@ -30,6 +30,7 @@ export type FullBoardCard = {
   narrator_share_percent: number | null;
   is_confidential: boolean;
   deadline: string;
+  released_at: string;
   status: string;
   word_count: number;
   payment_type: string;
@@ -64,6 +65,8 @@ function mapToFullBoardCard(row: Record<string, unknown>): FullBoardCard {
     narrator_share_percent: (row.narrator_share_percent as number) ?? null,
     is_confidential: Boolean(row.is_confidential),
     deadline: (row.deadline as string) ?? "",
+    // Stored as a timestamp; the date input needs YYYY-MM-DD.
+    released_at: ((row.released_at as string) ?? "").slice(0, 10),
     status: (row.status as string) ?? "contracted",
     word_count: (row.word_count as number) ?? 0,
     payment_type: (row.payment_type as string) ?? "pfh",
@@ -91,7 +94,7 @@ function mapToFullBoardCard(row: Record<string, unknown>): FullBoardCard {
 function blankCard(): FullBoardCard {
   return {
     id: "", created_at: "", title: "", subtitle: "", cover_url: "", author: "", co_narrator: "",
-    author_notes: "", narration_format: null, narrator_share_percent: null, is_confidential: false, deadline: "", status: "contracted",
+    author_notes: "", narration_format: null, narrator_share_percent: null, is_confidential: false, deadline: "", released_at: "", status: "contracted",
     word_count: 0, payment_type: "pfh", pfh_rate: 0, first15_due: "", first_15_complete: false,
     production_type: null, production_company: null, description: "", tags: [], trigger_warnings: [],
     audible_link: "", ar_link: "", spotify_link: "", script_url: "",
@@ -639,6 +642,26 @@ export function CardEditModal(props: CardEditModalProps) {
               </select>
             </div>
           </div>
+
+          {/* Release date had no field anywhere. The board stamps it
+              automatically when a card first moves to released, but it stamps
+              *that day* — so a book released earlier, or one that was already
+              released before that logic existed, ended up with nothing and no
+              way to correct it. It shows on the public book page. */}
+          {form.status === "released" && (
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div>
+                <label className={`${adminType.label} mb-1.5 block`}>Release date</label>
+                <input type="date" value={form.released_at}
+                  onChange={e => setForm(p => p && { ...p, released_at: e.target.value })}
+                  className={inputCls} />
+                <p className={`${adminType.small} mt-1.5`}>
+                  Shown on the public book page. Set automatically to the day a card first
+                  moves to Released, so it needs correcting for anything published earlier.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="border-t border-surface-border pt-6">
@@ -868,6 +891,7 @@ export function CardEditModal(props: CardEditModalProps) {
                 description: r.description || p.description,
                 tags: r.tags.length ? r.tags : p.tags,
                 trigger_warnings: r.triggerWarnings.length ? r.triggerWarnings : p.trigger_warnings,
+                released_at: r.releaseDate || p.released_at,
               })}
             />
           </div>

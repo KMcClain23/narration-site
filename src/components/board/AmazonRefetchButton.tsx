@@ -7,6 +7,8 @@ export type AmazonPreview = {
   description: string;
   tags: string[];
   triggerWarnings: string[];
+  /** YYYY-MM-DD, or "" when the page did not state one. */
+  releaseDate: string;
 };
 
 /**
@@ -56,6 +58,7 @@ export function AmazonRefetchButton({
         json.description ? "description" : null,
         json.tags?.length ? `${json.tags.length} tags` : null,
         json.triggerWarnings?.length ? `${json.triggerWarnings.length} warnings` : null,
+        json.releaseDate ? "release date" : null,
       ].filter(Boolean);
       setNote(filled.length ? `Loaded ${filled.join(", ")}. Not saved yet.` : "Amazon returned nothing usable.");
     } catch {
