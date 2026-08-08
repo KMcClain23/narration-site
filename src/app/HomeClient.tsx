@@ -668,12 +668,23 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
           <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 30%, rgba(6,8,46,0.85) 70%, rgba(6,8,46,1) 100%)" }} />
         </div>
 
+        {/* Grid rather than an absolutely-positioned portrait: the photo needs
+            to sit *above* the copy on a phone rather than vanish, and an
+            absolute element cannot participate in that stacking. */}
         <div className="relative max-w-5xl mx-auto px-5 sm:px-6 pt-4 sm:pt-10 pb-6 w-full">
-          <div className="max-w-2xl">
-            {/* Eyebrow */}
+          <div className="flex flex-col-reverse gap-8 md:grid md:grid-cols-12 md:items-center md:gap-10">
+          <div className="md:col-span-8">
+            {/* Eyebrow now carries the name.
+                The name used to be the h1 at text-7xl, which answered a
+                question no visitor arrives with — an author is deciding
+                whether you can narrate *their* book, and the pitch that
+                answers it was set at a quarter the size underneath. Identity
+                is still here, and the <title> tag carries it for search. */}
             <div className="fade-up flex items-center gap-3 mb-6">
               <div className="h-px w-8 bg-[#D4AF37]" />
-              <p className="text-[11px] uppercase tracking-[0.3em] text-[#D4AF37]">Audiobook narrator</p>
+              <p className="text-[11px] uppercase tracking-[0.3em] text-[#D4AF37]">
+                Dean Miller <span className="text-white/40">· Audiobook narrator</span>
+              </p>
             </div>
 
             {/* Availability badge */}
@@ -692,15 +703,18 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
               </span>
             </div>
 
-            {/* Name */}
-            <h1 className="fade-up-1 text-5xl sm:text-6xl md:text-7xl font-bold leading-[1.0] tracking-tight">
-              Dean<br />Miller
+            {/* The pitch, at the size the name used to be.
+                This line was the About section's heading, four sections down —
+                the best sentence on the site, where almost nobody scrolled. */}
+            <h1 className="fade-up-1 text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.05] tracking-tight max-w-2xl">
+              Listeners forget there&apos;s a narrator at all.
             </h1>
 
-            {/* Tagline */}
+            {/* Genre match, so an author knows within a glance whether this is
+                for their book. */}
             <p className="fade-up-2 mt-6 text-lg sm:text-xl text-white/70 leading-relaxed max-w-xl">
-              Character-driven narration for fiction that demands emotional depth —
-              dark romance, romantasy, and multi-character drama.
+              Character-driven audiobook narration for dark romance, romantasy,
+              and multi-character drama.
             </p>
 
             {/* The call to action, alone.
@@ -714,17 +728,22 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
             </div>
           </div>
 
-          {/* Profile image — floats right on desktop */}
-          <div className="hidden md:block absolute right-6 top-1/2 -translate-y-1/2 w-56 lg:w-64">
+          {/* Portrait, now visible on a phone.
+              It was hidden md:block, so the majority of visitors got no face at
+              all on a site whose entire proposition is one person's voice. On
+              mobile it sits above the copy (flex-col-reverse) at a size that
+              introduces without pushing the pitch off-screen. */}
+          <div className="fade-up md:col-span-4 mx-auto w-40 sm:w-48 md:w-full md:max-w-[16rem]">
             <div className="relative" style={{ aspectRatio: "3/4" }}>
               <div className="absolute inset-0 rounded-2xl overflow-hidden border-2 border-[#D4AF37]/40"
                 style={{ boxShadow: "0 0 30px rgba(212,175,55,0.15)" }}>
                 <Image src={PROFILE_URL} alt="Dean Miller, audiobook narrator" fill
-                  sizes="(max-width: 1024px) 224px, 288px"
+                  sizes="(max-width: 768px) 192px, 256px"
                   className="object-cover" style={{ objectPosition: "center top" }} priority />
                 <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(6,8,46,1) 0%, rgba(6,8,46,0.4) 40%, transparent 70%)" }} />
               </div>
             </div>
+          </div>
           </div>
         </div>
       </section>
@@ -824,8 +843,12 @@ function HomeContent({ acceptingProjects = true, bookingWindow, demos: rawDemos 
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-10 lg:gap-16 items-start">
             <div className="md:col-span-7 space-y-5">
+              {/* Plainer than it was, because the line that used to live here
+                  — "listeners forget there's a narrator at all" — is now the
+                  hero headline, and repeating it twice on one page spends the
+                  best sentence on the site twice for no extra effect. */}
               <h2 className="text-3xl sm:text-4xl font-bold leading-tight">
-                The kind of narration where listeners forget there's a narrator at all.
+                Background, method, and the room it&apos;s recorded in.
               </h2>
               <p className="text-white/70 text-base leading-relaxed">
                 I'm a professional audiobook narrator with a background in music and theatre. My focus is
