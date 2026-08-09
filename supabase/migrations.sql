@@ -536,3 +536,67 @@ begin
       with check (auth.role() = 'service_role');
   end if;
 end $$;
+
+-- Gross fee for a milestone, across all narrators. Null means "same as
+-- amount_expected" — a solo project, or one where the client pays each
+-- narrator directly. Invoices bill this rather than the narrator's own share,
+-- which would bill half of a duet.
+alter table payments add column if not exists amount_gross numeric(10,2);
+
+-- Money leaving the narrator's account after being paid: a co-narrator's half,
+-- an editor's fee, a proofer.
+--
+-- Deliberately does NOT encode tax treatment. Whether a co-narrator split is
+-- pass-through or income-with-an-offsetting-deduction depends on how the work
+-- is reported and is a question for an accountant, so `kind` records what the
+-- money was for and the app reports payouts separately from earnings without
+-- asserting which side of the line they fall on.
+--
+-- Ordering matters and is encoded in src/lib/payments.ts computeWaterfall():
+-- editor/proofer come off the gross BEFORE the narrator split, because
+-- production costs are borne by the project rather than by one narrator.
+create table if not exists payment_payouts (
+  id          uuid          primary key default gen_random_uuid(),
+  payment_id  uuid          not null references payments(id) on delete cascade,
+  payee_name  text          not null default '',
+  kind        text          not null default 'co_narrator',
+  amount      numeric(10,2) not null default 0,
+  -- Editors and proofers commonly bill per finished hour, the same unit the
+  -- narrator's own fee uses. `amount` stays authoritative once set: a payout
+  -- already made must not move because a word count was corrected later.
+  rate_pfh    numeric(10,2),
+  paid_on     date,
+  notes       text          not null default '',
+  created_at  timestamptz   not null default now(),
+  updated_at  timestamptz   not null default now()
+);
+
+create index if not exists payment_payouts_payment_id_idx on payment_payouts (payment_id);
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'payment_payouts_kind_check') then
+    alter table payment_payouts add constraint payment_payouts_kind_check
+      check (kind in ('co_narrator', 'editor', 'proofer', 'agent', 'other'));
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'payment_payouts_amount_check') then
+    alter table payment_payouts add constraint payment_payouts_amount_check
+      check (amount >= 0);
+  end if;
+end $$;
+
+alter table payment_payouts enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'payment_payouts'
+      and policyname = 'Service role full access'
+  ) then
+    create policy "Service role full access" on payment_payouts
+      for all
+      using (auth.role() = 'service_role')
+      with check (auth.role() = 'service_role');
+  end if;
+end $$;

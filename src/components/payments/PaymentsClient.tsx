@@ -14,7 +14,9 @@ import {
   isCardExpectedActual,
   PAYMENT_STATUS_LABEL,
   PAYMENT_STATUS_PILL,
+  PAYOUT_KIND_LABEL,
   type MoneyCard,
+  type PayoutKind,
   type PaymentRow,
   type PaymentStatus,
 } from "@/lib/payments";
@@ -141,6 +143,24 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
         />
       </section>
 
+      {/* Only rendered once there are payouts to report — an always-visible
+          $0 row would imply this is part of every project rather than
+          specific to duet work and edited titles. Reported, not netted off:
+          whether a payout reduces income or is a deductible expense depends
+          on how the work is reported, which is an accountant's call. */}
+      {totals.payoutsTotal > 0 && (
+        <section className="mt-4 rounded-xl border border-surface-border bg-surface px-4 py-3">
+          <p className={adminType.label}>Paid out to others</p>
+          <p className={`${adminType.monoNum} mt-1 text-text-primary`}>{formatMoney(totals.payoutsTotal)}</p>
+          <p className={`${adminType.small} mt-0.5`}>
+            {Object.entries(totals.payoutsByKind)
+              .sort((a, b) => b[1] - a[1])
+              .map(([kind, amt]) => `${PAYOUT_KIND_LABEL[kind as PayoutKind] ?? kind} ${formatMoney(amt)}`)
+              .join(" · ")}
+          </p>
+        </section>
+      )}
+
       {/* Milestones */}
       <section className="mt-10">
         <h2 className={adminType.titleLg}>Milestones</h2>
@@ -262,6 +282,7 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
         <PaymentFormModal
           cardId={editing.cardId}
           cardTitle={cardsById.get(editing.cardId)?.title ?? ""}
+          card={cardsById.get(editing.cardId)}
           payment={editing.payment}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}

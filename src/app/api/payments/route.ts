@@ -17,7 +17,11 @@ function unauthorized() {
 }
 
 const SELECT_COLS =
-  "id, card_id, label, amount_expected, due_on, invoiced_on, invoice_number, amount_received, received_on, method, notes, sort_order, created_at, updated_at";
+  "id, card_id, label, amount_expected, due_on, invoiced_on, invoice_number, amount_received, amount_gross, received_on, method, notes, sort_order, created_at, updated_at, " +
+  // Embedded so a payment always arrives with its payouts — every consumer
+  // needs them to compute the waterfall, and a second round-trip per payment
+  // would be pure overhead.
+  "payouts:payment_payouts(id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, notes)";
 
 /** Date columns reject "" — Supabase needs an explicit null for an empty date. */
 function dateOrNull(v: unknown): string | null {
@@ -75,6 +79,7 @@ export async function POST(req: Request) {
         invoiced_on: dateOrNull(body.invoiced_on),
         invoice_number: String(invoice_number).trim(),
         amount_received: amountOrNull(body.amount_received) ?? 0,
+        amount_gross: amountOrNull(body.amount_gross),
         received_on: dateOrNull(body.received_on),
         method: String(method).trim(),
         notes: String(notes).trim(),
@@ -113,6 +118,7 @@ export async function PATCH(req: Request) {
     if ("invoiced_on" in body) patch.invoiced_on = dateOrNull(body.invoiced_on);
     if ("invoice_number" in body) patch.invoice_number = String(body.invoice_number ?? "").trim();
     if ("amount_received" in body) patch.amount_received = amountOrNull(body.amount_received) ?? 0;
+    if ("amount_gross" in body) patch.amount_gross = amountOrNull(body.amount_gross);
     if ("received_on" in body) patch.received_on = dateOrNull(body.received_on);
     if ("method" in body) patch.method = String(body.method ?? "").trim();
     if ("notes" in body) patch.notes = String(body.notes ?? "").trim();

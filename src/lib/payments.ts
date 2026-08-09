@@ -17,12 +17,59 @@ export type PaymentRow = {
   due_on: string | null;
   invoiced_on: string | null;
   invoice_number: string;
+  /**
+   * The narrator's OWN share received — not the gross sum that landed in the
+   * account. On a duet where the narrator is payee of record, the client pays
+   * `amount_gross`, production costs come off the top, and this is the
+   * narrator's cut of what remained. Every total on the Payments page is
+   * denominated this way. See computeWaterfall() for the full order.
+   */
   amount_received: number;
+  /** What the client is billed across all narrators. Null = same as expected. */
+  amount_gross: number | null;
   received_on: string | null;
   method: string;
   notes: string;
   sort_order: number;
+  /** Money leaving the account after payment. Empty for solo, unedited work. */
+  payouts?: PayoutRow[];
 };
+
+export type PayoutKind = "co_narrator" | "editor" | "proofer" | "agent" | "other";
+
+export type PayoutRow = {
+  id: string;
+  payment_id: string;
+  payee_name: string;
+  kind: PayoutKind;
+  amount: number;
+  /** Per-finished-hour rate, when the payee bills that way. Populates amount. */
+  rate_pfh: number | null;
+  paid_on: string | null;
+  notes: string;
+};
+
+export const PAYOUT_KIND_LABEL: Record<PayoutKind, string> = {
+  co_narrator: "Co-narrator",
+  editor: "Editor",
+  proofer: "Proofer",
+  agent: "Agent",
+  other: "Other",
+};
+
+/**
+ * Payouts taken off the gross BEFORE the narrator split.
+ *
+ * Production costs are borne by the project, not by one narrator: the editor
+ * is paid out of the total fee and the remainder is what the narrators divide.
+ * Agent and other come out of the narrator's own share instead, since those
+ * are personal to whoever engaged them.
+ */
+const OFF_THE_TOP: ReadonlySet<PayoutKind> = new Set<PayoutKind>(["editor", "proofer"]);
+
+export function isOffTheTop(kind: PayoutKind): boolean {
+  return OFF_THE_TOP.has(kind);
+}
 
 // The board_cards columns the money layer reads. A subset of BoardV2Card —
 // declared separately because this also needs production_company/type and
@@ -127,12 +174,41 @@ export function isCardExpectedActual(rows: PaymentRow[]): boolean {
   return rows.some(r => r.amount_expected != null);
 }
 
+/**
+ * What a single row is worth, for totals that need a per-row figure.
+ *
+ * `amount_expected` is optional by design — leaving it blank means "use the
+ * calculated estimate" — but that left an invoiced, fully-paid row counting
+ * zero toward Invoiced. Falling back in order:
+ *   1. the explicit figure, when set;
+ *   2. what was actually received, since a paid row is self-evidently worth
+ *      at least that much;
+ *   3. the project estimate, but only for a single-milestone project — an
+ *      estimate covers the whole job and cannot be split across instalments
+ *      without inventing a number.
+ */
+export function rowValue(p: PaymentRow, card: MoneyCard, rows: PaymentRow[]): number {
+  if (p.amount_expected != null) return Number(p.amount_expected);
+  const received = Number(p.amount_received) || 0;
+  if (received > 0) return received;
+  if (rows.length === 1) return cardExpected(card, rows) ?? 0;
+  return 0;
+}
+
 export type MoneyTotals = {
   expected: number;
   invoiced: number;
   received: number;
   outstanding: number;
   overdue: number;
+  /**
+   * Everything paid onward to other people. Reported separately from earnings
+   * rather than netted off, because whether a given payout reduces income or
+   * is a deductible expense depends on how the work is reported — a question
+   * for an accountant, not for this file to decide.
+   */
+  payoutsTotal: number;
+  payoutsByKind: Record<string, number>;
 };
 
 export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, PaymentRow[]>): MoneyTotals {
@@ -140,15 +216,24 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
   let invoiced = 0;
   let received = 0;
   let overdue = 0;
+  let payoutsTotal = 0;
+  const payoutsByKind: Record<string, number> = {};
 
   for (const card of cards) {
     const rows = rowsByCard.get(card.id) ?? [];
     expected += cardExpected(card, rows) ?? 0;
 
     for (const r of rows) {
-      const amt = Number(r.amount_expected) || 0;
+      const amt = rowValue(r, card, rows);
       const got = Number(r.amount_received) || 0;
       received += got;
+
+      for (const p of r.payouts ?? []) {
+        const a = Number(p.amount) || 0;
+        payoutsTotal += a;
+        payoutsByKind[p.kind] = (payoutsByKind[p.kind] ?? 0) + a;
+      }
+
       if (r.invoiced_on) invoiced += amt;
       if (derivePaymentStatus(r) === "overdue") overdue += amt;
     }
@@ -162,7 +247,81 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
     received,
     outstanding: Math.max(0, invoiced - received),
     overdue,
+    payoutsTotal,
+    payoutsByKind,
   };
+}
+
+export type Waterfall = {
+  gross: number;
+  /** Editor/proofer fees, deducted before anyone's split. */
+  offTheTop: number;
+  /** What the narrators actually divide. */
+  distributable: number;
+  sharePercent: number;
+  /** The narrator's cut of the distributable amount. */
+  yourShare: number;
+  /** Deducted from the narrator's own share, not the project's. */
+  fromYourShare: number;
+  /** What the narrator keeps once everything above has come out. */
+  yourNet: number;
+  /** What is owed onward to co-narrators, when payee of record. */
+  toCoNarrators: number;
+};
+
+/**
+ * The order money actually moves: the client pays a gross fee, production costs
+ * come off the top, and only what remains gets split between narrators.
+ *
+ * This is why estimatedEarnings() reads high on any project with an editor — it
+ * applies the narrator's share to the full fee, with nothing taken out first.
+ * It is an estimate of the fee earned, not of what lands in the bank.
+ */
+export function computeWaterfall(
+  gross: number,
+  sharePercent: number,
+  payouts: PayoutRow[],
+): Waterfall {
+  const offTheTop = payouts
+    .filter(p => isOffTheTop(p.kind))
+    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+
+  const distributable = Math.max(0, gross - offTheTop);
+  const share = sharePercent / 100;
+  const yourShare = distributable * share;
+
+  const fromYourShare = payouts
+    .filter(p => p.kind === "agent" || p.kind === "other")
+    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+
+  return {
+    gross,
+    offTheTop,
+    distributable,
+    sharePercent,
+    yourShare,
+    fromYourShare,
+    yourNet: yourShare - fromYourShare,
+    toCoNarrators: Math.max(0, distributable - yourShare),
+  };
+}
+
+/** Finished hours a payout's PFH rate applies to. */
+export function finishedHours(wordCount: number | null): number {
+  return wordCount ? wordCount / 9400 : 0;
+}
+
+/**
+ * What an invoice for this milestone should bill.
+ *
+ * Gross when set — on a duet the client owes the whole fee, not the narrator's
+ * half — otherwise the narrator's own expected amount, which is correct for
+ * solo work and for projects where the client pays each narrator directly.
+ */
+export function invoiceAmount(p: PaymentRow, card: MoneyCard, rows: PaymentRow[]): number | null {
+  if (p.amount_gross != null) return Number(p.amount_gross);
+  if (p.amount_expected != null) return Number(p.amount_expected);
+  return cardExpected(card, rows);
 }
 
 export type ClientBreakdown = {

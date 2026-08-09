@@ -24,12 +24,15 @@ export default async function PaymentsPage() {
     supabaseAdmin
       .from("payments")
       .select(
-        "id, card_id, label, amount_expected, due_on, invoiced_on, invoice_number, amount_received, received_on, method, notes, sort_order"
+        "id, card_id, label, amount_expected, due_on, invoiced_on, invoice_number, amount_received, amount_gross, received_on, method, notes, sort_order, " +
+          "payouts:payment_payouts(id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, notes)"
       ),
   ]);
 
   const cards = (cardsRes.data ?? []) as MoneyCard[];
-  const payments = (paymentsRes.data ?? []) as PaymentRow[];
+  // Cast through unknown: supabase-js can't infer the shape of an embedded
+  // relation from a string select, so it widens the result to an error type.
+  const payments = (paymentsRes.data ?? []) as unknown as PaymentRow[];
 
   return (
     <AdminLayout>

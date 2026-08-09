@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { parseLocalDate } from "@/components/admin/board-card-utils";
@@ -11,7 +11,7 @@ import {
   PAYMENT_STATUS_PILL,
   type PaymentRow,
 } from "@/lib/payments";
-import { PaymentFormModal } from "./PaymentFormModal";
+import { PaymentFormModal, type CardMoneyContext } from "./PaymentFormModal";
 
 // The payment view inside a project's edit modal. Fetches on mount rather
 // than taking rows as a prop: the board loads 30+ cards and only one card's
@@ -26,26 +26,43 @@ function fmtDate(s: string | null): string {
 export function CardPaymentsPanel({
   cardId,
   cardTitle,
+  card,
 }: {
   cardId: string;
   cardTitle: string;
+  card?: CardMoneyContext;
 }) {
   const [payments, setPayments] = useState<PaymentRow[] | null>(null);
   const [editing, setEditing] = useState<{ payment: PaymentRow | null } | null>(null);
-
-  const load = useCallback(async () => {
-    const res = await fetch(`/api/payments?cardId=${cardId}`);
-    if (!res.ok) {
-      setPayments([]);
-      return;
-    }
-    const json = await res.json();
-    setPayments(json.payments ?? []);
-  }, [cardId]);
+  // Bumped to re-run the fetch after a save or delete. A counter rather than
+  // an exported load() so the request stays owned by the effect, which is
+  // what makes the cancellation guard below possible.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+
+    void (async () => {
+      const res = await fetch(`/api/payments?cardId=${cardId}`);
+      // The modal can close, or the board can switch cards, while this is in
+      // flight — without the guard a late response writes into a component
+      // that has moved on.
+      if (cancelled) return;
+      if (!res.ok) {
+        setPayments([]);
+        return;
+      }
+      const json = await res.json();
+      if (cancelled) return;
+      setPayments(json.payments ?? []);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cardId, reloadKey]);
+
+  const reload = () => setReloadKey(k => k + 1);
 
   if (payments === null) {
     return <p className={adminType.small}>Loading payments…</p>;
@@ -123,6 +140,7 @@ export function CardPaymentsPanel({
         <PaymentFormModal
           cardId={cardId}
           cardTitle={cardTitle}
+          card={card}
           payment={editing.payment}
           onClose={() => setEditing(null)}
           // Refetching rather than splicing local state keeps this panel
@@ -131,11 +149,11 @@ export function CardPaymentsPanel({
           // from what was typed.
           onSaved={() => {
             setEditing(null);
-            void load();
+            reload();
           }}
           onDeleted={() => {
             setEditing(null);
-            void load();
+            reload();
           }}
         />
       )}
