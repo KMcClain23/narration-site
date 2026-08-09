@@ -48,6 +48,8 @@ type DraftPayout = {
   kind: PayoutKind;
   amount: string;
   rate_pfh: string;
+  /** Blank until the money actually leaves — an unpaid payout is a liability. */
+  paid_on: string;
 };
 
 const MILESTONE_SUGGESTIONS = [
@@ -83,6 +85,7 @@ function toDrafts(p: PaymentRow | null): DraftPayout[] {
     kind: r.kind,
     amount: r.amount ? String(r.amount) : "",
     rate_pfh: r.rate_pfh != null ? String(r.rate_pfh) : "",
+    paid_on: r.paid_on ?? "",
   }));
 }
 
@@ -102,12 +105,16 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 function PayoutsEditor({
   payouts,
   finishedHrs,
+  allowCoNarrator,
   onChange,
 }: {
   payouts: DraftPayout[];
   finishedHrs: number;
+  /** False on solo work, where paying a co-narrator is not a thing. */
+  allowCoNarrator: boolean;
   onChange: (next: DraftPayout[]) => void;
 }) {
+  const kinds = allowCoNarrator ? KIND_ORDER : KIND_ORDER.filter(k => k !== "co_narrator");
   const update = (i: number, patch: Partial<DraftPayout>) => {
     const next = [...payouts];
     next[i] = { ...next[i], ...patch };
@@ -135,7 +142,7 @@ function PayoutsEditor({
                 onChange={e => update(i, { kind: e.target.value as PayoutKind })}
                 className={`${inputClass} w-auto flex-1`}
               >
-                {KIND_ORDER.map(k => (
+                {kinds.map(k => (
                   <option key={k} value={k}>
                     {PAYOUT_KIND_LABEL[k]}{isOffTheTop(k) ? " — off the top" : ""}
                   </option>
@@ -184,6 +191,21 @@ function PayoutsEditor({
                 Use {formatMoney(suggested)} — {finishedHrs.toFixed(1)} finished hrs × ${p.rate_pfh}/hr
               </button>
             )}
+
+            {/* Blank means still owed. Without this the page counted an
+                unpaid editor as money that had already left the account. */}
+            <label className="flex items-center gap-2">
+              <span className={`${adminType.small} shrink-0`}>Paid on</span>
+              <input
+                type="date"
+                className={inputClass}
+                value={p.paid_on}
+                onChange={e => update(i, { paid_on: e.target.value })}
+              />
+            </label>
+            {!p.paid_on && Number(p.amount) > 0 && (
+              <p className={adminType.small}>Leave blank until you&apos;ve actually paid them — counts as owed.</p>
+            )}
           </div>
         );
       })}
@@ -191,7 +213,7 @@ function PayoutsEditor({
       <button
         type="button"
         onClick={() =>
-          onChange([...payouts, { id: null, payee_name: "", kind: "editor", amount: "", rate_pfh: "" }])
+          onChange([...payouts, { id: null, payee_name: "", kind: "editor", amount: "", rate_pfh: "", paid_on: "" }])
         }
         className="flex items-center gap-1 text-[13px] text-text-muted hover:text-text-primary"
       >
@@ -217,7 +239,11 @@ function WaterfallBreakdown({ w }: { w: Waterfall }) {
       <Row label="Client pays" value={formatMoney(w.gross)} />
       {w.offTheTop > 0 && <Row label="Less production (off the top)" value={`− ${formatMoney(w.offTheTop)}`} />}
       {w.offTheTop > 0 && <Row label="Split between narrators" value={formatMoney(w.distributable)} />}
-      <Row label={`Your share (${w.sharePercent}%)`} value={formatMoney(w.yourShare)} />
+      {/* At 100% the "share" line just restates the line above it — there is
+          nobody to share with on a solo project. */}
+      {w.sharePercent !== 100 && (
+        <Row label={`Your share (${w.sharePercent}%)`} value={formatMoney(w.yourShare)} />
+      )}
       {w.toCoNarrators > 0 && <Row label="To co-narrator(s)" value={formatMoney(w.toCoNarrators)} />}
       {w.fromYourShare > 0 && <Row label="Less from your share" value={`− ${formatMoney(w.fromYourShare)}`} />}
       <div className="border-t border-accent-amber/15 pt-1">
@@ -285,6 +311,12 @@ export function PaymentFormModal({
 
   // The whole-project fee, which is what a client is billed — distinct from
   // the narrator's own estimate shown elsewhere on this form.
+  // Solo work has nobody to split with, so the co-narrator half of this
+  // section is noise there — the fee is simply the narrator's, minus costs.
+  const format = card?.narration_format ?? null;
+  const isSplit = format === "duet" || format === "dual" || format === "multicast";
+  const formatLabel = format ? format.charAt(0).toUpperCase() + format.slice(1) : "Split";
+
   const projectGross = finishedHrs > 0 && card?.pfh_rate ? finishedHrs * card.pfh_rate : 0;
   const grossPlaceholder = projectGross > 0 ? `e.g. ${projectGross.toFixed(0)}` : "e.g. 3000";
 
@@ -298,7 +330,7 @@ export function PaymentFormModal({
       kind: p.kind,
       amount: Number(p.amount) || 0,
       rate_pfh: p.rate_pfh ? Number(p.rate_pfh) : null,
-      paid_on: null,
+      paid_on: p.paid_on || null,
       notes: "",
     }));
     return computeWaterfall(gross, sharePercent, rows);
@@ -325,6 +357,7 @@ export function PaymentFormModal({
         kind: p.kind,
         amount: p.amount,
         rate_pfh: p.rate_pfh,
+        paid_on: p.paid_on,
         ...(p.id ? { id: p.id } : {}),
       };
       await fetch("/api/payments/payouts", {
@@ -449,17 +482,31 @@ export function PaymentFormModal({
               editor: leave gross blank and add no payouts, and the waterfall
               collapses to the plain expected/received pair above. */}
           <div className="rounded-lg border border-surface-border px-4 py-3 space-y-4 self-start">
-            <p className={adminType.label}>Gross &amp; payouts</p>
+            <p className={adminType.label}>{isSplit ? "Gross & payouts" : "Gross & costs"}</p>
             <p className={adminType.small}>
-              For duet/multicast work, or when an editor is paid out of the fee. Leave blank otherwise.
+              {isSplit
+                ? `${formatLabel} — the client pays one fee and it's divided. Add an editor here too if one is paid out of it.`
+                : "Solo project. Only needed if someone — an editor, a proofer — is paid out of the fee."}
             </p>
 
-            <Field label="Gross — what the client pays" hint="Whole fee, before anything comes out. Invoices bill this.">
+            <Field
+              label="Gross — what the client pays"
+              hint={
+                isSplit
+                  ? "Whole fee, all narrators, before anything comes out. Invoices bill this."
+                  : "The whole fee, before costs. Invoices bill this."
+              }
+            >
               <input className={inputClass} value={form.amount_gross} onChange={set("amount_gross")}
                 inputMode="decimal" placeholder={grossPlaceholder} />
             </Field>
 
-            <PayoutsEditor payouts={payouts} finishedHrs={finishedHrs} onChange={handleRemovePayouts} />
+            <PayoutsEditor
+              payouts={payouts}
+              finishedHrs={finishedHrs}
+              allowCoNarrator={isSplit}
+              onChange={handleRemovePayouts}
+            />
 
             {waterfall && <WaterfallBreakdown w={waterfall} />}
           </div>

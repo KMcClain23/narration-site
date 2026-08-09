@@ -202,13 +202,23 @@ export type MoneyTotals = {
   outstanding: number;
   overdue: number;
   /**
-   * Everything paid onward to other people. Reported separately from earnings
+   * Everything owed onward to other people. Reported separately from earnings
    * rather than netted off, because whether a given payout reduces income or
    * is a deductible expense depends on how the work is reported — a question
    * for an accountant, not for this file to decide.
    */
   payoutsTotal: number;
+  /** Payouts with a paid_on date — money that has actually left. */
+  payoutsPaid: number;
+  /**
+   * Payouts with no paid_on date. Distinct from paid because a narrator
+   * usually can't pay the editor until the client has paid them: showing the
+   * two as one figure claims money has moved when it hasn't.
+   */
+  payoutsOwed: number;
   payoutsByKind: Record<string, number>;
+  /** Who is still owed, for naming them rather than showing a bare total. */
+  owedTo: { name: string; kind: PayoutKind; amount: number }[];
 };
 
 export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, PaymentRow[]>): MoneyTotals {
@@ -217,7 +227,10 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
   let received = 0;
   let overdue = 0;
   let payoutsTotal = 0;
+  let payoutsPaid = 0;
+  let payoutsOwed = 0;
   const payoutsByKind: Record<string, number> = {};
+  const owedTo: { name: string; kind: PayoutKind; amount: number }[] = [];
 
   for (const card of cards) {
     const rows = rowsByCard.get(card.id) ?? [];
@@ -232,6 +245,13 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
         const a = Number(p.amount) || 0;
         payoutsTotal += a;
         payoutsByKind[p.kind] = (payoutsByKind[p.kind] ?? 0) + a;
+
+        if (p.paid_on) {
+          payoutsPaid += a;
+        } else if (a > 0) {
+          payoutsOwed += a;
+          owedTo.push({ name: p.payee_name, kind: p.kind, amount: a });
+        }
       }
 
       if (r.invoiced_on) invoiced += amt;
@@ -248,7 +268,10 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
     outstanding: Math.max(0, invoiced - received),
     overdue,
     payoutsTotal,
+    payoutsPaid,
+    payoutsOwed,
     payoutsByKind,
+    owedTo: owedTo.sort((a, b) => b.amount - a.amount),
   };
 }
 

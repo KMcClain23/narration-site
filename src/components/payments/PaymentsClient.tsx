@@ -16,7 +16,6 @@ import {
   PROJECT_STATE_LABEL,
   type MoneyCard,
   type PaymentRow,
-  type PayoutKind,
   type ProjectState,
 } from "@/lib/payments";
 import { PaymentFormModal } from "./PaymentFormModal";
@@ -321,15 +320,20 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
           value={`~${formatMoney(totals.expected)}`}
           hint={estimatedShare < totals.expected ? `${formatMoney(totals.expected - estimatedShare)} from invoices` : undefined}
         />
-        {totals.payoutsTotal > 0 && (
+        {/* Owed and paid are separate figures. A narrator usually can't pay
+            the editor until the client has paid them, so folding the two
+            together claims money has left the account when it hasn't. */}
+        {totals.payoutsOwed > 0 && (
           <Stat
-            label="Paid out"
-            value={formatMoney(totals.payoutsTotal)}
-            hint={Object.entries(totals.payoutsByKind)
-              .sort((a, b) => b[1] - a[1])
-              .map(([k, amt]) => `${PAYOUT_KIND_LABEL[k as PayoutKind] ?? k} ${formatMoney(amt)}`)
+            label="You owe others"
+            value={formatMoney(totals.payoutsOwed)}
+            hint={totals.owedTo
+              .map(o => `${PAYOUT_KIND_LABEL[o.kind]}${o.name ? ` · ${o.name}` : ""} ${formatMoney(o.amount)}`)
               .join(" · ")}
           />
+        )}
+        {totals.payoutsPaid > 0 && (
+          <Stat label="Paid out" value={formatMoney(totals.payoutsPaid)} />
         )}
       </section>
 
