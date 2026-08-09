@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Book, BookCategory } from "@/types/book";
+import { requireAdmin } from "@/lib/require-admin";
 
 type CreateBookBody = {
   title?: string;
@@ -108,7 +109,10 @@ export async function GET() {
   try {
     // Source of truth is board_cards. Try with slug first; fall back without
     // it if the column hasn't been migrated yet so the page never goes blank.
-    const STATUS_FILTER = ["contracted", "recording", "editing", "released"] as const;
+    // "prepping" belongs here: it sits between contracted and recording, both
+    // of which are public, so omitting it made a title vanish from the public
+    // page partway through the pipeline and reappear once recording started.
+    const STATUS_FILTER = ["contracted", "prepping", "recording", "editing", "released"] as const;
 
     const primary = await supabaseAdmin
       .from("board_cards")
@@ -197,6 +201,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = (await req.json()) as CreateBookBody;
 
@@ -261,6 +267,8 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = (await req.json()) as UpdateBookBody;
     const { id, updatedBook } = body;
@@ -316,6 +324,8 @@ export async function PUT(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = (await req.json()) as MoveBookBody;
     const { id, newCategory } = body;
@@ -356,6 +366,8 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = (await req.json()) as DeleteBookBody;
     const { id } = body;

@@ -2,6 +2,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PrepperClient, type ManuscriptRow } from "@/components/admin/prepper/PrepperClient";
 import { countNumberedChapters } from "@/lib/unnumbered-sections";
+import { assertAdmin } from "@/lib/require-admin";
 
 // Admin data changes constantly — always read fresh, same convention as the
 // other /tools pages.
@@ -41,6 +42,7 @@ async function syncMissingWordCountsToBoard(
 }
 
 export default async function PrepperPage() {
+  await assertAdmin();
   const { data: manuscripts } = await supabaseAdmin
     .from("manuscripts")
     .select("id, title, author, status, source_format, error_message, created_at")

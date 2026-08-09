@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { requireAdmin } from "@/lib/require-admin";
 
 // Authoritative public CDN base for narration-demos bucket.
 // Falls back to env var; env var should match this value.
@@ -23,6 +24,8 @@ const r2 = new S3Client({
 // page-level auth is enforced, but direct API access is unauthenticated.
 // Deferred to Stage 7 cleanup or a standalone security pass.
 export async function POST(req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { filename, contentType } = await req.json();
 

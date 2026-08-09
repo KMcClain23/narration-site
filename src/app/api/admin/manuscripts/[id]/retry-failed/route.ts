@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { EXTRACT_TAG } from "@/lib/extraction-runner";
+import { requireAdmin } from "@/lib/require-admin";
 
 /**
  * Clear the recorded failures on a manuscript's chapters so extraction picks
@@ -21,6 +22,8 @@ import { EXTRACT_TAG } from "@/lib/extraction-runner";
  * a minute on its own.
  */
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id } = await params;
 
   const { data, error } = await supabaseAdmin

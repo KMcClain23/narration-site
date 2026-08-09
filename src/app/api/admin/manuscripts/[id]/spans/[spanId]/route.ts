@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireAdmin } from "@/lib/require-admin";
 
 async function findOwnedSpan(manuscriptId: string, spanId: string) {
   const { data } = await supabaseAdmin
@@ -14,6 +15,8 @@ async function findOwnedSpan(manuscriptId: string, spanId: string) {
 // PATCH: reassign an existing span to a different character — the reader's
 // "highlight is the wrong character" correction.
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; spanId: string }> }) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id, spanId } = await params;
   const { character_id } = await req.json().catch(() => ({}));
 
@@ -44,6 +47,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 // DELETE: remove a wrong highlight entirely — the reader's "this shouldn't
 // be tagged at all" correction.
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string; spanId: string }> }) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id, spanId } = await params;
 
   const span = await findOwnedSpan(id, spanId);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { r2, R2_BUCKETS } from "@/lib/r2";
+import { requireAdmin } from "@/lib/require-admin";
 
 // Public — active demos only, ordered by sort_order
 export async function GET() {
@@ -23,6 +24,8 @@ export async function GET() {
 
 // Create new demo record
 export async function POST(req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await req.json();
     const { title, genre, description, file_url, file_key, duration_seconds, sort_order } = body;
@@ -56,6 +59,8 @@ export async function POST(req: NextRequest) {
 
 // Update demo (metadata, sort_order, active, or replace audio)
 export async function PUT(req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { id, ...updates } = await req.json();
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
@@ -90,6 +95,8 @@ export async function PUT(req: NextRequest) {
 
 // Delete demo + remove file from R2
 export async function DELETE(req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { id } = await req.json();
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });

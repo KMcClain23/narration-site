@@ -5,6 +5,7 @@ import { sanitizeName } from "@/lib/sanitize-name";
 import { parseCoNarrators } from "@/components/admin/board-card-utils";
 import { CoNarratorsListClient, type CoNarratorRow } from "@/components/contacts/CoNarratorsListClient";
 import { ContactsSubNav } from "@/components/contacts/ContactsSubNav";
+import { assertAdmin } from "@/lib/require-admin";
 
 // Admin data changes constantly and staleness has zero acceptable UX here —
 // unlike the public site's ISR-cached pages, this always reads fresh from
@@ -12,6 +13,7 @@ import { ContactsSubNav } from "@/components/contacts/ContactsSubNav";
 export const dynamic = "force-dynamic";
 
 export default async function ContactsCoNarratorsPage() {
+  await assertAdmin();
   const [coNarratorsRes, cardsRes] = await Promise.all([
     supabaseAdmin.from("co_narrators").select("id, name, email, bio, photo_url").order("name", { ascending: true }),
     // board_cards.co_narrator is a text column holding a JSON-encoded array

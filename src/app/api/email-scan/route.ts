@@ -6,17 +6,22 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import Anthropic from "@anthropic-ai/sdk";
+import { ADMIN_COOKIE_NAME, isValidAdminKey } from "@/lib/admin-auth";
 
 // ─── admin auth (same cookie pattern as other board routes) ───────────────────
 
-const ADMIN_COOKIE = "dmn_admin_key";
-
+// Was: "a cookie named dmn_admin_key exists and is non-empty", which any
+// visitor could satisfy with document.cookie. Now compares against
+// ADMIN_SECRET_KEY via the shared helper.
 function isAdmin(req: Request): boolean {
   const header = req.headers.get("cookie") ?? "";
-  return header.split(";").some(part => {
+  for (const part of header.split(";")) {
     const [name, ...rest] = part.trim().split("=");
-    return name.trim() === ADMIN_COOKIE && rest.join("=").trim().length > 0;
-  });
+    if (name.trim() === ADMIN_COOKIE_NAME) {
+      return isValidAdminKey(rest.join("="));
+    }
+  }
+  return false;
 }
 
 // ─── token management ─────────────────────────────────────────────────────────

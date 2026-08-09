@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { fetchAmazonBookResult } from "@/lib/amazon-scrape";
+import { fetchAmazonBookResult } from "@/lib/amazon-scrape";
+import { requireAdmin } from "@/lib/require-admin";
 
 /**
  * Fetch what Amazon says about a book, without saving anything.
@@ -15,6 +16,8 @@ import { fetchAmazonBookResult } from "@/lib/amazon-scrape";
  * refetch can never clobber a card by itself.
  */
 export async function POST(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { url } = await req.json();
 

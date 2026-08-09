@@ -10,6 +10,7 @@ import { AuthorProfileEditButton } from "@/components/contacts/AuthorProfileEdit
 import { BooksTogetherSection } from "@/components/contacts/BooksTogetherSection";
 import { ContactsSubNav } from "@/components/contacts/ContactsSubNav";
 import type { Person } from "@/components/admin/PersonForm";
+import { assertAdmin } from "@/lib/require-admin";
 
 // Admin data changes constantly and staleness has zero acceptable UX here —
 // unlike the public site's ISR-cached pages, this always reads fresh from
@@ -26,6 +27,7 @@ const SOCIAL_LINKS: { key: keyof Person; label: string; Icon: typeof FaAmazon }[
 ];
 
 export default async function AuthorProfilePage({ params }: { params: Promise<{ slug: string }> }) {
+  await assertAdmin();
   const { slug } = await params;
 
   const { data: authors } = await supabaseAdmin.from("authors").select("*");

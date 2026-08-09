@@ -458,3 +458,81 @@ begin
       check (narrator_share_percent is null or (narrator_share_percent between 1 and 99));
   end if;
 end $$;
+
+-- payments: one row per expected payment milestone on a project. A project
+-- with "50% on contract, 50% on delivery" is two rows; the common single
+-- payment-on-delivery case is one.
+--
+-- Payment status is deliberately NOT stored — it is derived from the dates
+-- and amounts (see src/lib/payments.ts). A stored status drifts the moment a
+-- due date passes without anyone opening the app.
+create table if not exists payments (
+  id              uuid          primary key default gen_random_uuid(),
+  card_id         uuid          not null references board_cards(id) on delete cascade,
+  -- e.g. "Deposit", "On delivery", "Pickups". Free text: milestone naming
+  -- varies per client and a CHECK would need a migration per new client.
+  label           text          not null default '',
+  -- Nullable on purpose: when unset the app falls back to the calculated
+  -- estimate (word_count / 9400 * pfh_rate * share) so a project shows an
+  -- expected value before any invoice exists.
+  amount_expected numeric(10,2),
+  due_on          date,
+  invoiced_on     date,
+  invoice_number  text          not null default '',
+  amount_received numeric(10,2) not null default 0,
+  received_on     date,
+  method          text          not null default '',
+  notes           text          not null default '',
+  sort_order      integer       not null default 0,
+  created_at      timestamptz   not null default now(),
+  updated_at      timestamptz   not null default now()
+);
+
+create index if not exists payments_card_id_idx on payments (card_id);
+create index if not exists payments_due_on_idx  on payments (due_on);
+
+alter table payments enable row level security;
+
+-- Financial rows are admin-only: service-role access exclusively, and
+-- deliberately no "Public read access" policy of the kind authors/co_narrators
+-- carry for the public site.
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'payments'
+      and policyname = 'Service role full access'
+  ) then
+    create policy "Service role full access" on payments
+      for all
+      using (auth.role() = 'service_role')
+      with check (auth.role() = 'service_role');
+  end if;
+end $$;
+
+-- books was the last table with RLS disabled: the publishable anon key, which
+-- ships to every browser, could read, insert, update and delete the entire
+-- public catalogue. Confirmed empirically — an anon INSERT returned a NOT NULL
+-- constraint error (23502) rather than an RLS denial, i.e. the write was
+-- authorized and only the bad payload stopped it.
+--
+-- No "Public read access" policy is added, unlike authors/co_narrators. Every
+-- read of this table goes through the service-role client, which bypasses RLS
+-- entirely — src/lib/supabase-browser.ts (the only anon-key client) has no
+-- importers anywhere in the codebase. Matching board_cards, which is likewise
+-- public-facing but service-role-only in practice.
+alter table books enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'books'
+      and policyname = 'Service role full access'
+  ) then
+    create policy "Service role full access" on books
+      for all
+      using (auth.role() = 'service_role')
+      with check (auth.role() = 'service_role');
+  end if;
+end $$;

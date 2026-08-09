@@ -3,11 +3,14 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { buildR2PublicUrl, r2, R2_BUCKETS, R2_PREFIXES } from "@/lib/r2";
 import { sanitizeName } from "@/lib/sanitize-name";
+import { requireAdmin } from "@/lib/require-admin";
 
 // Same bucket, client, and presigned-PUT pattern as /api/upload-cover/upload-url.
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { personType, id, name, contentType } = await req.json();
 

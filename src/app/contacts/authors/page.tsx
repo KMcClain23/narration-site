@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sanitizeName } from "@/lib/sanitize-name";
 import { AuthorsListClient, type AuthorRow } from "@/components/contacts/AuthorsListClient";
 import { ContactsSubNav } from "@/components/contacts/ContactsSubNav";
+import { assertAdmin } from "@/lib/require-admin";
 
 // Admin data changes constantly and staleness has zero acceptable UX here —
 // unlike the public site's ISR-cached pages, this always reads fresh from
@@ -11,6 +12,7 @@ import { ContactsSubNav } from "@/components/contacts/ContactsSubNav";
 export const dynamic = "force-dynamic";
 
 export default async function ContactsAuthorsPage() {
+  await assertAdmin();
   const [authorsRes, cardsRes] = await Promise.all([
     supabaseAdmin.from("authors").select("id, name, email, bio, photo_url").order("name", { ascending: true }),
     // Only the fields needed to compute book count / last activity per author.

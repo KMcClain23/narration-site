@@ -11,6 +11,7 @@ import { CoNarratorProfileEditButton } from "@/components/contacts/CoNarratorPro
 import { BooksTogetherSection } from "@/components/contacts/BooksTogetherSection";
 import { ContactsSubNav } from "@/components/contacts/ContactsSubNav";
 import type { Person } from "@/components/admin/PersonForm";
+import { assertAdmin } from "@/lib/require-admin";
 
 // Admin data changes constantly and staleness has zero acceptable UX here —
 // unlike the public site's ISR-cached pages, this always reads fresh from
@@ -28,6 +29,7 @@ const SOCIAL_LINKS: { key: keyof Person; label: string; Icon: typeof FaAmazon }[
 ];
 
 export default async function CoNarratorProfilePage({ params }: { params: Promise<{ slug: string }> }) {
+  await assertAdmin();
   const { slug } = await params;
 
   const { data: coNarrators } = await supabaseAdmin.from("co_narrators").select("*");

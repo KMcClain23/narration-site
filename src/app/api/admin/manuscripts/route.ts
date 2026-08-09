@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireAdmin } from "@/lib/require-admin";
 
 // The parse runs inside this invocation, after the response has been sent, so
 // the box has to stay alive as long as the parse route itself may take.
@@ -11,6 +12,8 @@ export const maxDuration = 60;
 // start → fire-and-forget process → poll pattern as the retired board-pdf-*
 // pipeline (commit 79e497e~1).
 export async function POST(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { title, author, key, format } = await req.json();
 

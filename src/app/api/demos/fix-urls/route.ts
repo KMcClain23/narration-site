@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireAdmin } from "@/lib/require-admin";
 
 // Correct public URLs for the original 6 demos (files live at bucket root).
 // These are the authoritative URLs — used by Fix URLs regardless of env vars.
@@ -24,6 +25,8 @@ const CORRECT_BASE = "https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev";
 // page-level auth is enforced, but direct API access is unauthenticated.
 // Deferred to Stage 7 cleanup or a standalone security pass.
 export async function POST() {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { data: demos, error: fetchErr } = await supabaseAdmin
     .from("demos")
     .select("id, title, file_url");

@@ -3,7 +3,8 @@ import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { r2, R2_BUCKETS } from "@/lib/r2";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { parseManuscript, PARSE_BUDGET_MS, toStorableText } from "@/lib/manuscript-parser";
-import { nextCharacterColor } from "@/lib/character-colors";
+import { nextCharacterColor } from "@/lib/character-colors";
+import { requireAdmin } from "@/lib/require-admin";
 
 export const maxDuration = 60;
 
@@ -47,6 +48,8 @@ function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
 // Downloads the source file from R2, deletes it (it's a temp upload, not a
 // permanent asset), parses chapters, writes them, and flips manuscripts.status.
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id } = await params;
 
   const { data: manuscript, error: fetchError } = await supabaseAdmin

@@ -11,7 +11,8 @@ import { ArchiveConfirmDialog, ARCHIVE_REASON_LABEL } from "@/components/board/A
 import { AmazonRefetchButton, type AmazonPreview } from "@/components/board/AmazonRefetchButton";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { TagsField, PersonForm, EMPTY_PERSON, type Person } from "@/components/admin/PersonForm";
-import { parseCoNarrators } from "@/components/admin/board-card-utils";
+import { estimatedEarnings, parseCoNarrators } from "@/components/admin/board-card-utils";
+import { CardPaymentsPanel } from "@/components/payments/CardPaymentsPanel";
 import type { NarrationFormat, ArchivedReason } from "@/types/book";
 
 // Full board_cards row shape needed across all four tabs (only Details is
@@ -713,7 +714,27 @@ export function CardEditModal(props: CardEditModalProps) {
     if (!form) return null;
     const hasRate = form.payment_type === "pfh" || form.payment_type === "rs_plus";
     const hours = form.word_count > 0 ? form.word_count / WORDS_PER_HOUR : 0;
-    const earnings = form.pfh_rate > 0 ? hours * form.pfh_rate : 0;
+    // Uses the shared helper rather than hours × rate so this agrees with the
+    // board card face and the Payments page. Computing it locally here meant
+    // a duet showed the full project value under a heading that reads as the
+    // narrator's earnings — twice the actual figure shown everywhere else.
+    // Null means the split is genuinely unknown (multicast, no explicit share).
+    const earnings = estimatedEarnings(
+      form.word_count,
+      form.pfh_rate,
+      form.payment_type,
+      form.narration_format,
+      form.narrator_share_percent,
+    );
+    // Spells out the split being applied, so the figure is explicable rather
+    // than just smaller than the rate × hours a narrator would work out by hand.
+    const appliedShare =
+      form.narrator_share_percent != null
+        ? form.narrator_share_percent
+        : form.narration_format === "duet" || form.narration_format === "dual"
+          ? 50
+          : 100;
+    const shareLabel = appliedShare !== 100 ? ` × ${appliedShare}% share` : "";
 
     return (
       <div className="space-y-8">
@@ -862,17 +883,33 @@ export function CardEditModal(props: CardEditModalProps) {
               </InfoTooltip>
             </p>
             {form.word_count > 0 && form.pfh_rate > 0 ? (
-              <p className="text-lg font-bold text-accent-amber-bright">
-                ${earnings.toLocaleString("en-US", { maximumFractionDigits: 0 })}
-                <span className="ml-2 text-xs font-normal text-text-muted">
-                  ~{hours.toFixed(1)} hrs × ${form.pfh_rate}/hr{form.payment_type === "rs_plus" ? " + royalties" : ""}
-                </span>
-              </p>
+              earnings != null ? (
+                <p className="text-lg font-bold text-accent-amber-bright">
+                  ${earnings.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                  <span className="ml-2 text-xs font-normal text-text-muted">
+                    ~{hours.toFixed(1)} hrs × ${form.pfh_rate}/hr{form.payment_type === "rs_plus" ? " + royalties" : ""}
+                    {shareLabel}
+                  </span>
+                </p>
+              ) : (
+                <p className={adminType.small}>
+                  Multicast has no default split — set Narrator Share to estimate your portion
+                </p>
+              )
             ) : (
               <p className={adminType.small}>Set word count and PFH rate to see estimated earnings</p>
             )}
           </div>
         )}
+
+        {/* Section 4: Payments — the estimate above is what the job is worth;
+            this is what has actually been invoiced and collected against it.
+            Shown regardless of hasRate: a plain-RS project has no calculable
+            estimate but can still have real money recorded against it. */}
+        <div className="rounded-lg border border-surface-border px-4 py-3">
+          <p className={`${adminType.label} mb-2`}>Payments</p>
+          <CardPaymentsPanel cardId={form.id} cardTitle={form.title} />
+        </div>
       </div>
     );
   };

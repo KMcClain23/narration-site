@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { dateOnlyToPacificNoon } from "@/lib/timezone";
-import { fetchAmazonBook } from "@/lib/amazon-scrape";
+import { fetchAmazonBook } from "@/lib/amazon-scrape";
+import { requireAdmin } from "@/lib/require-admin";
 
 function isAmazonUrl(url: unknown): url is string {
   return typeof url === "string" && /^https?:\/\/(www\.)?amazon\.com\//i.test(url.trim());
@@ -16,6 +17,8 @@ function isEmptyValue(v: unknown): boolean {
 
 // GET: admin gets all cards
 export async function GET(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { searchParams } = new URL(req.url);
 
   // Single card by ID
@@ -58,6 +61,8 @@ function makeSlug(title: string): string {
 
 // POST: create card (admin)
 export async function POST(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await req.json();
     const {
@@ -158,6 +163,8 @@ export async function POST(req: Request) {
 
 // PUT: update card (admin)
 export async function PUT(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await req.json();
     const { id, ...fields } = body;
@@ -299,6 +306,8 @@ export async function PUT(req: Request) {
 
 // DELETE: admin only
 export async function DELETE(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { id } = await req.json();
     if (!id) return NextResponse.json({ error: "ID required." }, { status: 400 });

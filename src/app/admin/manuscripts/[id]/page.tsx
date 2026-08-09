@@ -3,6 +3,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { adminType } from "@/lib/design-tokens";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ManuscriptReader, type ChapterWithSpans } from "@/components/admin/manuscript-reader/ManuscriptReader";
+import { assertAdmin } from "@/lib/require-admin";
 
 // Admin data changes constantly — always read fresh, same convention as the
 // contacts profile pages.
@@ -53,6 +54,7 @@ async function fetchAllSpans(chapterIds: string[]) {
 }
 
 export default async function ManuscriptReaderPage({ params }: { params: Promise<{ id: string }> }) {
+  await assertAdmin();
   const { id } = await params;
 
   const { data: manuscript } = await supabaseAdmin

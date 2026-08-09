@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { r2, R2_BUCKETS, R2_PREFIXES } from "@/lib/r2";
-import { sanitizeName } from "@/lib/sanitize-name";
+import { sanitizeName } from "@/lib/sanitize-name";
+import { requireAdmin } from "@/lib/require-admin";
 
 // Same bucket, client, and presigned-PUT pattern as /api/upload-person-photo/upload-url.
 const ALLOWED_TYPES: Record<string, "pdf" | "docx" | "txt"> = {
@@ -12,6 +13,8 @@ const ALLOWED_TYPES: Record<string, "pdf" | "docx" | "txt"> = {
 };
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { filename, contentType } = await req.json();
 

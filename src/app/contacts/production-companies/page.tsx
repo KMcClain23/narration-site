@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sanitizeName } from "@/lib/sanitize-name";
 import { ProductionCompaniesListClient, type ProductionCompanyRow } from "@/components/contacts/ProductionCompaniesListClient";
 import { ContactsSubNav } from "@/components/contacts/ContactsSubNav";
+import { assertAdmin } from "@/lib/require-admin";
 
 // Admin data changes constantly and staleness has zero acceptable UX here —
 // unlike the public site's ISR-cached pages, this always reads fresh from
@@ -11,6 +12,7 @@ import { ContactsSubNav } from "@/components/contacts/ContactsSubNav";
 export const dynamic = "force-dynamic";
 
 export default async function ContactsProductionCompaniesPage() {
+  await assertAdmin();
   const { data } = await supabaseAdmin.from("production_contacts").select("*").order("company", { ascending: true });
   const companies = data ?? [];
 

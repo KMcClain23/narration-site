@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireAdmin } from "@/lib/require-admin";
 
 // GET-only, read-only parallel to /api/board for the new board (/board-v2).
 // The existing /api/board stays untouched — this is intentionally a
@@ -12,6 +13,8 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 const ACTIVE_STATUSES = ["contracted", "prepping", "recording", "editing"] as const;
 
 export async function GET() {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { data, error } = await supabaseAdmin
     .from("board_cards")
     .select(

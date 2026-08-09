@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireAdmin } from "@/lib/require-admin";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -17,6 +18,8 @@ export async function GET(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { key, value } = await req.json();
     if (!key || value === undefined) {
@@ -36,6 +39,8 @@ export async function PATCH(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { key, value } = await req.json();
     if (!key || value === undefined) {

@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireAdmin } from "@/lib/require-admin";
 
 // production_contacts predates this admin redesign and stores the company
 // name under `company`, not `name` — this route maps that one field so the
@@ -31,6 +32,8 @@ function rowToPerson(r: any) {
 }
 
 export async function GET() {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { data, error } = await supabaseAdmin
     .from("production_contacts")
     .select("*")
@@ -40,6 +43,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await req.json();
     const {
@@ -79,6 +84,8 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await req.json();
     const { id, ...fields } = body;
@@ -121,6 +128,8 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { id } = await req.json();
     if (!id) return NextResponse.json({ error: "Company id is required." }, { status: 400 });

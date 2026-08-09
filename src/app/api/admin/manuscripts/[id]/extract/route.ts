@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { EXTRACT_TAG, runExtractionBudget } from "@/lib/extraction-runner";
+import { requireAdmin } from "@/lib/require-admin";
 
 export const maxDuration = 60;
 
@@ -19,6 +20,8 @@ const RUN_BUDGET_MS = 50_000;
  * by a person who wants to know.
  */
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id } = await params;
 
   try {

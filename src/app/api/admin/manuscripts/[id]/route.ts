@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { r2, R2_BUCKETS } from "@/lib/r2";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { countNumberedChapters } from "@/lib/unnumbered-sections";
+import { countNumberedChapters } from "@/lib/unnumbered-sections";
+import { requireAdmin } from "@/lib/require-admin";
 
 // GET: poll status — the manuscripts.status column plus a chapter count,
 // same role as the retired board-pdf-status/route.ts.
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id } = await params;
 
   const { data, error } = await supabaseAdmin
@@ -55,6 +58,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 // zero orphaned chapters). R2 storage doesn't cascade with the DB, though —
 // each character's voice-sample object has to be cleaned up explicitly first.
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id } = await params;
 
   const [{ data: characters }, { data: manuscript }] = await Promise.all([

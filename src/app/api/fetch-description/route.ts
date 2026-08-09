@@ -3,6 +3,7 @@
 // Open Library if the Google result is missing or truncated.
 
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/require-admin";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,8 @@ async function fromOpenLibrary(title: string, author: string): Promise<string | 
 // ── handler ───────────────────────────────────────────────────────────────────
 
 export async function GET(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { searchParams } = new URL(req.url);
   const title  = (searchParams.get("title")  ?? "").trim();
   const author = (searchParams.get("author") ?? "").trim();

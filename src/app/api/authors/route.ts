@@ -5,12 +5,22 @@
 
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { isAdminRequest, requireAdmin } from "@/lib/require-admin";
+
+// What an anonymous caller gets. The public narrated-works page renders a
+// name, bio, photo and social links and nothing else — while `select("*")`
+// also returns email, location, preferred_contact and private notes for all
+// 27 authors. Admin callers still get the full row.
+const PUBLIC_AUTHOR_COLUMNS =
+  "id, name, bio, photo_url, website, amazon, goodreads, instagram, tiktok, threads, facebook";
 
 export async function GET() {
   try {
+    const isAdmin = await isAdminRequest();
+
     const { data, error } = await supabaseAdmin
       .from("authors")
-      .select("*")
+      .select(isAdmin ? "*" : PUBLIC_AUTHOR_COLUMNS)
       .order("name", { ascending: true });
 
     if (error) throw error;
@@ -26,6 +36,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await req.json();
     const {
@@ -60,6 +72,8 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await req.json();
     const { id, ...fields } = body;
@@ -108,6 +122,8 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await req.json();
     const { id } = body;

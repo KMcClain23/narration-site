@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireAdmin } from "@/lib/require-admin";
 
 // POST: manual correction — the reader's "assign to character" flow (select
 // text Claude missed, pick a character, create the span by hand). Always
@@ -7,6 +8,8 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 // location; this is exactly what Phase 3's automatic matching couldn't do
 // for these lines.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id } = await params;
 
   const body = await req.json();

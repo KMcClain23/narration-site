@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { redis, INQUIRY_KEY, ARCHIVE_KEY, parseInquiryList, isOlderThanDays } from "@/lib/inquiries";
+import { requireAdmin } from "@/lib/require-admin";
 
 // SECURITY GAP: this route is not covered by middleware.ts's matcher —
 // page-level auth is enforced, but direct API access is unauthenticated.
@@ -9,6 +10,8 @@ import { redis, INQUIRY_KEY, ARCHIVE_KEY, parseInquiryList, isOlderThanDays } fr
  * GET: Admin views all archived inquiries
  */
 export async function GET() {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const raw = await redis.lrange(ARCHIVE_KEY, 0, -1);
   return NextResponse.json(parseInquiryList(raw));
 }
@@ -17,6 +20,8 @@ export async function GET() {
  * PATCH: Admin restores a single archived inquiry back to active
  */
 export async function PATCH(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { id } = await req.json();
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
@@ -43,6 +48,8 @@ export async function PATCH(req: Request) {
  * Bulk deletes are permanent; the client is expected to confirm before calling.
  */
 export async function DELETE(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await req.json();
     const raw = await redis.lrange(ARCHIVE_KEY, 0, -1);

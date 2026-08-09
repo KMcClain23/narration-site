@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { isAdminRequest, requireAdmin } from "@/lib/require-admin";
 
 // GET: public fetch of approved testimonials, or all for admin
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const admin = searchParams.get("admin") === "true";
+  // ?admin=true returns pending/rejected reviews too, so the flag has to be
+  // earned rather than asserted — anyone could append it to the public URL.
+  // The unflagged call stays open: the homepage reads approved reviews.
+  const admin = searchParams.get("admin") === "true" && (await isAdminRequest());
 
   const query = supabaseAdmin
     .from("testimonials")
@@ -51,6 +55,8 @@ export async function POST(req: Request) {
 
 // PATCH: admin approve or reject
 export async function PATCH(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await req.json();
     const { id, status } = body;
@@ -75,6 +81,8 @@ export async function PATCH(req: Request) {
 
 // DELETE: admin hard-delete
 export async function DELETE(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { id } = await req.json();
     if (!id) return NextResponse.json({ error: "ID required." }, { status: 400 });

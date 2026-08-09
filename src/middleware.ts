@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-
-const COOKIE_NAME = "dmn_admin_key";
+import { ADMIN_COOKIE_NAME, isValidAdminKey } from "@/lib/admin-auth";
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -19,11 +18,14 @@ export function middleware(req: NextRequest) {
     pathname === "/inquiries" ||
     pathname.startsWith("/tools") ||
     pathname === "/settings" ||
+    pathname === "/payments" ||
     pathname === "/released";
 
   if (isAdminRoute || isBoardRoute || isNewAdminRoute) {
-    const cookie = req.cookies.get(COOKIE_NAME)?.value ?? "";
-    if (!cookie) {
+    // Compares the cookie against ADMIN_SECRET_KEY. This previously only
+    // checked the cookie was non-empty, which meant
+    // `document.cookie = "dmn_admin_key=x"` reached every admin page.
+    if (!isValidAdminKey(req.cookies.get(ADMIN_COOKIE_NAME)?.value)) {
       const url = req.nextUrl.clone();
       url.pathname = "/admin/login";
       return NextResponse.redirect(url);
@@ -44,6 +46,6 @@ export const config = {
   matcher: [
     "/admin/:path*", "/board", "/board/archive", "/board/card/:path*",
     "/schedule", "/contacts", "/contacts/:path*",
-    "/inquiries", "/tools", "/tools/:path*", "/settings", "/released",
+    "/inquiries", "/tools", "/tools/:path*", "/settings", "/payments", "/released",
   ],
 };

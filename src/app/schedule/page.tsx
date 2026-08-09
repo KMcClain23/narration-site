@@ -5,6 +5,7 @@ import { AcceptingProjectsToggle } from "@/components/schedule/AcceptingProjects
 import { BookingWindowPicker } from "@/components/schedule/BookingWindowPicker";
 import { MonthlyScheduleGrid } from "@/components/schedule/MonthlyScheduleGrid";
 import { DueSoonSection } from "@/components/schedule/DueSoonSection";
+import { assertAdmin } from "@/lib/require-admin";
 
 // Same "active work" definition /api/board-v2/cards encodes (equivalent to
 // excluding released/audition given the current status set) — queried
@@ -19,6 +20,7 @@ const ACTIVE_STATUSES = ["contracted", "prepping", "recording", "editing"] as co
 export const dynamic = "force-dynamic";
 
 export default async function SchedulePage() {
+  await assertAdmin();
   const [settingsRes, cardsRes] = await Promise.all([
     supabaseAdmin
       .from("site_settings")

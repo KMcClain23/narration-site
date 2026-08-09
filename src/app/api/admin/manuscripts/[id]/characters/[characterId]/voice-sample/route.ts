@@ -4,6 +4,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { r2, R2_BUCKETS, R2_PREFIXES, buildR2PublicUrl } from "@/lib/r2";
 import { sanitizeName } from "@/lib/sanitize-name";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireAdmin } from "@/lib/require-admin";
 
 const ALLOWED_TYPES = new Set(["audio/mpeg", "audio/mp3"]);
 
@@ -22,6 +23,8 @@ async function findOwnedCharacter(manuscriptId: string, characterId: string) {
 // manuscripts). Doesn't touch the character row; PATCH does that once the
 // PUT to R2 has actually succeeded.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string; characterId: string }> }) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id, characterId } = await params;
   const character = await findOwnedCharacter(id, characterId);
   if (!character) return NextResponse.json({ error: "Character not found for this manuscript" }, { status: 404 });
@@ -44,6 +47,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 // PATCH: attach an already-uploaded clip to the character, replacing (and
 // deleting from R2) whatever was there before.
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; characterId: string }> }) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id, characterId } = await params;
   const character = await findOwnedCharacter(id, characterId);
   if (!character) return NextResponse.json({ error: "Character not found for this manuscript" }, { status: 404 });
@@ -66,6 +71,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 // DELETE: remove the sample entirely.
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string; characterId: string }> }) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id, characterId } = await params;
   const character = await findOwnedCharacter(id, characterId);
   if (!character) return NextResponse.json({ error: "Character not found for this manuscript" }, { status: 404 });

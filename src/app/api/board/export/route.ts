@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireAdmin } from "@/lib/require-admin";
 
 // Trimmed, curated column set (not every board_cards column) — order matches
 // the exact spec given for this export, not DB column order.
@@ -72,6 +73,8 @@ function formatCell(key: string, value: unknown): string {
 // GET: curated CSV export of every board_cards row (active + archived), 21
 // columns per product spec, sorted by created_at descending.
 export async function GET() {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { data, error } = await supabaseAdmin
     .from("board_cards")
     .select("*")

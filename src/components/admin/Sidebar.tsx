@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  LayoutGrid, Calendar, CheckCircle2, Users, Mail, Wrench, Settings as SettingsIcon,
+  LayoutGrid, Calendar, CheckCircle2, Users, Mail, Wrench, DollarSign, Settings as SettingsIcon,
   ChevronLeft, ChevronRight, LogOut,
 } from "lucide-react";
 import { SidebarSection, type NavItem } from "./SidebarSection";
@@ -17,6 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   // a released book could not be found again once it had left the board.
   { label: "Released", href: "/released", icon: CheckCircle2 },
   { label: "Schedule", href: "/schedule", icon: Calendar },
+  { label: "Payments", href: "/payments", icon: DollarSign },
   {
     label: "Contacts", href: "/contacts", icon: Users,
     subItems: [

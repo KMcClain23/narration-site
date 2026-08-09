@@ -7,6 +7,7 @@ import { FrequentCollaborators } from "./FrequentCollaborators";
 import { SiteAnalyticsSection, type AnalyticsEvent } from "./SiteAnalyticsSection";
 import { VercelAnalyticsSection } from "./VercelAnalyticsSection";
 import { getVercelAnalytics } from "@/lib/vercel-analytics";
+import { assertAdmin } from "@/lib/require-admin";
 import {
   computeCareerTotals,
   computeEarnings,
@@ -33,6 +34,7 @@ export default async function ToolsAnalyticsPage({
 }: {
   searchParams: Promise<{ days?: string }>;
 }) {
+  await assertAdmin();
   const sp = await searchParams;
   const rawDays = parseInt(sp.days ?? "30", 10);
   const activeDays = [7, 30, 90, 0].includes(rawDays) ? rawDays : 30;

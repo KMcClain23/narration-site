@@ -5,17 +5,28 @@
 
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { isAdminRequest, requireAdmin } from "@/lib/require-admin";
+
+// Mirrors PUBLIC_AUTHOR_COLUMNS in ../authors/route.ts — the public pages
+// show a name, bio, photo and links; email, location, preferred_contact,
+// representation and notes stay admin-only.
+const PUBLIC_CO_NARRATOR_COLUMNS =
+  "id, name, bio, photo_url, website, amazon, goodreads, instagram, tiktok, facebook";
 
 export async function GET() {
+  const isAdmin = await isAdminRequest();
+
   const { data, error } = await supabaseAdmin
     .from("co_narrators")
-    .select("*")
+    .select(isAdmin ? "*" : PUBLIC_CO_NARRATOR_COLUMNS)
     .order("name", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ co_narrators: data });
 }
 
 export async function POST(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const body = await req.json();
   const {
     name, bio = "", website = "", amazon = "", instagram = "", tiktok = "", facebook = "", goodreads = "", email = "",
@@ -37,6 +48,8 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const body = await req.json();
   const { id, ...fields } = body;
   if (!id) return NextResponse.json({ error: "ID required." }, { status: 400 });
@@ -58,6 +71,8 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id } = await req.json();
   if (!id) return NextResponse.json({ error: "ID required." }, { status: 400 });
   const { error } = await supabaseAdmin.from("co_narrators").delete().eq("id", id);
