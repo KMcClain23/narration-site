@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { dateOnlyToPacificNoon, formatFullDate } from "@/lib/timezone";
+import { BLANK_LINE, BUSINESS } from "@/lib/business-identity";
 
 export interface ContractData {
   contractDate: string;
@@ -150,11 +151,12 @@ function PageHeader({ data, company, site }: { data: ContractData; company: stri
 export function ContractPDF({ data, template }: { data: ContractData; template?: boolean }) {
   const showChars = data.narrationStyle === "Duet" || data.narrationStyle === "Multicast";
 
-  // Narrator identity — blank for generic template
-  const narratorName    = template ? "________________________" : "Dean Miller";
-  const narratorCompany = template ? "________________________" : "Dean Miller Narration LLC";
-  const narratorEmail   = template ? "________________________" : "dean@dmnarration.com";
-  const narratorSite    = template ? "" : " · dmnarration.com";
+  // Narrator identity — blank for generic template. Shared with InvoicePDF so
+  // the two documents can't disagree about the trading name or remit-to email.
+  const narratorName    = template ? BLANK_LINE : BUSINESS.name;
+  const narratorCompany = template ? BLANK_LINE : BUSINESS.company;
+  const narratorEmail   = template ? BLANK_LINE : BUSINESS.email;
+  const narratorSite    = template ? "" : ` · ${BUSINESS.site}`;
 
   // Estimated total (PFH only); halved for Duet since narrator covers ~half the book
   const rate  = parseFloat(data.rateAmount);

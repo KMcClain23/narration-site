@@ -15,12 +15,14 @@ import {
   PAYMENT_STATUS_LABEL,
   PAYMENT_STATUS_PILL,
   PAYOUT_KIND_LABEL,
+  rowValue,
   type MoneyCard,
   type PayoutKind,
   type PaymentRow,
   type PaymentStatus,
 } from "@/lib/payments";
 import { PaymentFormModal } from "./PaymentFormModal";
+import { InvoiceButton } from "./InvoiceButton";
 
 // Attention order, not alphabetical: the reason to open this page is to find
 // money that hasn't arrived, so settled rows sink to the bottom.
@@ -88,13 +90,17 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
     });
   }, [payments]);
 
-  // Projects still running on the calculated estimate. These are where the
-  // "expected" total comes from before any invoice exists, so they're worth
-  // showing explicitly rather than leaving the number unexplained.
+  // Projects with no invoice raised yet.
+  //
+  // Keyed on whether any row carries an invoice date — NOT on whether a
+  // payment row exists. Merely recording or editing a payment is not
+  // invoicing, and the previous version dropped a project off this list the
+  // moment anything was saved against it, which is exactly when it still
+  // needs to be here.
   const unbilled = useMemo(() => {
     return cards
-      .filter(c => !rowsByCard.has(c.id))
-      .map(c => ({ card: c, estimate: cardExpected(c, []) }))
+      .filter(c => !(rowsByCard.get(c.id) ?? []).some(r => r.invoiced_on))
+      .map(c => ({ card: c, estimate: cardExpected(c, rowsByCard.get(c.id) ?? []) }))
       .filter(x => x.estimate != null && x.estimate > 0)
       .sort((a, b) => (b.estimate ?? 0) - (a.estimate ?? 0));
   }, [cards, rowsByCard]);
@@ -188,8 +194,20 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
                     <tr key={p.id} className="border-b border-divider last:border-0">
                       <td className={`${adminType.bodyMd} px-4 py-3`}>{card?.title ?? "Unknown project"}</td>
                       <td className={`${adminType.body} px-4 py-3`}>{p.label || "—"}</td>
+                      {/* Leaving the amount blank means "use the estimate", so
+                          showing a dash here contradicted the field's own
+                          placeholder. The derived figure is prefixed with ~ so
+                          it never reads as an agreed number. */}
                       <td className={`${adminType.monoNum} px-4 py-3`}>
-                        {p.amount_expected != null ? formatMoney(Number(p.amount_expected)) : "—"}
+                        {p.amount_expected != null ? (
+                          formatMoney(Number(p.amount_expected))
+                        ) : card ? (
+                          <span className="text-text-dim">
+                            ~{formatMoney(rowValue(p, card, rowsByCard.get(p.card_id) ?? []))}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td className={`${adminType.monoNum} px-4 py-3`}>{fmtDate(p.due_on)}</td>
                       <td className={`${adminType.monoNum} px-4 py-3`}>
@@ -197,13 +215,22 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
                       </td>
                       <td className="px-4 py-3"><StatusPill status={status} /></td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setEditing({ cardId: p.card_id, payment: p })}
-                          className="text-[13px] text-text-muted hover:text-text-primary"
-                        >
-                          Edit
-                        </button>
+                        <div className="flex items-center justify-end gap-3">
+                          {card && (
+                            <InvoiceButton
+                              payment={p}
+                              card={card}
+                              rows={rowsByCard.get(p.card_id) ?? []}
+                            />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setEditing({ cardId: p.card_id, payment: p })}
+                            className="text-[13px] text-text-muted hover:text-text-primary"
+                          >
+                            Edit
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -218,7 +245,8 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
       <section className="mt-10">
         <h2 className={adminType.titleLg}>Not yet invoiced</h2>
         <p className={`${adminType.small} mt-1`}>
-          Projects with a calculated estimate but no payment milestone recorded.
+          Projects with no invoice date set yet. Recording a payment doesn&apos;t remove one from
+          this list — raising an invoice does.
         </p>
         <div className="mt-4 space-y-2">
           {unbilled.length === 0 ? (

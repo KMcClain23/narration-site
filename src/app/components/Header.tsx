@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { BUSINESS, PROFILE_PHOTO_URL, ROLE_LABEL } from "@/lib/business-identity";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FaTiktok, FaInstagram, FaDiscord } from "react-icons/fa";
@@ -24,6 +25,7 @@ function isAdminWorldRoute(pathname: string): boolean {
   if (pathname === "/inquiries") return true;
   if (pathname.startsWith("/tools")) return true;
   if (pathname === "/settings") return true;
+  if (pathname === "/payments") return true;
   if (pathname === "/released") return true;
   return false;
 }
@@ -162,8 +164,8 @@ export default function Header() {
         >
           <div className="h-9 w-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center overflow-hidden transition group-hover:border-[#D4AF37]/50 group-hover:bg-[#D4AF37]/10">
             <Image
-              src="https://pub-0274e76b677f47ea8135396e59f3ef10.r2.dev/Profile%20Photo%202.jpg"
-              alt="Dean Miller"
+              src={PROFILE_PHOTO_URL}
+              alt={BUSINESS.name}
               width={36}
               height={36}
               className="object-cover"
@@ -172,8 +174,8 @@ export default function Header() {
             />
           </div>
           <div className="leading-tight">
-            <p className="text-sm font-semibold text-white">Dean Miller</p>
-            <p className="text-xs text-white/60 hidden sm:block">Audiobook Narrator</p>
+            <p className="text-sm font-semibold text-white">{BUSINESS.name}</p>
+            <p className="text-xs text-white/60 hidden sm:block">{ROLE_LABEL}</p>
           </div>
         </Link>
 

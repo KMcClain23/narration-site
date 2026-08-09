@@ -254,6 +254,26 @@ export function PaymentFormModal({
   const set = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [key]: e.target.value }));
 
+  /**
+   * Setting an invoice date is the moment an invoice starts existing, so that
+   * is when a number is reserved — not on every payment. Most payments here
+   * are informal (Venmo from an indie author) and never get invoiced at all;
+   * numbering those would manufacture paperwork and burn sequence numbers.
+   * Only fills a blank field, so a hand-entered number is never overwritten.
+   */
+  async function onInvoicedOnChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value;
+    setForm(f => ({ ...f, invoiced_on: value }));
+    if (!value || form.invoice_number.trim()) return;
+
+    const res = await fetch("/api/payments/next-invoice-number");
+    if (!res.ok) return;
+    const { invoice_number } = await res.json();
+    // Re-checked after the await: the field may have been typed into while
+    // the request was in flight, and the user's own value wins.
+    setForm(f => (f.invoice_number.trim() ? f : { ...f, invoice_number }));
+  }
+
   const finishedHrs = finishedHours(card?.word_count ?? null);
 
   const sharePercent =
@@ -355,7 +375,7 @@ export function PaymentFormModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
-        className="admin-scrollbar max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-surface-border bg-surface p-6"
+        className="admin-scrollbar max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-surface-border bg-surface p-6"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
@@ -368,7 +388,13 @@ export function PaymentFormModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-5">
+          {/* Two columns from md up: the payment itself on the left, the
+              gross/payouts breakdown on the right. Stacked they run past the
+              viewport and the waterfall — the thing worth looking at while
+              typing — falls below the fold. */}
+          <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
+          <div className="space-y-4">
           <Field
             label="What's this payment for?"
             hint="Only matters when a project pays in more than one instalment. One payment? Leave it."
@@ -392,10 +418,11 @@ export function PaymentFormModal({
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="Invoiced on">
-              <input type="date" className={inputClass} value={form.invoiced_on} onChange={set("invoiced_on")} />
+              <input type="date" className={inputClass} value={form.invoiced_on} onChange={onInvoicedOnChange} />
             </Field>
-            <Field label="Invoice #">
-              <input className={inputClass} value={form.invoice_number} onChange={set("invoice_number")} />
+            <Field label="Invoice #" hint="Fills in when you set an invoice date.">
+              <input className={inputClass} value={form.invoice_number} onChange={set("invoice_number")}
+                placeholder="Blank for informal payments" />
             </Field>
           </div>
 
@@ -409,10 +436,19 @@ export function PaymentFormModal({
             </Field>
           </div>
 
+          <Field label="Method">
+            <input className={inputClass} value={form.method} onChange={set("method")} placeholder="PayPal, ACH, check…" />
+          </Field>
+
+          <Field label="Notes">
+            <textarea className={`${inputClass} min-h-[72px]`} value={form.notes} onChange={set("notes")} />
+          </Field>
+          </div>
+
           {/* Gross + payouts. Skipped entirely on a solo project with no
               editor: leave gross blank and add no payouts, and the waterfall
               collapses to the plain expected/received pair above. */}
-          <div className="rounded-lg border border-surface-border px-4 py-3 space-y-4">
+          <div className="rounded-lg border border-surface-border px-4 py-3 space-y-4 self-start">
             <p className={adminType.label}>Gross &amp; payouts</p>
             <p className={adminType.small}>
               For duet/multicast work, or when an editor is paid out of the fee. Leave blank otherwise.
@@ -427,18 +463,11 @@ export function PaymentFormModal({
 
             {waterfall && <WaterfallBreakdown w={waterfall} />}
           </div>
+          </div>
 
-          <Field label="Method">
-            <input className={inputClass} value={form.method} onChange={set("method")} placeholder="PayPal, ACH, check…" />
-          </Field>
+          {error && <p className="mt-4 text-sm text-alert-red">{error}</p>}
 
-          <Field label="Notes">
-            <textarea className={`${inputClass} min-h-[72px]`} value={form.notes} onChange={set("notes")} />
-          </Field>
-
-          {error && <p className="text-sm text-alert-red">{error}</p>}
-
-          <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="mt-5 flex items-center justify-between gap-3 border-t border-surface-border pt-4">
             {payment ? (
               <button type="button" onClick={handleDelete} disabled={saving}
                 className="text-sm text-alert-red hover:underline disabled:opacity-50">

@@ -1,7 +1,10 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
+import { BUSINESS, PROFILE_PHOTO_URL, ROLE_LABEL } from "@/lib/business-identity";
 import {
   LayoutGrid, Calendar, CheckCircle2, Users, Mail, Wrench, DollarSign, Settings as SettingsIcon,
   ChevronLeft, ChevronRight, LogOut,
@@ -71,13 +74,33 @@ export function Sidebar() {
         collapsed ? "w-14" : "w-60"
       }`}
     >
-      {/* Top */}
-      <div className="px-4 py-4">
-        {collapsed ? (
-          <p className="font-semibold text-[16px] text-text-primary text-center" title="DMN Admin">D</p>
-        ) : (
-          <p className="font-semibold text-[16px] text-text-primary">DMN Admin</p>
-        )}
+      {/* Top — the way back to the public site.
+          Admin routes suppress the public header entirely (Header.tsx returns
+          null for them), so the old "DMN Admin" wordmark left no route out of
+          admin except editing the URL. */}
+      <div className={collapsed ? "px-2 py-4" : "px-3 py-4"}>
+        <Link
+          href="/"
+          title="View public site"
+          className="group flex items-center gap-2.5 rounded-lg p-1 transition-colors hover:bg-surface-raised"
+        >
+          <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-surface-border bg-surface-raised transition-colors group-hover:border-accent-amber/50">
+            <Image
+              src={PROFILE_PHOTO_URL}
+              alt={BUSINESS.name}
+              width={36}
+              height={36}
+              className="object-cover"
+              style={{ objectPosition: "center 30%" }}
+            />
+          </span>
+          {!collapsed && (
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-sm font-semibold text-text-primary">{BUSINESS.name}</span>
+              <span className="block truncate text-xs text-text-muted">{ROLE_LABEL}</span>
+            </span>
+          )}
+        </Link>
       </div>
       <div className="h-px bg-divider mx-4 mb-2" />
 
