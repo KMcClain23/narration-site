@@ -89,11 +89,56 @@ const LIGATURES: Array<[RegExp, string]> = [
   [/ﬆ/g, "st"],
 ];
 
-function normalizeLigatures(s: string): string {
+/**
+ * Characters that extract cleanly and cannot be stored.
+ *
+ * PostgreSQL text cannot hold U+0000 at all, and supabase-js sends rows as
+ * JSON, so a single NUL anywhere in a chapter fails the insert with
+ * "unsupported Unicode escape sequence" — after the whole parse has run. The
+ * book that surfaced this had exactly one, on page 344 of 395, in a damaged
+ * region of the text layer.
+ *
+ * Lone surrogates are the same class of problem: a high or low surrogate
+ * without its pair is not a valid code point, survives extraction, and is
+ * rejected on the way to the database.
+ *
+ * The other C0 controls are not rejected but have no meaning in prose, and a
+ * stray one would show up in an ACX-bound script. Tab, newline and carriage
+ * return are kept because paragraph assembly reads them, and form feed (U+000C)
+ * is kept because the txt path splits pages on it.
+ */
+const UNSTORABLE = /[\u0000-\u0008\u000B\u000E-\u001F\u007F]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+/**
+ * Everything that has to happen to extracted text before anything else sees it.
+ *
+ * Ligature folding and control stripping run together because they share the
+ * same requirement: apply once, at the extraction boundary, so no downstream
+ * stage — word matching, the page map sent to Claude, the stored chapter — can
+ * encounter text the earlier stage would have rejected.
+ */
+function normalizeExtractedText(s: string): string {
   if (!s) return s;
   let out = s;
   for (const [re, rep] of LIGATURES) out = out.replace(re, rep);
-  return out;
+  // Replaced with a space rather than removed: a control character sitting
+  // between two words is a separator, and deleting it would join them.
+  return out.replace(UNSTORABLE, " ");
+}
+
+/**
+ * Last check before a value is handed to the database.
+ *
+ * The extraction boundary above is the real fix, and this is not a substitute
+ * for it. It exists because the cost of one escaped character is so lopsided:
+ * a chapter title that came back from Claude rather than from the page bypasses
+ * extraction entirely, and a single bad character in any of several hundred
+ * rows fails the whole insert — discarding a parse that took forty seconds and
+ * a model call, with nothing stored and only "unsupported Unicode escape
+ * sequence" to show for it.
+ */
+export function toStorableText(s: string): string {
+  return s.replace(UNSTORABLE, " ");
 }
 
 // ─── Text-layer quality detection ──────────────────────────────────────────────
@@ -239,7 +284,13 @@ async function processDocx(buffer: Buffer): Promise<
     extractRawText: (src: { buffer: Buffer }) => Promise<{ value: string }>;
   };
 
-  const { value: html } = await mammoth.convertToHtml({ buffer });
+  // Normalised here for the same reason the PDF and txt paths do it at their
+  // own boundaries: this is where docx text enters. Tags contain neither
+  // ligature glyphs nor control characters, so running it over the whole HTML
+  // string is safe and covers both branches below at once.
+  const { value: html } = await mammoth
+    .convertToHtml({ buffer })
+    .then((r) => ({ value: normalizeExtractedText(r.value) }));
 
   // Collect every <h1> with its position in the HTML string
   interface H1 { title: string; index: number; end: number }
@@ -268,7 +319,7 @@ async function processDocx(buffer: Buffer): Promise<
   // for docx files with no Heading-1 styling at all — rare enough that it's
   // being left as a follow-up rather than blocking Phase 2.
   const { value: rawText } = await mammoth.extractRawText({ buffer });
-  const words = rawText.split(/\s+/).filter(Boolean);
+  const words = normalizeExtractedText(rawText).split(/\s+/).filter(Boolean);
   const CHUNK = 300;
   const pages: string[] = [];
   for (let i = 0; i < words.length; i += CHUNK) pages.push(words.slice(i, i + CHUNK).join(" "));
@@ -342,7 +393,7 @@ async function extractPagesFromPdf(buffer: Buffer): Promise<{ flatPages: string[
           // transform[0] is the horizontal scale of the text matrix, which for
           // unrotated text is the rendered glyph height.
           const size = Math.abs(item.transform[0]);
-          const str = normalizeLigatures(item.str);
+          const str = normalizeExtractedText(item.str);
           if (lastY === null || y === lastY) {
             if (cur === "") { curIndent = x; curSize = size; curY = y; }
             cur += str;
@@ -1006,7 +1057,7 @@ export interface TocChapter {
 
 /** Aggressive normalization for comparing a TOC title against body text. */
 function normalizeForMatch(s: string): string {
-  return normalizeLigatures(s).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return normalizeExtractedText(s).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 function stripTocNumbering(s: string): string {
@@ -2258,7 +2309,7 @@ export async function parseManuscript(
     const trace = makeTrace("txt");
     const txtWarnings: string[] = [];
 
-    const decoded = normalizeLigatures(
+    const decoded = normalizeExtractedText(
       buffer.toString("utf8").replace(/^﻿/, "").replace(/\r\n/g, "\n")
     );
     const rawPages = decoded.split("\f");

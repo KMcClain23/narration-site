@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { r2, R2_BUCKETS } from "@/lib/r2";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { parseManuscript, PARSE_BUDGET_MS } from "@/lib/manuscript-parser";
+import { parseManuscript, PARSE_BUDGET_MS, toStorableText } from "@/lib/manuscript-parser";
 import { nextCharacterColor } from "@/lib/character-colors";
 
 export const maxDuration = 60;
@@ -96,9 +96,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const rows = chapters.map((ch, i) => ({
       manuscript_id: id,
       order_index: i,
-      title: ch.title,
-      pov_character: ch.povCharacter,
-      raw_text: ch.rawText,
+      title: toStorableText(ch.title),
+      pov_character: ch.povCharacter ? toStorableText(ch.povCharacter) : ch.povCharacter,
+      raw_text: toStorableText(ch.rawText),
     }));
 
     const { error: insertError } = await supabaseAdmin.from("chapters").insert(rows);
