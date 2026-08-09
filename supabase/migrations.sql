@@ -600,3 +600,31 @@ begin
       with check (auth.role() = 'service_role');
   end if;
 end $$;
+
+-- Royalty share income is not a fee. Nobody invoices Audible, the amount is
+-- unknowable in advance, and it arrives repeatedly and indefinitely rather
+-- than once on delivery. Forcing it through the fee fields would mean an
+-- "expected" figure nobody can supply and an invoice that will never exist.
+--
+-- 'fee'     — the existing shape: expected, invoiced, due, gross, payouts.
+-- 'royalty' — a statement that arrived: period, amount, date received.
+--
+-- Defaulting to 'fee' leaves every existing row exactly as it was. An RS+
+-- project is simply one fee row plus as many royalty rows as there are
+-- statements, which is what RS+ actually is.
+alter table payments add column if not exists kind text not null default 'fee';
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'payments_kind_check') then
+    alter table payments add constraint payments_kind_check
+      check (kind in ('fee', 'royalty'));
+  end if;
+end $$;
+
+-- Which royalty period the statement covers, e.g. "Q1 2026" or "Jan 2026".
+-- Free text: distributors report on different cadences and a date range would
+-- imply a precision the statements don't always have.
+alter table payments add column if not exists period text not null default '';
+
+create index if not exists payments_kind_idx on payments (kind);

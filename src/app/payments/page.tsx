@@ -24,7 +24,7 @@ export default async function PaymentsPage() {
     supabaseAdmin
       .from("payments")
       .select(
-        "id, card_id, label, amount_expected, due_on, invoiced_on, invoice_number, amount_received, amount_gross, received_on, method, notes, sort_order, " +
+        "id, card_id, kind, period, label, amount_expected, due_on, invoiced_on, invoice_number, amount_received, amount_gross, received_on, method, notes, sort_order, " +
           "payouts:payment_payouts(id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, notes)"
       ),
   ]);

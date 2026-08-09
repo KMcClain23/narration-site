@@ -9,9 +9,21 @@
 
 import { estimatedEarnings, parseLocalDate } from "@/components/admin/board-card-utils";
 
+/**
+ * A fee is billed and chased; a royalty statement simply arrives.
+ *
+ * Kept as two kinds of the same row rather than two tables because they answer
+ * the same question — what did this project pay — and an RS+ deal is literally
+ * one fee plus many royalty statements.
+ */
+export type PaymentKind = "fee" | "royalty";
+
 export type PaymentRow = {
   id: string;
   card_id: string;
+  kind: PaymentKind;
+  /** Royalty statements only: which period the statement covers. */
+  period: string;
   label: string;
   amount_expected: number | null;
   due_on: string | null;
@@ -137,6 +149,12 @@ export function derivePaymentStatus(p: PaymentRow, now = todayLocal()): PaymentS
   const expected = rowExpected(p);
   const received = Number(p.amount_received) || 0;
 
+  // A royalty statement is never owed, overdue or invoiced — it either
+  // arrived or it hasn't been entered yet. Running it through the fee ladder
+  // below would mark an un-entered statement "overdue" against a due date
+  // that has no meaning for royalties.
+  if (p.kind === "royalty") return received > 0 ? "paid" : "expected";
+
   // Tolerance of a cent absorbs numeric(10,2) rounding so a fully-settled
   // invoice doesn't sit forever at "partial" over a rounding remainder.
   if (expected != null && received >= expected - 0.01 && expected > 0) return "paid";
@@ -156,7 +174,9 @@ export function derivePaymentStatus(p: PaymentRow, now = todayLocal()): PaymentS
  * $2,400 whole-project estimate reads as $3,600 of work that doesn't exist.
  */
 export function cardExpected(card: MoneyCard, rows: PaymentRow[]): number | null {
-  const explicit = rows.filter(r => r.amount_expected != null);
+  // Royalty statements are history, not a forecast — including them would
+  // make "expected" grow every time a statement is entered.
+  const explicit = rows.filter(r => r.kind !== "royalty" && r.amount_expected != null);
   if (explicit.length > 0) {
     return explicit.reduce((sum, r) => sum + Number(r.amount_expected), 0);
   }
@@ -188,10 +208,16 @@ export function isCardExpectedActual(rows: PaymentRow[]): boolean {
  *      without inventing a number.
  */
 export function rowValue(p: PaymentRow, card: MoneyCard, rows: PaymentRow[]): number {
+  // A royalty statement is worth exactly what it paid. There is no estimate
+  // to fall back on — that is the nature of royalty share.
+  if (p.kind === "royalty") return Number(p.amount_received) || 0;
+
   if (p.amount_expected != null) return Number(p.amount_expected);
   const received = Number(p.amount_received) || 0;
   if (received > 0) return received;
-  if (rows.length === 1) return cardExpected(card, rows) ?? 0;
+  // Only the fee rows can claim the project estimate; a royalty row alongside
+  // them must not, or the estimate would be counted twice.
+  if (rows.filter(r => r.kind !== "royalty").length === 1) return cardExpected(card, rows) ?? 0;
   return 0;
 }
 
@@ -207,6 +233,8 @@ export type MoneyTotals = {
    * is a deductible expense depends on how the work is reported — a question
    * for an accountant, not for this file to decide.
    */
+  /** Royalty-share income received. Counted in `received`, never in `expected` — royalties are history, not a forecast. */
+  royalties: number;
   payoutsTotal: number;
   /** Payouts with a paid_on date — money that has actually left. */
   payoutsPaid: number;
@@ -226,6 +254,7 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
   let invoiced = 0;
   let received = 0;
   let overdue = 0;
+  let royalties = 0;
   let payoutsTotal = 0;
   let payoutsPaid = 0;
   let payoutsOwed = 0;
@@ -240,6 +269,7 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
       const amt = rowValue(r, card, rows);
       const got = Number(r.amount_received) || 0;
       received += got;
+      if (r.kind === "royalty") royalties += got;
 
       for (const p of r.payouts ?? []) {
         const a = Number(p.amount) || 0;
@@ -254,8 +284,10 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
         }
       }
 
-      if (r.invoiced_on) invoiced += amt;
-      if (derivePaymentStatus(r) === "overdue") overdue += amt;
+      if (r.kind !== "royalty") {
+        if (r.invoiced_on) invoiced += amt;
+        if (derivePaymentStatus(r) === "overdue") overdue += amt;
+      }
     }
   }
 
@@ -267,6 +299,7 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
     received,
     outstanding: Math.max(0, invoiced - received),
     overdue,
+    royalties,
     payoutsTotal,
     payoutsPaid,
     payoutsOwed,
@@ -367,7 +400,14 @@ export const PROJECT_STATE_LABEL: Record<ProjectState, string> = {
 
 export function projectState(card: MoneyCard, rows: PaymentRow[]): ProjectState {
   const received = rows.reduce((s, r) => s + (Number(r.amount_received) || 0), 0);
-  const invoicedRows = rows.filter(r => r.invoiced_on);
+  const invoicedRows = rows.filter(r => r.kind !== "royalty" && r.invoiced_on);
+
+  // Pure royalty share is never invoiced — there is no client to bill, only
+  // statements that arrive. Calling it "ready to invoice" would park it in a
+  // to-do list it can never leave.
+  if (card.payment_type === "rs") {
+    return received > 0 ? "paid" : card.status === "released" ? "untracked" : "production";
+  }
   const invoicedTotal = invoicedRows.reduce((s, r) => s + rowValue(r, card, rows), 0);
 
   if (invoicedRows.length > 0) {

@@ -17,7 +17,7 @@ function unauthorized() {
 }
 
 const SELECT_COLS =
-  "id, card_id, label, amount_expected, due_on, invoiced_on, invoice_number, amount_received, amount_gross, received_on, method, notes, sort_order, created_at, updated_at, " +
+  "id, card_id, kind, period, label, amount_expected, due_on, invoiced_on, invoice_number, amount_received, amount_gross, received_on, method, notes, sort_order, created_at, updated_at, " +
   // Embedded so a payment always arrives with its payouts — every consumer
   // needs them to compute the waterfall, and a second round-trip per payment
   // would be pure overhead.
@@ -73,6 +73,8 @@ export async function POST(req: Request) {
       .from("payments")
       .insert({
         card_id,
+        kind: body.kind === "royalty" ? "royalty" : "fee",
+        period: String(body.period ?? "").trim(),
         label: String(label).trim(),
         amount_expected: amountOrNull(body.amount_expected),
         due_on: dateOrNull(body.due_on),
@@ -112,6 +114,8 @@ export async function PATCH(req: Request) {
     // update never blanks a column the caller never mentioned.
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
+    if ("kind" in body) patch.kind = body.kind === "royalty" ? "royalty" : "fee";
+    if ("period" in body) patch.period = String(body.period ?? "").trim();
     if ("label" in body) patch.label = String(body.label ?? "").trim();
     if ("amount_expected" in body) patch.amount_expected = amountOrNull(body.amount_expected);
     if ("due_on" in body) patch.due_on = dateOrNull(body.due_on);

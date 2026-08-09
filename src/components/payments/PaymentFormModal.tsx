@@ -10,6 +10,7 @@ import {
   formatMoney,
   isOffTheTop,
   PAYOUT_KIND_LABEL,
+  type PaymentKind,
   type PayoutKind,
   type PayoutRow,
   type PaymentRow,
@@ -29,6 +30,8 @@ export type CardMoneyContext = {
 // and coercing on each keystroke fights the caret. Conversion happens once,
 // on submit.
 type FormState = {
+  kind: PaymentKind;
+  period: string;
   label: string;
   amount_expected: string;
   due_on: string;
@@ -65,6 +68,8 @@ const KIND_ORDER: PayoutKind[] = ["editor", "proofer", "co_narrator", "agent", "
 
 function toForm(p: PaymentRow | null): FormState {
   return {
+    kind: p?.kind ?? "fee",
+    period: p?.period ?? "",
     label: p?.label ?? "",
     amount_expected: p?.amount_expected != null ? String(p.amount_expected) : "",
     due_on: p?.due_on ?? "",
@@ -192,6 +197,16 @@ function PayoutsEditor({
               </button>
             )}
 
+            {/* A rate with no hours to multiply can't produce a figure. Saying
+                so beats silently offering nothing, which looks like the
+                calculator is broken. */}
+            {p.rate_pfh && finishedHrs === 0 && (
+              <p className={adminType.small}>
+                Can&apos;t calculate from a rate — this project has no word count, so there are no finished
+                hours. Enter the amount directly, or add a word count to the project.
+              </p>
+            )}
+
             {/* Blank means still owed. Without this the page counted an
                 unpaid editor as money that had already left the account. */}
             <label className="flex items-center gap-2">
@@ -313,6 +328,7 @@ export function PaymentFormModal({
   // the narrator's own estimate shown elsewhere on this form.
   // Solo work has nobody to split with, so the co-narrator half of this
   // section is noise there — the fee is simply the narrator's, minus costs.
+  const isRoyalty = form.kind === "royalty";
   const format = card?.narration_format ?? null;
   const isSplit = format === "duet" || format === "dual" || format === "multicast";
   const formatLabel = format ? format.charAt(0).toUpperCase() + format.slice(1) : "Split";
@@ -426,6 +442,57 @@ export function PaymentFormModal({
               gross/payouts breakdown on the right. Stacked they run past the
               viewport and the waterfall — the thing worth looking at while
               typing — falls below the fold. */}
+          {/* Fee vs royalty. A royalty statement is never invoiced and its
+              amount isn't knowable in advance, so the fee fields below would
+              all be blanks that can never be filled. */}
+          <div className="mb-4 inline-flex rounded-lg border border-surface-border p-0.5">
+            {(["fee", "royalty"] as PaymentKind[]).map(k => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setForm(f => ({ ...f, kind: k }))}
+                className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                  form.kind === k
+                    ? "bg-accent-amber text-background font-medium"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                {k === "fee" ? "Fee" : "Royalty share"}
+              </button>
+            ))}
+          </div>
+
+          {isRoyalty ? (
+            <div className="max-w-md space-y-4">
+              <Field label="Period" hint="Whatever the statement covers — a quarter, a month, a payout run.">
+                <input className={inputClass} value={form.period} onChange={set("period")}
+                  placeholder="Q1 2026" />
+              </Field>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Amount received">
+                  <input className={inputClass} value={form.amount_received} onChange={set("amount_received")}
+                    inputMode="decimal" placeholder="0" />
+                </Field>
+                <Field label="Received on">
+                  <input type="date" className={inputClass} value={form.received_on} onChange={set("received_on")} />
+                </Field>
+              </div>
+
+              <Field label="Source" hint="ACX, Findaway, the publisher — whoever the statement came from.">
+                <input className={inputClass} value={form.method} onChange={set("method")} placeholder="ACX" />
+              </Field>
+
+              <Field label="Notes">
+                <textarea className={`${inputClass} min-h-[72px]`} value={form.notes} onChange={set("notes")} />
+              </Field>
+
+              <p className={adminType.small}>
+                Royalties count toward what you&apos;ve collected, but never toward expected or outstanding —
+                there&apos;s no invoice behind them and no way to forecast the next one.
+              </p>
+            </div>
+          ) : (
           <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
           <div className="space-y-4">
           <Field
@@ -508,9 +575,22 @@ export function PaymentFormModal({
               onChange={handleRemovePayouts}
             />
 
-            {waterfall && <WaterfallBreakdown w={waterfall} />}
+            {waterfall ? (
+              <WaterfallBreakdown w={waterfall} />
+            ) : (
+              // Rendering nothing here read as a missing feature rather than
+              // as missing inputs — the breakdown needs a fee to divide, and
+              // this project has neither a typed gross nor a word count and
+              // rate to derive one from.
+              <p className={`${adminType.small} rounded-lg border border-surface-border px-3 py-2.5`}>
+                {finishedHrs > 0
+                  ? "Enter the gross fee above to see where the money goes."
+                  : "No breakdown yet — enter the gross fee above, or set this project's word count and PFH rate to have it calculated."}
+              </p>
+            )}
           </div>
           </div>
+          )}
 
           {error && <p className="mt-4 text-sm text-alert-red">{error}</p>}
 
