@@ -324,6 +324,50 @@ export function invoiceAmount(p: PaymentRow, card: MoneyCard, rows: PaymentRow[]
   return cardExpected(card, rows);
 }
 
+/**
+ * Where a project sits in the money cycle.
+ *
+ * One state per project, so a project appears exactly once on the page. The
+ * previous layout listed payments and un-invoiced projects as two separate
+ * sections, which meant a project with a payment row but no invoice date
+ * appeared in both — describing the same thing twice in different words.
+ */
+export type ProjectState = "awaiting" | "ready" | "production" | "paid" | "untracked";
+
+export const PROJECT_STATE_LABEL: Record<ProjectState, string> = {
+  awaiting: "Awaiting payment",
+  ready: "Ready to invoice",
+  production: "In production",
+  paid: "Paid",
+  untracked: "Released — no payment recorded",
+};
+
+export function projectState(card: MoneyCard, rows: PaymentRow[]): ProjectState {
+  const received = rows.reduce((s, r) => s + (Number(r.amount_received) || 0), 0);
+  const invoicedRows = rows.filter(r => r.invoiced_on);
+  const invoicedTotal = invoicedRows.reduce((s, r) => s + rowValue(r, card, rows), 0);
+
+  if (invoicedRows.length > 0) {
+    // Cent of tolerance so numeric(10,2) rounding doesn't strand a settled
+    // invoice in "awaiting" forever.
+    return received + 0.01 >= invoicedTotal ? "paid" : "awaiting";
+  }
+
+  // Paid without ever being invoiced — the common indie case, where the
+  // author simply sends the money.
+  if (received > 0) return "paid";
+
+  // A title that is already on sale with nothing recorded against it is
+  // history, not a task: it shipped before this tracker existed. Calling it
+  // "ready to invoice" would put a decade of back catalogue in the same list
+  // as this week's work.
+  if (card.status === "released") return "untracked";
+
+  // Billable once it is off the mic. Anything earlier can't be invoiced,
+  // because the work hasn't been delivered.
+  return card.status === "editing" ? "ready" : "production";
+}
+
 export type ClientBreakdown = {
   client: string;
   projects: number;

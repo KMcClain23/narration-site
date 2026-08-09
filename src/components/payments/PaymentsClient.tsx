@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { parseLocalDate } from "@/components/admin/board-card-utils";
 import {
@@ -9,59 +9,218 @@ import {
   clientOf,
   computeByClient,
   computeTotals,
-  derivePaymentStatus,
   formatMoney,
   isCardExpectedActual,
-  PAYMENT_STATUS_LABEL,
-  PAYMENT_STATUS_PILL,
   PAYOUT_KIND_LABEL,
-  rowValue,
+  projectState,
+  PROJECT_STATE_LABEL,
   type MoneyCard,
-  type PayoutKind,
   type PaymentRow,
-  type PaymentStatus,
+  type PayoutKind,
+  type ProjectState,
 } from "@/lib/payments";
 import { PaymentFormModal } from "./PaymentFormModal";
 import { InvoiceButton } from "./InvoiceButton";
 
-// Attention order, not alphabetical: the reason to open this page is to find
-// money that hasn't arrived, so settled rows sink to the bottom.
-const STATUS_RANK: Record<PaymentStatus, number> = {
-  overdue: 0,
-  partial: 1,
-  invoiced: 2,
-  expected: 3,
-  paid: 4,
+// Order is the order of attention: money you're owed, then work you could
+// bill, then everything that needs no decision today.
+const GROUP_ORDER: ProjectState[] = ["awaiting", "ready", "production", "paid", "untracked"];
+
+// Groups that answer "what should I do next" stay open; the rest are counts
+// until asked for. Previously every project was rendered at full weight, so
+// 16 in-production titles — none of them actionable — dominated the page.
+const OPEN_BY_DEFAULT: Record<ProjectState, boolean> = {
+  awaiting: true,
+  ready: true,
+  production: false,
+  paid: false,
+  untracked: false,
+};
+
+const GROUP_HINT: Record<ProjectState, string> = {
+  awaiting: "Invoiced, not yet paid in full.",
+  ready: "Delivered work with no invoice raised yet.",
+  production: "Still recording or prepping — nothing to bill until delivery.",
+  paid: "Settled.",
+  untracked:
+    "Already on sale with nothing recorded yet. Still tracked and still countable — add a payment on any row to backfill what you were paid.",
+};
+
+type Project = {
+  card: MoneyCard;
+  rows: PaymentRow[];
+  state: ProjectState;
+  amount: number | null;
+  isEstimate: boolean;
 };
 
 function fmtDate(s: string | null): string {
-  if (!s) return "—";
+  if (!s) return "";
   return parseLocalDate(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function Tile({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: "amber" | "red" }) {
-  const valueColor =
+function Stat({
+  label,
+  value,
+  hint,
+  primary,
+  tone,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  primary?: boolean;
+  tone?: "amber" | "red";
+}) {
+  const color =
     tone === "red" ? "text-alert-red" : tone === "amber" ? "text-accent-amber-bright" : "text-text-primary";
   return (
-    <div className="rounded-xl border border-surface-border bg-surface p-4">
+    <div>
       <p className={adminType.label}>{label}</p>
-      <p className={`mt-1.5 font-bold text-2xl tabular-nums ${valueColor}`}>{value}</p>
-      {hint && <p className={`${adminType.small} mt-0.5`}>{hint}</p>}
+      <p className={`${primary ? "text-2xl font-bold" : "text-lg font-semibold"} tabular-nums ${color} mt-0.5`}>
+        {value}
+      </p>
+      {hint && <p className={adminType.small}>{hint}</p>}
     </div>
   );
 }
 
-function StatusPill({ status }: { status: PaymentStatus }) {
+function ProjectRow({
+  project,
+  onAddPayment,
+  onEditPayment,
+}: {
+  project: Project;
+  onAddPayment: () => void;
+  onEditPayment: (p: PaymentRow) => void;
+}) {
+  const { card, rows, amount, isEstimate } = project;
+  const primary = rows[0];
+
   return (
-    <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${PAYMENT_STATUS_PILL[status]}`}>
-      {PAYMENT_STATUS_LABEL[status]}
-    </span>
+    <div className="border-b border-divider px-4 py-3 last:border-0">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0 flex-1">
+          <p className={`${adminType.bodyMd} truncate`}>{card.title}</p>
+          <p className={adminType.small}>
+            {clientOf(card)} · {card.status}
+            {primary?.due_on ? ` · due ${fmtDate(primary.due_on)}` : ""}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-4">
+          <span className={`${adminType.monoNum} ${isEstimate ? "text-text-dim" : "text-text-primary"}`}>
+            {amount != null ? `${isEstimate ? "~" : ""}${formatMoney(amount)}` : "—"}
+          </span>
+
+          {primary ? (
+            <>
+              <InvoiceButton payment={primary} card={card} rows={rows} />
+              <button
+                type="button"
+                onClick={() => onEditPayment(primary)}
+                className="text-[13px] text-text-muted hover:text-text-primary"
+              >
+                Edit
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={onAddPayment}
+              className="flex items-center gap-1 rounded-lg border border-surface-border px-2.5 py-1.5 text-[13px] text-text-body hover:border-accent-amber hover:text-text-primary"
+            >
+              <Plus size={14} /> Payment
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Only projects that genuinely pay in instalments get the extra lines —
+          a single-payment project would just repeat the row above. */}
+      {rows.length > 1 && (
+        <div className="mt-2 space-y-1 border-l border-surface-border pl-3">
+          {rows.map(r => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => onEditPayment(r)}
+              className="flex w-full items-center justify-between gap-3 text-left hover:opacity-80"
+            >
+              <span className={adminType.small}>
+                {r.label || "Payment"}
+                {r.due_on ? ` · due ${fmtDate(r.due_on)}` : ""}
+              </span>
+              <span className={adminType.monoNum}>
+                {r.amount_expected != null ? formatMoney(Number(r.amount_expected)) : "—"}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Group({
+  state,
+  projects,
+  total,
+  onAddPayment,
+  onEditPayment,
+}: {
+  state: ProjectState;
+  projects: Project[];
+  total: number;
+  onAddPayment: (cardId: string) => void;
+  onEditPayment: (cardId: string, p: PaymentRow) => void;
+}) {
+  const [open, setOpen] = useState(OPEN_BY_DEFAULT[state]);
+  if (projects.length === 0) return null;
+
+  return (
+    <section className="mt-4 overflow-hidden rounded-xl border border-surface-border">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex w-full items-center gap-3 bg-surface px-4 py-3 text-left hover:bg-surface-raised"
+      >
+        {open ? <ChevronDown size={16} className="text-text-muted" /> : <ChevronRight size={16} className="text-text-muted" />}
+        <span className={adminType.title}>{PROJECT_STATE_LABEL[state]}</span>
+        <span className={`${adminType.monoNum} rounded-full bg-pill-neutral-bg px-2 py-0.5 text-pill-neutral-text`}>
+          {projects.length}
+        </span>
+        {/* Suppressed at zero: the back-catalogue group has no rates on file,
+            and "$0" beside 11 titles reads as "these were worth nothing"
+            rather than "nothing is recorded". */}
+        <span className="ml-auto flex items-center gap-3">
+          <span className={adminType.monoNum}>{total > 0 ? formatMoney(total) : "—"}</span>
+        </span>
+      </button>
+
+      {open && (
+        <>
+          <p className={`${adminType.small} border-t border-surface-border px-4 py-2`}>{GROUP_HINT[state]}</p>
+          <div>
+            {projects.map(p => (
+              <ProjectRow
+                key={p.card.id}
+                project={p}
+                onAddPayment={() => onAddPayment(p.card.id)}
+                onEditPayment={row => onEditPayment(p.card.id, row)}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 
 export function PaymentsClient({ cards, payments: initialPayments }: { cards: MoneyCard[]; payments: PaymentRow[] }) {
   const [payments, setPayments] = useState<PaymentRow[]>(initialPayments);
   const [editing, setEditing] = useState<{ cardId: string; payment: PaymentRow | null } | null>(null);
+  const [showClients, setShowClients] = useState(false);
 
   const cardsById = useMemo(() => new Map(cards.map(c => [c.id, c])), [cards]);
 
@@ -78,32 +237,41 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
   const totals = useMemo(() => computeTotals(cards, rowsByCard), [cards, rowsByCard]);
   const byClient = useMemo(() => computeByClient(cards, rowsByCard), [cards, rowsByCard]);
 
-  const sortedPayments = useMemo(() => {
-    return [...payments].sort((a, b) => {
-      const rank = STATUS_RANK[derivePaymentStatus(a)] - STATUS_RANK[derivePaymentStatus(b)];
-      if (rank !== 0) return rank;
-      // Undated rows sort last within a status rather than reading as due
-      // at the epoch, which would put them above genuinely urgent ones.
-      const at = a.due_on ? parseLocalDate(a.due_on).getTime() : Infinity;
-      const bt = b.due_on ? parseLocalDate(b.due_on).getTime() : Infinity;
-      return at - bt;
-    });
-  }, [payments]);
-
-  // Projects with no invoice raised yet.
-  //
-  // Keyed on whether any row carries an invoice date — NOT on whether a
-  // payment row exists. Merely recording or editing a payment is not
-  // invoicing, and the previous version dropped a project off this list the
-  // moment anything was saved against it, which is exactly when it still
-  // needs to be here.
-  const unbilled = useMemo(() => {
+  const projects = useMemo<Project[]>(() => {
     return cards
-      .filter(c => !(rowsByCard.get(c.id) ?? []).some(r => r.invoiced_on))
-      .map(c => ({ card: c, estimate: cardExpected(c, rowsByCard.get(c.id) ?? []) }))
-      .filter(x => x.estimate != null && x.estimate > 0)
-      .sort((a, b) => (b.estimate ?? 0) - (a.estimate ?? 0));
+      .map(card => {
+        const rows = rowsByCard.get(card.id) ?? [];
+        const state = projectState(card, rows);
+        const received = rows.reduce((s, r) => s + (Number(r.amount_received) || 0), 0);
+        const expected = cardExpected(card, rows);
+
+        // The number that matters differs by column: what landed for settled
+        // work, what's still owed for invoiced work, the expected value for
+        // everything else. One shared "expected" figure would have shown
+        // Whiskey & Lies at its $1,548 estimate under a "Paid" heading, when
+        // what actually arrived was $1,500.
+        const amount =
+          state === "paid" ? received
+          : state === "awaiting" ? Math.max(0, (expected ?? 0) - received)
+          : expected;
+
+        return {
+          card,
+          rows,
+          state,
+          amount,
+          isEstimate: state === "paid" || state === "awaiting" ? false : !isCardExpectedActual(rows),
+        };
+      })
+      .sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0));
   }, [cards, rowsByCard]);
+
+  const grouped = useMemo(() => {
+    const m = new Map<ProjectState, Project[]>();
+    for (const s of GROUP_ORDER) m.set(s, []);
+    for (const p of projects) m.get(p.state)!.push(p);
+    return m;
+  }, [projects]);
 
   const estimatedShare = useMemo(() => {
     const actual = cards
@@ -128,182 +296,96 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
     setEditing(null);
   }
 
+  const owed = totals.outstanding;
+
   return (
-    <div className="mx-auto max-w-[1200px]">
+    <div className="mx-auto max-w-[1000px]">
       <h1 className={adminType.titleLg}>Payments</h1>
 
-      {/* Headline figures */}
-      <section className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Tile
-          label="Expected"
-          value={formatMoney(totals.expected)}
-          hint={estimatedShare > 0.5 ? `${formatMoney(estimatedShare)} still estimated` : "All from invoices"}
+      {/* One compact strip rather than four large tiles. Three of the four
+          were restating the same single payment, and the only actionable
+          number — what you're owed — was the one reading $0. */}
+      <section className="mt-5 flex flex-wrap items-start gap-x-10 gap-y-4 rounded-xl border border-surface-border bg-surface px-5 py-4">
+        <Stat
+          label="Owed to you"
+          value={formatMoney(owed)}
+          primary
+          tone={totals.overdue > 0 ? "red" : owed > 0 ? "amber" : undefined}
+          hint={totals.overdue > 0 ? `${formatMoney(totals.overdue)} overdue` : owed === 0 ? "Nothing outstanding" : undefined}
         />
-        <Tile label="Invoiced" value={formatMoney(totals.invoiced)} />
-        <Tile label="Received" value={formatMoney(totals.received)} />
-        <Tile
-          label="Outstanding"
-          value={formatMoney(totals.outstanding)}
-          hint={totals.overdue > 0 ? `${formatMoney(totals.overdue)} overdue` : undefined}
-          tone={totals.overdue > 0 ? "red" : "amber"}
+        <Stat label="Collected" value={formatMoney(totals.received)} />
+        {/* Marked as an estimate in the label, not just a footnote — the
+            figure is derived from word counts, not from anything agreed. */}
+        <Stat
+          label="Pipeline (est.)"
+          value={`~${formatMoney(totals.expected)}`}
+          hint={estimatedShare < totals.expected ? `${formatMoney(totals.expected - estimatedShare)} from invoices` : undefined}
         />
-      </section>
-
-      {/* Only rendered once there are payouts to report — an always-visible
-          $0 row would imply this is part of every project rather than
-          specific to duet work and edited titles. Reported, not netted off:
-          whether a payout reduces income or is a deductible expense depends
-          on how the work is reported, which is an accountant's call. */}
-      {totals.payoutsTotal > 0 && (
-        <section className="mt-4 rounded-xl border border-surface-border bg-surface px-4 py-3">
-          <p className={adminType.label}>Paid out to others</p>
-          <p className={`${adminType.monoNum} mt-1 text-text-primary`}>{formatMoney(totals.payoutsTotal)}</p>
-          <p className={`${adminType.small} mt-0.5`}>
-            {Object.entries(totals.payoutsByKind)
+        {totals.payoutsTotal > 0 && (
+          <Stat
+            label="Paid out"
+            value={formatMoney(totals.payoutsTotal)}
+            hint={Object.entries(totals.payoutsByKind)
               .sort((a, b) => b[1] - a[1])
-              .map(([kind, amt]) => `${PAYOUT_KIND_LABEL[kind as PayoutKind] ?? kind} ${formatMoney(amt)}`)
+              .map(([k, amt]) => `${PAYOUT_KIND_LABEL[k as PayoutKind] ?? k} ${formatMoney(amt)}`)
               .join(" · ")}
-          </p>
-        </section>
-      )}
-
-      {/* Milestones */}
-      <section className="mt-10">
-        <h2 className={adminType.titleLg}>Milestones</h2>
-        <div className="admin-scrollbar mt-4 overflow-x-auto rounded-xl border border-surface-border">
-          <table className="w-full min-w-[880px] text-left">
-            <thead>
-              <tr className="border-b border-surface-border bg-surface">
-                {["Project", "Milestone", "Expected", "Due", "Received", "Status", ""].map(h => (
-                  <th key={h} className={`${adminType.label} px-4 py-3`}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sortedPayments.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className={`${adminType.small} px-4 py-6`}>
-                    No payments recorded yet. Add one from a project below.
-                  </td>
-                </tr>
-              ) : (
-                sortedPayments.map(p => {
-                  const card = cardsById.get(p.card_id);
-                  const status = derivePaymentStatus(p);
-                  return (
-                    <tr key={p.id} className="border-b border-divider last:border-0">
-                      <td className={`${adminType.bodyMd} px-4 py-3`}>{card?.title ?? "Unknown project"}</td>
-                      <td className={`${adminType.body} px-4 py-3`}>{p.label || "—"}</td>
-                      {/* Leaving the amount blank means "use the estimate", so
-                          showing a dash here contradicted the field's own
-                          placeholder. The derived figure is prefixed with ~ so
-                          it never reads as an agreed number. */}
-                      <td className={`${adminType.monoNum} px-4 py-3`}>
-                        {p.amount_expected != null ? (
-                          formatMoney(Number(p.amount_expected))
-                        ) : card ? (
-                          <span className="text-text-dim">
-                            ~{formatMoney(rowValue(p, card, rowsByCard.get(p.card_id) ?? []))}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className={`${adminType.monoNum} px-4 py-3`}>{fmtDate(p.due_on)}</td>
-                      <td className={`${adminType.monoNum} px-4 py-3`}>
-                        {Number(p.amount_received) > 0 ? formatMoney(Number(p.amount_received)) : "—"}
-                      </td>
-                      <td className="px-4 py-3"><StatusPill status={status} /></td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-3">
-                          {card && (
-                            <InvoiceButton
-                              payment={p}
-                              card={card}
-                              rows={rowsByCard.get(p.card_id) ?? []}
-                            />
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setEditing({ cardId: p.card_id, payment: p })}
-                            className="text-[13px] text-text-muted hover:text-text-primary"
-                          >
-                            Edit
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+          />
+        )}
       </section>
 
-      {/* Projects with no milestone yet — the estimate-only tail */}
-      <section className="mt-10">
-        <h2 className={adminType.titleLg}>Not yet invoiced</h2>
-        <p className={`${adminType.small} mt-1`}>
-          Projects with no invoice date set yet. Recording a payment doesn&apos;t remove one from
-          this list — raising an invoice does.
-        </p>
-        <div className="mt-4 space-y-2">
-          {unbilled.length === 0 ? (
-            <p className={adminType.small}>Every project with an estimate has a milestone.</p>
-          ) : (
-            unbilled.map(({ card, estimate }) => (
-              <div
-                key={card.id}
-                className="flex items-center justify-between gap-4 rounded-xl border border-surface-border bg-surface px-4 py-3"
-              >
-                <div className="min-w-0">
-                  <p className={`${adminType.bodyMd} truncate`}>{card.title}</p>
-                  <p className={adminType.small}>{clientOf(card)} · {card.status}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-4">
-                  <span className={adminType.monoNum}>~{formatMoney(estimate ?? 0)}</span>
-                  <button
-                    type="button"
-                    onClick={() => setEditing({ cardId: card.id, payment: null })}
-                    className="flex items-center gap-1 rounded-lg border border-surface-border px-2.5 py-1.5 text-[13px] text-text-body hover:border-accent-amber hover:text-text-primary"
-                  >
-                    <Plus size={14} /> Payment
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </section>
+      {GROUP_ORDER.map(state => {
+        const list = grouped.get(state) ?? [];
+        return (
+          <Group
+            key={state}
+            state={state}
+            projects={list}
+            total={list.reduce((s, p) => s + (p.amount ?? 0), 0)}
+            onAddPayment={cardId => setEditing({ cardId, payment: null })}
+            onEditPayment={(cardId, row) => setEditing({ cardId, payment: row })}
+          />
+        );
+      })}
 
-      {/* Per-client */}
-      <section className="mt-10 mb-4">
-        <h2 className={adminType.titleLg}>By client</h2>
-        <div className="admin-scrollbar mt-4 overflow-x-auto rounded-xl border border-surface-border">
-          <table className="w-full min-w-[640px] text-left">
-            <thead>
-              <tr className="border-b border-surface-border bg-surface">
-                {["Client", "Projects", "Expected", "Received", "Avg PFH"].map(h => (
-                  <th key={h} className={`${adminType.label} px-4 py-3`}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {byClient.map(c => (
-                <tr key={c.client} className="border-b border-divider last:border-0">
-                  <td className={`${adminType.bodyMd} px-4 py-3`}>{c.client}</td>
-                  <td className={`${adminType.monoNum} px-4 py-3`}>{c.projects}</td>
-                  <td className={`${adminType.monoNum} px-4 py-3`}>{formatMoney(c.expected)}</td>
-                  <td className={`${adminType.monoNum} px-4 py-3`}>{formatMoney(c.received)}</td>
-                  <td className={`${adminType.monoNum} px-4 py-3`}>
-                    {c.avgPfh != null ? formatMoney(c.avgPfh) : "—"}
-                  </td>
+      {/* Analytics, not a to-do — collapsed so it doesn't compete with the
+          work above. */}
+      <section className="mt-8 mb-4 overflow-hidden rounded-xl border border-surface-border">
+        <button
+          type="button"
+          onClick={() => setShowClients(o => !o)}
+          className="flex w-full items-center gap-3 bg-surface px-4 py-3 text-left hover:bg-surface-raised"
+        >
+          {showClients ? <ChevronDown size={16} className="text-text-muted" /> : <ChevronRight size={16} className="text-text-muted" />}
+          <span className={adminType.title}>By client</span>
+          <span className={`${adminType.monoNum} rounded-full bg-pill-neutral-bg px-2 py-0.5 text-pill-neutral-text`}>
+            {byClient.length}
+          </span>
+        </button>
+
+        {showClients && (
+          <div className="admin-scrollbar overflow-x-auto border-t border-surface-border">
+            <table className="w-full min-w-[560px] text-left">
+              <thead>
+                <tr className="border-b border-divider">
+                  {["Client", "Projects", "Expected", "Received", "Avg PFH"].map(h => (
+                    <th key={h} className={`${adminType.label} px-4 py-2.5`}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {byClient.map(c => (
+                  <tr key={c.client} className="border-b border-divider last:border-0">
+                    <td className={`${adminType.bodyMd} px-4 py-2.5`}>{c.client}</td>
+                    <td className={`${adminType.monoNum} px-4 py-2.5`}>{c.projects}</td>
+                    <td className={`${adminType.monoNum} px-4 py-2.5`}>{formatMoney(c.expected)}</td>
+                    <td className={`${adminType.monoNum} px-4 py-2.5`}>{formatMoney(c.received)}</td>
+                    <td className={`${adminType.monoNum} px-4 py-2.5`}>{c.avgPfh != null ? formatMoney(c.avgPfh) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {editing && (
