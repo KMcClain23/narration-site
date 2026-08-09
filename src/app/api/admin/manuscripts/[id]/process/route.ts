@@ -84,10 +84,19 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     // Parser warnings join it: a chapter placed by arithmetic because its
     // heading could not be confirmed is exactly the kind of thing that reads
     // fine and is quietly wrong, so it belongs where someone will see it.
+    // Any garbled page is worth naming, not just a quarter of them. The
+    // threshold used to be 25%, which is above where real damage starts:
+    // "Devils of Seattle" measured 11.5% and said nothing, while the pages it
+    // had already identified were unreadable prose that would have gone
+    // straight into a recording script. A minority of bad pages is harder to
+    // notice than a majority, not easier.
+    const judgeable = quality?.pageRatios.filter((r) => r !== null).length ?? 0;
     const notes = [
-      quality && quality.suspectRatio > 0.25
-        ? `Parsed, but ${quality.suspectPages.length} of ${quality.pageRatios.filter((r) => r !== null).length} pages ` +
-          `look garbled (likely a corrupt text layer needing OCR).`
+      quality && quality.suspectPages.length > 0
+        ? `Parsed, but ${quality.suspectPages.length} of ${judgeable} pages look garbled ` +
+          `(likely a corrupt text layer needing OCR)` +
+          (quality.suspectRatio > 0.25 ? "." : `: ${quality.suspectPages.slice(0, 12).join(", ")}` +
+            (quality.suspectPages.length > 12 ? ` and ${quality.suspectPages.length - 12} more.` : "."))
         : null,
       ...(warnings ?? []),
     ].filter(Boolean);

@@ -1900,7 +1900,19 @@ function endsCleanly(text: string): boolean {
  *
  * The merge is reported, not silent: a boundary the parser had to repair is
  * worth someone's eye on it.
+ *
+ * It also refuses to run away with the book. Merging is a local repair to a
+ * few bad boundaries; if most boundaries look bad, the premise is wrong and
+ * the evidence is measuring something else. "Devils of Seattle" is the case:
+ * its running headers and page numbers extract as mojibake ("FE3I4Y Dj
+ * YEATT4E", "LC"), header stripping cannot recognise them because the
+ * corruption differs page to page, so every section ends on a fragment with no
+ * terminal punctuation. Every boundary looked broken, each merge extended the
+ * tail with more of the same, and a 395-page novel was stored as one 94,000-word
+ * chapter called "Copyright" — which reads as a successful import.
  */
+const MERGE_SYSTEMIC_RATIO = 1 / 3;
+
 function mergeContinuationChapters(
   chapters: ParsedChapter[]
 ): { chapters: ParsedChapter[]; warnings: string[] } {
@@ -1923,6 +1935,26 @@ function mergeContinuationChapters(
       continue;
     }
     merged.push({ ...ch });
+  }
+
+  // Too many repairs is not a book that needed repairing. Four is the smallest
+  // count where a third is meaningful rather than an artefact of a short list.
+  if (chapters.length >= 4 && repaired.length > chapters.length * MERGE_SYSTEMIC_RATIO) {
+    console.log(
+      `${TAG} merge abandoned — ${repaired.length} of ${chapters.length} boundaries looked broken`
+    );
+    return {
+      chapters,
+      warnings: [
+        `${repaired.length} of ${chapters.length} detected sections looked like they began ` +
+          `mid-sentence, so the boundaries were left alone rather than merged — that many at ` +
+          `once means the text itself is unreliable, not the boundaries. This usually means a ` +
+          `corrupt text layer: headings, running headers and page numbers extract as gibberish, ` +
+          `so every section appears to end mid-sentence. The chapter splits below are unlikely ` +
+          `to be right. A cleaner source file (EPUB, DOCX, or a PDF with a working text layer) ` +
+          `would import properly.`,
+      ],
+    };
   }
 
   if (repaired.length) {
