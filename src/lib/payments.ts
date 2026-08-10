@@ -93,7 +93,7 @@ export function narratorShare(card: MoneyCard): number {
 }
 
 /**
- * What a payout actually costs *you*, as opposed to what you write the cheque
+ * What a payout actually costs *you*, as opposed to what you write the check
  * for.
  *
  * On a duet the narrator of record collects the whole fee, pays the editor,
@@ -270,7 +270,7 @@ export function rowValue(p: PaymentRow, card: MoneyCard, rows: PaymentRow[]): nu
 export type PayoutObligation = {
   name: string;
   kind: PayoutKind;
-  /** The cheque you write. */
+  /** The check you write. */
   amount: number;
   /** What it costs you once a duet co-narrator carries their half. */
   burden: number;
@@ -314,7 +314,7 @@ export type MoneyTotals = {
   /** Unpaid payouts on unreleased projects: a committed cost, not yet a debt. */
   payoutsUpcoming: number;
   /**
-   * The three figures above are cheques written. These are what those cheques
+   * The three figures above are checks written. These are what those checks
    * cost you after a duet co-narrator carries their half of the off-the-top
    * costs — the basis every other total on this page uses. See payoutBurden().
    */
@@ -596,7 +596,7 @@ export function projectState(card: MoneyCard, rows: PaymentRow[]): ProjectState 
 
   // A title that is already on sale with nothing recorded against it is
   // history, not a task: it shipped before this tracker existed. Calling it
-  // "ready to invoice" would put a decade of back catalogue in the same list
+  // "ready to invoice" would put a decade of back catalog in the same list
   // as this week's work.
   if (card.status === "released") return "untracked";
 

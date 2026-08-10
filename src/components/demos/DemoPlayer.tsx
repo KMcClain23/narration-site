@@ -11,7 +11,7 @@ import { sendGAEvent } from "@next/third-parties/google";
  * raw <audio controls> — a white browser widget on a navy page, with its own
  * duration readout disagreeing with the one printed above it. Same component
  * on both pages now: one gold play control, one seek bar, one duration, and
- * the single-active-playback behaviour that stops two clips overlapping.
+ * the single-active-playback behavior that stops two clips overlapping.
  */
 
 function formatTime(seconds: number) {
@@ -21,8 +21,8 @@ function formatTime(seconds: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-// Rotating border colours for demo cards (cycles past six)
-// Rotating border colours for demo cards (cycles if more than 6 demos)
+// Rotating border colors for demo cards (cycles past six)
+// Rotating border colors for demo cards (cycles if more than 6 demos)
 export const DEMO_COLORS = [
   "border-pink-400","border-purple-400","border-violet-400",
   "border-rose-300","border-blue-400","border-amber-400",

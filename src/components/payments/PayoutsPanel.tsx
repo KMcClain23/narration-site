@@ -80,7 +80,7 @@ export function PayoutsPanel({ totals }: { totals: MoneyTotals }) {
   // The headline "Collected" figure is gross: it counts money already
   // committed to an editor.
   //
-  // Both use the burden figures, not the cheque amounts: `received` is already
+  // Both use the burden figures, not the check amounts: `received` is already
   // the narrator's own share, so charging it the whole of an editor invoice
   // that came off the top before the split would deduct the co-narrator's half
   // from your money as well.
@@ -90,10 +90,6 @@ export function PayoutsPanel({ totals }: { totals: MoneyTotals }) {
   // Those aren't debts yet, but they are already spoken for, so the money is
   // not really yours to plan around.
   const netAfterEditing = netInHand - totals.payoutsUpcomingBurden;
-
-  // The gap between the cheques and the cost, which only exists on split work.
-  const upcomingCash = totals.payoutsUpcoming;
-  const sharedUpcoming = upcomingCash - totals.payoutsUpcomingBurden > 0.005;
 
   // Name the cost by what is actually in it rather than assuming "editing" —
   // a co-narrator split is not an editing cost.
@@ -199,18 +195,6 @@ export function PayoutsPanel({ totals }: { totals: MoneyTotals }) {
               )}
             </div>
 
-            {totals.payoutsUpcoming > 0.005 && (
-              <p className={`${adminType.small} mt-2 text-right`}>
-                {sharedUpcoming && (
-                  <>
-                    You write {formatMoney(upcomingCash)} of cheques, but the cost comes off the
-                    top before the narrator split, so your co-narrator carries the rest.{" "}
-                  </>
-                )}
-                These sit on books you haven&rsquo;t been paid for yet — the fees come in alongside
-                them.
-              </p>
-            )}
           </div>
         </>
       )}

@@ -214,7 +214,7 @@ export async function POST(req: Request) {
 Active books (match by title):
 ${bookList}
 
-Emails to analyse:
+Emails to analyze:
 ${emailList}
 
 For each email that mentions a specific date, deadline, or schedule related to a book above, output one JSON object. Return ONLY a JSON array — no prose, no markdown fence.

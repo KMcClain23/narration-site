@@ -66,7 +66,7 @@ export function estimatedEarnings(
   if (!wordCount || !pfhRate) return null;
   // Multicast has no knowable DEFAULT split, which is why it bails — but an
   // explicit per-card share is precisely the answer to that question, so it
-  // is honoured when set. Previously this returned null before ever reading
+  // is honored when set. Previously this returned null before ever reading
   // narratorSharePercent, contradicting the contract described above.
   if (narrationFormat === "multicast" && narratorSharePercent == null) return null;
   const hours = wordCount / WORDS_PER_FINISHED_HOUR;

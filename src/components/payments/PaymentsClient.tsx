@@ -40,14 +40,14 @@ const OPEN_BY_DEFAULT: Record<ProjectState, boolean> = {
 };
 
 /**
- * A colour per state, carried by a left edge and the count pill.
+ * A color per state, carried by a left edge and the count pill.
  *
  * Complete class strings, never assembled at runtime — Tailwind's scanner only
  * sees literals (same reason URGENCY_PILL is written out longhand).
  *
  * The palette encodes urgency rather than decorating: amber is money someone
  * owes you, teal is work you could bill today, green is settled, and the two
- * groups that need no decision stay grey so they recede.
+ * groups that need no decision stay gray so they recede.
  */
 const GROUP_ACCENT: Record<ProjectState, { edge: string; pill: string }> = {
   awaiting: {
@@ -236,7 +236,7 @@ function Group({
         <span className={`${adminType.monoNum} rounded-full px-2 py-0.5 ${GROUP_ACCENT[state].pill}`}>
           {projects.length}
         </span>
-        {/* Suppressed at zero: the back-catalogue group has no rates on file,
+        {/* Suppressed at zero: the back-catalog group has no rates on file,
             and "$0" beside 11 titles reads as "these were worth nothing"
             rather than "nothing is recorded". */}
         <span className="ml-auto flex items-center gap-3">
@@ -401,7 +401,7 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
             // Pipeline is the estimate, while gross takes actual receipts where
             // a job paid above its estimate. Without the working shown, a net
             // larger than the pipeline it follows just looks wrong.
-            // Quotes the burden, not the cheque total: the figure above
+            // Quotes the burden, not the check total: the figure above
             // subtracts your share of the off-the-top costs, and a hint that
             // cites $1,916 against a $958 deduction won't reconcile by eye.
             hint={`~${formatMoney(totals.projectedGross)} gross · ${formatMoney(

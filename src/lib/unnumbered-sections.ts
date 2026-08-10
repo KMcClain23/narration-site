@@ -31,12 +31,12 @@ const CHAPTER_TITLED = /^chapter\b/i;
  * Returns one entry per section: its chapter number, or null for matter.
  */
 export function computeChapterNumbers(titles: Array<string | null>): Array<number | null> {
-  const firstChapterLabelled = titles.findIndex((t) => t && CHAPTER_TITLED.test(t.trim()));
-  const labelsChapters = firstChapterLabelled !== -1;
+  const firstChapterLabeled = titles.findIndex((t) => t && CHAPTER_TITLED.test(t.trim()));
+  const labelsChapters = firstChapterLabeled !== -1;
 
   let n = 0;
   return titles.map((title, i) => {
-    const beforeFirstChapter = labelsChapters && i < firstChapterLabelled;
+    const beforeFirstChapter = labelsChapters && i < firstChapterLabeled;
     if (beforeFirstChapter || isUnnumberedSection(title)) return null;
     return ++n;
   });

@@ -344,7 +344,7 @@ function StatementUpload({ onApply }: { onApply: (s: ParsedStatement) => void })
               onClick={() => onApply(c)}
               className="flex w-full items-center justify-between gap-3 rounded-lg border border-surface-border bg-background px-3 py-2 text-left hover:border-accent-amber/40"
             >
-              <span className={adminType.bodyMd}>{c.period || "Unlabelled period"}</span>
+              <span className={adminType.bodyMd}>{c.period || "Unlabeled period"}</span>
               <span className={adminType.monoNum}>
                 {formatMoney(c.amount_received)}
                 {CONFIDENCE_NOTE[c.confidence] && (

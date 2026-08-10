@@ -73,7 +73,7 @@ function detectFileType(bytes: Uint8Array): "pdf" | "docx" | "txt" | "unknown" {
  * Professionally typeset PDFs encode "fi", "fl", "ff" etc. as single Unicode
  * ligature glyphs (U+FB00–U+FB06). Left alone they silently corrupt every
  * downstream word-level operation: "fingers" reads as one token no dictionary
- * or word-frequency check recognises, TOC titles fail to match, and Claude sees
+ * or word-frequency check recognizes, TOC titles fail to match, and Claude sees
  * a garbled word. Vellum and InDesign both emit these by default, so this
  * applies to essentially every retail-typeset manuscript, not just the odd one.
  *
@@ -284,7 +284,7 @@ async function processDocx(buffer: Buffer): Promise<
     extractRawText: (src: { buffer: Buffer }) => Promise<{ value: string }>;
   };
 
-  // Normalised here for the same reason the PDF and txt paths do it at their
+  // Normalized here for the same reason the PDF and txt paths do it at their
   // own boundaries: this is where docx text enters. Tags contain neither
   // ligature glyphs nor control characters, so running it over the whole HTML
   // string is safe and covers both branches below at once.
@@ -357,7 +357,7 @@ interface PdfLine {
    * thing that distinguishes a chapter heading from a sentence in a print
    * layout — a paperback interior sets "CHAPTER TWELVE" at 15pt and the POV
    * name under it at 25pt against 11pt body text. Discarding it meant chapter
-   * openings had to be recognised from wording alone, which fails on any book
+   * openings had to be recognized from wording alone, which fails on any book
    * that does not print the word "Chapter" in reading order at the top of the
    * page. See detectChaptersByTypography.
    */
@@ -646,7 +646,7 @@ const DROP_CAP_LOOKAHEAD = 6;
 /**
  * Reattach a drop cap that optical recognition moved onto a later line.
  *
- * An oversized initial spans two lines of body text, so its vertical centre
+ * An oversized initial spans two lines of body text, so its vertical center
  * sits beside the *second* one. OCR reads by row and emits it there, leaving a
  * chapter that opens like this:
  *
@@ -742,7 +742,7 @@ interface TocEntry {
   startPage: number; // physical content-stream page index (1-based)
 }
 
-/** Convert "iii" / "iv" / "7" → integer. Returns 0 for unrecognised strings. */
+/** Convert "iii" / "iv" / "7" → integer. Returns 0 for unrecognized strings. */
 function parsePageNum(s: string): number {
   const n = parseInt(s, 10);
   if (!isNaN(n) && n > 0) return n;
@@ -1863,7 +1863,7 @@ const CHAPTER_SIZE_FAIL_MULTIPLE = 8;
 const CHAPTER_SIZE_FAIL_FLOOR = 20_000;
 
 /**
- * Trailing scene-break ornament — asterisks, bullets, a centred rule.
+ * Trailing scene-break ornament — asterisks, bullets, a centerd rule.
  *
  * Deliberately excludes dashes and quotation marks: a chapter that ends on
  * interrupted dialogue ("But I—") ends legitimately, and stripping those would
@@ -1905,7 +1905,7 @@ function endsCleanly(text: string): boolean {
  * few bad boundaries; if most boundaries look bad, the premise is wrong and
  * the evidence is measuring something else. "Devils of Seattle" is the case:
  * its running headers and page numbers extract as mojibake ("FE3I4Y Dj
- * YEATT4E", "LC"), header stripping cannot recognise them because the
+ * YEATT4E", "LC"), header stripping cannot recognize them because the
  * corruption differs page to page, so every section ends on a fragment with no
  * terminal punctuation. Every boundary looked broken, each merge extended the
  * tail with more of the same, and a 395-page novel was stored as one 94,000-word
@@ -2170,7 +2170,7 @@ async function askClaude(pageMap: string): Promise<Array<{ title: string; startP
  *
  * Deployment state is otherwise invisible from the output: an old parser and a
  * new one both produce chapters, and telling them apart meant comparing
- * character counts against a previous run. Bump this whenever parser behaviour
+ * character counts against a previous run. Bump this whenever parser behavior
  * changes, so a production log line names the code that produced it.
  *
  * v2 — TOC as primary source, printed-page offset derivation with validation,
@@ -2703,7 +2703,7 @@ export async function parseManuscript(
       // header it was shown.
       //
       // Stripping first means the map carries the opening words of each page's
-      // actual text, which is what a chapter opening can be recognised from.
+      // actual text, which is what a chapter opening can be recognized from.
       console.log(`${TAG} no TOC and no typographic headings — falling back to body-text detection`);
       const pageMap = buildPageMap(cleanedFlatPages);
       if (!pageMap) throw new Error("Could not extract any text from PDF");

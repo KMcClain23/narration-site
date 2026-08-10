@@ -265,13 +265,13 @@ const STEPS: Step[] = [
     title: "Growing your roster & going full-time",
     duration: "6 months–3 years",
     summary: "Sustainable narrator income comes from repeat clients, referrals, and a growing backlist of royalty-earning titles.",
-    detail: "Most full-time audiobook narrators earn income from a combination of active work (current projects) and passive income (royalties from a growing catalogue). Building a roster of 3–5 authors who book you repeatedly is more valuable than constantly auditioning for new projects. Deliver exceptional work, communicate clearly, and make each author feel like their project is your priority — because it is. The romance author community refers narrators constantly in private groups. One glowing recommendation from a well-connected author can fill your calendar for months.",
+    detail: "Most full-time audiobook narrators earn income from a combination of active work (current projects) and passive income (royalties from a growing catalog). Building a roster of 3–5 authors who book you repeatedly is more valuable than constantly auditioning for new projects. Deliver exceptional work, communicate clearly, and make each author feel like their project is your priority — because it is. The romance author community refers narrators constantly in private groups. One glowing recommendation from a well-connected author can fill your calendar for months.",
     tips: [
       "Treat every project as an audition for the next one — repeat bookings are your most efficient source of income",
       "Ask satisfied authors for referrals explicitly — most are happy to recommend but won't think to do it unprompted",
       "Build a project pipeline so you're never scrambling — ideally have the next 2–3 projects confirmed before finishing the current one",
       "Track your PFH rate over time and raise it as your experience grows — don't stay at entry rates once you have a track record",
-      "A catalogue of 20+ titles with even modest royalty share can become meaningful passive income over years",
+      "A catalog of 20+ titles with even modest royalty share can become meaningful passive income over years",
       "Consider specialising deeply in one genre — being known as 'the' dark romance narrator is more valuable than being a generalist",
     ],
     resources: [

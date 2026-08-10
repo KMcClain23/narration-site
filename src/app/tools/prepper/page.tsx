@@ -64,7 +64,7 @@ export default async function PrepperPage() {
   //
   // Titles are gathered per book in reading order rather than tallied as they
   // arrive, because front matter is identified partly by what precedes the
-  // first labelled chapter — a per-row test cannot see that.
+  // first labeled chapter — a per-row test cannot see that.
   const titlesByManuscript = new Map<string, Array<string | null>>();
   const extractedCountByManuscript = new Map<string, number>();
   const wordCountByManuscript = new Map<string, number>();

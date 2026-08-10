@@ -23,7 +23,7 @@ type DbDemo = {
   sort_order: number;
 };
 
-// Rotating border colours — same palette and same index-based assignment as
+// Rotating border colors — same palette and same index-based assignment as
 // HomeClient's card grid, so a demo's accent color matches between its
 // homepage card and its own download page.
 const DEMO_COLORS = [

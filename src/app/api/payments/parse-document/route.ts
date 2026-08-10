@@ -116,7 +116,7 @@ double-counts income across every month, so read them precisely:
 - Set confidence low and explain in notes whenever a figure is internally
   inconsistent or ambiguous.
 - A statement period may appear only in the filename. Use it when the cells
-  do not state one, normalised to a readable form such as "Jun 2026".
+  do not state one, normalized to a readable form such as "Jun 2026".
 - The document belongs to the narrator, so their own name appears all over it —
   in the filename, as the royalty earner, as the account holder, as the "from"
   party on an invoice they issued. client_name is never them. It is the author,

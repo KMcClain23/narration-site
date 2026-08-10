@@ -3,7 +3,7 @@ import { dateOnlyToPacificNoon, formatFullDate } from "@/lib/timezone";
 import { BUSINESS } from "@/lib/business-identity";
 
 // Deliberately mirrors ContractPDF's typography and spacing — a client who has
-// already signed a contract should recognise the invoice as coming from the
+// already signed a contract should recognize the invoice as coming from the
 // same business rather than from a different template.
 
 export type InvoiceLine = {

@@ -14,7 +14,7 @@ import { formatMoney, type MoneyCard, type PaymentRow } from "@/lib/payments";
 // than "what has this book earned". The per-project grouping above answers
 // the second question; this answers the first.
 
-/** "Jun 2026" and "Apr 2026" sort correctly; unlabelled rows sink. */
+/** "Jun 2026" and "Apr 2026" sort correctly; unlabeled rows sink. */
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
 function periodKey(period: string): number {

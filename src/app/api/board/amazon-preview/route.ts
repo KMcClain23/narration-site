@@ -37,7 +37,7 @@ export async function POST(req: Request) {
       // readable page" made it look like a bad link.
       const message: Record<typeof result.reason, string> = {
         blocked:
-          "Amazon blocked the request. It serves a bot check to datacentre addresses, " +
+          "Amazon blocked the request. It serves a bot check to datacenter addresses, " +
           "so this will keep failing from the server regardless of the link. Copy the " +
           "description across by hand for now.",
         "not-found": "Amazon returned 404 for that link. Check the URL on the card.",
