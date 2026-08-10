@@ -83,6 +83,32 @@ export function isOffTheTop(kind: PayoutKind): boolean {
   return OFF_THE_TOP.has(kind);
 }
 
+/**
+ * The narrator's cut of a project. Mirrors estimatedEarnings() so the money
+ * layer splits on exactly the same basis the board estimates on.
+ */
+export function narratorShare(card: MoneyCard): number {
+  if (card.narrator_share_percent != null) return card.narrator_share_percent / 100;
+  return card.narration_format === "duet" || card.narration_format === "dual" ? 0.5 : 1;
+}
+
+/**
+ * What a payout actually costs *you*, as opposed to what you write the cheque
+ * for.
+ *
+ * On a duet the narrator of record collects the whole fee, pays the editor,
+ * and splits what remains — so the editor's invoice leaves your account in
+ * full, but half of it is borne by your co-narrator through a smaller split.
+ * Every total on this page is denominated in your own money, so an off-the-top
+ * cost has to be carried at your share of it or it overstates the hit.
+ *
+ * Agent and other are personal, so they cost you the full amount.
+ */
+export function payoutBurden(payout: PayoutRow, card: MoneyCard): number {
+  const amount = Number(payout.amount) || 0;
+  return isOffTheTop(payout.kind) ? amount * narratorShare(card) : amount;
+}
+
 // The board_cards columns the money layer reads. A subset of BoardV2Card —
 // declared separately because this also needs production_company/type and
 // released_at, which the board itself has no use for.
@@ -244,7 +270,10 @@ export function rowValue(p: PaymentRow, card: MoneyCard, rows: PaymentRow[]): nu
 export type PayoutObligation = {
   name: string;
   kind: PayoutKind;
+  /** The cheque you write. */
   amount: number;
+  /** What it costs you once a duet co-narrator carries their half. */
+  burden: number;
   projectTitle: string;
   dueAfterRelease: boolean;
 };
@@ -284,6 +313,14 @@ export type MoneyTotals = {
   payoutsOwedNow: number;
   /** Unpaid payouts on unreleased projects: a committed cost, not yet a debt. */
   payoutsUpcoming: number;
+  /**
+   * The three figures above are cheques written. These are what those cheques
+   * cost you after a duet co-narrator carries their half of the off-the-top
+   * costs — the basis every other total on this page uses. See payoutBurden().
+   */
+  payoutsPaidBurden: number;
+  payoutsOwedNowBurden: number;
+  payoutsUpcomingBurden: number;
   /** Every unpaid obligation, for grouping by payee rather than listing raw. */
   owedTo: PayoutObligation[];
   /**
@@ -295,8 +332,16 @@ export type MoneyTotals = {
    * count a finished job twice.
    */
   projectedGross: number;
-  /** projectedGross less everything owed onward to other people. */
+  /** projectedGross less what those payouts actually cost you. */
   projectedNet: number;
+  /**
+   * `expected` less the editing it will take to earn it.
+   *
+   * estimatedEarnings() applies the narrator split but knows nothing about
+   * production costs, so the raw pipeline figure reads as money that will land
+   * in the bank when part of it is already committed to an editor.
+   */
+  expectedNet: number;
 };
 
 export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, PaymentRow[]>): MoneyTotals {
@@ -314,6 +359,10 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
   const owedTo: PayoutObligation[] = [];
   let payoutsOwedNow = 0;
   let payoutsUpcoming = 0;
+  let payoutsBurdenTotal = 0;
+  let payoutsPaidBurden = 0;
+  let payoutsOwedNowBurden = 0;
+  let payoutsUpcomingBurden = 0;
 
   let projectedGross = 0;
 
@@ -351,22 +400,34 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
 
       for (const p of r.payouts ?? []) {
         const a = Number(p.amount) || 0;
+        // What you pay vs what it costs you: on a duet the editor's invoice
+        // leaves your account whole, but comes off the top before the split,
+        // so your co-narrator carries half of it.
+        const burden = payoutBurden(p, card);
         payoutsTotal += a;
+        payoutsBurdenTotal += burden;
         payoutsByKind[p.kind] = (payoutsByKind[p.kind] ?? 0) + a;
 
         if (p.paid_on) {
           payoutsPaid += a;
+          payoutsPaidBurden += burden;
         } else if (a > 0) {
           payoutsOwed += a;
           // A payout only becomes a debt once the book has shipped — before
           // that it is a committed cost on work still in progress.
           const dueAfterRelease = card.status !== "released";
-          if (dueAfterRelease) payoutsUpcoming += a;
-          else payoutsOwedNow += a;
+          if (dueAfterRelease) {
+            payoutsUpcoming += a;
+            payoutsUpcomingBurden += burden;
+          } else {
+            payoutsOwedNow += a;
+            payoutsOwedNowBurden += burden;
+          }
           owedTo.push({
             name: p.payee_name,
             kind: p.kind,
             amount: a,
+            burden,
             projectTitle: card.title,
             dueAfterRelease,
           });
@@ -398,11 +459,15 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
     payoutsByKind,
     payoutsOwedNow,
     payoutsUpcoming,
+    payoutsPaidBurden,
+    payoutsOwedNowBurden,
+    payoutsUpcomingBurden,
     owedTo: owedTo.sort((a, b) => b.amount - a.amount),
     // Royalties sit outside cardExpected by design — they are history, not a
     // forecast — so they are added here rather than being counted twice.
     projectedGross: projectedGross + royaltiesEarned,
-    projectedNet: projectedGross + royaltiesEarned - payoutsTotal,
+    projectedNet: projectedGross + royaltiesEarned - payoutsBurdenTotal,
+    expectedNet: expected - payoutsBurdenTotal,
   };
 }
 

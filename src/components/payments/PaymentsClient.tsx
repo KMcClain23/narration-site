@@ -376,10 +376,19 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
         <Stat label="Collected" value={formatMoney(totals.received)} />
         {/* Marked as an estimate in the label, not just a footnote — the
             figure is derived from word counts, not from anything agreed. */}
+        {/* Net of editing, not gross. The estimate applies the narrator split
+            but knows nothing about production costs, so the gross figure reads
+            as a bank balance when part of it is already an editor's. */}
         <Stat
           label="Pipeline (est.)"
-          value={`~${formatMoney(totals.expected)}`}
-          hint={estimatedShare < totals.expected ? `${formatMoney(totals.expected - estimatedShare)} from invoices` : undefined}
+          value={`~${formatMoney(totals.expectedNet)}`}
+          hint={
+            totals.expected - totals.expectedNet > 0.005
+              ? `${formatMoney(totals.expected)} before editing`
+              : estimatedShare < totals.expected
+                ? `${formatMoney(totals.expected - estimatedShare)} from invoices`
+                : undefined
+          }
         />
         {/* The bottom line of the pipeline beside it: every tracked project at
             its best available figure, less everything that goes to someone
@@ -392,7 +401,12 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
             // Pipeline is the estimate, while gross takes actual receipts where
             // a job paid above its estimate. Without the working shown, a net
             // larger than the pipeline it follows just looks wrong.
-            hint={`~${formatMoney(totals.projectedGross)} gross · ${formatMoney(totals.payoutsTotal)} to others`}
+            // Quotes the burden, not the cheque total: the figure above
+            // subtracts your share of the off-the-top costs, and a hint that
+            // cites $1,916 against a $958 deduction won't reconcile by eye.
+            hint={`~${formatMoney(totals.projectedGross)} gross · ${formatMoney(
+              totals.projectedGross - totals.projectedNet,
+            )} your share of costs`}
           />
         )}
         {/* Owed and paid are separate figures. A narrator usually can't pay

@@ -79,12 +79,21 @@ export function PayoutsPanel({ totals }: { totals: MoneyTotals }) {
   // What's left of collected income once every debt currently due is settled.
   // The headline "Collected" figure is gross: it counts money already
   // committed to an editor.
-  const netInHand = totals.received - totals.payoutsPaid - totals.payoutsOwedNow;
+  //
+  // Both use the burden figures, not the cheque amounts: `received` is already
+  // the narrator's own share, so charging it the whole of an editor invoice
+  // that came off the top before the split would deduct the co-narrator's half
+  // from your money as well.
+  const netInHand = totals.received - totals.payoutsPaidBurden - totals.payoutsOwedNowBurden;
 
   // And what's left once the estimated costs on unreleased books are paid too.
   // Those aren't debts yet, but they are already spoken for, so the money is
   // not really yours to plan around.
-  const netAfterEditing = netInHand - totals.payoutsUpcoming;
+  const netAfterEditing = netInHand - totals.payoutsUpcomingBurden;
+
+  // The gap between the cheques and the cost, which only exists on split work.
+  const upcomingCash = totals.payoutsUpcoming;
+  const sharedUpcoming = upcomingCash - totals.payoutsUpcomingBurden > 0.005;
 
   // Name the cost by what is actually in it rather than assuming "editing" —
   // a co-narrator split is not an editing cost.
@@ -170,17 +179,19 @@ export function PayoutsPanel({ totals }: { totals: MoneyTotals }) {
           <div className="border-t border-surface-border bg-surface px-4 py-3">
             <div className="ml-auto w-full max-w-xs space-y-1">
               <Line label="Collected" value={totals.received} />
-              {totals.payoutsPaid > 0.005 && (
-                <Line label="Already paid out" value={-totals.payoutsPaid} />
+              {totals.payoutsPaidBurden > 0.005 && (
+                <Line label="Already paid out" value={-totals.payoutsPaidBurden} />
               )}
-              {totals.payoutsOwedNow > 0.005 && <Line label="Due now" value={-totals.payoutsOwedNow} />}
+              {totals.payoutsOwedNowBurden > 0.005 && (
+                <Line label="Due now" value={-totals.payoutsOwedNowBurden} />
+              )}
               <Line label="Net in hand" value={netInHand} strong />
 
-              {totals.payoutsUpcoming > 0.005 && (
+              {totals.payoutsUpcomingBurden > 0.005 && (
                 <>
                   <Line
-                    label={`${upcomingLabel} still to come`}
-                    value={-totals.payoutsUpcoming}
+                    label={`${upcomingLabel}, your share`}
+                    value={-totals.payoutsUpcomingBurden}
                     className="border-t border-divider pt-1.5"
                   />
                   <Line label={`Net after ${upcomingLabel.toLowerCase()}`} value={netAfterEditing} strong />
@@ -190,8 +201,14 @@ export function PayoutsPanel({ totals }: { totals: MoneyTotals }) {
 
             {totals.payoutsUpcoming > 0.005 && (
               <p className={`${adminType.small} mt-2 text-right`}>
-                Those costs sit on books you haven&rsquo;t been paid for yet — the fees come in
-                alongside them.
+                {sharedUpcoming && (
+                  <>
+                    You write {formatMoney(upcomingCash)} of cheques, but the cost comes off the
+                    top before the narrator split, so your co-narrator carries the rest.{" "}
+                  </>
+                )}
+                These sit on books you haven&rsquo;t been paid for yet — the fees come in alongside
+                them.
               </p>
             )}
           </div>
