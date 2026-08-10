@@ -234,6 +234,21 @@ export function rowValue(p: PaymentRow, card: MoneyCard, rows: PaymentRow[]): nu
   return 0;
 }
 
+/**
+ * One unpaid payout, carrying enough context to group and explain it.
+ *
+ * `dueAfterRelease` is the difference between a cost you have committed to and
+ * a debt you currently hold: an editor on a book still in production will be
+ * owed, but isn't yet.
+ */
+export type PayoutObligation = {
+  name: string;
+  kind: PayoutKind;
+  amount: number;
+  projectTitle: string;
+  dueAfterRelease: boolean;
+};
+
 export type MoneyTotals = {
   expected: number;
   invoiced: number;
@@ -262,8 +277,15 @@ export type MoneyTotals = {
    */
   payoutsOwed: number;
   payoutsByKind: Record<string, number>;
-  /** Who is still owed, for naming them rather than showing a bare total. */
-  owedTo: { name: string; kind: PayoutKind; amount: number }[];
+  /**
+   * Unpaid payouts on projects that have shipped — money genuinely due now.
+   * An editor isn't owed for a book still in the booth.
+   */
+  payoutsOwedNow: number;
+  /** Unpaid payouts on unreleased projects: a committed cost, not yet a debt. */
+  payoutsUpcoming: number;
+  /** Every unpaid obligation, for grouping by payee rather than listing raw. */
+  owedTo: PayoutObligation[];
 };
 
 export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, PaymentRow[]>): MoneyTotals {
@@ -278,7 +300,9 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
   let payoutsPaid = 0;
   let payoutsOwed = 0;
   const payoutsByKind: Record<string, number> = {};
-  const owedTo: { name: string; kind: PayoutKind; amount: number }[] = [];
+  const owedTo: PayoutObligation[] = [];
+  let payoutsOwedNow = 0;
+  let payoutsUpcoming = 0;
 
   for (const card of cards) {
     const rows = rowsByCard.get(card.id) ?? [];
@@ -310,7 +334,18 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
           payoutsPaid += a;
         } else if (a > 0) {
           payoutsOwed += a;
-          owedTo.push({ name: p.payee_name, kind: p.kind, amount: a });
+          // A payout only becomes a debt once the book has shipped — before
+          // that it is a committed cost on work still in progress.
+          const dueAfterRelease = card.status !== "released";
+          if (dueAfterRelease) payoutsUpcoming += a;
+          else payoutsOwedNow += a;
+          owedTo.push({
+            name: p.payee_name,
+            kind: p.kind,
+            amount: a,
+            projectTitle: card.title,
+            dueAfterRelease,
+          });
         }
       }
 
@@ -337,6 +372,8 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
     payoutsPaid,
     payoutsOwed,
     payoutsByKind,
+    payoutsOwedNow,
+    payoutsUpcoming,
     owedTo: owedTo.sort((a, b) => b.amount - a.amount),
   };
 }

@@ -12,7 +12,6 @@ import {
   computeTotals,
   formatMoney,
   isCardExpectedActual,
-  PAYOUT_KIND_LABEL,
   projectState,
   PROJECT_STATE_LABEL,
   type MoneyCard,
@@ -23,6 +22,7 @@ import { PaymentFormModal } from "./PaymentFormModal";
 import { InvoiceButton } from "./InvoiceButton";
 import { ImportDropZone } from "./ImportDropZone";
 import { RoyaltyLedger } from "./RoyaltyLedger";
+import { PayoutsPanel } from "./PayoutsPanel";
 
 // Order is the order of attention: money you're owed, then work you could
 // bill, then everything that needs no decision today.
@@ -384,17 +384,16 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
         {/* Owed and paid are separate figures. A narrator usually can't pay
             the editor until the client has paid them, so folding the two
             together claims money has left the account when it hasn't. */}
-        {totals.payoutsOwed > 0 && (
+        {totals.payoutsOwedNow > 0.005 && (
           <Stat
             label="You owe others"
-            value={formatMoney(totals.payoutsOwed)}
-            hint={totals.owedTo
-              .map(o => `${PAYOUT_KIND_LABEL[o.kind]}${o.name ? ` · ${o.name}` : ""} ${formatMoney(o.amount)}`)
-              .join(" · ")}
+            value={formatMoney(totals.payoutsOwedNow)}
+            hint={
+              totals.payoutsUpcoming > 0.005
+                ? `${formatMoney(totals.payoutsUpcoming)} more after release`
+                : undefined
+            }
           />
-        )}
-        {totals.payoutsPaid > 0 && (
-          <Stat label="Paid out" value={formatMoney(totals.payoutsPaid)} />
         )}
         {totals.royaltiesEarned > 0 && (
           <Stat
@@ -408,6 +407,8 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
           />
         )}
       </section>
+
+      <PayoutsPanel totals={totals} />
 
       <ImportDropZone cards={cards} onImported={() => router.refresh()} />
       {GROUP_ORDER.map(state => {
