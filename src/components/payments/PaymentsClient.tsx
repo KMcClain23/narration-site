@@ -341,17 +341,6 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
           hint={totals.overdue > 0 ? `${formatMoney(totals.overdue)} overdue` : owed === 0 ? "Nothing outstanding" : undefined}
         />
         <Stat label="Collected" value={formatMoney(totals.received)} />
-        {totals.royaltiesEarned > 0 && (
-          <Stat
-            label="Royalties"
-            value={formatMoney(totals.royaltiesEarned)}
-            hint={
-              totals.royaltiesOwed > 0.01
-                ? `${formatMoney(totals.royaltiesOwed)} not yet paid out`
-                : "all paid out"
-            }
-          />
-        )}
         {/* Marked as an estimate in the label, not just a footnote — the
             figure is derived from word counts, not from anything agreed. */}
         <Stat
@@ -374,12 +363,20 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
         {totals.payoutsPaid > 0 && (
           <Stat label="Paid out" value={formatMoney(totals.payoutsPaid)} />
         )}
+        {totals.royaltiesEarned > 0 && (
+          <Stat
+            label="Royalties"
+            value={formatMoney(totals.royaltiesEarned)}
+            hint={
+              totals.royaltiesOwed > 0.01
+                ? `${formatMoney(totals.royaltiesOwed)} not yet paid out`
+                : "all paid out"
+            }
+          />
+        )}
       </section>
 
       <ImportDropZone cards={cards} onImported={() => router.refresh()} />
-
-      <RoyaltyLedger cards={cards} payments={payments} onChanged={() => router.refresh()} />
-
       {GROUP_ORDER.map(state => {
         const list = grouped.get(state) ?? [];
         return (
@@ -434,6 +431,11 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
           </div>
         )}
       </section>
+
+      {/* Last on the page, below the project work and the client analytics.
+          Royalty statements arrive monthly, pay out in cents, and rarely
+          need a decision — they belong on the record, not in the way. */}
+      <RoyaltyLedger cards={cards} payments={payments} onChanged={() => router.refresh()} />
 
       {editing && (
         <PaymentFormModal
