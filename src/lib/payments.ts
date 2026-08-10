@@ -286,6 +286,17 @@ export type MoneyTotals = {
   payoutsUpcoming: number;
   /** Every unpaid obligation, for grouping by payee rather than listing raw. */
   owedTo: PayoutObligation[];
+  /**
+   * What the whole tracked book of work is worth: fees plus royalties earned,
+   * counting each project once whether it has been paid or not.
+   *
+   * Deliberately NOT `received + expected`. `expected` already spans every
+   * project including the paid ones, so adding collected income on top would
+   * count a finished job twice.
+   */
+  projectedGross: number;
+  /** projectedGross less everything owed onward to other people. */
+  projectedNet: number;
 };
 
 export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, PaymentRow[]>): MoneyTotals {
@@ -304,9 +315,22 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
   let payoutsOwedNow = 0;
   let payoutsUpcoming = 0;
 
+  let projectedGross = 0;
+
   for (const card of cards) {
     const rows = rowsByCard.get(card.id) ?? [];
-    expected += cardExpected(card, rows) ?? 0;
+    const cardEst = cardExpected(card, rows) ?? 0;
+    expected += cardEst;
+
+    // Each project contributes once, at whichever figure is better evidence:
+    // the estimate, or what actually came in when that overshot it. A project
+    // paid without an explicit invoice figure still falls back to the PFH
+    // estimate, so taking the estimate alone would understate a job that paid
+    // above it.
+    const feeReceived = rows
+      .filter(r => r.kind !== "royalty")
+      .reduce((s, r) => s + (Number(r.amount_received) || 0), 0);
+    projectedGross += Math.max(cardEst, feeReceived);
 
     for (const r of rows) {
       const amt = rowValue(r, card, rows);
@@ -375,6 +399,10 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
     payoutsOwedNow,
     payoutsUpcoming,
     owedTo: owedTo.sort((a, b) => b.amount - a.amount),
+    // Royalties sit outside cardExpected by design — they are history, not a
+    // forecast — so they are added here rather than being counted twice.
+    projectedGross: projectedGross + royaltiesEarned,
+    projectedNet: projectedGross + royaltiesEarned - payoutsTotal,
   };
 }
 

@@ -381,6 +381,20 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
           value={`~${formatMoney(totals.expected)}`}
           hint={estimatedShare < totals.expected ? `${formatMoney(totals.expected - estimatedShare)} from invoices` : undefined}
         />
+        {/* The bottom line of the pipeline beside it: every tracked project at
+            its best available figure, less everything that goes to someone
+            else. Pipeline is gross, and gross overstates what you keep. */}
+        {totals.payoutsTotal > 0.005 && (
+          <Stat
+            label="Net (projected)"
+            value={`~${formatMoney(totals.projectedNet)}`}
+            // Spelled out because this sits beside Pipeline and can exceed it:
+            // Pipeline is the estimate, while gross takes actual receipts where
+            // a job paid above its estimate. Without the working shown, a net
+            // larger than the pipeline it follows just looks wrong.
+            hint={`~${formatMoney(totals.projectedGross)} gross · ${formatMoney(totals.payoutsTotal)} to others`}
+          />
+        )}
         {/* Owed and paid are separate figures. A narrator usually can't pay
             the editor until the client has paid them, so folding the two
             together claims money has left the account when it hasn't. */}
