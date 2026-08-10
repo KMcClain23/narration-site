@@ -82,7 +82,7 @@ export function RoyaltyLedger({
   }
 
   return (
-    <section className="mt-4 overflow-hidden rounded-xl border border-surface-border">
+    <section className="mt-3 mb-4 overflow-hidden rounded-xl border border-surface-border">
       <button
         type="button"
         onClick={() => setOpen(o => !o)}

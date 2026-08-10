@@ -39,6 +39,39 @@ const OPEN_BY_DEFAULT: Record<ProjectState, boolean> = {
   untracked: false,
 };
 
+/**
+ * A colour per state, carried by a left edge and the count pill.
+ *
+ * Complete class strings, never assembled at runtime — Tailwind's scanner only
+ * sees literals (same reason URGENCY_PILL is written out longhand).
+ *
+ * The palette encodes urgency rather than decorating: amber is money someone
+ * owes you, teal is work you could bill today, green is settled, and the two
+ * groups that need no decision stay grey so they recede.
+ */
+const GROUP_ACCENT: Record<ProjectState, { edge: string; pill: string }> = {
+  awaiting: {
+    edge: "border-l-accent-amber",
+    pill: "bg-accent-amber/15 text-accent-amber-bright",
+  },
+  ready: {
+    edge: "border-l-status-prepping",
+    pill: "bg-status-prepping/15 text-status-prepping",
+  },
+  production: {
+    edge: "border-l-text-dim",
+    pill: "bg-pill-neutral-bg text-pill-neutral-text",
+  },
+  paid: {
+    edge: "border-l-capacity-light",
+    pill: "bg-capacity-light/15 text-capacity-light",
+  },
+  untracked: {
+    edge: "border-l-surface-border",
+    pill: "bg-pill-neutral-bg text-pill-neutral-text",
+  },
+};
+
 const GROUP_HINT: Record<ProjectState, string> = {
   awaiting: "Money you're owed — invoiced work, or royalties earned but not yet paid out.",
   ready: "Delivered work with no invoice raised yet.",
@@ -190,7 +223,9 @@ function Group({
   if (projects.length === 0) return null;
 
   return (
-    <section className="mt-4 overflow-hidden rounded-xl border border-surface-border">
+    <section
+      className={`mt-3 overflow-hidden rounded-xl border border-surface-border border-l-[3px] ${GROUP_ACCENT[state].edge}`}
+    >
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
@@ -198,7 +233,7 @@ function Group({
       >
         {open ? <ChevronDown size={16} className="text-text-muted" /> : <ChevronRight size={16} className="text-text-muted" />}
         <span className={adminType.title}>{PROJECT_STATE_LABEL[state]}</span>
-        <span className={`${adminType.monoNum} rounded-full bg-pill-neutral-bg px-2 py-0.5 text-pill-neutral-text`}>
+        <span className={`${adminType.monoNum} rounded-full px-2 py-0.5 ${GROUP_ACCENT[state].pill}`}>
           {projects.length}
         </span>
         {/* Suppressed at zero: the back-catalogue group has no rates on file,
@@ -389,9 +424,13 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
         );
       })}
 
-      {/* Analytics, not a to-do — collapsed so it doesn't compete with the
-          work above. */}
-      <section className="mt-8 mb-4 overflow-hidden rounded-xl border border-surface-border">
+      {/* Everything above is a state a project is IN and may need acting on.
+          These two are lenses over the same money — kept below a divider and
+          without an accent edge so they read as reference, not as two more
+          things demanding attention. */}
+      <p className={`${adminType.label} mt-10 border-t border-divider pt-5`}>Reference</p>
+
+      <section className="mt-3 mb-4 overflow-hidden rounded-xl border border-surface-border">
         <button
           type="button"
           onClick={() => setShowClients(o => !o)}
