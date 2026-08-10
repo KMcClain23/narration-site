@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, Upload, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { useModalOpen } from "@/components/admin/AdminModalContext";
 import {
@@ -238,6 +238,133 @@ function PayoutsEditor({
   );
 }
 
+/** One candidate row read out of an uploaded statement. */
+type ParsedStatement = {
+  period: string;
+  amount_received: number;
+  received_on: string;
+  source: string;
+  title: string;
+  confidence: "high" | "medium" | "low";
+  notes: string;
+};
+
+const CONFIDENCE_NOTE: Record<ParsedStatement["confidence"], string> = {
+  high: "",
+  medium: "check this one",
+  low: "unsure — verify against the statement",
+};
+
+/**
+ * Reads a statement and offers what it found. Deliberately does not save:
+ * an extraction mistake must not become a financial record without being
+ * looked at, so this only ever fills the form in.
+ */
+function StatementUpload({ onApply }: { onApply: (s: ParsedStatement) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [candidates, setCandidates] = useState<ParsedStatement[] | null>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Reset immediately so re-picking the same file fires a change event.
+    e.target.value = "";
+    if (!file) return;
+
+    setBusy(true);
+    setError(null);
+    setCandidates(null);
+
+    const body = new FormData();
+    body.append("file", file);
+
+    try {
+      const res = await fetch("/api/payments/parse-document", { method: "POST", body });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Could not read that statement.");
+        return;
+      }
+      // Only royalty rows are useful here — the same endpoint also reads
+      // invoices and processor exports, which belong in the bulk import.
+      const found: ParsedStatement[] = (json.rows ?? [])
+        .filter((r: { kind?: string }) => r.kind === "royalty")
+        .map((r: Record<string, unknown>) => ({
+          period: String(r.period ?? ""),
+          amount_received: Number(r.amount) || 0,
+          received_on: String(r.date ?? ""),
+          source: String(r.method ?? ""),
+          title: String(r.title ?? ""),
+          confidence: (r.confidence as ParsedStatement["confidence"]) ?? "low",
+          notes: String(r.notes ?? ""),
+        }));
+      if (found.length === 0) {
+        setError("No payment information found in that file.");
+        return;
+      }
+      // A single period is unambiguous — fill it in rather than making the
+      // narrator confirm a list of one.
+      if (found.length === 1) onApply(found[0]);
+      setCandidates(found);
+    } catch {
+      setError("Could not read that statement.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-dashed border-surface-border px-3 py-3 space-y-2">
+      <label className="flex cursor-pointer items-center gap-2 text-[13px] text-text-muted hover:text-text-primary">
+        <Upload size={14} />
+        {busy ? "Reading statement…" : "Upload a statement to fill this in"}
+        <input
+          type="file"
+          className="hidden"
+          accept=".xlsx,.xlsm,.pdf,.csv,.txt,.tsv,image/png,image/jpeg"
+          onChange={handleFile}
+          disabled={busy}
+        />
+      </label>
+      <p className={adminType.small}>
+        ACX Excel or CSV, a PDF remittance, or a screenshot. Nothing is saved until you press Save.
+      </p>
+
+      {error && <p className="text-[13px] text-alert-red">{error}</p>}
+
+      {candidates && candidates.length > 1 && (
+        <div className="space-y-1 pt-1">
+          <p className={adminType.small}>
+            Found {candidates.length} periods — add one now, then repeat for the others.
+          </p>
+          {candidates.map((c, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onApply(c)}
+              className="flex w-full items-center justify-between gap-3 rounded-lg border border-surface-border bg-background px-3 py-2 text-left hover:border-accent-amber/40"
+            >
+              <span className={adminType.bodyMd}>{c.period || "Unlabelled period"}</span>
+              <span className={adminType.monoNum}>
+                {formatMoney(c.amount_received)}
+                {CONFIDENCE_NOTE[c.confidence] && (
+                  <span className={`${adminType.small} ml-2`}>{CONFIDENCE_NOTE[c.confidence]}</span>
+                )}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {candidates?.length === 1 && CONFIDENCE_NOTE[candidates[0].confidence] && (
+        <p className={adminType.small}>
+          Filled in — {CONFIDENCE_NOTE[candidates[0].confidence]}.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
@@ -464,13 +591,38 @@ export function PaymentFormModal({
 
           {isRoyalty ? (
             <div className="max-w-md space-y-4">
+              <StatementUpload
+                onApply={s =>
+                  setForm(f => ({
+                    ...f,
+                    period: s.period || f.period,
+                    // An uploaded statement reports earnings; whether it has
+                    // been paid is a separate fact the narrator supplies.
+                    amount_expected: s.amount_received ? String(s.amount_received) : f.amount_expected,
+                    received_on: s.received_on || f.received_on,
+                    method: s.source || f.method,
+                    notes: s.notes || f.notes,
+                  }))
+                }
+              />
               <Field label="Period" hint="Whatever the statement covers — a quarter, a month, a payout run.">
                 <input className={inputClass} value={form.period} onChange={set("period")}
                   placeholder="Q1 2026" />
               </Field>
 
+              {/* Earned and received are separate because they usually happen
+                  months apart: ACX reports earnings monthly but only pays once
+                  the accrued balance clears its threshold. */}
+              <Field
+                label="Earned this period"
+                hint="What the statement says you earned, whether or not it's been paid yet."
+              >
+                <input className={inputClass} value={form.amount_expected} onChange={set("amount_expected")}
+                  inputMode="decimal" placeholder="0.00" />
+              </Field>
+
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Amount received">
+                <Field label="Received" hint="Leave 0 until it's actually paid.">
                   <input className={inputClass} value={form.amount_received} onChange={set("amount_received")}
                     inputMode="decimal" placeholder="0" />
                 </Field>

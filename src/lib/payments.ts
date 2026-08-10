@@ -149,11 +149,21 @@ export function derivePaymentStatus(p: PaymentRow, now = todayLocal()): PaymentS
   const expected = rowExpected(p);
   const received = Number(p.amount_received) || 0;
 
-  // A royalty statement is never owed, overdue or invoiced — it either
-  // arrived or it hasn't been entered yet. Running it through the fee ladder
-  // below would mark an un-entered statement "overdue" against a due date
-  // that has no meaning for royalties.
-  if (p.kind === "royalty") return received > 0 ? "paid" : "expected";
+  // Royalties accrue before they are disbursed: a distributor reports what was
+  // earned each period and pays the accumulated balance later, often months
+  // later and only once it clears a threshold. So a royalty row carries both
+  // what was earned (amount_expected) and what has actually landed
+  // (amount_received), and is owed until those meet.
+  //
+  // There is no overdue state — a distributor sets its own payment timing and
+  // owes nothing on a schedule you can be late against.
+  if (p.kind === "royalty") {
+    const earned = expected ?? 0;
+    if (earned > 0 && received + 0.01 >= earned) return "paid";
+    if (received > 0) return "partial";
+    if (earned > 0) return "expected";
+    return received > 0 ? "paid" : "expected";
+  }
 
   // Tolerance of a cent absorbs numeric(10,2) rounding so a fully-settled
   // invoice doesn't sit forever at "partial" over a rounding remainder.
@@ -208,9 +218,12 @@ export function isCardExpectedActual(rows: PaymentRow[]): boolean {
  *      without inventing a number.
  */
 export function rowValue(p: PaymentRow, card: MoneyCard, rows: PaymentRow[]): number {
-  // A royalty statement is worth exactly what it paid. There is no estimate
-  // to fall back on — that is the nature of royalty share.
-  if (p.kind === "royalty") return Number(p.amount_received) || 0;
+  // A royalty row is worth what the statement says was earned; what has been
+  // received against it may still be nothing. There is no estimate to fall
+  // back on — that is the nature of royalty share.
+  if (p.kind === "royalty") {
+    return p.amount_expected != null ? Number(p.amount_expected) : Number(p.amount_received) || 0;
+  }
 
   if (p.amount_expected != null) return Number(p.amount_expected);
   const received = Number(p.amount_received) || 0;
@@ -235,6 +248,10 @@ export type MoneyTotals = {
    */
   /** Royalty-share income received. Counted in `received`, never in `expected` — royalties are history, not a forecast. */
   royalties: number;
+  /** Royalty income earned across all statements, paid or not. */
+  royaltiesEarned: number;
+  /** Earned but not yet disbursed — a real receivable, not a forecast. */
+  royaltiesOwed: number;
   payoutsTotal: number;
   /** Payouts with a paid_on date — money that has actually left. */
   payoutsPaid: number;
@@ -255,6 +272,8 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
   let received = 0;
   let overdue = 0;
   let royalties = 0;
+  let royaltiesEarned = 0;
+  let royaltiesOwed = 0;
   let payoutsTotal = 0;
   let payoutsPaid = 0;
   let payoutsOwed = 0;
@@ -269,7 +288,18 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
       const amt = rowValue(r, card, rows);
       const got = Number(r.amount_received) || 0;
       received += got;
-      if (r.kind === "royalty") royalties += got;
+
+      // Royalties are owed from the moment they are earned until the
+      // distributor actually disburses them — which on ACX means accruing for
+      // months below a payment threshold. Counting them only once paid hid
+      // real money; counting them as collected on the statement date claimed
+      // money that hadn't arrived.
+      if (r.kind === "royalty") {
+        royalties += got;
+        royaltiesEarned += amt;
+        royaltiesOwed += Math.max(0, amt - got);
+        continue;
+      }
 
       for (const p of r.payouts ?? []) {
         const a = Number(p.amount) || 0;
@@ -284,10 +314,8 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
         }
       }
 
-      if (r.kind !== "royalty") {
-        if (r.invoiced_on) invoiced += amt;
-        if (derivePaymentStatus(r) === "overdue") overdue += amt;
-      }
+      if (r.invoiced_on) invoiced += amt;
+      if (derivePaymentStatus(r) === "overdue") overdue += amt;
     }
   }
 
@@ -297,9 +325,14 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
     expected,
     invoiced,
     received,
-    outstanding: Math.max(0, invoiced - received),
+    // Fee invoices chase `received` down; royalties owed are additive — a
+    // distributor never invoices, so they would otherwise vanish from what
+    // you are owed entirely.
+    outstanding: Math.max(0, invoiced - (received - royalties)) + royaltiesOwed,
     overdue,
     royalties,
+    royaltiesEarned,
+    royaltiesOwed,
     payoutsTotal,
     payoutsPaid,
     payoutsOwed,
@@ -406,7 +439,15 @@ export function projectState(card: MoneyCard, rows: PaymentRow[]): ProjectState 
   // statements that arrive. Calling it "ready to invoice" would park it in a
   // to-do list it can never leave.
   if (card.payment_type === "rs") {
-    return received > 0 ? "paid" : card.status === "released" ? "untracked" : "production";
+    const royalty = rows.filter(r => r.kind === "royalty");
+    const owed = royalty.reduce(
+      (s, r) => s + Math.max(0, rowValue(r, card, rows) - (Number(r.amount_received) || 0)),
+      0,
+    );
+    // Earned but not yet disbursed is money awaiting payment, not settled work.
+    if (owed > 0.01) return "awaiting";
+    if (royalty.length > 0 || received > 0) return "paid";
+    return card.status === "released" ? "untracked" : "production";
   }
   const invoicedTotal = invoicedRows.reduce((s, r) => s + rowValue(r, card, rows), 0);
 

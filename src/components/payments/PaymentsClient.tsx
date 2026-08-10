@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { parseLocalDate } from "@/components/admin/board-card-utils";
@@ -20,6 +21,7 @@ import {
 } from "@/lib/payments";
 import { PaymentFormModal } from "./PaymentFormModal";
 import { InvoiceButton } from "./InvoiceButton";
+import { ImportDropZone } from "./ImportDropZone";
 
 // Order is the order of attention: money you're owed, then work you could
 // bill, then everything that needs no decision today.
@@ -220,6 +222,9 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
   const [payments, setPayments] = useState<PaymentRow[]>(initialPayments);
   const [editing, setEditing] = useState<{ cardId: string; payment: PaymentRow | null } | null>(null);
   const [showClients, setShowClients] = useState(false);
+  // Imports insert rows server-side; refresh rather than trying to splice
+  // them into local state from the bulk response.
+  const router = useRouter();
 
   const cardsById = useMemo(() => new Map(cards.map(c => [c.id, c])), [cards]);
 
@@ -313,6 +318,17 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
           hint={totals.overdue > 0 ? `${formatMoney(totals.overdue)} overdue` : owed === 0 ? "Nothing outstanding" : undefined}
         />
         <Stat label="Collected" value={formatMoney(totals.received)} />
+        {totals.royaltiesEarned > 0 && (
+          <Stat
+            label="Royalties"
+            value={formatMoney(totals.royaltiesEarned)}
+            hint={
+              totals.royaltiesOwed > 0.01
+                ? `${formatMoney(totals.royaltiesOwed)} not yet paid out`
+                : "all paid out"
+            }
+          />
+        )}
         {/* Marked as an estimate in the label, not just a footnote — the
             figure is derived from word counts, not from anything agreed. */}
         <Stat
@@ -336,6 +352,8 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
           <Stat label="Paid out" value={formatMoney(totals.payoutsPaid)} />
         )}
       </section>
+
+      <ImportDropZone cards={cards} onImported={() => router.refresh()} />
 
       {GROUP_ORDER.map(state => {
         const list = grouped.get(state) ?? [];

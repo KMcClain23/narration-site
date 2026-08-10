@@ -9,7 +9,8 @@
     "lint": "eslint",
     "apply-trigger-warnings": "npx --yes tsx scripts/apply-trigger-warnings.ts",
     "backfill-release-dates": "npx --yes tsx scripts/backfill-release-dates.ts",
-    "apply-release-dates": "npx --yes tsx scripts/apply-release-dates.ts"
+    "apply-release-dates": "npx --yes tsx scripts/apply-release-dates.ts",
+    "import-payments": "npx --yes tsx scripts/import-payments.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
