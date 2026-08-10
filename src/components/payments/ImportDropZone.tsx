@@ -132,6 +132,9 @@ export function ImportDropZone({
 
   return (
     <section className="mt-6">
+      {/* One row rather than a tall panel: dropping a file is occasional, and
+          the drop target only has to be findable, not the largest thing on the
+          page. Status shares the row instead of growing it. */}
       <div
         onDragOver={e => {
           e.preventDefault();
@@ -139,16 +142,16 @@ export function ImportDropZone({
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
-        className={`rounded-xl border border-dashed px-5 py-6 text-center transition-colors ${
+        className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-dashed px-4 py-2.5 transition-colors ${
           dragging ? "border-accent-amber bg-accent-amber/5" : "border-surface-border bg-surface"
         }`}
       >
-        <FileUp size={20} className="mx-auto text-text-muted" />
-        <p className={`${adminType.bodyMd} mt-2`}>
-          {busy ? "Reading…" : "Drop a royalty statement, payout export, or invoice"}
-        </p>
-        <p className={`${adminType.small} mt-0.5`}>
-          Excel, CSV, PDF or a screenshot ·{" "}
+        <FileUp size={15} className="shrink-0 text-text-muted" />
+        <span className={adminType.bodyMd}>
+          {busy ? "Reading…" : "Drop a statement, payout export or invoice"}
+        </span>
+        <span className={adminType.small}>
+          Excel, CSV, PDF or image ·{" "}
           <label className="cursor-pointer text-accent-amber-bright hover:underline">
             choose a file
             <input
@@ -163,13 +166,13 @@ export function ImportDropZone({
               }}
             />
           </label>
-        </p>
+        </span>
 
-        {error && <p className="mt-2 text-[13px] text-alert-red">{error}</p>}
+        {error && <span className="ml-auto text-[13px] text-alert-red">{error}</span>}
         {result && (
-          <p className="mt-2 flex items-center justify-center gap-1.5 text-[13px] text-capacity-light">
+          <span className="ml-auto flex items-center gap-1.5 text-[13px] text-capacity-light">
             <Check size={14} /> {result}
-          </p>
+          </span>
         )}
       </div>
 
