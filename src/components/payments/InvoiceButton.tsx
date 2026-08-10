@@ -55,11 +55,14 @@ export function InvoiceButton({
   card,
   rows,
   className,
+  label = "Invoice",
 }: {
   payment: PaymentRow;
   card: MoneyCard;
   rows: PaymentRow[];
   className?: string;
+  /** "Invoice copy" on settled work, where the document already exists. */
+  label?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,7 +126,7 @@ export function InvoiceButton({
             "flex items-center gap-1 text-[13px] text-text-muted hover:text-text-primary disabled:opacity-50"
           }
         >
-          <FileText size={14} /> {busy ? "Opening…" : "Invoice"}
+          <FileText size={14} /> {busy ? "Opening…" : label}
         </button>
         {error && <span className="text-[13px] text-alert-red">{error}</span>}
       </span>

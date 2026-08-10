@@ -129,8 +129,16 @@ function ProjectRow({
   onAddPayment: () => void;
   onEditPayment: (p: PaymentRow) => void;
 }) {
-  const { card, rows, amount, isEstimate } = project;
+  const { card, rows, amount, isEstimate, state } = project;
   const primary = rows[0];
+
+  // Settled work has nothing left to bill. Most of it was never invoiced at
+  // all — a distributor pays without one — so offering the action there is
+  // worse than noise: opening the editor reserves the next number in the
+  // sequence, spending one on a document nobody asked for. Where an invoice
+  // genuinely was raised, reproducing it is still useful at tax time.
+  const wasInvoiced = Boolean(primary?.invoice_number || primary?.invoiced_on);
+  const showInvoice = Boolean(primary) && (state !== "paid" || wasInvoiced);
 
   return (
     <div className="border-b border-divider px-4 py-3 last:border-0">
@@ -150,7 +158,14 @@ function ProjectRow({
 
           {primary ? (
             <>
-              <InvoiceButton payment={primary} card={card} rows={rows} />
+              {showInvoice && (
+                <InvoiceButton
+                  payment={primary}
+                  card={card}
+                  rows={rows}
+                  label={state === "paid" ? "Invoice copy" : "Invoice"}
+                />
+              )}
               <button
                 type="button"
                 onClick={() => onEditPayment(primary)}
