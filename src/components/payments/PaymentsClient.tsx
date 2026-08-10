@@ -228,8 +228,12 @@ function Group({
   );
 }
 
-export function PaymentsClient({ cards, payments: initialPayments }: { cards: MoneyCard[]; payments: PaymentRow[] }) {
-  const [payments, setPayments] = useState<PaymentRow[]>(initialPayments);
+export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; payments: PaymentRow[] }) {
+  // Rendered straight from the server payload, never mirrored into local
+  // state. A local copy went stale two ways: the payment returned by POST is
+  // serialized before its payouts are created, so an added editor fee showed
+  // no change at all; and state seeded from props once never picked up a
+  // router.refresh(). Every mutation below re-reads instead.
   const [editing, setEditing] = useState<{ cardId: string; payment: PaymentRow | null } | null>(null);
   const [showClients, setShowClients] = useState(false);
   // Imports insert rows server-side; refresh rather than trying to splice
@@ -307,20 +311,14 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
     return totals.expected - actual;
   }, [cards, rowsByCard, totals.expected]);
 
-  function handleSaved(p: PaymentRow) {
-    setPayments(prev => {
-      const idx = prev.findIndex(x => x.id === p.id);
-      if (idx === -1) return [...prev, p];
-      const next = [...prev];
-      next[idx] = p;
-      return next;
-    });
+  function handleSaved() {
     setEditing(null);
+    router.refresh();
   }
 
-  function handleDeleted(id: string) {
-    setPayments(prev => prev.filter(p => p.id !== id));
+  function handleDeleted() {
     setEditing(null);
+    router.refresh();
   }
 
   const owed = totals.outstanding;
