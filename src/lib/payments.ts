@@ -438,8 +438,11 @@ export function projectState(card: MoneyCard, rows: PaymentRow[]): ProjectState 
   // Pure royalty share is never invoiced — there is no client to bill, only
   // statements that arrive. Calling it "ready to invoice" would park it in a
   // to-do list it can never leave.
-  if (card.payment_type === "rs") {
-    const royalty = rows.filter(r => r.kind === "royalty");
+  const royalty = rows.filter(r => r.kind === "royalty");
+  // Keyed on having royalty rows, not only on payment_type: an RS+ project is
+  // a fee plus royalties, and checking the type alone would leave its unpaid
+  // statements out of "awaiting payment" entirely.
+  if (card.payment_type === "rs" || royalty.length > 0) {
     const owed = royalty.reduce(
       (s, r) => s + Math.max(0, rowValue(r, card, rows) - (Number(r.amount_received) || 0)),
       0,

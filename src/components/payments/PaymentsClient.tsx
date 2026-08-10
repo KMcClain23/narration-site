@@ -22,6 +22,7 @@ import {
 import { PaymentFormModal } from "./PaymentFormModal";
 import { InvoiceButton } from "./InvoiceButton";
 import { ImportDropZone } from "./ImportDropZone";
+import { RoyaltyLedger } from "./RoyaltyLedger";
 
 // Order is the order of attention: money you're owed, then work you could
 // bill, then everything that needs no decision today.
@@ -148,9 +149,18 @@ function ProjectRow({
               onClick={() => onEditPayment(r)}
               className="flex w-full items-center justify-between gap-3 text-left hover:opacity-80"
             >
+              {/* A royalty row is identified by its period, not a milestone
+                  label — "Payment · due —" told you nothing about which
+                  statement it came from. */}
               <span className={adminType.small}>
-                {r.label || "Payment"}
-                {r.due_on ? ` · due ${fmtDate(r.due_on)}` : ""}
+                {r.kind === "royalty" ? r.period || "Royalties" : r.label || "Payment"}
+                {r.kind === "royalty"
+                  ? Number(r.amount_received) > 0
+                    ? " · paid"
+                    : " · awaiting payout"
+                  : r.due_on
+                    ? ` · due ${fmtDate(r.due_on)}`
+                    : ""}
               </span>
               <span className={adminType.monoNum}>
                 {r.amount_expected != null ? formatMoney(Number(r.amount_expected)) : "—"}
@@ -354,6 +364,8 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
       </section>
 
       <ImportDropZone cards={cards} onImported={() => router.refresh()} />
+
+      <RoyaltyLedger cards={cards} payments={payments} onChanged={() => router.refresh()} />
 
       {GROUP_ORDER.map(state => {
         const list = grouped.get(state) ?? [];

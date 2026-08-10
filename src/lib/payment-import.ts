@@ -146,14 +146,19 @@ export function toBulkPayload(p: PlanRow) {
   // recorded against it. Marking it received on import would claim money that
   // has not arrived.
   if (row.kind === "royalty") {
+    // Imported as earned-only, never as received — regardless of how the
+    // parser read amount_kind. A royalty statement reports earnings; the
+    // disbursement is a separate event that happens later and covers several
+    // periods at once. Trusting amount_kind here marked every ACX statement
+    // paid on import, which claimed money that had not arrived.
     return {
       card_id: p.cardId,
       kind: "royalty" as const,
       period: row.period,
       label: "",
       amount_expected: row.amount,
-      amount_received: row.amount_kind === "received" ? row.amount : 0,
-      received_on: row.amount_kind === "received" ? row.date : "",
+      amount_received: 0,
+      received_on: "",
       invoiced_on: "",
       due_on: "",
       invoice_number: "",

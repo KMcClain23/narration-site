@@ -59,7 +59,21 @@ export function ImportDropZone({
         return;
       }
       setDocType(json.document_type ?? null);
-      setPlan(planImport(rows, matchCards));
+
+      const next = planImport(rows, matchCards);
+
+      // Nothing to decide — every row matched a project, none was declined or
+      // low-confidence — so importing it is the only thing the review screen
+      // would have been used for. Review exists for the ambiguous cases, not
+      // as a toll on every file.
+      const needsAttention = next.some(
+        p => !p.cardId || !p.include || p.row.confidence !== "high",
+      );
+      if (!needsAttention) {
+        await importRows(next);
+        return;
+      }
+      setPlan(next);
     } catch {
       setError("Could not read that file.");
     } finally {
@@ -78,9 +92,8 @@ export function ImportDropZone({
     setPlan(p => (p ? p.map((row, j) => (j === i ? { ...row, ...patch } : row)) : p));
   }
 
-  async function handleImport() {
-    if (!plan) return;
-    const chosen = plan.filter(p => p.include && p.cardId);
+  async function importRows(rows: PlanRow[]) {
+    const chosen = rows.filter(p => p.include && p.cardId);
     if (chosen.length === 0) return;
 
     setBusy(true);
@@ -98,7 +111,7 @@ export function ImportDropZone({
       }
       const dupes = (json.skipped ?? []).length;
       setResult(
-        `Imported ${json.imported}${dupes ? ` · ${dupes} skipped as already recorded` : ""}.`,
+        `Imported ${json.imported}${dupes ? ` · ${dupes} already recorded` : ""}.`,
       );
       setPlan(null);
       setDocType(null);
@@ -108,6 +121,10 @@ export function ImportDropZone({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleImport() {
+    if (plan) await importRows(plan);
   }
 
   const selected = plan?.filter(p => p.include && p.cardId) ?? [];
