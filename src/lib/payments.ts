@@ -270,10 +270,7 @@ export function rowValue(p: PaymentRow, card: MoneyCard, rows: PaymentRow[]): nu
 export type PayoutObligation = {
   name: string;
   kind: PayoutKind;
-  /** The check you write. */
   amount: number;
-  /** What it costs you once a duet co-narrator carries their half. */
-  burden: number;
   projectTitle: string;
   dueAfterRelease: boolean;
 };
@@ -313,14 +310,6 @@ export type MoneyTotals = {
   payoutsOwedNow: number;
   /** Unpaid payouts on unreleased projects: a committed cost, not yet a debt. */
   payoutsUpcoming: number;
-  /**
-   * The three figures above are checks written. These are what those checks
-   * cost you after a duet co-narrator carries their half of the off-the-top
-   * costs — the basis every other total on this page uses. See payoutBurden().
-   */
-  payoutsPaidBurden: number;
-  payoutsOwedNowBurden: number;
-  payoutsUpcomingBurden: number;
   /** Every unpaid obligation, for grouping by payee rather than listing raw. */
   owedTo: PayoutObligation[];
   /**
@@ -360,9 +349,6 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
   let payoutsOwedNow = 0;
   let payoutsUpcoming = 0;
   let payoutsBurdenTotal = 0;
-  let payoutsPaidBurden = 0;
-  let payoutsOwedNowBurden = 0;
-  let payoutsUpcomingBurden = 0;
 
   let projectedGross = 0;
 
@@ -410,7 +396,6 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
 
         if (p.paid_on) {
           payoutsPaid += a;
-          payoutsPaidBurden += burden;
         } else if (a > 0) {
           payoutsOwed += a;
           // A payout only becomes a debt once the book has shipped — before
@@ -418,16 +403,13 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
           const dueAfterRelease = card.status !== "released";
           if (dueAfterRelease) {
             payoutsUpcoming += a;
-            payoutsUpcomingBurden += burden;
           } else {
             payoutsOwedNow += a;
-            payoutsOwedNowBurden += burden;
           }
           owedTo.push({
             name: p.payee_name,
             kind: p.kind,
             amount: a,
-            burden,
             projectTitle: card.title,
             dueAfterRelease,
           });
@@ -459,9 +441,6 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
     payoutsByKind,
     payoutsOwedNow,
     payoutsUpcoming,
-    payoutsPaidBurden,
-    payoutsOwedNowBurden,
-    payoutsUpcomingBurden,
     owedTo: owedTo.sort((a, b) => b.amount - a.amount),
     // Royalties sit outside cardExpected by design — they are history, not a
     // forecast — so they are added here rather than being counted twice.
