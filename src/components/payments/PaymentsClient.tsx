@@ -40,7 +40,7 @@ const OPEN_BY_DEFAULT: Record<ProjectState, boolean> = {
 };
 
 const GROUP_HINT: Record<ProjectState, string> = {
-  awaiting: "Invoiced, not yet paid in full.",
+  awaiting: "Money you're owed — invoiced work, or royalties earned but not yet paid out.",
   ready: "Delivered work with no invoice raised yet.",
   production: "Still recording or prepping — nothing to bill until delivery.",
   paid: "Settled.",
@@ -259,6 +259,19 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
         const received = rows.reduce((s, r) => s + (Number(r.amount_received) || 0), 0);
         const expected = cardExpected(card, rows);
 
+        // cardExpected() excludes royalty rows on purpose — royalties are not
+        // a forecast — so a project owed only royalties computed to $0 while
+        // the header correctly showed money owed. Added back explicitly.
+        const royaltyOwed = rows
+          .filter(r => r.kind === "royalty")
+          .reduce(
+            (s, r) => s + Math.max(0, (Number(r.amount_expected) || 0) - (Number(r.amount_received) || 0)),
+            0,
+          );
+        const feeReceived = rows
+          .filter(r => r.kind !== "royalty")
+          .reduce((s, r) => s + (Number(r.amount_received) || 0), 0);
+
         // The number that matters differs by column: what landed for settled
         // work, what's still owed for invoiced work, the expected value for
         // everything else. One shared "expected" figure would have shown
@@ -266,7 +279,7 @@ export function PaymentsClient({ cards, payments: initialPayments }: { cards: Mo
         // what actually arrived was $1,500.
         const amount =
           state === "paid" ? received
-          : state === "awaiting" ? Math.max(0, (expected ?? 0) - received)
+          : state === "awaiting" ? Math.max(0, (expected ?? 0) - feeReceived) + royaltyOwed
           : expected;
 
         return {
