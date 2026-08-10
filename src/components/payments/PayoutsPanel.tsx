@@ -42,16 +42,57 @@ function groupByPayee(owedTo: MoneyTotals["owedTo"]): Grouped[] {
   return [...map.values()].sort((a, b) => b.total - a.total);
 }
 
+/** One line of the closing ledger. Negatives carry their own sign. */
+function Line({
+  label,
+  value,
+  strong,
+  className = "",
+}: {
+  label: string;
+  value: number;
+  strong?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={`flex items-baseline justify-between gap-4 ${className}`}>
+      <span className={strong ? adminType.bodyMd : adminType.small}>{label}</span>
+      <span
+        className={`${adminType.monoNum} ${
+          strong ? "text-text-primary" : value < 0 ? "text-text-dim" : "text-text-body"
+        }`}
+      >
+        {value < 0 ? `−${formatMoney(-value)}` : formatMoney(value)}
+      </span>
+    </div>
+  );
+}
+
 export function PayoutsPanel({ totals }: { totals: MoneyTotals }) {
   const [open, setOpen] = useState(false);
   const groups = groupByPayee(totals.owedTo);
 
   if (totals.payoutsOwed <= 0 && totals.payoutsPaid <= 0) return null;
 
-  // What's left of collected income once everyone else has been paid. The
-  // headline "Collected" figure is gross: it counts money that is already
+  // Two nets, because they answer different questions.
+  //
+  // What's left of collected income once every debt currently due is settled.
+  // The headline "Collected" figure is gross: it counts money already
   // committed to an editor.
-  const netAfterPayouts = totals.received - totals.payoutsPaid - totals.payoutsOwedNow;
+  const netInHand = totals.received - totals.payoutsPaid - totals.payoutsOwedNow;
+
+  // And what's left once the estimated costs on unreleased books are paid too.
+  // Those aren't debts yet, but they are already spoken for, so the money is
+  // not really yours to plan around.
+  const netAfterEditing = netInHand - totals.payoutsUpcoming;
+
+  // Name the cost by what is actually in it rather than assuming "editing" —
+  // a co-narrator split is not an editing cost.
+  const upcomingKinds = new Set(totals.owedTo.filter(o => o.dueAfterRelease).map(o => o.kind));
+  const upcomingLabel =
+    upcomingKinds.size === 1
+      ? PAYOUT_KIND_LABEL[[...upcomingKinds][0] as keyof typeof PAYOUT_KIND_LABEL] ?? "Payouts"
+      : "Payouts";
 
   return (
     <section className="mt-3 overflow-hidden rounded-xl border border-surface-border">
@@ -123,15 +164,36 @@ export function PayoutsPanel({ totals }: { totals: MoneyTotals }) {
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 border-t border-surface-border bg-surface px-4 py-2.5">
-            <span className={adminType.small}>Collected {formatMoney(totals.received)}</span>
-            {totals.payoutsPaid > 0.005 && (
-              <span className={adminType.small}>Already paid out {formatMoney(totals.payoutsPaid)}</span>
+          {/* A vertical ledger rather than a row of stats: this is one
+              subtraction carried down twice, and a chain of arithmetic reads
+              as a column. */}
+          <div className="border-t border-surface-border bg-surface px-4 py-3">
+            <div className="ml-auto w-full max-w-xs space-y-1">
+              <Line label="Collected" value={totals.received} />
+              {totals.payoutsPaid > 0.005 && (
+                <Line label="Already paid out" value={-totals.payoutsPaid} />
+              )}
+              {totals.payoutsOwedNow > 0.005 && <Line label="Due now" value={-totals.payoutsOwedNow} />}
+              <Line label="Net in hand" value={netInHand} strong />
+
+              {totals.payoutsUpcoming > 0.005 && (
+                <>
+                  <Line
+                    label={`${upcomingLabel} still to come`}
+                    value={-totals.payoutsUpcoming}
+                    className="border-t border-divider pt-1.5"
+                  />
+                  <Line label={`Net after ${upcomingLabel.toLowerCase()}`} value={netAfterEditing} strong />
+                </>
+              )}
+            </div>
+
+            {totals.payoutsUpcoming > 0.005 && (
+              <p className={`${adminType.small} mt-2 text-right`}>
+                Those costs sit on books you haven&rsquo;t been paid for yet — the fees come in
+                alongside them.
+              </p>
             )}
-            <span className={adminType.small}>Due now {formatMoney(totals.payoutsOwedNow)}</span>
-            <span className={`${adminType.monoNum} text-text-primary`}>
-              Net after payouts {formatMoney(netAfterPayouts)}
-            </span>
           </div>
         </>
       )}
