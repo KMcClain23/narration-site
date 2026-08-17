@@ -281,6 +281,20 @@ export function cardInvoiceTotal(card: MoneyCard, rows: PaymentRow[]): number | 
   return base + editingCost(rows) * (1 - narratorShare(card));
 }
 
+/**
+ * What the narrator keeps once the invoice is paid.
+ *
+ * Not what the provider collected. A card payment arrives grossed up by the
+ * processing fee and may carry editing the narrator is only fronting, so the
+ * figure banked and the figure earned are two different numbers — and
+ * amount_received records the second. This is the narration line on the
+ * invoice: the share net of the narrator's own half of the editing.
+ */
+export function narratorShareDue(card: MoneyCard, rows: PaymentRow[]): number | null {
+  const invoice = cardInvoiceTotal(card, rows);
+  return invoice == null ? null : invoice - editingCost(rows);
+}
+
 /** True when the figure came from real invoices rather than the PFH estimate. */
 export function isCardExpectedActual(rows: PaymentRow[]): boolean {
   return rows.some(r => r.amount_expected != null);

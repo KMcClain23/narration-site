@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { findPaymentBy, settleFromProvider } from "@/lib/settle-payment";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -24,6 +25,28 @@ export async function POST(request: Request) {
     try {
       const sessionId = (event.data.object as Stripe.Checkout.Session).id;
       const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+      // An invoice payment and a merch order arrive as the same event type and
+      // are told apart by where they came from: an invoice is paid through a
+      // Payment Link this app raised, a merch order through a Checkout Session
+      // carrying line items in its metadata. Without this branch an author
+      // paying an invoice fell into the Printify path and was logged as an
+      // order with no items.
+      const linkId =
+        typeof session.payment_link === "string"
+          ? session.payment_link
+          : (session.payment_link?.id ?? null);
+
+      if (linkId) {
+        const paymentId = await findPaymentBy("stripe_payment_link_id", linkId);
+        if (!paymentId) {
+          console.log("Stripe payment link with no matching invoice:", linkId);
+          return NextResponse.json({ received: true });
+        }
+        const result = await settleFromProvider(paymentId, "Card");
+        console.log(`Invoice ${paymentId}: ${result.reason}`);
+        return NextResponse.json({ received: true });
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const s = session as any;
