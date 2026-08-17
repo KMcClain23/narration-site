@@ -74,7 +74,7 @@ const GROUP_ACCENT: Record<ProjectState, { edge: string; pill: string }> = {
 
 const GROUP_HINT: Record<ProjectState, string> = {
   awaiting: "Money you're owed — invoiced work, or royalties earned but not yet paid out.",
-  ready: "Delivered work with no invoice raised yet.",
+  ready: "Billable now — delivered, or cancelled with a fee still due.",
   production: "Still recording or prepping — nothing to bill until delivery.",
   paid: "Settled.",
   untracked:

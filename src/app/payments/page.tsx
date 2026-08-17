@@ -16,10 +16,12 @@ export default async function PaymentsPage() {
       .select(
         "id, title, author, status, word_count, pfh_rate, payment_type, narration_format, narrator_share_percent, production_type, production_company, released_at, deadline"
       )
-      // Archived cards (recasted/canceled) are excluded — money that was never
-      // going to arrive shouldn't inflate the expected figure. Released cards
-      // ARE included, unlike the board: a delivered book is exactly when
-      // payment is outstanding.
+      // Archived cards are excluded — money that was never going to arrive
+      // shouldn't inflate the expected figure. Released cards ARE included,
+      // unlike the board: a delivered book is exactly when payment is
+      // outstanding. So are recast ones — the contract ends but the
+      // cancellation fee still has to be billed, so archiving a recast card
+      // would hide the one invoice you still need to raise.
       .is("archived_at", null),
     supabaseAdmin
       .from("payments")

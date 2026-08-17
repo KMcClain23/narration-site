@@ -628,3 +628,25 @@ end $$;
 alter table payments add column if not exists period text not null default '';
 
 create index if not exists payments_kind_idx on payments (kind);
+
+-- ============================================================
+-- Stage 9: 'recast' board_cards.status
+--
+-- An author can replace a narrator mid-project. The work stops, but a
+-- cancellation fee is usually still due, so the card has to survive as
+-- something billable. Archiving it (the previous convention) removed it from
+-- the Payments page entirely, which meant the fee could never be invoiced.
+--
+-- Additive: widens the existing CHECK, no data is rewritten.
+-- ============================================================
+
+do $$
+begin
+  if exists (select 1 from pg_constraint where conname = 'board_cards_status_check') then
+    alter table board_cards drop constraint board_cards_status_check;
+  end if;
+
+  alter table board_cards
+    add constraint board_cards_status_check
+    check (status in ('audition', 'contracted', 'prepping', 'recording', 'editing', 'released', 'recast'));
+end $$;

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { FileText } from "lucide-react";
-import { finishedHours, invoiceAmount, type MoneyCard, type PaymentRow } from "@/lib/payments";
+import { agreedFee, finishedHours, invoiceAmount, type MoneyCard, type PaymentRow } from "@/lib/payments";
 import { type InvoiceData } from "./InvoicePDF";
 import { InvoiceEditor } from "./InvoiceEditor";
 
@@ -24,12 +24,33 @@ export function buildInvoice(
 ): InvoiceData {
   const amount = invoiceAmount(payment, card, rows) ?? 0;
   const hrs = finishedHours(card.word_count);
+  const recast = card.status === "recast";
 
-  const detail =
-    hrs > 0 && card.pfh_rate ? `${hrs.toFixed(1)} finished hours × $${card.pfh_rate}/PFH` : "";
+  // A cancellation fee is not billed by the finished hour — the hours were
+  // never delivered — so quoting "12.9 finished hours × $300/PFH" beside a
+  // half-fee would invite exactly the query you don't want on this invoice.
+  // State the basis instead: what share of the agreed fee this is.
+  const agreed = agreedFee(card);
+  // Only when both figures are denominated the same way. amount_gross is the
+  // whole client-side fee while agreedFee() is the narrator's share, so on a
+  // split project the percentage would be wrong — and wrong on a document
+  // going to the author.
+  const pct =
+    recast && agreed && agreed > 0 && payment.amount_gross == null
+      ? Math.round((amount / agreed) * 100)
+      : null;
 
-  const description = payment.label
-    ? `Audiobook narration — ${card.title} (${payment.label})`
+  const detail = recast
+    ? pct != null
+      ? `Cancellation fee — ${pct}% of the agreed fee`
+      : "Cancellation fee — recording ended before delivery"
+    : hrs > 0 && card.pfh_rate
+      ? `${hrs.toFixed(1)} finished hours × $${card.pfh_rate}/PFH`
+      : "";
+
+  const label = payment.label || (recast ? "cancelled — recast" : "");
+  const description = label
+    ? `Audiobook narration — ${card.title} (${label})`
     : `Audiobook narration — ${card.title}`;
 
   return {
