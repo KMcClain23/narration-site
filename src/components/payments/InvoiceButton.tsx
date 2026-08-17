@@ -88,10 +88,13 @@ export function buildInvoice(
    * the editing comes off it — the same split payoutBurden() applies — and the
    * full fee is then added back as its own line.
    */
-  const editing = rows
-    .filter(r => r.kind !== "royalty")
-    .flatMap(r => r.payouts ?? [])
-    .filter(p => isOffTheTop(p.kind) && Number(p.amount) > 0);
+  // Only this payment's own payouts. Editing is recorded against the row that
+  // fronts it, so reading every row would put the whole project's editing onto
+  // each instalment invoice — the same fault that made the webhook record a
+  // project total against a single payment.
+  const editing = (payment.payouts ?? []).filter(
+    p => isOffTheTop(p.kind) && Number(p.amount) > 0,
+  );
 
   const editingTotal = editing.reduce((s, p) => s + Number(p.amount), 0);
   const lines: InvoiceData["lines"] = [

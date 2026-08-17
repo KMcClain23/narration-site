@@ -281,18 +281,35 @@ export function cardInvoiceTotal(card: MoneyCard, rows: PaymentRow[]): number | 
   return base + editingCost(rows) * (1 - narratorShare(card));
 }
 
+/** Editing and proofing fronted on one payment row. */
+export function rowEditingCost(payment: PaymentRow): number {
+  return (payment.payouts ?? [])
+    .filter(p => isOffTheTop(p.kind))
+    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+}
+
 /**
- * What the narrator keeps once the invoice is paid.
+ * What the narrator keeps when THIS payment is settled.
  *
- * Not what the provider collected. A card payment arrives grossed up by the
- * processing fee and may carry editing the narrator is only fronting, so the
- * figure banked and the figure earned are two different numbers — and
- * amount_received records the second. This is the narration line on the
- * invoice: the share net of the narrator's own half of the editing.
+ * Per payment, not per project. A project can carry several rows — a deposit
+ * and a delivery instalment, a fee beside its royalties — and settling one of
+ * them must not credit the value of the others. Reading the card total here
+ * recorded $368.02 against a $1.00 payment, because the project also held an
+ * unrelated $367.02 row.
+ *
+ * Not what the provider collected either. A card payment arrives grossed up by
+ * the processing fee and may carry editing the narrator is only fronting, so
+ * the figure banked and the figure earned are different numbers —
+ * amount_received records the second.
  */
-export function narratorShareDue(card: MoneyCard, rows: PaymentRow[]): number | null {
-  const invoice = cardInvoiceTotal(card, rows);
-  return invoice == null ? null : invoice - editingCost(rows);
+export function paymentNarratorShare(
+  payment: PaymentRow,
+  card: MoneyCard,
+  rows: PaymentRow[],
+): number | null {
+  const base = invoiceAmount(payment, card, rows);
+  if (base == null) return null;
+  return base - rowEditingCost(payment) * narratorShare(card);
 }
 
 /** True when the figure came from real invoices rather than the PFH estimate. */
