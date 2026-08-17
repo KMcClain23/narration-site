@@ -6,6 +6,16 @@ import { useState } from "react";
 // archive gesture and the board's long-press action menu can show this same
 // full dialog directly, without opening the whole Edit modal first.
 export const ARCHIVE_REASONS = ["recasted", "canceled", "other"] as const;
+/**
+ * Archiving is the LAST step, not the first.
+ *
+ * "Recasted" here and the `recast` board status are sequential, not two names
+ * for one thing: set the status while a partial fee is still owed, so the card
+ * stays on Payments where it can be invoiced and chased, then archive it once
+ * the money has actually landed. Archiving first hides the card from Payments
+ * entirely — /payments filters on archived_at — and the invoice you still need
+ * to raise goes with it.
+ */
 export const ARCHIVE_REASON_LABEL: Record<string, string> = {
   recasted: "Recasted",
   canceled: "Canceled",

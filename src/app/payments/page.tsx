@@ -20,7 +20,7 @@ export default async function PaymentsPage() {
       // shouldn't inflate the expected figure. Released cards ARE included,
       // unlike the board: a delivered book is exactly when payment is
       // outstanding. So are recast ones — the contract ends but the
-      // cancellation fee still has to be billed, so archiving a recast card
+      // partial project fee still has to be billed, so archiving a recast card
       // would hide the one invoice you still need to raise.
       .is("archived_at", null),
     supabaseAdmin

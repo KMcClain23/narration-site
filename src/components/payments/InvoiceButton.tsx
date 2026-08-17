@@ -26,10 +26,10 @@ export function buildInvoice(
   const hrs = finishedHours(card.word_count);
   const recast = card.status === "recast";
 
-  // A cancellation fee is not billed by the finished hour — the hours were
-  // never delivered — so quoting "12.9 finished hours × $300/PFH" beside a
-  // half-fee would invite exactly the query you don't want on this invoice.
-  // State the basis instead: what share of the agreed fee this is.
+  // Not billed by the finished hour — those hours were never delivered — so
+  // quoting "6.6 finished hours × $250/PFH" beside a half payment would invite
+  // exactly the query you don't want on this invoice. State the basis instead:
+  // what share of the agreed fee this is.
   const agreed = agreedFee(card);
   // Only when both figures are denominated the same way. amount_gross is the
   // whole client-side fee while agreedFee() is the narrator's share, so on a
@@ -42,15 +42,17 @@ export function buildInvoice(
 
   const detail = recast
     ? pct != null
-      ? `Cancellation fee — ${pct}% of the agreed fee`
-      : "Cancellation fee — recording ended before delivery"
+      ? `Partial project fee — ${pct}% of the agreed fee`
+      : "Partial project fee"
     : hrs > 0 && card.pfh_rate
       ? `${hrs.toFixed(1)} finished hours × $${card.pfh_rate}/PFH`
       : "";
 
-  const label = payment.label || (recast ? "cancelled — recast" : "");
-  const description = label
-    ? `Audiobook narration — ${card.title} (${label})`
+  // "Recast" stays internal to the tracker. The author is being billed for a
+  // share of the agreed fee, and the reason the project ended is not something
+  // the invoice line has to relitigate.
+  const description = payment.label
+    ? `Audiobook narration — ${card.title} (${payment.label})`
     : `Audiobook narration — ${card.title}`;
 
   return {

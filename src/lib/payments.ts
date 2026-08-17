@@ -216,7 +216,7 @@ export function cardExpected(card: MoneyCard, rows: PaymentRow[]): number | null
   if (explicit.length > 0) {
     return explicit.reduce((sum, r) => sum + Number(r.amount_expected), 0);
   }
-  // A recast project earns a cancellation fee, not the contracted fee, and the
+  // A recast project earns a partial project fee, not the contracted fee, and the
   // percentage is a negotiation — nothing before recording starts, pro rata
   // during, commonly half once past the midpoint. Falling back to the full
   // estimate would park a fee in the pipeline that was never agreed, so this
@@ -235,7 +235,7 @@ export function cardExpected(card: MoneyCard, rows: PaymentRow[]): number | null
  * The contracted fee, ignoring any cancellation.
  *
  * cardExpected() deliberately goes quiet on recast work, but an invoice still
- * needs the original figure to say what the cancellation fee is a percentage
+ * needs the original figure to say what the partial fee is a percentage
  * of. Narrator-share basis, same as the board estimate.
  */
 export function agreedFee(card: MoneyCard): number | null {
@@ -603,7 +603,7 @@ export function projectState(card: MoneyCard, rows: PaymentRow[]): ProjectState 
   if (card.status === "released") return "untracked";
 
   // Recast work is billable the moment it stops. Nothing more will be
-  // delivered, but the cancellation fee is due now and won't arrive on its own
+  // delivered, but the partial project fee is due now and won't arrive on its own
   // — treating it as "in production" would hide the one project on the page
   // that needs an invoice today.
   if (card.status === "recast") return "ready";

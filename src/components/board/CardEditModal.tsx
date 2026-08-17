@@ -111,7 +111,7 @@ const STATUSES = [
   { value: "editing", label: "Editing", bg: "bg-orange-500/15", border: "border-orange-500/25", text: "text-orange-300" },
   { value: "released", label: "Released", bg: "bg-emerald-500/15", border: "border-emerald-500/25", text: "text-emerald-300" },
   // An author can replace a narrator mid-project. The work stops, but a
-  // cancellation fee is usually still due, so the card has to survive as
+  // partial project fee is usually still due, so the card has to survive as
   // something billable rather than be deleted or left sitting in Recording.
   { value: "recast", label: "Recast", bg: "bg-rose-500/15", border: "border-rose-500/25", text: "text-rose-300" },
 ] as const;
