@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Required fields missing" }, { status: 400 });
     }
 
-    const from = process.env.RESEND_FROM_EMAIL || "Dean Miller <dean@dmnarration.com>";
+    const from = process.env.RESEND_FROM_EMAIL || "Dean Miller <Dean@DMNarration.com>";
 
     const attachments: { filename: string; content: Buffer }[] = [];
     if (file && file.size > 0) {
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     const { error } = await resend.emails.send({
       from,
-      to: "dean@dmnarration.com",
+      to: "Dean@DMNarration.com",
       replyTo: email,
       subject: `HVO Submission: ${bookTitle} — ${authorName}`,
       html: `

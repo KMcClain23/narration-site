@@ -8,8 +8,13 @@
 export const BUSINESS = {
   name: "Dean Miller",
   company: "Dean Miller Narration LLC",
-  email: "dean@dmnarration.com",
-  site: "dmnarration.com",
+  /**
+   * Capitalised for display. Mail routing ignores case — the domain by RFC,
+   * the local part by every mail server in practice — so this is the same
+   * mailbox as the lowercase form, written the way the brand reads.
+   */
+  email: "Dean@DMNarration.com",
+  site: "DMNarration.com",
 } as const;
 
 /**
