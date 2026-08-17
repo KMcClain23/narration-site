@@ -6,7 +6,7 @@ import { pdf } from "@react-pdf/renderer";
 import { Mail, Plus, Trash2, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { useModalOpen } from "@/components/admin/AdminModalContext";
-import { BUSINESS, PAYMENT_METHODS } from "@/lib/business-identity";
+import { BUSINESS } from "@/lib/business-identity";
 import { InvoicePDF, type InvoiceData, type InvoiceLine } from "./InvoicePDF";
 
 // Loaded lazily and client-only: PDFViewer touches browser APIs, same reason
@@ -214,8 +214,6 @@ export function InvoiceEditor({
       body.append("message", sendMessage);
       body.append("filename", filename);
       body.append("amount_due", String(amountDue));
-      body.append("venmo", PAYMENT_METHODS.venmo);
-      body.append("paypal", PAYMENT_METHODS.paypal);
       if (data.paypalLink) body.append("paypal_link", data.paypalLink);
       body.append("memo", `Invoice ${data.invoiceNumber} — ${data.bookTitle}`.trim());
       if (data.cardLink) body.append("card_link", data.cardLink);

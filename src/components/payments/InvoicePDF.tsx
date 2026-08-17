@@ -1,6 +1,6 @@
-import { Document, Page, Text, View, StyleSheet, Link } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet, Link, Image } from "@react-pdf/renderer";
 import { dateOnlyToPacificNoon, formatFullDate } from "@/lib/timezone";
-import { BUSINESS, PAYMENT_METHODS, ROLE_LABEL, payOptions } from "@/lib/business-identity";
+import { BUSINESS, ROLE_LABEL, LOGO_URL, payOptions } from "@/lib/business-identity";
 import { PDF_BRAND as C } from "@/lib/pdf-brand";
 
 // Carries the brand onto paper: navy and gold spent on structure rather than
@@ -41,6 +41,8 @@ const s = StyleSheet.create({
 
   // header
   headerRow:  { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  brand:      { flexDirection: "row", alignItems: "center", gap: 11 },
+  logo:       { width: 44, height: 44, borderRadius: 22 },
   co:         { fontFamily: "Helvetica-Bold", fontSize: 15, color: C.ink, letterSpacing: 0.2 },
   coRole:     { fontFamily: "Helvetica-Bold", fontSize: 6.5, color: C.goldDeep, letterSpacing: 1.6, textTransform: "uppercase", marginTop: 3 },
   coContact:  { fontSize: 8, color: C.muted, marginTop: 6 },
@@ -81,7 +83,6 @@ const s = StyleSheet.create({
 
   // how to pay
   payBox:     { backgroundColor: C.wash, borderLeft: `2.5pt solid ${C.gold}`, padding: "11pt 14pt", marginTop: 22 },
-  payLine:    { fontSize: 9.5, color: C.ink, marginBottom: 2 },
   payButton:  { backgroundColor: C.ink, color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 9.5, textDecoration: "none", padding: "8pt 16pt", borderRadius: 3, textAlign: "center" },
   payRow:     { marginTop: 8 },
   payNote:    { fontSize: 7.5, color: C.muted, marginTop: 4 },
@@ -123,10 +124,16 @@ export function InvoicePDF({ data }: { data: InvoiceData }) {
     <Document title={`Invoice ${data.invoiceNumber} — ${data.bookTitle}`} author={BUSINESS.company}>
       <Page size="LETTER" style={s.page}>
         <View style={s.headerRow}>
-          <View>
-            <Text style={s.co}>{BUSINESS.company}</Text>
-            <Text style={s.coRole}>{ROLE_LABEL}</Text>
-            <Text style={s.coContact}>{BUSINESS.email} · {BUSINESS.site}</Text>
+          <View style={s.brand}>
+            {/* The mark is already navy and gold, so it sits in the masthead
+                without a container — the page palette was drawn from it. */}
+            {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt prop */}
+            <Image src={LOGO_URL} style={s.logo} />
+            <View>
+              <Text style={s.co}>{BUSINESS.company}</Text>
+              <Text style={s.coRole}>{ROLE_LABEL}</Text>
+              <Text style={s.coContact}>{BUSINESS.email} · {BUSINESS.site}</Text>
+            </View>
           </View>
           <View>
             <Text style={s.docType}>Invoice</Text>
@@ -201,18 +208,15 @@ export function InvoicePDF({ data }: { data: InvoiceData }) {
                 option they recognise, and only the last costs anything. */}
             {options.map(o => (
               <View key={o.url} style={s.payRow}>
-                <Link src={o.url} style={s.payButton}>
+                {/* Provider colours: a payer recognises the button before
+                    reading it, and the card option wears the brand gold since
+                    "card" is nobody's brand. */}
+                <Link src={o.url} style={[s.payButton, { backgroundColor: o.bg, color: o.fg }]}>
                   {o.label} — {money(o.amount)}
                 </Link>
                 {o.note ? <Text style={s.payNote}>{o.note}</Text> : null}
               </View>
             ))}
-
-            {/* Fallback for anyone who would rather not use a link at all. */}
-            <Text style={s.payNote}>
-              {PAYMENT_METHODS.venmo ? `Venmo ${PAYMENT_METHODS.venmo} · ` : ""}
-              Remit to {BUSINESS.company} · {BUSINESS.email}
-            </Text>
           </View>
         )}
 

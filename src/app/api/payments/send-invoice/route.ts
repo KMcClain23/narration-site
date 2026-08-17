@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { requireAdmin } from "@/lib/require-admin";
-import { BUSINESS, ROLE_LABEL, payOptions } from "@/lib/business-identity";
+import { BUSINESS, ROLE_LABEL, LOGO_URL, payOptions } from "@/lib/business-identity";
 import { PDF_BRAND as C } from "@/lib/pdf-brand";
 
 export const dynamic = "force-dynamic";
@@ -72,16 +72,22 @@ export async function POST(req: NextRequest) {
   const amountDue = Number(form.get("amount_due"));
   const cardLink = String(form.get("card_link") ?? "").trim();
   const paypalLink = String(form.get("paypal_link") ?? "").trim();
-  const venmo = String(form.get("venmo") ?? "").trim();
-  const paypal = String(form.get("paypal") ?? "").trim();
 
   // Same navy-and-gold as the PDF. An email that looks like a different
   // business from its own attachment reads as a phishing attempt.
   const masthead = `
     <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 22px;">
       <tr><td style="padding:0 0 12px;border-bottom:2px solid ${C.gold};">
-        <div style="font-size:17px;font-weight:700;color:${C.ink};">${esc(BUSINESS.company)}</div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${C.goldDeep};margin-top:3px;">${esc(ROLE_LABEL)}</div>
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td style="padding-right:12px;vertical-align:middle;">
+            <img src="${esc(LOGO_URL)}" width="46" height="46" alt=""
+                 style="display:block;width:46px;height:46px;border-radius:23px;border:0;" />
+          </td>
+          <td style="vertical-align:middle;">
+            <div style="font-size:17px;font-weight:700;color:${C.ink};">${esc(BUSINESS.company)}</div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${C.goldDeep};margin-top:3px;">${esc(ROLE_LABEL)}</div>
+          </td>
+        </tr></table>
       </td></tr>
     </table>`;
 
@@ -109,9 +115,10 @@ export async function POST(req: NextRequest) {
 
   const buttons = options
     .map(
+      // Provider colours, matching the PDF: recognised before they are read.
       o => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 10px;">
-              <tr><td style="background:${C.ink};border-radius:5px;">
-                <a href="${esc(o.url)}" style="display:inline-block;padding:13px 26px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">
+              <tr><td style="background:${o.bg};border-radius:5px;">
+                <a href="${esc(o.url)}" style="display:inline-block;padding:13px 26px;color:${o.fg};font-size:15px;font-weight:600;text-decoration:none;">
                   ${esc(o.label)} — ${esc(usd(o.amount))}
                 </a>
               </td></tr>
@@ -120,13 +127,7 @@ export async function POST(req: NextRequest) {
     )
     .join("");
 
-  const fallback = venmo || paypal
-    ? `<p style="margin:14px 0 0;font-size:13px;color:${C.muted};">
-         ${[venmo ? `Venmo ${esc(venmo)}` : "", paypal ? `PayPal ${esc(paypal)}` : ""].filter(Boolean).join(" · ")}
-       </p>`
-    : "";
-
-  const html = `${masthead}${summary}${body}${buttons}${fallback}`;
+  const html = `${masthead}${summary}${body}${buttons}`;
 
   const { data, error } = await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL || `${BUSINESS.name} <${BUSINESS.email}>`,

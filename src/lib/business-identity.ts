@@ -69,7 +69,26 @@ export function grossUpForCard(amountDue: number): { total: number; fee: number 
  * `amount` is what that method charges the payer, which is not always the
  * invoice total — the card route carries the processing fee on top.
  */
-export type PayOption = { label: string; url: string; amount: number; note?: string };
+export type PayOption = {
+  label: string;
+  url: string;
+  amount: number;
+  note?: string;
+  /** The provider's own colour, so a payer recognises the button before reading it. */
+  bg: string;
+  fg: string;
+};
+
+/**
+ * Provider colours. Venmo and PayPal wear their own so they are recognised at a
+ * glance; the card button wears the brand gold, since "card" is not a brand and
+ * the fallback should look like it came from this business.
+ */
+const PAY_COLORS = {
+  venmo: { bg: "#008CFF", fg: "#ffffff" },
+  paypal: { bg: "#003087", fg: "#ffffff" },
+  card: { bg: "#c9a55a", fg: "#141b2b" },
+} as const;
 
 /**
  * Venmo, with the amount and memo already filled in.
@@ -112,7 +131,7 @@ export function payOptions(
   const avoidNote = PAYMENT_METHODS.venmo ? " — Venmo avoids it" : "";
 
   const venmo = venmoPayUrl(PAYMENT_METHODS.venmo, amountDue, memo);
-  if (venmo) out.push({ label: "Pay with Venmo", url: venmo, amount: amountDue });
+  if (venmo) out.push({ label: "Pay with Venmo", url: venmo, amount: amountDue, ...PAY_COLORS.venmo });
 
   // Grossed up like the card, for the same reason: PayPal charges a business
   // account on every invoice it receives, so billing the plain amount here
@@ -130,6 +149,7 @@ export function payOptions(
       label: "Pay with PayPal",
       url: paypalUrl,
       amount: pp.total,
+      ...PAY_COLORS.paypal,
       note: `Includes a $${pp.fee.toFixed(2)} processing fee${avoidNote}.`,
     });
   }
@@ -140,6 +160,7 @@ export function payOptions(
       label: "Pay by card or Apple Pay",
       url: links.card,
       amount: total,
+      ...PAY_COLORS.card,
       note: `Includes a $${fee.toFixed(2)} processing fee${avoidNote}.`,
     });
   }
@@ -149,6 +170,17 @@ export function payOptions(
 
 /** Placeholder run of underscores used by the blank contract template. */
 export const BLANK_LINE = "________________________";
+
+/**
+ * The logo mark, as an absolute URL.
+ *
+ * Absolute rather than "/logo-mark.png" because both consumers are off-site:
+ * the PDF is rendered in a browser with no page context, and an email client
+ * fetches images from the open internet. A relative path resolves to neither.
+ */
+export const LOGO_URL = `${
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || "https://dmnarration.com"
+}/logo-mark.png`;
 
 /** Profile photo, shared by the public header and the admin sidebar. */
 export const PROFILE_PHOTO_URL =
