@@ -219,16 +219,31 @@ export function InvoiceButton({
   }
 
   /**
-   * Persisted on download rather than on open: a number that was looked at and
-   * abandoned shouldn't be claimed. Only fills a blank — an existing number is
-   * never overwritten, even if it was edited by hand for this one document.
+   * Write back what the finished invoice established.
+   *
+   * Persisted on download or send rather than on open: a number that was looked
+   * at and abandoned shouldn't be claimed.
+   *
+   * The dates matter as much as the number. Without invoiced_on the project
+   * stays under "Ready to invoice" after it has been invoiced, and without
+   * due_on nothing can ever go overdue — the invoice said 31 August and the
+   * app had no idea.
    */
-  async function handleNumberAssigned(invoiceNumber: string) {
-    if (payment.invoice_number || !invoiceNumber) return;
+  async function handleIssued(next: { invoiceNumber: string; invoicedOn?: string; dueOn?: string }) {
+    const body: Record<string, unknown> = { id: payment.id };
+
+    // Only fills a blank — an existing number is never overwritten, even if it
+    // was edited by hand for this one document.
+    if (!payment.invoice_number && next.invoiceNumber) body.invoice_number = next.invoiceNumber;
+    if (next.invoicedOn && !payment.invoiced_on) body.invoiced_on = next.invoicedOn;
+    if (next.dueOn) body.due_on = next.dueOn;
+
+    if (Object.keys(body).length === 1) return;
+
     await fetch("/api/payments", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: payment.id, invoice_number: invoiceNumber }),
+      body: JSON.stringify(body),
     });
   }
 
@@ -253,7 +268,7 @@ export function InvoiceButton({
         <InvoiceEditor
           initial={draft}
           onClose={() => setDraft(null)}
-          onNumberAssigned={handleNumberAssigned}
+          onIssued={handleIssued}
           paymentId={payment.id}
         />
       )}

@@ -98,13 +98,13 @@ function LinkRow({
 export function InvoiceEditor({
   initial,
   onClose,
-  onNumberAssigned,
+  onIssued,
   paymentId,
 }: {
   initial: InvoiceData;
   onClose: () => void;
-  /** Fired once on download so the payment can persist its invoice number. */
-  onNumberAssigned?: (invoiceNumber: string) => void;
+  /** Fired on download or send so the payment can persist what was issued. */
+  onIssued?: (next: { invoiceNumber: string; invoicedOn?: string; dueOn?: string }) => void;
   /** Needed to raise (and remember) a Stripe link against this payment. */
   paymentId?: string;
 }) {
@@ -146,7 +146,8 @@ export function InvoiceEditor({
       a.download = `${safe(data.invoiceNumber || "invoice")}-${safe(data.bookTitle)}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-      onNumberAssigned?.(data.invoiceNumber);
+      onIssued?.({ invoiceNumber: data.invoiceNumber, dueOn: data.dueDate });
+      router.refresh();
     } finally {
       setBusy(false);
     }
@@ -253,7 +254,11 @@ export function InvoiceEditor({
         return;
       }
       // The invoice number is now committed — it has gone to a client.
-      onNumberAssigned?.(data.invoiceNumber);
+      onIssued?.({
+        invoiceNumber: data.invoiceNumber,
+        invoicedOn: data.invoiceDate,
+        dueOn: data.dueDate,
+      });
       router.refresh();
       setSentTo(sendTo.trim());
       setComposing(false);
