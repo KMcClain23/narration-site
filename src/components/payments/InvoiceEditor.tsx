@@ -365,9 +365,14 @@ export function InvoiceEditor({
                     onCreate={() => raiseLink("paypal")}
                   />
                 </div>
+                {/* Says what the button does to the document, not just that it
+                    exists. Raising a link creates a real object at the provider
+                    — a live PayPal invoice, no less — so it stays opt-in, and
+                    the reason only Venmo shows until then has to be visible. */}
                 <p className={`${adminType.small} mt-1.5`}>
-                  Each adds its own processing fee on top, so you net {money(amountDue)} either way.
-                  Venmo needs no link — it is on every invoice already.
+                  Venmo is on every invoice already. Card and PayPal appear on the invoice only
+                  once you create their link — each adds its own processing fee on top, so you
+                  net {money(amountDue)} whichever the client picks.
                 </p>
                 {linkError && <p className="mt-1 text-[13px] text-alert-red">{linkError}</p>}
               </Field>
