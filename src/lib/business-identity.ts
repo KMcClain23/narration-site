@@ -157,7 +157,11 @@ export function payOptions(
   if (links.card && /^https:\/\//.test(links.card)) {
     const { total, fee } = grossUpForCard(amountDue);
     out.push({
-      label: "Pay by card or Apple Pay",
+      // Apple Pay, Google Pay and Link are wallet surfaces on the card rail,
+      // not separate providers — Stripe offers whichever the payer's device
+      // supports on the same page. Naming them here rather than giving each a
+      // button avoids splitting one payment method into three.
+      label: "Pay by card, Apple Pay or Google Pay",
       url: links.card,
       amount: total,
       ...PAY_COLORS.card,

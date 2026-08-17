@@ -11,11 +11,18 @@ import {
   type MoneyCard,
   type PaymentRow,
 } from "@/lib/payments";
+import { parseCoNarrators } from "@/components/admin/board-card-utils";
 import { grossUpForCard } from "@/lib/business-identity";
 import { type InvoiceData } from "./InvoicePDF";
 import { InvoiceEditor } from "./InvoiceEditor";
 
 type AuthorRow = { name: string; email?: string | null; location?: string | null };
+
+/** "Ann Dahlia", "Ann Dahlia and Edward Baker", "A, B and C". */
+function listNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
 
 /**
  * Bills this narrator's share, plus any editing they are fronting.
@@ -100,6 +107,33 @@ export function buildInvoice(
     });
   }
 
+  /**
+   * On split work, say so on the document.
+   *
+   * Each narrator bills the author for their own half, so this invoice is
+   * deliberately less than the budget the author agreed. Without a line saying
+   * why, the arithmetic looks wrong from their side — and the editing charge
+   * looks like it might arrive twice, once from each narrator.
+   *
+   * A default, not a lock: the notes field stays editable before sending.
+   */
+  const others = parseCoNarrators(card.co_narrator);
+  const split = narratorShare(card) < 1;
+  const notes = split
+    ? [
+        others.length
+          ? `This invoice covers my share of the narration. ${listNames(others)} ${
+              others.length === 1 ? "invoices" : "invoice"
+            } separately for theirs.`
+          : "This invoice covers my share of the narration. The other narrator(s) on this title invoice separately for theirs.",
+        editingTotal > 0.005
+          ? "Editing covers the full title and is billed here only — it will not appear on their invoice."
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : "";
+
   return {
     invoiceNumber,
     invoiceDate: payment.invoiced_on || new Date().toISOString().split("T")[0],
@@ -114,7 +148,7 @@ export function buildInvoice(
     // the billed total, so showing it as paid would understate the balance.
     amountPaid: payment.amount_gross == null ? Number(payment.amount_received) || 0 : 0,
     method: payment.method,
-    notes: "",
+    notes,
     ...(payment.paypal_payment_link ? { paypalLink: payment.paypal_payment_link } : {}),
     // Carried through so reopening an invoice shows the link it already has
     // rather than offering to raise a second one for the same money.

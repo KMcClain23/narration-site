@@ -126,6 +126,8 @@ export type MoneyCard = {
   payment_type: string | null;
   narration_format: string | null;
   narrator_share_percent: number | null;
+  /** JSON-encoded array string — see parseCoNarrators in board-card-utils. */
+  co_narrator: string | null;
   production_type: string | null;
   production_company: string | null;
   released_at: string | null;

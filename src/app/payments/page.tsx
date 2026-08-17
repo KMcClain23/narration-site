@@ -14,7 +14,7 @@ export default async function PaymentsPage() {
     supabaseAdmin
       .from("board_cards")
       .select(
-        "id, title, author, status, word_count, pfh_rate, payment_type, narration_format, narrator_share_percent, production_type, production_company, released_at, deadline"
+        "id, title, author, status, word_count, pfh_rate, payment_type, narration_format, narrator_share_percent, co_narrator, production_type, production_company, released_at, deadline"
       )
       // Archived cards are excluded — money that was never going to arrive
       // shouldn't inflate the expected figure. Released cards ARE included,
