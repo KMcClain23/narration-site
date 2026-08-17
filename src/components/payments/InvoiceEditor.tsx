@@ -3,9 +3,10 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { pdf } from "@react-pdf/renderer";
-import { Plus, Trash2, X } from "lucide-react";
+import { Mail, Plus, Trash2, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { useModalOpen } from "@/components/admin/AdminModalContext";
+import { BUSINESS, PAYMENT_METHODS } from "@/lib/business-identity";
 import { InvoicePDF, type InvoiceData, type InvoiceLine } from "./InvoicePDF";
 
 // Loaded lazily and client-only: PDFViewer touches browser APIs, same reason
@@ -18,6 +19,9 @@ const InvoicePreview = dynamic(() => import("./InvoicePreview"), {
     </div>
   ),
 });
+
+const money = (n: number) =>
+  n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
 
 const inputClass =
   "w-full rounded-lg border border-surface-border bg-background px-3 py-2 text-sm text-text-primary placeholder:text-text-dim focus:border-accent-amber focus:outline-none";
@@ -48,15 +52,31 @@ export function InvoiceEditor({
   initial,
   onClose,
   onNumberAssigned,
+  paymentId,
 }: {
   initial: InvoiceData;
   onClose: () => void;
   /** Fired once on download so the payment can persist its invoice number. */
   onNumberAssigned?: (invoiceNumber: string) => void;
+  /** Needed to raise (and remember) a Stripe link against this payment. */
+  paymentId?: string;
 }) {
   useModalOpen(true);
   const [data, setData] = useState<InvoiceData>(initial);
   const [busy, setBusy] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+
+  // Sending is deliberately two steps. The recipient, subject and body are all
+  // editable and visible before anything leaves — an invoice email lands in a
+  // client's inbox and cannot be recalled.
+  const [composing, setComposing] = useState(false);
+  const [sendTo, setSendTo] = useState(initial.billToEmail);
+  const [sendSubject, setSendSubject] = useState("");
+  const [sendMessage, setSendMessage] = useState("");
+  const [sendBusy, setSendBusy] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
 
   const set = <K extends keyof InvoiceData>(key: K) => (v: InvoiceData[K]) =>
     setData(d => ({ ...d, [key]: v }));
@@ -85,17 +105,103 @@ export function InvoiceEditor({
   }
 
   const subtotal = data.lines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
+  const amountDue = Math.max(0, subtotal - (Number(data.amountPaid) || 0));
+
+  /** Build the PDF once, so the emailed file is the one that was previewed. */
+  async function renderPdf(): Promise<{ blob: Blob; filename: string }> {
+    const blob = await pdf(<InvoicePDF data={data} />).toBlob();
+    return { blob, filename: `${safe(data.invoiceNumber || "invoice")}-${safe(data.bookTitle)}.pdf` };
+  }
+
+  async function handleCardLink() {
+    if (!paymentId) return;
+    setLinkBusy(true);
+    setLinkError(null);
+    try {
+      const res = await fetch("/api/payments/stripe-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payment_id: paymentId,
+          amount_due: amountDue,
+          title: data.bookTitle,
+          invoice_number: data.invoiceNumber,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setLinkError(json.error ?? "Could not create the payment link.");
+        return;
+      }
+      setData(d => ({ ...d, cardLink: json.url, cardTotal: json.total, cardFee: json.fee }));
+    } catch {
+      setLinkError("Could not reach Stripe.");
+    } finally {
+      setLinkBusy(false);
+    }
+  }
+
+  function openCompose() {
+    setSendError(null);
+    setSentTo(null);
+    setSendTo(data.billToEmail);
+    setSendSubject(
+      `Invoice ${data.invoiceNumber || ""} — ${data.bookTitle}`.replace(/\s+—/, " —").trim(),
+    );
+    setSendMessage(
+      `Hi ${data.billToName || "there"},\n\n` +
+        `Please find attached invoice ${data.invoiceNumber || ""} for ${data.bookTitle}, ` +
+        `for ${money(amountDue)}.\n\nPayment options are listed on the invoice. ` +
+        `Any questions, just reply to this email.\n\nThank you,\n${BUSINESS.name}\n${BUSINESS.company}`,
+    );
+    setComposing(true);
+  }
+
+  async function handleSend() {
+    setSendBusy(true);
+    setSendError(null);
+    try {
+      const { blob, filename } = await renderPdf();
+      const body = new FormData();
+      body.append("to", sendTo.trim());
+      body.append("subject", sendSubject);
+      body.append("message", sendMessage);
+      body.append("filename", filename);
+      body.append("amount_due", String(amountDue));
+      body.append("venmo", PAYMENT_METHODS.venmo);
+      if (data.cardLink) {
+        body.append("card_link", data.cardLink);
+        body.append("card_total", String(data.cardTotal ?? 0));
+      }
+      body.append("pdf", blob, filename);
+
+      const res = await fetch("/api/payments/send-invoice", { method: "POST", body });
+      const json = await res.json();
+      if (!res.ok) {
+        setSendError(json.error ?? "Could not send the email.");
+        return;
+      }
+      // The invoice number is now committed — it has gone to a client.
+      onNumberAssigned?.(data.invoiceNumber);
+      setSentTo(sendTo.trim());
+      setComposing(false);
+    } catch {
+      setSendError("Could not send the email.");
+    } finally {
+      setSendBusy(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
-        className="flex max-h-[92vh] w-full max-w-6xl flex-col rounded-2xl border border-surface-border bg-surface"
+        className="relative flex max-h-[92vh] w-full max-w-6xl flex-col rounded-2xl border border-surface-border bg-surface"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-surface-border p-5">
           <div>
             <h2 className={adminType.title}>Invoice</h2>
-            <p className={`${adminType.small} mt-0.5`}>Every field is editable — nothing is sent until you download.</p>
+            <p className={`${adminType.small} mt-0.5`}>Every field is editable. Nothing leaves until you download or send.</p>
           </div>
           <button type="button" onClick={onClose} className="text-text-muted hover:text-text-primary" aria-label="Close">
             <X size={18} />
@@ -194,6 +300,39 @@ export function InvoiceEditor({
               </Field>
             </div>
 
+            {/* Card payments are opt-in per invoice: raising a link costs the
+                payer a fee, so it shouldn't appear on every document by
+                default. Venmo needs nothing here — it's printed from config. */}
+            {paymentId && amountDue > 0 && (
+              <Field label="Card payment link">
+                {data.cardLink ? (
+                  <div className="rounded-lg border border-surface-border bg-background px-3 py-2.5">
+                    <p className="break-all text-[13px] text-text-body">{data.cardLink}</p>
+                    <p className={`${adminType.small} mt-1`}>
+                      Client pays {money(data.cardTotal ?? 0)}
+                      {data.cardFee ? ` — the ${money(data.cardFee)} fee is theirs, not yours` : ""}.
+                      You receive {money(amountDue)}.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleCardLink}
+                      disabled={linkBusy}
+                      className="rounded-lg border border-surface-border px-3 py-2 text-sm text-text-body hover:border-accent-amber hover:text-text-primary disabled:opacity-50"
+                    >
+                      {linkBusy ? "Creating…" : "Create Stripe link"}
+                    </button>
+                    <p className={`${adminType.small} mt-1`}>
+                      Adds the processing fee on top, so you still net {money(amountDue)}.
+                    </p>
+                  </>
+                )}
+                {linkError && <p className="mt-1 text-[13px] text-alert-red">{linkError}</p>}
+              </Field>
+            )}
+
             <Field label="Notes / terms">
               <textarea className={`${inputClass} min-h-[72px]`} value={data.notes}
                 onChange={e => set("notes")(e.target.value)}
@@ -207,16 +346,67 @@ export function InvoiceEditor({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-surface-border p-4">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-surface-border p-4">
+          {sentTo && (
+            <span className="mr-auto text-[13px] text-capacity-light">Sent to {sentTo}.</span>
+          )}
           <button type="button" onClick={onClose}
             className="rounded-lg px-4 py-2 text-sm text-text-muted hover:text-text-primary">
             Cancel
+          </button>
+          <button type="button" onClick={openCompose} disabled={busy || sendBusy}
+            className="flex items-center gap-1.5 rounded-lg border border-surface-border px-4 py-2 text-sm text-text-body hover:border-accent-amber hover:text-text-primary disabled:opacity-50">
+            <Mail size={14} /> Email invoice
           </button>
           <button type="button" onClick={handleDownload} disabled={busy}
             className="rounded-lg bg-accent-amber px-4 py-2 text-sm font-medium text-background hover:bg-accent-amber-bright disabled:opacity-50">
             {busy ? "Building…" : "Download PDF"}
           </button>
         </div>
+
+        {/* Compose step. Everything that will leave is on screen and editable;
+            the send button is the only thing that actually dispatches. */}
+        {composing && (
+          <div
+            className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 px-4"
+            onClick={e => { if (e.target === e.currentTarget) setComposing(false); }}
+          >
+            <div className="w-full max-w-lg rounded-2xl border border-surface-border bg-surface p-5">
+              <h3 className={adminType.title}>Email this invoice</h3>
+              <p className={`${adminType.small} mb-4`}>
+                The PDF exactly as previewed goes out as an attachment. This cannot be unsent.
+              </p>
+
+              <div className="space-y-3">
+                <Field label="To">
+                  <input className={inputClass} value={sendTo} onChange={e => setSendTo(e.target.value)}
+                    placeholder="client@example.com" />
+                </Field>
+                <Field label="Subject">
+                  <input className={inputClass} value={sendSubject}
+                    onChange={e => setSendSubject(e.target.value)} />
+                </Field>
+                <Field label="Message">
+                  <textarea className={`${inputClass} min-h-[150px]`} value={sendMessage}
+                    onChange={e => setSendMessage(e.target.value)} />
+                </Field>
+              </div>
+
+              {sendError && <p className="mt-3 text-[13px] text-alert-red">{sendError}</p>}
+
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <button type="button" onClick={() => setComposing(false)}
+                  className="rounded-lg px-4 py-2 text-sm text-text-muted hover:text-text-primary">
+                  Cancel
+                </button>
+                <button type="button" onClick={handleSend} disabled={sendBusy || !sendTo.trim()}
+                  className="rounded-lg bg-accent-amber px-4 py-2 text-sm font-medium text-background hover:bg-accent-amber-bright disabled:opacity-50">
+                  {sendBusy ? "Sending…" : `Send to ${sendTo.trim() || "…"}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -43,6 +43,8 @@ export type PaymentRow = {
   method: string;
   notes: string;
   sort_order: number;
+  /** Stripe Payment Link already raised for this invoice, if any. */
+  stripe_payment_link?: string;
   /** Money leaving the account after payment. Empty for solo, unedited work. */
   payouts?: PayoutRow[];
 };

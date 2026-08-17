@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FileText } from "lucide-react";
 import { agreedFee, finishedHours, invoiceAmount, type MoneyCard, type PaymentRow } from "@/lib/payments";
+import { grossUpForCard } from "@/lib/business-identity";
 import { type InvoiceData } from "./InvoicePDF";
 import { InvoiceEditor } from "./InvoiceEditor";
 
@@ -70,6 +71,18 @@ export function buildInvoice(
     amountPaid: payment.amount_gross == null ? Number(payment.amount_received) || 0 : 0,
     method: payment.method,
     notes: "",
+    // Carried through so reopening an invoice shows the link it already has
+    // rather than offering to raise a second one for the same money.
+    ...(payment.stripe_payment_link
+      ? {
+          cardLink: payment.stripe_payment_link,
+          ...(() => {
+            const due = Math.max(0, amount - (payment.amount_gross == null ? Number(payment.amount_received) || 0 : 0));
+            const { total, fee } = grossUpForCard(due);
+            return { cardTotal: total, cardFee: fee };
+          })(),
+        }
+      : {}),
   };
 }
 
@@ -159,6 +172,7 @@ export function InvoiceButton({
           initial={draft}
           onClose={() => setDraft(null)}
           onNumberAssigned={handleNumberAssigned}
+          paymentId={payment.id}
         />
       )}
     </>

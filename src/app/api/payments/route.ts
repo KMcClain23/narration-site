@@ -17,7 +17,7 @@ function unauthorized() {
 }
 
 const SELECT_COLS =
-  "id, card_id, kind, period, label, amount_expected, due_on, invoiced_on, invoice_number, amount_received, amount_gross, received_on, method, notes, sort_order, created_at, updated_at, " +
+  "id, card_id, kind, period, label, amount_expected, due_on, invoiced_on, invoice_number, amount_received, amount_gross, received_on, method, notes, sort_order, stripe_payment_link, created_at, updated_at, " +
   // Embedded so a payment always arrives with its payouts — every consumer
   // needs them to compute the waterfall, and a second round-trip per payment
   // would be pure overhead.

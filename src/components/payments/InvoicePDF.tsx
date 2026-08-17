@@ -1,6 +1,6 @@
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet, Link } from "@react-pdf/renderer";
 import { dateOnlyToPacificNoon, formatFullDate } from "@/lib/timezone";
-import { BUSINESS } from "@/lib/business-identity";
+import { BUSINESS, PAYMENT_METHODS } from "@/lib/business-identity";
 
 // Deliberately mirrors ContractPDF's typography and spacing — a client who has
 // already signed a contract should recognize the invoice as coming from the
@@ -25,6 +25,11 @@ export type InvoiceData = {
   amountPaid: number;
   method: string;
   notes: string;
+  /** Stripe Payment Link for this invoice, when one has been raised. */
+  cardLink?: string;
+  /** The card total once the processing fee is carried by the payer, not you. */
+  cardTotal?: number;
+  cardFee?: number;
 };
 
 const s = StyleSheet.create({
@@ -62,6 +67,8 @@ const s = StyleSheet.create({
   dueLabel:   { fontFamily: "Helvetica-Bold", fontSize: 11 },
   dueValue:   { fontFamily: "Helvetica-Bold", fontSize: 11 },
   // remit / notes
+  payButton:  { backgroundColor: "#111", color: "#fff", fontFamily: "Helvetica-Bold", fontSize: 9.5, textDecoration: "none", padding: "7pt 14pt", borderRadius: 3, marginTop: 5, marginBottom: 2, textAlign: "center" },
+  payNote:    { fontSize: 8, color: "#666", marginTop: 3 },
   remitBox:   { backgroundColor: "#f7f7f7", border: "0.5pt solid #ddd", padding: "8pt 12pt", marginTop: 20 },
   notes:      { fontSize: 8.5, color: "#555", marginTop: 12, lineHeight: 1.5 },
   footer:     { position: "absolute", bottom: 22, left: 54, right: 54, textAlign: "center", fontSize: 7.5, color: "#999", borderTop: "0.5pt solid #ddd", paddingTop: 5 },
@@ -163,9 +170,37 @@ export function InvoicePDF({ data }: { data: InvoiceData }) {
 
         {!settled && (
           <View style={s.remitBox}>
-            <Text style={s.blockHead}>REMIT TO</Text>
-            <Text style={s.blockLine}>{BUSINESS.company}</Text>
-            <Text style={s.blockLine}>{BUSINESS.email}</Text>
+            <Text style={s.blockHead}>HOW TO PAY</Text>
+
+            {/* Free methods first. An author reads down and stops at the first
+                one they can use, so ordering decides what most of them pick —
+                and the card option is the only one that costs you anything. */}
+            {PAYMENT_METHODS.venmo ? (
+              <Text style={s.blockLine}>Venmo — {PAYMENT_METHODS.venmo}</Text>
+            ) : null}
+
+            {data.cardLink ? (
+              <>
+                {/* A real link, not printed URL text. Most authors read this
+                    on a phone, and buy.stripe.com/… is not something anyone
+                    retypes — an unclickable URL is an unpaid invoice. */}
+                <Link src={data.cardLink} style={s.payButton}>
+                  Pay {money(data.cardTotal ?? 0)} by card or Apple Pay
+                </Link>
+                {/* Stated, not buried: the payer is choosing to add the
+                    processing fee, and a total that silently differs from
+                    "Amount due" above is how invoice queries start. */}
+                {data.cardFee ? (
+                  <Text style={s.payNote}>
+                    Includes a {money(data.cardFee)} card processing fee. Venmo avoids it.
+                  </Text>
+                ) : null}
+              </>
+            ) : null}
+
+            <Text style={s.payNote}>
+              Remit to {BUSINESS.company} · {BUSINESS.email}
+            </Text>
           </View>
         )}
 

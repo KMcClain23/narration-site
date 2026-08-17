@@ -650,3 +650,13 @@ begin
     add constraint board_cards_status_check
     check (status in ('audition', 'contracted', 'prepping', 'recording', 'editing', 'released', 'recast'));
 end $$;
+
+-- ============================================================
+-- Stage 9: payments.stripe_payment_link
+--
+-- Stored rather than regenerated: reopening the invoice editor must not mint a
+-- second link for the same money, which would leave two live URLs an author
+-- could pay against and no way to tell which one they used.
+-- ============================================================
+
+alter table payments add column if not exists stripe_payment_link text not null default '';
