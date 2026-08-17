@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { FileText } from "lucide-react";
-import { agreedFee, finishedHours, invoiceAmount, type MoneyCard, type PaymentRow } from "@/lib/payments";
+import {
+  agreedFee,
+  finishedHours,
+  invoiceAmount,
+  isOffTheTop,
+  narratorShare,
+  type MoneyCard,
+  type PaymentRow,
+} from "@/lib/payments";
 import { grossUpForCard } from "@/lib/business-identity";
 import { type InvoiceData } from "./InvoicePDF";
 import { InvoiceEditor } from "./InvoiceEditor";
@@ -10,11 +18,13 @@ import { InvoiceEditor } from "./InvoiceEditor";
 type AuthorRow = { name: string; email?: string | null; location?: string | null };
 
 /**
- * Bills the GROSS, not the narrator's share.
+ * Bills this narrator's share, plus any editing they are fronting.
  *
- * On a duet the client owes the whole fee; what the narrator keeps after the
- * editor and the co-narrator is an internal matter with no place on the
- * client's invoice.
+ * Not the whole project fee: on a duet each narrator invoices the author for
+ * their own half, so billing the gross here would double-charge the author
+ * once the co-narrator's invoice arrives. Editing is the exception — one
+ * narrator collects the whole fee so they can pay the editor, and it appears
+ * as its own line rather than being folded into the narration figure.
  */
 export function buildInvoice(
   payment: PaymentRow,
@@ -56,6 +66,40 @@ export function buildInvoice(
     ? `Audiobook narration — ${card.title} (${payment.label})`
     : `Audiobook narration — ${card.title}`;
 
+  /**
+   * Editing is billed on its own line, at the full editor fee.
+   *
+   * The author's budget already covers it — a $300/PFH ten-hour book is $3,000,
+   * of which $500 is editing and $2,500 is split between two narrators. The
+   * narrator of record collects their $1,250 plus the whole $500 so they can
+   * pay the editor, and bills $1,750; the co-narrator bills their $1,250
+   * separately. Rolling both into one number would leave the author unable to
+   * see what they are paying for, and the two narrator invoices would not
+   * visibly reconcile against the budget they agreed.
+   *
+   * `amount` is the narrator's share *before* the deduction, so their half of
+   * the editing comes off it — the same split payoutBurden() applies — and the
+   * full fee is then added back as its own line.
+   */
+  const editing = rows
+    .filter(r => r.kind !== "royalty")
+    .flatMap(r => r.payouts ?? [])
+    .filter(p => isOffTheTop(p.kind) && Number(p.amount) > 0);
+
+  const editingTotal = editing.reduce((s, p) => s + Number(p.amount), 0);
+  const lines: InvoiceData["lines"] = [
+    { description, detail, amount: amount - editingTotal * narratorShare(card) },
+  ];
+
+  if (editingTotal > 0.005) {
+    const rate = editing.find(p => p.rate_pfh)?.rate_pfh;
+    lines.push({
+      description: `Editing — ${card.title}`,
+      detail: rate && hrs > 0 ? `${hrs.toFixed(1)} finished hours × $${rate}/PFH` : "",
+      amount: editingTotal,
+    });
+  }
+
   return {
     invoiceNumber,
     invoiceDate: payment.invoiced_on || new Date().toISOString().split("T")[0],
@@ -64,7 +108,7 @@ export function buildInvoice(
     billToEmail: author?.email || "",
     billToLocation: author?.location || "",
     bookTitle: card.title,
-    lines: [{ description, detail, amount }],
+    lines,
     // Only counts against the invoice when the invoice is for the narrator's
     // own share. On a gross invoice the narrator's receipt is a fraction of
     // the billed total, so showing it as paid would understate the balance.
