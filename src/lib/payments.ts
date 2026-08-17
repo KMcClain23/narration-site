@@ -143,6 +143,26 @@ export type MoneyCard = {
  */
 export type PaymentStatus = "paid" | "partial" | "overdue" | "invoiced" | "expected";
 
+/**
+ * How a client can settle a fee invoice.
+ *
+ * "Card" and "PayPal" are spelled exactly as the webhooks write them, so a
+ * payment settled automatically and one recorded by hand end up as the same
+ * string — otherwise the same method would appear twice in any grouping.
+ *
+ * Royalty rows do not use this: their method names a distributor rather than a
+ * way of paying, so that field stays free text.
+ */
+export const CLIENT_PAYMENT_METHODS = [
+  "Venmo",
+  "Card",
+  "PayPal",
+  "Zelle",
+  "Check",
+  "Bank transfer",
+  "Other",
+] as const;
+
 export const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
   paid: "Paid",
   partial: "Partially paid",

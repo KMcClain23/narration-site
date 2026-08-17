@@ -8,6 +8,7 @@ import { Mail, Plus, Trash2, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { useModalOpen } from "@/components/admin/AdminModalContext";
 import { BUSINESS } from "@/lib/business-identity";
+import { CLIENT_PAYMENT_METHODS } from "@/lib/payments";
 import { InvoicePDF, type InvoiceData, type InvoiceLine } from "./InvoicePDF";
 
 // Loaded lazily and client-only: PDFViewer touches browser APIs, same reason
@@ -349,8 +350,25 @@ export function InvoiceEditor({
                   inputMode="decimal" placeholder="0" />
               </Field>
               <Field label="Method">
-                <input className={inputClass} value={data.method}
-                  onChange={e => set("method")(e.target.value)} placeholder="PayPal, ACH, check…" />
+                <select
+                  className={inputClass}
+                  value={data.method}
+                  onChange={e => set("method")(e.target.value)}
+                >
+                  <option value="">—</option>
+                  {/* A value already stored but not on the list — imported, or
+                      typed before this was a select — is offered rather than
+                      silently swapped for the first option on the next save. */}
+                  {data.method &&
+                    !CLIENT_PAYMENT_METHODS.some(m => m === data.method) && (
+                      <option value={data.method}>{data.method}</option>
+                    )}
+                  {CLIENT_PAYMENT_METHODS.map(m => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
               </Field>
             </div>
 
