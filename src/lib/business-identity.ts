@@ -22,7 +22,7 @@ export const BUSINESS = {
  */
 export const PAYMENT_METHODS = {
   /** Venmo handle, including the @. */
-  venmo: "",
+  venmo: "@DMNarration",
 } as const;
 
 /**
