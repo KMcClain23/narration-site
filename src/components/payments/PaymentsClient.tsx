@@ -7,7 +7,9 @@ import { adminType } from "@/lib/design-tokens";
 import { parseLocalDate } from "@/components/admin/board-card-utils";
 import {
   cardExpected,
+  cardInvoiceTotal,
   clientOf,
+  editingCost,
   computeByClient,
   computeTotals,
   formatMoney,
@@ -87,6 +89,8 @@ type Project = {
   state: ProjectState;
   amount: number | null;
   isEstimate: boolean;
+  /** Editing fronted on this project, already inside `amount`. */
+  editing: number;
 };
 
 function fmtDate(s: string | null): string {
@@ -129,7 +133,7 @@ function ProjectRow({
   onAddPayment: () => void;
   onEditPayment: (p: PaymentRow) => void;
 }) {
-  const { card, rows, amount, isEstimate, state } = project;
+  const { card, rows, amount, isEstimate, state, editing } = project;
   const primary = rows[0];
 
   // Settled work has nothing left to bill. Most of it was never invoiced at
@@ -152,8 +156,20 @@ function ProjectRow({
         </div>
 
         <div className="flex shrink-0 items-center gap-4">
-          <span className={`${adminType.monoNum} ${isEstimate ? "text-text-dim" : "text-text-primary"}`}>
-            {amount != null ? `${isEstimate ? "~" : ""}${formatMoney(amount)}` : "—"}
+          {/* The figure is what gets invoiced. Where it includes editing the
+              narrator is fronting, the split is spelled out beneath, so the
+              amount they keep is never something they have to work out. */}
+          <span className="text-right">
+            <span
+              className={`${adminType.monoNum} block ${isEstimate ? "text-text-dim" : "text-text-primary"}`}
+            >
+              {amount != null ? `${isEstimate ? "~" : ""}${formatMoney(amount)}` : "—"}
+            </span>
+            {amount != null && editing > 0.005 && state !== "paid" && (
+              <span className={`${adminType.small} block`}>
+                {formatMoney(amount - editing)} you · {formatMoney(editing)} editing
+              </span>
+            )}
           </span>
 
           {primary ? (
@@ -311,7 +327,11 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
         const rows = rowsByCard.get(card.id) ?? [];
         const state = projectState(card, rows);
         const received = rows.reduce((s, r) => s + (Number(r.amount_received) || 0), 0);
-        const expected = cardExpected(card, rows);
+        // What will be billed, not the narrator's pre-deduction share — see
+        // cardInvoiceTotal(). The row sits under "Ready to invoice", so the
+        // number on it has to be the one that goes on the invoice.
+        const expected = cardInvoiceTotal(card, rows);
+        const editing = editingCost(rows);
 
         // cardExpected() excludes royalty rows on purpose — royalties are not
         // a forecast — so a project owed only royalties computed to $0 while
@@ -341,6 +361,7 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
           rows,
           state,
           amount,
+          editing,
           isEstimate: state === "paid" || state === "awaiting" ? false : !isCardExpectedActual(rows),
         };
       })

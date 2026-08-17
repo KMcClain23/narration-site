@@ -254,6 +254,33 @@ export function agreedFee(card: MoneyCard): number | null {
   );
 }
 
+/** Editing and proofing recorded against this project's fee rows. */
+export function editingCost(rows: PaymentRow[]): number {
+  return rows
+    .filter(r => r.kind !== "royalty")
+    .flatMap(r => r.payouts ?? [])
+    .filter(p => isOffTheTop(p.kind))
+    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+}
+
+/**
+ * What this project will actually be billed for.
+ *
+ * cardExpected() is the narrator's share *before* their own half of the
+ * editing comes off — a figure that is neither what they invoice nor what they
+ * keep, and so belongs on no screen by itself. On a duet with $980 of editing
+ * it read $1,960 while the invoice came to $2,449.80 and the narrator's own
+ * share was $1,469.80.
+ *
+ * The invoice is that share net of their half, plus the whole editing fee they
+ * front on the project's behalf: base − editing×share + editing.
+ */
+export function cardInvoiceTotal(card: MoneyCard, rows: PaymentRow[]): number | null {
+  const base = cardExpected(card, rows);
+  if (base == null) return null;
+  return base + editingCost(rows) * (1 - narratorShare(card));
+}
+
 /** True when the figure came from real invoices rather than the PFH estimate. */
 export function isCardExpectedActual(rows: PaymentRow[]): boolean {
   return rows.some(r => r.amount_expected != null);
