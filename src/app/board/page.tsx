@@ -221,6 +221,14 @@ export default function BoardV2Page() {
     setEditingViaDeepLink(false);
   }, []);
 
+  // Search hands back an id, not a board card — the whole point is that the
+  // result may be a book this board never loaded. CardEditModal fetches by id,
+  // so a released, recast or archived title opens the same as any other.
+  const handleOpenCardById = useCallback((id: string) => {
+    setEditingCardId(id);
+    setEditingViaDeepLink(false);
+  }, []);
+
   const handleLongPress = useCallback((card: BoardV2Card, x: number, y: number) => {
     setActionMenu({ card, x, y });
   }, []);
@@ -263,6 +271,7 @@ export default function BoardV2Page() {
           onToggleFirst15={handleToggleFirst15}
           onLongPress={handleLongPress}
           onOpenCard={handleOpenCard}
+          onSearchOpenCard={handleOpenCardById}
           onCreateProject={() => setCreatingProject(true)}
           onUpdateStatus={updateStatus}
           onRequestRelease={card => setReleaseConfirm(card)}
@@ -279,6 +288,7 @@ export default function BoardV2Page() {
           onToggleFirst15={handleToggleFirst15}
           onLongPress={handleLongPress}
           onOpenCard={handleOpenCard}
+          onSearchOpenCard={handleOpenCardById}
           onSwipeArchive={card => setArchiveTarget(card)}
           onCreateProject={() => setCreatingProject(true)}
         />

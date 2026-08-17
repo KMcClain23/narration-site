@@ -11,6 +11,7 @@ import { ReleasedDropZone, RELEASED_DROPZONE_ID } from "@/components/admin/Relea
 import { SubgroupDivider } from "@/components/admin/SubgroupDivider";
 import { adminType } from "@/lib/design-tokens";
 import { FilterChip } from "@/components/board/FilterChip";
+import { BoardSearch } from "@/components/board/BoardSearch";
 import { PIPELINE_BUCKETS, PRODUCTION_SUBGROUPS, type PipelineBucket, type DateFilter } from "@/components/board/board-filters";
 
 // Unchanged from pre-Stage-2 board/page.tsx — extracted verbatim (plus the
@@ -52,6 +53,7 @@ export function DesktopBoardColumns({
   onToggleFirst15,
   onLongPress,
   onOpenCard,
+  onSearchOpenCard,
   onCreateProject,
   onUpdateStatus,
   onRequestRelease,
@@ -71,6 +73,7 @@ export function DesktopBoardColumns({
   onToggleFirst15: (id: string, complete: boolean) => void;
   onLongPress: (card: BoardV2Card, x: number, y: number) => void;
   onOpenCard: (card: BoardV2Card) => void;
+  onSearchOpenCard: (id: string) => void;
   onCreateProject: () => void;
   onUpdateStatus: (id: string, status: string) => void;
   onRequestRelease: (card: BoardV2Card) => void;
@@ -137,6 +140,9 @@ export function DesktopBoardColumns({
             </button>
             <FilterChip label="Due this week" active={dateFilter === "week"} onClick={() => onToggleDateFilter("week")} />
             <FilterChip label="Due this month" active={dateFilter === "month"} onClick={() => onToggleDateFilter("month")} />
+            {/* Last in the row: the chips filter what's drawn, search reaches
+                past it to books the board never draws. */}
+            <BoardSearch onOpenCard={onSearchOpenCard} />
           </div>
         </div>
 

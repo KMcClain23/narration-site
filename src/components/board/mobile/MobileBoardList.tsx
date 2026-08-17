@@ -6,6 +6,7 @@ import type { BoardV2Card } from "@/components/admin/board-card-utils";
 import { SubgroupDivider } from "@/components/admin/SubgroupDivider";
 import { adminType } from "@/lib/design-tokens";
 import { FilterChip } from "@/components/board/FilterChip";
+import { BoardSearch } from "@/components/board/BoardSearch";
 import { PIPELINE_BUCKETS, PRODUCTION_SUBGROUPS, type PipelineBucket, type DateFilter } from "@/components/board/board-filters";
 import { MobileBoardCard } from "./MobileBoardCard";
 import { BoardFAB } from "./BoardFAB";
@@ -23,6 +24,7 @@ export function MobileBoardList({
   onToggleFirst15,
   onLongPress,
   onOpenCard,
+  onSearchOpenCard,
   onSwipeArchive,
   onCreateProject,
 }: {
@@ -36,6 +38,7 @@ export function MobileBoardList({
   onToggleFirst15: (id: string, complete: boolean) => void;
   onLongPress: (card: BoardV2Card, x: number, y: number) => void;
   onOpenCard: (card: BoardV2Card) => void;
+  onSearchOpenCard: (id: string) => void;
   onSwipeArchive: (card: BoardV2Card) => void;
   onCreateProject: () => void;
 }) {
@@ -78,6 +81,12 @@ export function MobileBoardList({
         >
           Released ({releasedCount})
         </Link>
+      </div>
+
+      {/* Above the chips: the chips narrow what is drawn, search reaches past
+          the board to books it never draws. */}
+      <div className="mb-3">
+        <BoardSearch onOpenCard={onSearchOpenCard} />
       </div>
 
       <div className="mb-2 flex gap-2">
