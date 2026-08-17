@@ -9,6 +9,7 @@ import { adminType } from "@/lib/design-tokens";
 import { useModalOpen } from "@/components/admin/AdminModalContext";
 import { BUSINESS } from "@/lib/business-identity";
 import { CLIENT_PAYMENT_METHODS } from "@/lib/payments";
+import { dateOnlyToPacificNoon, formatFullDate } from "@/lib/timezone";
 import { InvoicePDF, type InvoiceData, type InvoiceLine } from "./InvoicePDF";
 
 // Loaded lazily and client-only: PDFViewer touches browser APIs, same reason
@@ -35,6 +36,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </label>
   );
+}
+
+/** "August 31, 2026" — matching how the PDF prints its own dates. */
+function fmtDueDate(d: string): string {
+  try {
+    return formatFullDate(dateOnlyToPacificNoon(d) ?? d);
+  } catch {
+    return d;
+  }
 }
 
 function safe(part: string): string {
@@ -202,11 +212,20 @@ export function InvoiceEditor({
     setSendSubject(
       `Invoice ${data.invoiceNumber || ""} — ${data.bookTitle}`.replace(/\s+—/, " —").trim(),
     );
+    // First name only. "Hi Lea Rose," is how a mailshot opens, not how someone
+    // you have worked with for months does.
+    const firstName = data.billToName.trim().split(/\s+/)[0] || "there";
+    const due = data.dueDate ? `, due ${fmtDueDate(data.dueDate)}` : "";
+    const ref = data.invoiceNumber ? `Invoice ${data.invoiceNumber} is attached` : "Invoice attached";
+
     setSendMessage(
-      `Hi ${data.billToName || "there"},\n\n` +
-        `Please find attached invoice ${data.invoiceNumber || ""} for ${data.bookTitle}, ` +
-        `for ${money(amountDue)}.\n\nPayment options are listed on the invoice. ` +
-        `Any questions, just reply to this email.\n\nThank you,\n${BUSINESS.name}\n${BUSINESS.company}`,
+      `Hi ${firstName},\n\n` +
+        // One sentence carrying everything that matters: what it is, how much,
+        // and by when. The old draft said "for His For Christmas, for $367.02"
+        // and left the due date off the email entirely.
+        `${ref}: ${money(amountDue)} for ${data.bookTitle}${due}.\n\n` +
+        `You can pay using the buttons below, or the details on the invoice itself.\n\n` +
+        `Thanks,\n${BUSINESS.name}\n${BUSINESS.company}`,
     );
     setComposing(true);
   }
