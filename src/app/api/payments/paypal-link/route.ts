@@ -1,21 +1,80 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireAdmin } from "@/lib/require-admin";
-import { grossUp, PAYPAL_FEE, BUSINESS } from "@/lib/business-identity";
+import { grossUp, PAYPAL_FEE } from "@/lib/business-identity";
 import { paypalConfigured, paypalFetch, paypalErrorMessage } from "@/lib/paypal";
 
 export const dynamic = "force-dynamic";
 
-type InvoiceBody = { id?: string; detail?: { metadata?: { recipient_view_url?: string } } };
+type InvoiceBody = {
+  id?: string;
+  href?: string;
+  detail?: { metadata?: { recipient_view_url?: string } };
+};
+
+/**
+ * Creating an invoice answers with a self link, not an id — `{ rel, href,
+ * method }` — so the id has to come off the end of the URL. Later reads do
+ * return `id`, hence both.
+ */
+function invoiceIdFrom(body: unknown): string | null {
+  const b = body as InvoiceBody | null;
+  if (b?.id) return b.id;
+  const tail = b?.href?.split("/").filter(Boolean).pop();
+  return tail || null;
+}
+
+/** The id of an invoice already raised under this number, if there is one. */
+async function findInvoiceByNumber(invoiceNumber: string): Promise<string | null> {
+  if (!invoiceNumber) return null;
+  const res = await paypalFetch("/v2/invoicing/search-invoices?page_size=2", {
+    method: "POST",
+    json: { invoice_number: invoiceNumber },
+  });
+  if (!res.ok) return null;
+  const items = (res.body as { items?: InvoiceBody[] } | null)?.items ?? [];
+  return items.length === 1 ? invoiceIdFrom(items[0]) : null;
+}
+
+/**
+ * The payer-facing URL, sending the invoice first if it is still a draft.
+ *
+ * Sending is what makes an invoice payable; both delivery flags are false so
+ * PayPal emails nobody. This app sends its own branded email, and a second
+ * PayPal-branded invoice for the same money in the same inbox is how a client
+ * ends up paying twice or paying neither.
+ */
+async function payableLink(invoiceId: string): Promise<{ url?: string; error?: string }> {
+  const read = await paypalFetch(`/v2/invoicing/invoices/${invoiceId}`, { method: "GET" });
+  if (!read.ok) return { error: paypalErrorMessage(read.status, read.body) };
+
+  const viewUrl = (b: unknown) => (b as InvoiceBody | null)?.detail?.metadata?.recipient_view_url;
+
+  if ((read.body as { status?: string } | null)?.status !== "DRAFT") {
+    return { url: viewUrl(read.body) };
+  }
+
+  const sent = await paypalFetch(`/v2/invoicing/invoices/${invoiceId}/send`, {
+    method: "POST",
+    json: { send_to_recipient: false, send_to_invoicer: false },
+  });
+  // Reported rather than swallowed. Returning null here sent the caller on to
+  // create a second invoice, which then failed as a duplicate — reporting the
+  // duplicate instead of the real reason the first one never became payable.
+  if (!sent.ok) return { error: paypalErrorMessage(sent.status, sent.body) };
+
+  const reread = await paypalFetch(`/v2/invoicing/invoices/${invoiceId}`, { method: "GET" });
+  return { url: viewUrl(reread.body) };
+}
 
 /**
  * Raise a PayPal-hosted invoice for one payment and return its payable link.
  *
- * Three calls, because PayPal has no single "make me a payable link" endpoint:
- * create the draft, send it with delivery suppressed, then read back the
- * recipient view URL. Suppressing delivery matters — this app sends its own
- * email with its own branding, and letting PayPal also email the client would
- * put two different invoices for the same money in their inbox.
+ * Create the draft, send it with delivery suppressed, then read back the
+ * recipient view URL — PayPal has no single "make me a payable link" endpoint.
+ * Suppressing delivery matters: this app sends its own branded email, and
+ * letting PayPal also email would put two invoices for the same money in one
+ * inbox.
  *
  * The stored link is returned unchanged if one exists, for the same reason as
  * the Stripe route: two live links for one debt is one too many.
@@ -63,6 +122,26 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Recover an invoice this app already raised before trying to raise
+    // another. Creating the draft can succeed and a later step still fail —
+    // which burns the invoice number, since PayPal rejects a duplicate — and
+    // without this the retry could never succeed. Searching by our own number
+    // makes the whole route idempotent rather than only its happy path.
+    const existingId = await findInvoiceByNumber(invoiceNumber);
+    if (existingId) {
+      const recovered = await payableLink(existingId);
+      if (recovered.error) {
+        return NextResponse.json({ error: recovered.error }, { status: 502 });
+      }
+      if (recovered.url) {
+        await supabaseAdmin
+          .from("payments")
+          .update({ paypal_payment_link: recovered.url, paypal_invoice_id: existingId })
+          .eq("id", paymentId);
+        return NextResponse.json({ url: recovered.url, total, fee, reused: true });
+      }
+    }
+
     // The client is billed the grossed-up figure as a single line, so the
     // PayPal invoice and this app's PDF agree on one number. Splitting the fee
     // onto its own line would invite the client to query it there instead.
@@ -76,10 +155,10 @@ export async function POST(req: NextRequest) {
           currency_code: "USD",
           note: `Payment for ${title}.`,
         },
-        invoicer: {
-          business_name: BUSINESS.company,
-          email_address: BUSINESS.email,
-        },
+        // No invoicer block. PayPal derives it from the credentials, and
+        // naming an email here fails with USER_NOT_FOUND whenever it isn't the
+        // one on the authenticated account — which is always true in sandbox,
+        // and would be true in live the day the business email changes.
         primary_recipients: billToEmail
           ? [
               {
@@ -107,27 +186,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const invoiceId = (draft.body as InvoiceBody)?.id;
+    const invoiceId = invoiceIdFrom(draft.body);
     if (!invoiceId) {
       return NextResponse.json({ error: "PayPal did not return an invoice id." }, { status: 502 });
     }
 
-    // Sending is what makes an invoice payable; the flags stop PayPal emailing
-    // anyone, so the only delivery is this app's own.
-    const sent = await paypalFetch(`/v2/invoicing/invoices/${invoiceId}/send`, {
-      method: "POST",
-      json: { send_to_recipient: false, send_to_invoicer: false },
-    });
-
-    if (!sent.ok) {
-      return NextResponse.json(
-        { error: paypalErrorMessage(sent.status, sent.body) },
-        { status: 502 },
-      );
+    const made = await payableLink(invoiceId);
+    if (made.error) {
+      return NextResponse.json({ error: made.error }, { status: 502 });
     }
-
-    const read = await paypalFetch(`/v2/invoicing/invoices/${invoiceId}`, { method: "GET" });
-    const url = (read.body as InvoiceBody)?.detail?.metadata?.recipient_view_url;
+    const url = made.url;
 
     if (!url) {
       return NextResponse.json(
