@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isAdminRequest } from "@/lib/require-admin";
+import { derivePaymentStatus, type PaymentRow } from "@/lib/payments";
+import { closePaymentLinks, type LinkClosure, type PaymentLinkRow } from "@/lib/close-payment-links";
 
 // CRUD for payment milestones. Every write goes through supabaseAdmin
 // (service role) — payments has RLS on with a service-role-only policy and
@@ -17,7 +19,7 @@ function unauthorized() {
 }
 
 const SELECT_COLS =
-  "id, card_id, kind, period, label, amount_expected, due_on, invoiced_on, invoice_number, amount_received, amount_gross, received_on, method, notes, sort_order, stripe_payment_link, paypal_payment_link, created_at, updated_at, " +
+  "id, card_id, kind, period, label, amount_expected, due_on, invoiced_on, invoice_number, amount_received, amount_gross, received_on, method, notes, sort_order, stripe_payment_link, stripe_payment_link_id, paypal_payment_link, paypal_invoice_id, payment_links_closed_at, created_at, updated_at, " +
   // Embedded so a payment always arrives with its payouts — every consumer
   // needs them to compute the waterfall, and a second round-trip per payment
   // would be pure overhead.
@@ -136,7 +138,21 @@ export async function PATCH(req: Request) {
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ payment: data });
+
+    // Settling the invoice retires the ways it could still be paid. Any link
+    // left live is one a client could pay a second time, months later, from an
+    // email they never deleted — so this runs on the way through rather than
+    // waiting to be remembered.
+    //
+    // Awaited, not fired and forgotten: a serverless invocation can be frozen
+    // the moment the response is written, which would leave the links open and
+    // nothing to show for the attempt.
+    let links: LinkClosure | null = null;
+    if (derivePaymentStatus(data as unknown as PaymentRow) === "paid") {
+      links = await closePaymentLinks(data as unknown as PaymentLinkRow);
+    }
+
+    return NextResponse.json({ payment: data, ...(links ? { links } : {}) });
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -147,6 +163,17 @@ export async function DELETE(req: Request) {
 
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required." }, { status: 400 });
+
+  // Close the links before the row goes, or they outlive the only record that
+  // they exist — a live Stripe URL and an open PayPal invoice with nothing left
+  // in the app pointing at them.
+  const { data: doomed } = await supabaseAdmin
+    .from("payments")
+    .select("id, method, stripe_payment_link, stripe_payment_link_id, paypal_invoice_id, payment_links_closed_at")
+    .eq("id", id)
+    .single();
+
+  if (doomed) await closePaymentLinks(doomed as unknown as PaymentLinkRow);
 
   const { error } = await supabaseAdmin.from("payments").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

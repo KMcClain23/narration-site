@@ -671,3 +671,15 @@ alter table payments add column if not exists stripe_payment_link text not null 
 
 alter table payments add column if not exists paypal_payment_link text not null default '';
 alter table payments add column if not exists paypal_invoice_id text not null default '';
+
+-- ============================================================
+-- Stage 9: payment link closure
+--
+-- Deactivating a Stripe Payment Link needs its plink_ id; the URL alone cannot
+-- address it through the API. payment_links_closed_at is stamped once the
+-- outstanding links have been retired, so settling a payment twice doesn't
+-- re-call either provider.
+-- ============================================================
+
+alter table payments add column if not exists stripe_payment_link_id text not null default '';
+alter table payments add column if not exists payment_links_closed_at timestamptz;

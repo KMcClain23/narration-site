@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
 
     await supabaseAdmin
       .from("payments")
-      .update({ stripe_payment_link: link.url })
+      .update({ stripe_payment_link: link.url, stripe_payment_link_id: link.id })
       .eq("id", paymentId);
 
     return NextResponse.json({ url: link.url, total, fee, reused: false });
