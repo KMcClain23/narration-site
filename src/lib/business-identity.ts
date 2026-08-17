@@ -20,9 +20,18 @@ export const BUSINESS = {
  * A blank entry is omitted from the invoice rather than printed empty — a
  * payment instruction that is half-filled in is worse than one that is absent.
  */
-export const PAYMENT_METHODS = {
+export const PAYMENT_METHODS: { venmo: string; paypal: string } = {
   /** Venmo handle, including the @. */
   venmo: "@DMNarration",
+  /**
+   * PayPal.Me URL, or the business account's email. A URL renders as a real
+   * link on the invoice; an email renders as text to send to.
+   *
+   * Not free, unlike Venmo: a business account receiving goods-and-services
+   * payments is charged, so this sits below Venmo in the list for the same
+   * reason the card link does.
+   */
+  paypal: "",
 } as const;
 
 /**
@@ -35,10 +44,100 @@ export const PAYMENT_METHODS = {
  */
 export const CARD_FEE = { percent: 0.029, fixed: 0.3 } as const;
 
-export function grossUpForCard(amountDue: number): { total: number; fee: number } {
+/**
+ * PayPal's goods-and-services rate. A business account cannot receive
+ * friends-and-family payments, so every invoice paid this way is charged.
+ */
+export const PAYPAL_FEE = { percent: 0.0349, fixed: 0.49 } as const;
+
+export function grossUp(
+  amountDue: number,
+  rate: { percent: number; fixed: number },
+): { total: number; fee: number } {
   if (amountDue <= 0) return { total: 0, fee: 0 };
-  const total = Math.ceil(((amountDue + CARD_FEE.fixed) / (1 - CARD_FEE.percent)) * 100) / 100;
+  const total = Math.ceil(((amountDue + rate.fixed) / (1 - rate.percent)) * 100) / 100;
   return { total, fee: Math.round((total - amountDue) * 100) / 100 };
+}
+
+export function grossUpForCard(amountDue: number): { total: number; fee: number } {
+  return grossUp(amountDue, CARD_FEE);
+}
+
+/**
+ * One payable option, uniform across the PDF and the email.
+ *
+ * `amount` is what that method charges the payer, which is not always the
+ * invoice total — the card route carries the processing fee on top.
+ */
+export type PayOption = { label: string; url: string; amount: number; note?: string };
+
+/**
+ * Venmo, with the amount and memo already filled in.
+ *
+ * The web link doubles as an app link: on a phone Venmo intercepts its own
+ * domain, so this opens the app with the payment part-composed rather than
+ * dropping the payer on a profile page to type the figure themselves.
+ */
+export function venmoPayUrl(handle: string, amount: number, memo: string): string {
+  const user = handle.replace(/^@/, "").trim();
+  if (!user) return "";
+  const q = new URLSearchParams({ txn: "pay", amount: amount.toFixed(2), note: memo });
+  return `https://venmo.com/${encodeURIComponent(user)}?${q.toString()}`;
+}
+
+/**
+ * PayPal.Me with the amount appended, or a plain mailto when only the business
+ * email is known — PayPal has no amount-prefilled link for a bare address.
+ */
+export function paypalPayUrl(paypal: string, amount: number): string {
+  const v = paypal.trim();
+  if (!v) return "";
+  if (/^https?:\/\//i.test(v)) return `${v.replace(/\/+$/, "")}/${amount.toFixed(2)}`;
+  if (/^[\w.+-]+@[\w.-]+$/.test(v)) return "";
+  return `https://paypal.me/${encodeURIComponent(v.replace(/^@/, ""))}/${amount.toFixed(2)}`;
+}
+
+/**
+ * Every way this invoice can be paid, cheapest first.
+ *
+ * Order is the whole point: a payer takes the first option they recognise, and
+ * only the last one costs the narrator anything.
+ */
+export function payOptions(amountDue: number, memo: string, cardLink?: string): PayOption[] {
+  const out: PayOption[] = [];
+
+  const venmo = venmoPayUrl(PAYMENT_METHODS.venmo, amountDue, memo);
+  if (venmo) out.push({ label: "Pay with Venmo", url: venmo, amount: amountDue });
+
+  // Grossed up like the card, for the same reason: PayPal charges a business
+  // account on every invoice it receives, so billing the plain amount here
+  // would quietly hand the fee back to the narrator.
+  const pp = grossUp(amountDue, PAYPAL_FEE);
+  const paypal = paypalPayUrl(PAYMENT_METHODS.paypal, pp.total);
+  if (paypal) {
+    out.push({
+      label: "Pay with PayPal",
+      url: paypal,
+      amount: pp.total,
+      note: `Includes a $${pp.fee.toFixed(2)} processing fee${
+        PAYMENT_METHODS.venmo ? " — Venmo avoids it" : ""
+      }.`,
+    });
+  }
+
+  if (cardLink && /^https:\/\//.test(cardLink)) {
+    const { total, fee } = grossUpForCard(amountDue);
+    out.push({
+      label: "Pay by card or Apple Pay",
+      url: cardLink,
+      amount: total,
+      note: `Includes a $${fee.toFixed(2)} processing fee${
+        PAYMENT_METHODS.venmo ? " — Venmo avoids it" : ""
+      }.`,
+    });
+  }
+
+  return out;
 }
 
 /** Placeholder run of underscores used by the blank contract template. */

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { requireAdmin } from "@/lib/require-admin";
-import { BUSINESS } from "@/lib/business-identity";
+import { BUSINESS, ROLE_LABEL, payOptions } from "@/lib/business-identity";
+import { PDF_BRAND as C } from "@/lib/pdf-brand";
 
 export const dynamic = "force-dynamic";
 
@@ -70,43 +71,68 @@ export async function POST(req: NextRequest) {
   // what they owe, then leave the inbox again to act on it.
   const amountDue = Number(form.get("amount_due"));
   const cardLink = String(form.get("card_link") ?? "").trim();
-  const cardTotal = Number(form.get("card_total"));
   const venmo = String(form.get("venmo") ?? "").trim();
+  const paypal = String(form.get("paypal") ?? "").trim();
+
+  // Same navy-and-gold as the PDF. An email that looks like a different
+  // business from its own attachment reads as a phishing attempt.
+  const masthead = `
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 22px;">
+      <tr><td style="padding:0 0 12px;border-bottom:2px solid ${C.gold};">
+        <div style="font-size:17px;font-weight:700;color:${C.ink};">${esc(BUSINESS.company)}</div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${C.goldDeep};margin-top:3px;">${esc(ROLE_LABEL)}</div>
+      </td></tr>
+    </table>`;
 
   const summary = Number.isFinite(amountDue) && amountDue > 0
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px;border:1px solid #e3e3e3;border-radius:8px;">
-         <tr><td style="padding:16px 18px;">
-           <div style="font-size:12px;letter-spacing:.5px;color:#888;text-transform:uppercase;">Amount due</div>
-           <div style="font-size:26px;font-weight:700;color:#111;margin-top:2px;">${esc(usd(amountDue))}</div>
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 22px;background:${C.wash};border-left:4px solid ${C.gold};border-radius:3px;">
+         <tr><td style="padding:15px 18px;">
+           <div style="font-size:10px;font-weight:700;letter-spacing:1.2px;color:${C.goldDeep};text-transform:uppercase;">Amount due</div>
+           <div style="font-size:28px;font-weight:700;color:${C.ink};margin-top:3px;">${esc(usd(amountDue))}</div>
          </td></tr>
        </table>`
     : "";
 
-  // https only. The link comes from this app's own Stripe call, but a mail
-  // body is the last place to relax about what a URL scheme can be.
-  const payButton = /^https:\/\//.test(cardLink)
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">
-         <tr><td style="background:#111;border-radius:6px;">
-           <a href="${esc(cardLink)}" style="display:inline-block;padding:13px 26px;color:#fff;font-size:15px;font-weight:600;text-decoration:none;">
-             Pay${Number.isFinite(cardTotal) && cardTotal > 0 ? ` ${esc(usd(cardTotal))}` : ""} by card
-           </a>
-         </td></tr>
-       </table>
-       <p style="margin:0 0 20px;font-size:13px;color:#777;">
-         Card payments include a processing fee${venmo ? `. Venmo to ${esc(venmo)} avoids it` : ""}.
-       </p>`
-    : venmo
-      ? `<p style="margin:0 0 20px;font-size:14px;color:#444;">Venmo — ${esc(venmo)}</p>`
-      : "";
+  // The same options, in the same order, as the attached PDF — built from the
+  // same helper so the email and the document can't disagree about what the
+  // client owes or how they can send it.
+  //
+  // https only. These come from this app's own config and Stripe call, but a
+  // mail body is the last place to relax about what a URL scheme can be.
+  const memo = String(form.get("memo") ?? subject).slice(0, 200);
+  const options = payOptions(
+    Number.isFinite(amountDue) && amountDue > 0 ? amountDue : 0,
+    memo,
+    /^https:\/\//.test(cardLink) ? cardLink : undefined,
+  ).filter(o => /^https:\/\//.test(o.url));
 
-  const html = `${summary}${body}${payButton}`;
+  const buttons = options
+    .map(
+      o => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 10px;">
+              <tr><td style="background:${C.ink};border-radius:5px;">
+                <a href="${esc(o.url)}" style="display:inline-block;padding:13px 26px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">
+                  ${esc(o.label)} — ${esc(usd(o.amount))}
+                </a>
+              </td></tr>
+              ${o.note ? `<tr><td style="padding-top:2px;font-size:12px;color:${C.muted};">${esc(o.note)}</td></tr>` : ""}
+            </table>`,
+    )
+    .join("");
+
+  const fallback = venmo || paypal
+    ? `<p style="margin:14px 0 0;font-size:13px;color:${C.muted};">
+         ${[venmo ? `Venmo ${esc(venmo)}` : "", paypal ? `PayPal ${esc(paypal)}` : ""].filter(Boolean).join(" · ")}
+       </p>`
+    : "";
+
+  const html = `${masthead}${summary}${body}${buttons}${fallback}`;
 
   const { data, error } = await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL || `${BUSINESS.name} <${BUSINESS.email}>`,
     to,
     replyTo: BUSINESS.email,
     subject,
-    html: `<div style="font-family:sans-serif;max-width:600px;font-size:15px;line-height:1.6;color:#111;">${html}</div>`,
+    html: `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:580px;margin:0 auto;padding:8px;font-size:15px;line-height:1.6;color:${C.body};">${html}</div>`,
     attachments: [{ filename, content: pdf }],
   });
 

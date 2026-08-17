@@ -169,10 +169,9 @@ export function InvoiceEditor({
       body.append("filename", filename);
       body.append("amount_due", String(amountDue));
       body.append("venmo", PAYMENT_METHODS.venmo);
-      if (data.cardLink) {
-        body.append("card_link", data.cardLink);
-        body.append("card_total", String(data.cardTotal ?? 0));
-      }
+      body.append("paypal", PAYMENT_METHODS.paypal);
+      body.append("memo", `Invoice ${data.invoiceNumber} — ${data.bookTitle}`.trim());
+      if (data.cardLink) body.append("card_link", data.cardLink);
       body.append("pdf", blob, filename);
 
       const res = await fetch("/api/payments/send-invoice", { method: "POST", body });
