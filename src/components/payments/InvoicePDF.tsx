@@ -32,6 +32,8 @@ export type InvoiceData = {
   /** The card total once the processing fee is carried by the payer, not you. */
   cardTotal?: number;
   cardFee?: number;
+  /** PayPal-hosted invoice link, when one has been raised. */
+  paypalLink?: string;
 };
 
 const s = StyleSheet.create({
@@ -115,7 +117,7 @@ export function InvoicePDF({ data }: { data: InvoiceData }) {
   const balance = subtotal - data.amountPaid;
   const settled = balance <= 0.005;
   const memo = data.invoiceNumber ? `Invoice ${data.invoiceNumber} — ${data.bookTitle}` : data.bookTitle;
-  const options = payOptions(Math.max(0, balance), memo, data.cardLink);
+  const options = payOptions(Math.max(0, balance), memo, { card: data.cardLink, paypal: data.paypalLink });
 
   return (
     <Document title={`Invoice ${data.invoiceNumber} — ${data.bookTitle}`} author={BUSINESS.company}>

@@ -103,8 +103,13 @@ export function paypalPayUrl(paypal: string, amount: number): string {
  * Order is the whole point: a payer takes the first option they recognise, and
  * only the last one costs the narrator anything.
  */
-export function payOptions(amountDue: number, memo: string, cardLink?: string): PayOption[] {
+export function payOptions(
+  amountDue: number,
+  memo: string,
+  links: { card?: string; paypal?: string } = {},
+): PayOption[] {
   const out: PayOption[] = [];
+  const avoidNote = PAYMENT_METHODS.venmo ? " — Venmo avoids it" : "";
 
   const venmo = venmoPayUrl(PAYMENT_METHODS.venmo, amountDue, memo);
   if (venmo) out.push({ label: "Pay with Venmo", url: venmo, amount: amountDue });
@@ -113,27 +118,29 @@ export function payOptions(amountDue: number, memo: string, cardLink?: string): 
   // account on every invoice it receives, so billing the plain amount here
   // would quietly hand the fee back to the narrator.
   const pp = grossUp(amountDue, PAYPAL_FEE);
-  const paypal = paypalPayUrl(PAYMENT_METHODS.paypal, pp.total);
-  if (paypal) {
+  // A raised invoice link beats the PayPal.Me handle whenever one exists: it
+  // carries a fixed amount the payer cannot edit down, where a .Me link only
+  // suggests one.
+  const paypalUrl =
+    links.paypal && /^https:\/\//.test(links.paypal)
+      ? links.paypal
+      : paypalPayUrl(PAYMENT_METHODS.paypal, pp.total);
+  if (paypalUrl) {
     out.push({
       label: "Pay with PayPal",
-      url: paypal,
+      url: paypalUrl,
       amount: pp.total,
-      note: `Includes a $${pp.fee.toFixed(2)} processing fee${
-        PAYMENT_METHODS.venmo ? " — Venmo avoids it" : ""
-      }.`,
+      note: `Includes a $${pp.fee.toFixed(2)} processing fee${avoidNote}.`,
     });
   }
 
-  if (cardLink && /^https:\/\//.test(cardLink)) {
+  if (links.card && /^https:\/\//.test(links.card)) {
     const { total, fee } = grossUpForCard(amountDue);
     out.push({
       label: "Pay by card or Apple Pay",
-      url: cardLink,
+      url: links.card,
       amount: total,
-      note: `Includes a $${fee.toFixed(2)} processing fee${
-        PAYMENT_METHODS.venmo ? " — Venmo avoids it" : ""
-      }.`,
+      note: `Includes a $${fee.toFixed(2)} processing fee${avoidNote}.`,
     });
   }
 

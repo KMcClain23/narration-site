@@ -71,6 +71,7 @@ export function buildInvoice(
     amountPaid: payment.amount_gross == null ? Number(payment.amount_received) || 0 : 0,
     method: payment.method,
     notes: "",
+    ...(payment.paypal_payment_link ? { paypalLink: payment.paypal_payment_link } : {}),
     // Carried through so reopening an invoice shows the link it already has
     // rather than offering to raise a second one for the same money.
     ...(payment.stripe_payment_link

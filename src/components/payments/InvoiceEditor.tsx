@@ -39,14 +39,49 @@ function safe(part: string): string {
   return part.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
 }
 
+/** One provider row: create it, or show the link once it exists. */
+function LinkRow({
+  name,
+  url,
+  busy,
+  disabled,
+  onCreate,
+}: {
+  name: string;
+  url?: string;
+  busy: boolean;
+  disabled: boolean;
+  onCreate: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-surface-border bg-background px-3 py-2">
+      <span className={`${adminType.small} w-28 shrink-0`}>{name}</span>
+      {url ? (
+        <span className="min-w-0 flex-1 truncate text-[13px] text-capacity-light" title={url}>
+          {url}
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={onCreate}
+          disabled={disabled}
+          className="text-[13px] text-accent-amber-bright hover:underline disabled:opacity-50"
+        >
+          {busy ? "Creating…" : "Create link"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /**
  * Every field on the invoice is editable before it goes out.
  *
  * The generated values are a starting point, not a commitment: a client may
  * need a different bill-to, an extra line for pickups, a rounded figure, or
  * wording the project record doesn't hold. Nothing here writes back to the
- * payment except the invoice number, which is the one value that has to stay
- * stable so the same invoice keeps its identity.
+ * payment except the invoice number and the payment links, which have to stay
+ * stable so the same invoice keeps its identity and its payable URLs.
  */
 export function InvoiceEditor({
   initial,
@@ -64,7 +99,7 @@ export function InvoiceEditor({
   useModalOpen(true);
   const [data, setData] = useState<InvoiceData>(initial);
   const [busy, setBusy] = useState(false);
-  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkBusy, setLinkBusy] = useState<"stripe" | "paypal" | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
 
   // Sending is deliberately two steps. The recipient, subject and body are all
@@ -113,12 +148,17 @@ export function InvoiceEditor({
     return { blob, filename: `${safe(data.invoiceNumber || "invoice")}-${safe(data.bookTitle)}.pdf` };
   }
 
-  async function handleCardLink() {
+  /**
+   * Both providers raise a link the same way, so they share a handler. The
+   * route decides idempotency: asking twice returns the link already stored
+   * rather than a second payable URL for the same debt.
+   */
+  async function raiseLink(provider: "stripe" | "paypal") {
     if (!paymentId) return;
-    setLinkBusy(true);
+    setLinkBusy(provider);
     setLinkError(null);
     try {
-      const res = await fetch("/api/payments/stripe-link", {
+      const res = await fetch(`/api/payments/${provider}-link`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -126,6 +166,8 @@ export function InvoiceEditor({
           amount_due: amountDue,
           title: data.bookTitle,
           invoice_number: data.invoiceNumber,
+          bill_to_email: data.billToEmail,
+          bill_to_name: data.billToName,
         }),
       });
       const json = await res.json();
@@ -133,11 +175,15 @@ export function InvoiceEditor({
         setLinkError(json.error ?? "Could not create the payment link.");
         return;
       }
-      setData(d => ({ ...d, cardLink: json.url, cardTotal: json.total, cardFee: json.fee }));
+      setData(d =>
+        provider === "stripe"
+          ? { ...d, cardLink: json.url, cardTotal: json.total, cardFee: json.fee }
+          : { ...d, paypalLink: json.url },
+      );
     } catch {
-      setLinkError("Could not reach Stripe.");
+      setLinkError(`Could not reach ${provider === "stripe" ? "Stripe" : "PayPal"}.`);
     } finally {
-      setLinkBusy(false);
+      setLinkBusy(null);
     }
   }
 
@@ -170,6 +216,7 @@ export function InvoiceEditor({
       body.append("amount_due", String(amountDue));
       body.append("venmo", PAYMENT_METHODS.venmo);
       body.append("paypal", PAYMENT_METHODS.paypal);
+      if (data.paypalLink) body.append("paypal_link", data.paypalLink);
       body.append("memo", `Invoice ${data.invoiceNumber} — ${data.bookTitle}`.trim());
       if (data.cardLink) body.append("card_link", data.cardLink);
       body.append("pdf", blob, filename);
@@ -303,31 +350,27 @@ export function InvoiceEditor({
                 payer a fee, so it shouldn't appear on every document by
                 default. Venmo needs nothing here — it's printed from config. */}
             {paymentId && amountDue > 0 && (
-              <Field label="Card payment link">
-                {data.cardLink ? (
-                  <div className="rounded-lg border border-surface-border bg-background px-3 py-2.5">
-                    <p className="break-all text-[13px] text-text-body">{data.cardLink}</p>
-                    <p className={`${adminType.small} mt-1`}>
-                      Client pays {money(data.cardTotal ?? 0)}
-                      {data.cardFee ? ` — the ${money(data.cardFee)} fee is theirs, not yours` : ""}.
-                      You receive {money(amountDue)}.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleCardLink}
-                      disabled={linkBusy}
-                      className="rounded-lg border border-surface-border px-3 py-2 text-sm text-text-body hover:border-accent-amber hover:text-text-primary disabled:opacity-50"
-                    >
-                      {linkBusy ? "Creating…" : "Create Stripe link"}
-                    </button>
-                    <p className={`${adminType.small} mt-1`}>
-                      Adds the processing fee on top, so you still net {money(amountDue)}.
-                    </p>
-                  </>
-                )}
+              <Field label="Payment links">
+                <div className="space-y-2">
+                  <LinkRow
+                    name="Card / Apple Pay"
+                    url={data.cardLink}
+                    busy={linkBusy === "stripe"}
+                    disabled={linkBusy !== null}
+                    onCreate={() => raiseLink("stripe")}
+                  />
+                  <LinkRow
+                    name="PayPal"
+                    url={data.paypalLink}
+                    busy={linkBusy === "paypal"}
+                    disabled={linkBusy !== null}
+                    onCreate={() => raiseLink("paypal")}
+                  />
+                </div>
+                <p className={`${adminType.small} mt-1.5`}>
+                  Each adds its own processing fee on top, so you net {money(amountDue)} either way.
+                  Venmo needs no link — it is on every invoice already.
+                </p>
                 {linkError && <p className="mt-1 text-[13px] text-alert-red">{linkError}</p>}
               </Field>
             )}

@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
   // what they owe, then leave the inbox again to act on it.
   const amountDue = Number(form.get("amount_due"));
   const cardLink = String(form.get("card_link") ?? "").trim();
+  const paypalLink = String(form.get("paypal_link") ?? "").trim();
   const venmo = String(form.get("venmo") ?? "").trim();
   const paypal = String(form.get("paypal") ?? "").trim();
 
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
   const options = payOptions(
     Number.isFinite(amountDue) && amountDue > 0 ? amountDue : 0,
     memo,
-    /^https:\/\//.test(cardLink) ? cardLink : undefined,
+    { card: cardLink, paypal: paypalLink },
   ).filter(o => /^https:\/\//.test(o.url));
 
   const buttons = options

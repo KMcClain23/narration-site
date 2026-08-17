@@ -660,3 +660,14 @@ end $$;
 -- ============================================================
 
 alter table payments add column if not exists stripe_payment_link text not null default '';
+
+-- ============================================================
+-- Stage 9: payments.paypal_payment_link / paypal_invoice_id
+--
+-- The PayPal-hosted invoice raised for this payment, alongside the Stripe one.
+-- Stored for the same reason: reopening the editor must not mint a second
+-- payable link for the same money.
+-- ============================================================
+
+alter table payments add column if not exists paypal_payment_link text not null default '';
+alter table payments add column if not exists paypal_invoice_id text not null default '';
