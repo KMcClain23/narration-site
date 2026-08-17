@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { pdf } from "@react-pdf/renderer";
 import { Mail, Plus, Trash2, X } from "lucide-react";
@@ -97,6 +98,7 @@ export function InvoiceEditor({
   paymentId?: string;
 }) {
   useModalOpen(true);
+  const router = useRouter();
   const [data, setData] = useState<InvoiceData>(initial);
   const [busy, setBusy] = useState(false);
   const [linkBusy, setLinkBusy] = useState<"stripe" | "paypal" | null>(null);
@@ -180,6 +182,11 @@ export function InvoiceEditor({
           ? { ...d, cardLink: json.url, cardTotal: json.total, cardFee: json.fee }
           : { ...d, paypalLink: json.url },
       );
+      // The route stored the link against the payment, but this page is still
+      // holding the props it loaded before that. Without a refresh, closing and
+      // reopening the invoice offers "Create link" for a link that already
+      // exists — which reads as the link having been lost.
+      router.refresh();
     } catch {
       setLinkError(`Could not reach ${provider === "stripe" ? "Stripe" : "PayPal"}.`);
     } finally {
@@ -227,6 +234,7 @@ export function InvoiceEditor({
       }
       // The invoice number is now committed — it has gone to a client.
       onNumberAssigned?.(data.invoiceNumber);
+      router.refresh();
       setSentTo(sendTo.trim());
       setComposing(false);
     } catch {
@@ -237,10 +245,12 @@ export function InvoiceEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    // No click-outside-to-close. This holds a half-composed invoice — edited
+    // amounts, a rewritten note, a payment link just raised — and a stray click
+    // on the backdrop discarded the lot. Leaving is deliberate: Cancel or the X.
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div
         className="relative flex max-h-[92vh] w-full max-w-6xl flex-col rounded-2xl border border-surface-border bg-surface"
-        onClick={e => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-surface-border p-5">
           <div>
@@ -414,7 +424,6 @@ export function InvoiceEditor({
         {composing && (
           <div
             className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 px-4"
-            onClick={e => { if (e.target === e.currentTarget) setComposing(false); }}
           >
             <div className="w-full max-w-lg rounded-2xl border border-surface-border bg-surface p-5">
               <h3 className={adminType.title}>Email this invoice</h3>
