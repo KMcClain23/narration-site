@@ -74,14 +74,23 @@ export function narratorShareOf(
   return narrationFormat === "duet" || narrationFormat === "dual" ? 0.5 : 1;
 }
 
-/** Weekdays from `from` to `to`, counting both ends. Weekends are not booth days. */
-export function weekdaysBetween(from: Date, to: Date): number {
+/** Monday to Friday, used when no recording days have been chosen. */
+const DEFAULT_DAYS = [1, 2, 3, 4, 5];
+
+/**
+ * Days between `from` and `to` inclusive that fall on a recording day.
+ *
+ * `days` holds Date.getDay() numbers, 0 for Sunday. Which days those are is a
+ * preference, not a fact about the week: a narrator who records Saturdays has
+ * more room than one who does not, and that changes the answer.
+ */
+export function recordingDaysBetween(from: Date, to: Date, days: number[] = DEFAULT_DAYS): number {
+  const wanted = new Set(days.length ? days : DEFAULT_DAYS);
   const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
   const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
   let count = 0;
   for (const d = start; d <= end; d.setDate(d.getDate() + 1)) {
-    const day = d.getDay();
-    if (day !== 0 && day !== 6) count++;
+    if (wanted.has(d.getDay())) count++;
   }
   return count;
 }
@@ -89,11 +98,11 @@ export function weekdaysBetween(from: Date, to: Date): number {
 export type NarrationPlan = {
   /** Hours at the mic for this narrator's share of the manuscript. */
   hours: number;
-  /** Weekdays left including today. Null when the card has no deadline. */
-  weekdaysLeft: number | null;
-  /** hours ÷ weekdaysLeft. Null with no deadline, or when none remain. */
-  hoursPerWeekday: number | null;
-  /** The deadline has passed, or no weekday is left to record in. */
+  /** Recording days left including today. Null when the card has no deadline. */
+  daysLeft: number | null;
+  /** hours ÷ daysLeft. Null with no deadline, or when no day is left. */
+  hoursPerDay: number | null;
+  /** The deadline has passed, or no recording day is left before it. */
   overdue: boolean;
 };
 
@@ -109,6 +118,7 @@ export function narrationPlan(
   narrationFormat: string | null,
   narratorSharePercent: number | null,
   deadline: string | null,
+  recordingDays: number[] = DEFAULT_DAYS,
   today: Date = new Date(),
 ): NarrationPlan | null {
   if (!wordCount || wordCount <= 0) return null;
@@ -116,18 +126,19 @@ export function narrationPlan(
   if (share == null) return null;
 
   const hours = (wordCount * share) / WORDS_PER_NARRATION_HOUR;
-  if (!deadline) return { hours, weekdaysLeft: null, hoursPerWeekday: null, overdue: false };
+  if (!deadline) return { hours, daysLeft: null, hoursPerDay: null, overdue: false };
 
   const due = parseLocalDate(deadline);
   const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  if (due < midnight) return { hours, weekdaysLeft: 0, hoursPerWeekday: null, overdue: true };
+  if (due < midnight) return { hours, daysLeft: 0, hoursPerDay: null, overdue: true };
 
-  const weekdaysLeft = weekdaysBetween(midnight, due);
-  // A Saturday deadline with today also on the weekend leaves no booth day at
-  // all. Dividing by zero there would read as Infinity hours a day.
-  if (weekdaysLeft === 0) return { hours, weekdaysLeft: 0, hoursPerWeekday: null, overdue: true };
+  const daysLeft = recordingDaysBetween(midnight, due, recordingDays);
+  // A deadline can fall inside a stretch with no recording day in it at all —
+  // a Sunday deadline for someone who records weekdays only. Dividing by zero
+  // there would read as Infinity hours a day.
+  if (daysLeft === 0) return { hours, daysLeft: 0, hoursPerDay: null, overdue: true };
 
-  return { hours, weekdaysLeft, hoursPerWeekday: hours / weekdaysLeft, overdue: false };
+  return { hours, daysLeft, hoursPerDay: hours / daysLeft, overdue: false };
 }
 
 // Board-card display estimate — same ratio as the Production tab's

@@ -13,6 +13,7 @@ import {
   type Urgency,
   type BoardV2Card,
 } from "./board-card-utils";
+import { useRecordingDays } from "@/lib/recording-days";
 
 // The visual content shared by desktop's BoardCard (drag + mouse long-press)
 // and mobile's MobileBoardCard (swipe + touch long-press) — the two own
@@ -49,6 +50,7 @@ export function BoardCardContent({
   onToggleFirst15: (id: string, complete: boolean) => void;
 }) {
   const coNarrators = parseCoNarrators(card.co_narrator);
+  const recordingDays = useRecordingDays();
   const showFormatPill = card.narration_format && card.narration_format !== "solo";
 
   return (
@@ -137,17 +139,18 @@ export function BoardCardContent({
               card.narration_format,
               card.narrator_share_percent,
               card.deadline,
+              recordingDays,
             );
             if (!plan) return " ";
             return (
               <>
                 <span className="text-text-muted">{plan.hours.toFixed(1)} hrs at the mic</span>
                 {plan.overdue ? (
-                  <span className="text-alert-red"> · no weekdays left</span>
-                ) : plan.hoursPerWeekday != null ? (
-                  <span className={plan.hoursPerWeekday >= HEAVY_DAY ? "text-accent-amber-bright" : "text-text-muted"}>
+                  <span className="text-alert-red"> · no recording days left</span>
+                ) : plan.hoursPerDay != null ? (
+                  <span className={plan.hoursPerDay >= HEAVY_DAY ? "text-accent-amber-bright" : "text-text-muted"}>
                     {" · "}
-                    {plan.hoursPerWeekday.toFixed(1)} hrs/weekday
+                    {plan.hoursPerDay.toFixed(1)} hrs/day
                   </span>
                 ) : null}
               </>

@@ -2,6 +2,8 @@ import "server-only";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { paymentNarratorShare, type MoneyCard, type PaymentRow } from "@/lib/payments";
 import { closePaymentLinks, type PaymentLinkRow } from "@/lib/close-payment-links";
+import { notifyPaymentReceived, type OwedPayee } from "@/lib/notify-payment";
+import { venmoPayUrl } from "@/lib/business-identity";
 
 /**
  * Record that a provider collected an invoice, and shut the other ways to pay.
@@ -35,6 +37,61 @@ export async function findPaymentBy(
     .eq(column, value)
     .maybeSingle();
   return (data as { id?: string } | null)?.id ?? null;
+}
+
+/**
+ * Who is still owed out of a project, with the ways to pay each of them.
+ *
+ * Across every payment on the card rather than the one that just settled: an
+ * editor is owed for the book, not for whichever instalment happened to arrive.
+ *
+ * Contact details are looked up by name, the same free-text join the contacts
+ * pages use, and any failure here degrades to a name and an amount. A missing
+ * Venmo handle must never cost the narrator the notification itself.
+ */
+async function owedOnProject(rows: PaymentRow[], projectTitle: string): Promise<OwedPayee[]> {
+  const byName = new Map<string, number>();
+  for (const r of rows) {
+    for (const p of r.payouts ?? []) {
+      if (p.paid_on) continue;
+      const amount = Number(p.amount) || 0;
+      if (amount <= 0) continue;
+      const name = p.payee_name?.trim() || "Unnamed";
+      byName.set(name, (byName.get(name) ?? 0) + amount);
+    }
+  }
+  if (byName.size === 0) return [];
+
+  const contacts = new Map<string, { email: string; venmo: string }>();
+  try {
+    const [editors, coNarrators] = await Promise.all([
+      supabaseAdmin.from("editors").select("name, email, venmo"),
+      supabaseAdmin.from("co_narrators").select("name, email"),
+    ]);
+    for (const c of coNarrators.data ?? []) {
+      contacts.set(String(c.name).trim().toLowerCase(), { email: c.email ?? "", venmo: "" });
+    }
+    // Editors last so their Venmo handle wins if a name appears in both.
+    for (const e of editors.data ?? []) {
+      contacts.set(String(e.name).trim().toLowerCase(), { email: e.email ?? "", venmo: e.venmo ?? "" });
+    }
+  } catch {
+    // No contacts table yet, or the query failed. Names and amounts still send.
+  }
+
+  return [...byName.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, amount]) => {
+      const contact = contacts.get(name.toLowerCase());
+      return {
+        name,
+        amount,
+        venmoUrl: contact?.venmo
+          ? venmoPayUrl(contact.venmo, amount, `${projectTitle} · ${name}`.trim())
+          : "",
+        email: contact?.email ?? "",
+      };
+    });
 }
 
 export async function settleFromProvider(paymentId: string, method: string): Promise<SettleResult> {
@@ -92,6 +149,16 @@ export async function settleFromProvider(paymentId: string, method: string): Pro
   await closePaymentLinks({
     ...(payment as unknown as PaymentLinkRow),
     method: row.method ?? "",
+  });
+
+  const project = card as unknown as { title?: string; author?: string };
+  await notifyPaymentReceived({
+    amount: due,
+    method,
+    projectTitle: project.title ?? "Untitled",
+    author: project.author ?? "",
+    invoiceNumber: row.invoice_number ?? "",
+    owed: await owedOnProject(rows, project.title ?? ""),
   });
 
   return { settled: true, reason: `recorded ${due.toFixed(2)} via ${method}` };

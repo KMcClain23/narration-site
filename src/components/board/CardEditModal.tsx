@@ -17,6 +17,8 @@ import {
   parseCoNarrators,
   WORDS_PER_NARRATION_HOUR,
 } from "@/components/admin/board-card-utils";
+import { RecordingDaysPicker } from "@/components/admin/RecordingDaysPicker";
+import { useRecordingDays } from "@/lib/recording-days";
 import { CardPaymentsPanel } from "@/components/payments/CardPaymentsPanel";
 import type { NarrationFormat, ArchivedReason } from "@/types/book";
 
@@ -227,6 +229,9 @@ export function CardEditModal(props: CardEditModalProps) {
   const [loading, setLoading] = useState(mode === "edit");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<FullBoardCard | null>(mode === "create" ? blankCard() : null);
+  // Read at the top level, not inside renderProductionTab: that function returns
+  // early when there is no form, which would make the hook conditional.
+  const recordingDays = useRecordingDays();
   const [savedForm, setSavedForm] = useState<FullBoardCard | null>(mode === "create" ? blankCard() : null);
   const [activeTab, setActiveTab] = useState<TabId>("details");
   const [saving, setSaving] = useState(false);
@@ -752,6 +757,7 @@ export function CardEditModal(props: CardEditModalProps) {
       form.narration_format,
       form.narrator_share_percent,
       form.deadline || null,
+      recordingDays,
     );
 
     return (
@@ -930,8 +936,8 @@ export function CardEditModal(props: CardEditModalProps) {
             <InfoTooltip variant="inline">
               <p>
                 Your share of the manuscript at ~{WORDS_PER_NARRATION_HOUR.toLocaleString()} words
-                per hour at the mic, spread over the weekdays left before the deadline. Recording
-                time only: prep, pickups and proofing are on top.
+                per hour at the mic, spread over the recording days left before the deadline.
+                Recording time only: prep, pickups and proofing are on top.
               </p>
             </InfoTooltip>
           </p>
@@ -945,21 +951,21 @@ export function CardEditModal(props: CardEditModalProps) {
                   {appliedShare !== 100 ? ` (${appliedShare}% share)` : ""}
                 </span>
               </p>
-              {plan.hoursPerWeekday != null ? (
+              {plan.hoursPerDay != null ? (
                 <p className={`${adminType.small} mt-0.5`}>
                   <span className="text-text-body">
-                    {plan.hoursPerWeekday.toFixed(1)} hrs per weekday
+                    {plan.hoursPerDay.toFixed(1)} hrs per recording day
                   </span>{" "}
-                  to finish on time · {plan.weekdaysLeft} weekday
-                  {plan.weekdaysLeft === 1 ? "" : "s"} left
+                  to finish on time · {plan.daysLeft} day
+                  {plan.daysLeft === 1 ? "" : "s"} left
                 </p>
               ) : plan.overdue ? (
                 <p className={`${adminType.small} mt-0.5 text-alert-red`}>
-                  No weekdays left before the deadline.
+                  No recording days left before the deadline.
                 </p>
               ) : (
                 <p className={`${adminType.small} mt-0.5`}>
-                  Set a deadline to see hours per weekday.
+                  Set a deadline to see hours per recording day.
                 </p>
               )}
             </>
@@ -970,6 +976,14 @@ export function CardEditModal(props: CardEditModalProps) {
                 : "Set a word count to see how long this takes"}
             </p>
           )}
+
+          {/* The days themselves, right beside the number they divide. A
+              narrator who records Saturdays has more room than one who does
+              not, and this is where that stops being an assumption. */}
+          <div className="mt-3 border-t border-surface-border pt-3">
+            <p className={`${adminType.label} mb-1.5`}>Days I record</p>
+            <RecordingDaysPicker />
+          </div>
         </div>
 
         {/* Section 4: Payments — the estimate above is what the job is worth;
