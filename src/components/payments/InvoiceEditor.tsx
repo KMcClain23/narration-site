@@ -414,6 +414,12 @@ export function InvoiceEditor({
     setComposing(true);
   }
 
+  // How many people actually receive this, so the send button can say so.
+  const ccCount = sendCc
+    .split(",")
+    .map(a => a.trim())
+    .filter(Boolean).length;
+
   async function handleSend() {
     setSendBusy(true);
     setSendError(null);
@@ -724,11 +730,11 @@ export function InvoiceEditor({
                 <Field
                   label="Cc"
                   hint={
-                    coNarratorEmails.length
-                      ? billingWhole
-                        ? "Your co-narrators, since this invoice bills their work too."
-                        : "Leave empty on a share invoice — they bill the author themselves."
-                      : undefined
+                    ccCount > 0
+                      ? `They receive the invoice too, and both parties see each other's address.`
+                      : coNarratorEmails.length && !billingWhole
+                        ? "Left empty on a share invoice, since the others bill the author themselves."
+                        : undefined
                   }
                 >
                   <input className={inputClass} value={sendCc}
@@ -754,7 +760,14 @@ export function InvoiceEditor({
                 </button>
                 <button type="button" onClick={handleSend} disabled={sendBusy || !sendTo.trim()}
                   className="rounded-lg bg-accent-amber px-4 py-2 text-sm font-medium text-background hover:bg-accent-amber-bright disabled:opacity-50">
-                  {sendBusy ? "Sending…" : `Send to ${sendTo.trim() || "…"}`}
+                  {/* Names everyone who will receive it, not just the To. A
+                      button reading "Send to <one address>" while a Cc is set
+                      under-reports an action that cannot be undone. */}
+                  {sendBusy
+                    ? "Sending…"
+                    : ccCount > 0
+                      ? `Send to ${ccCount + 1} recipients`
+                      : `Send to ${sendTo.trim() || "…"}`}
                 </button>
               </div>
             </div>
