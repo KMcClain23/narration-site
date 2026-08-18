@@ -6,7 +6,6 @@ import { BookingWindowPicker } from "@/components/schedule/BookingWindowPicker";
 import { MonthlyScheduleGrid } from "@/components/schedule/MonthlyScheduleGrid";
 import { DueSoonSection } from "@/components/schedule/DueSoonSection";
 import { CapacityCalendar } from "@/components/schedule/CapacityCalendar";
-import { TodayAgenda } from "@/components/schedule/TodayAgenda";
 import type { CapacityCard, TimeBlock } from "@/lib/capacity";
 import { assertAdmin } from "@/lib/require-admin";
 
@@ -92,24 +91,11 @@ export default async function SchedulePage() {
 
   return (
     <AdminLayout>
-      {/* Two columns on wide screens, using the empty gutter the content was
-          already leaving. The agenda sticks so it stays put while the calendar
-          and the lists below it scroll past. */}
-      <div className="mx-auto flex max-w-[1520px] gap-6">
-        <aside className="hidden w-[260px] shrink-0 xl:block">
-          <div className="sticky top-8">
-            <TodayAgenda cards={capacityCards} blocks={blocks} />
-          </div>
-        </aside>
-
-        <div className="min-w-0 flex-1 max-w-[1200px]">
-          <h1 className={adminType.titleLg}>Schedule</h1>
-
-          {/* Below xl there is no gutter to float in, so it leads the page
-              instead of disappearing. */}
-          <div className="mt-4 xl:hidden">
-            <TodayAgenda cards={capacityCards} blocks={blocks} />
-          </div>
+      {/* Single column again. Today's agenda moved into the sidebar, where it
+          is visible on every page rather than only on the one page that
+          already tells you what today holds. */}
+      <div className="mx-auto max-w-[1200px]">
+        <h1 className={adminType.titleLg}>Schedule</h1>
 
         {/* Section 1: Availability */}
         <section className="mt-8">
@@ -144,7 +130,6 @@ export default async function SchedulePage() {
             <DueSoonSection cards={datedCards} />
           </div>
         </section>
-        </div>
       </div>
     </AdminLayout>
   );

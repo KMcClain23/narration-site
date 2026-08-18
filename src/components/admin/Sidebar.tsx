@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { SidebarSection, type NavItem } from "./SidebarSection";
 import { useUnreadInquiries } from "./useUnreadInquiries";
+import { useAgenda } from "./useAgenda";
+import { SidebarAgenda } from "./SidebarAgenda";
 import { useLogout } from "./useLogout";
 
 /**
@@ -76,6 +78,8 @@ export function Sidebar() {
     return localStorage.getItem(COLLAPSE_KEY) === "1";
   });
   const unreadInquiries = useUnreadInquiries();
+  // Keyed on the route so it refreshes after days or blocks are changed.
+  const agenda = useAgenda(pathname);
   const { logout: handleLogout, loggingOut } = useLogout();
 
   const toggleCollapsed = () => {
@@ -145,6 +149,11 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
+
+      {/* Today, above the footer so it sits at the bottom of the eye's travel
+          down the nav. Hidden when collapsed: there is no useful 56px version
+          of a list of titles and hours. */}
+      {!collapsed && <SidebarAgenda agenda={agenda} />}
 
       {/* Sign out + Collapse toggle */}
       <div className="p-2 border-t border-surface-border space-y-0.5">

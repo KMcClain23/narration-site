@@ -14,12 +14,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   return (
     <AdminModalProvider>
       {isDesktop && <Sidebar />}
-      {/* overflow-y-auto here never actually engages — the parent flex
-          container uses min-h-screen (grows to fit), not h-screen (capped),
-          so this element's scrollHeight always equals its clientHeight and
-          the real scrolling happens on window/body. Confirmed via testing;
-          BottomTabBar's scroll-hide listens on window accordingly. */}
-      <main className={`admin-scrollbar flex-1 min-w-0 overflow-y-auto p-8 ${isDesktop ? "" : "pb-24"}`}>
+      {/* No overflow-y here on purpose. It never engaged — the parent uses
+          min-h-screen (grows to fit), not h-screen (capped), so the real
+          scrolling has always happened on window/body — but it still made this
+          element a scroll container, and `sticky` inside a scroll container
+          that never scrolls simply cannot stick. That silently broke every
+          sticky descendant, which is why the schedule's agenda scrolled away. */}
+      <main className={`admin-scrollbar flex-1 min-w-0 p-8 ${isDesktop ? "" : "pb-24"}`}>
         {children}
       </main>
       {!isDesktop && <BottomTabBar />}
