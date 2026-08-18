@@ -683,3 +683,17 @@ alter table payments add column if not exists paypal_invoice_id text not null de
 
 alter table payments add column if not exists stripe_payment_link_id text not null default '';
 alter table payments add column if not exists payment_links_closed_at timestamptz;
+
+-- ============================================================
+-- Stage 9: payments.invoice_draft
+--
+-- The invoice as last edited — corrected finished hours, hand-adjusted lines, a
+-- rewritten note, the whole-project choice. All of it was regenerated on every
+-- open, discarding whatever had been typed the time before.
+--
+-- Stored as a document rather than columns because that is what it is: a draft
+-- of a thing to be sent, whose shape follows the invoice format rather than the
+-- payment record's.
+-- ============================================================
+
+alter table payments add column if not exists invoice_draft jsonb;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { pdf } from "@react-pdf/renderer";
@@ -111,6 +111,9 @@ export function InvoiceEditor({
   paymentId,
   wholeProject,
   coNarratorEmails = [],
+  isPartial = false,
+  savedHours,
+  savedBillingWhole,
   initialHours = 0,
   canRecompute = false,
   recompute,
@@ -125,6 +128,12 @@ export function InvoiceEditor({
   wholeProject?: { lines: InvoiceData["lines"]; notes: string };
   /** Addresses for the other narrators, to copy in on a whole-project invoice. */
   coNarratorEmails?: string[];
+  /** True for a cancellation or part-project fee, where nothing is complete. */
+  isPartial?: boolean;
+  /** Hours as last saved, which outrank the estimate. */
+  savedHours?: string;
+  /** The whole-project choice as last saved. */
+  savedBillingWhole?: boolean;
   /** Finished hours as estimated from word count, to start the field at. */
   initialHours?: number;
   /** False when the project has no PFH rate, so hours cannot rebuild anything. */
@@ -154,7 +163,7 @@ export function InvoiceEditor({
   const [sendError, setSendError] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
 
-  const [billingWhole, setBillingWhole] = useState(false);
+  const [billingWhole, setBillingWhole] = useState(savedBillingWhole ?? false);
   // Captured so switching back restores what was generated, not whatever the
   // other shape last left behind. Replaced wholesale when the hours change,
   // since both shapes are rebuilt from them.
@@ -165,7 +174,8 @@ export function InvoiceEditor({
 
   // Held as text, not a number: "12." is a state a person passes through while
   // typing 12.9, and coercing it to 12 mid-keystroke fights them.
-  const [hours, setHours] = useState(initialHours ? initialHours.toFixed(1) : "");
+  // A saved runtime is a measurement someone took; the estimate is a guess.
+  const [hours, setHours] = useState(savedHours ?? (initialHours ? initialHours.toFixed(1) : ""));
 
   /**
    * Rebuild the invoice from a corrected runtime.
@@ -243,6 +253,38 @@ export function InvoiceEditor({
       setLinkError("Could not reach the payment providers to retire the old links.");
     }
   }
+
+  /**
+   * Keep the draft, debounced.
+   *
+   * Every edit here is a decision — a corrected runtime, a reworded note, a
+   * rounded figure — and until now all of them were discarded on close. Saved a
+   * beat after typing stops rather than on every keystroke, so a long note is
+   * one write instead of two hundred.
+   *
+   * The payment links are deliberately not saved: they live on the payment row,
+   * are raised and voided against the providers, and a copy here could
+   * resurrect one that had since been retired.
+   */
+  useEffect(() => {
+    if (!paymentId) return;
+    const timer = setTimeout(() => {
+      const rest: Partial<InvoiceData> = { ...data };
+      delete rest.cardLink;
+      delete rest.cardTotal;
+      delete rest.cardFee;
+      delete rest.paypalLink;
+      void fetch("/api/payments/invoice-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_id: paymentId, draft: { data: rest, hours, billingWhole } }),
+      }).catch(() => {
+        // A draft that fails to save is not worth interrupting the work over —
+        // the invoice in front of them is unaffected.
+      });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [paymentId, data, hours, billingWhole]);
 
   const set = <K extends keyof InvoiceData>(key: K) => (v: InvoiceData[K]) =>
     setData(d => ({ ...d, [key]: v }));
@@ -349,12 +391,23 @@ export function InvoiceEditor({
     const due = data.dueDate ? `, due ${fmtDueDate(data.dueDate)}` : "";
     const ref = data.invoiceNumber ? `Invoice ${data.invoiceNumber} is attached` : "Invoice attached";
 
+    // Finishing a book is a good day for the author too, and the invoice is
+    // usually the message that tells them it's done. Worth a sentence.
+    //
+    // Suppressed on a partial fee: a project that ended early is not something
+    // to congratulate anyone on, and "I hope you love how it turned out" beside
+    // a cancellation charge would read as tone-deaf.
+    const opening = isPartial
+      ? ""
+      : `That's ${data.bookTitle} wrapped — thank you for trusting me with it, and I hope you love how it turned out.\n\n`;
+
     setSendMessage(
       `Hi ${firstName},\n\n` +
+        opening +
         // One sentence carrying everything that matters: what it is, how much,
         // and by when. The old draft said "for His For Christmas, for $367.02"
         // and left the due date off the email entirely.
-        `${ref}: ${money(amountDue)} for ${data.bookTitle}${due}.\n\n` +
+        `${ref}: ${money(amountDue)}${isPartial ? ` for ${data.bookTitle}` : ""}${due}. ` +
         `You can pay using the buttons below, or the details on the invoice itself.\n\n` +
         `Thanks,\n${BUSINESS.name}\n${BUSINESS.company}`,
     );

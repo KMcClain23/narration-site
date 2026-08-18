@@ -19,6 +19,13 @@ import { InvoiceEditor } from "./InvoiceEditor";
 
 type AuthorRow = { name: string; email?: string | null; location?: string | null };
 
+/** What the editor last had open, as stored against the payment. */
+type SavedDraft = {
+  data?: Partial<InvoiceData>;
+  hours?: string;
+  billingWhole?: boolean;
+};
+
 /** "Ann Dahlia", "Ann Dahlia and Edward Baker", "A, B and C". */
 function listNames(names: string[]): string {
   if (names.length <= 1) return names[0] ?? "";
@@ -262,6 +269,7 @@ export function InvoiceButton({
   const [coNarratorEmails, setCoNarratorEmails] = useState<string[]>([]);
   // Kept so recompute() can rebuild the invoice without refetching the author.
   const [author, setAuthor] = useState<AuthorRow | null>(null);
+  const [savedDraft, setSavedDraft] = useState<SavedDraft | null>(null);
 
   async function handleOpen() {
     setBusy(true);
@@ -306,7 +314,33 @@ export function InvoiceButton({
       setCoNarratorEmails(coNarratorEmails);
       setAuthor(resolved);
 
-      setDraft(buildInvoice(payment, card, rows, resolved, invoiceNumber));
+      const generated = buildInvoice(payment, card, rows, resolved, invoiceNumber);
+
+      // A saved draft wins over the freshly generated one, because it holds
+      // decisions: a corrected runtime, a reworded note, an adjusted figure.
+      // The payment links are the exception — those are taken from the payment
+      // every time, so a saved copy cannot resurrect a link since voided.
+      let saved: SavedDraft | null = null;
+      try {
+        const res = await fetch(`/api/payments/invoice-draft?payment_id=${payment.id}`);
+        if (res.ok) saved = (await res.json()).draft ?? null;
+      } catch {
+        // No saved draft reachable; the generated one is a fine starting point.
+      }
+
+      setSavedDraft(saved);
+      setDraft(
+        saved?.data
+          ? {
+              ...generated,
+              ...saved.data,
+              cardLink: generated.cardLink,
+              cardTotal: generated.cardTotal,
+              cardFee: generated.cardFee,
+              paypalLink: generated.paypalLink,
+            }
+          : generated,
+      );
     } catch {
       setError("Could not prepare the invoice.");
     } finally {
@@ -368,7 +402,10 @@ export function InvoiceButton({
           paymentId={payment.id}
           wholeProject={draft.wholeProject ?? undefined}
           coNarratorEmails={coNarratorEmails}
+          isPartial={card.status === "recast"}
           initialHours={finishedHours(card.word_count)}
+          savedHours={savedDraft?.hours}
+          savedBillingWhole={savedDraft?.billingWhole}
           canRecompute={Boolean(card.pfh_rate)}
           // Rebuilds both shapes from a corrected runtime. The editor holds the
           // hours; everything needed to turn them back into lines lives here.
