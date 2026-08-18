@@ -753,3 +753,52 @@ create policy expenses_service_role on expenses
 -- payer's to report. Without the method recorded, every payout looks alike and
 -- the $600 question cannot be answered.
 alter table payment_payouts add column if not exists paid_via text not null default '';
+
+-- ---------------------------------------------------------------------------
+-- Editors and proofers as contacts.
+--
+-- They were the one working relationship with nowhere to live: payouts record
+-- a payee_name as free text, so the person who edits most of the catalogue
+-- existed only as a string repeated on each payment, with her email and Venmo
+-- handle kept somewhere outside the app entirely.
+--
+-- No FK to payment_payouts on purpose. That column is free text and matching
+-- is done by name, the same convention authors and co-narrators already use
+-- against board_cards; adding a constraint now would break every existing row.
+create table if not exists editors (
+  id         uuid        primary key default gen_random_uuid(),
+  name       text        not null,
+  email      text        not null default '',
+  -- How they get paid. Kept beside the name because the moment it is needed is
+  -- the moment a payout is marked paid, not tax season.
+  venmo      text        not null default '',
+  paypal     text        not null default '',
+  role       text        not null default 'editor',
+  notes      text        not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'editors_role_check') then
+    alter table editors add constraint editors_role_check
+      check (role in ('editor', 'proofer', 'both'));
+  end if;
+end $$;
+
+-- Name is the join key to payment_payouts.payee_name, so duplicates would
+-- split one person's history in two.
+create unique index if not exists editors_name_idx on editors (lower(name));
+
+alter table editors enable row level security;
+
+drop policy if exists editors_service_role on editors;
+create policy editors_service_role on editors
+  for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+
+-- Seeded rather than typed in, so the name matches payment_payouts.payee_name
+-- exactly and her existing history attaches on the first load.
+insert into editors (name, email, venmo, role)
+select 'Marizete', 'marizete.gp@gmail.com', '@Marizete-Garcia', 'editor'
+where not exists (select 1 from editors where lower(name) = 'marizete');

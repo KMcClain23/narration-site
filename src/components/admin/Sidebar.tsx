@@ -40,6 +40,7 @@ const NAV_GROUPS: NavItem[][] = [
       subItems: [
         { label: "Authors", href: "/contacts/authors" },
         { label: "Co-Narrators", href: "/contacts/co-narrators" },
+        { label: "Editors", href: "/contacts/editors" },
         { label: "Production Companies", href: "/contacts/production-companies" },
       ],
     },
