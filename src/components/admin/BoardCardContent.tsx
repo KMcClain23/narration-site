@@ -9,6 +9,7 @@ import {
   URGENCY_PILL,
   parseCoNarrators,
   estimatedEarnings,
+  narrationPlan,
   type Urgency,
   type BoardV2Card,
 } from "./board-card-utils";
@@ -26,6 +27,13 @@ const URGENCY_TEXT = {
   yellow: "text-accent-amber-bright",
   red: "text-alert-red",
 } as const;
+
+/**
+ * Hours a day past which a book is eating the week rather than fitting in it.
+ * A display threshold only — nothing is calculated from it. Change it here if
+ * a four-hour recording day stops feeling heavy.
+ */
+const HEAVY_DAY = 4;
 
 function first15Urgency(days: number): Urgency {
   if (days < 0) return "red";
@@ -118,6 +126,33 @@ export function BoardCardContent({
                 return earnings === null ? words : `${words} · ~$${Math.round(earnings).toLocaleString("en-US")}`;
               })()
             : " "}
+        </p>
+
+        {/* 6. Booth load — height-preserving, same as the row above, so cards
+            stay a uniform height whether or not a word count is set. */}
+        <p className="mt-0.5 text-[13px]">
+          {(() => {
+            const plan = narrationPlan(
+              card.word_count,
+              card.narration_format,
+              card.narrator_share_percent,
+              card.deadline,
+            );
+            if (!plan) return " ";
+            return (
+              <>
+                <span className="text-text-muted">{plan.hours.toFixed(1)} hrs at the mic</span>
+                {plan.overdue ? (
+                  <span className="text-alert-red"> · no weekdays left</span>
+                ) : plan.hoursPerWeekday != null ? (
+                  <span className={plan.hoursPerWeekday >= HEAVY_DAY ? "text-accent-amber-bright" : "text-text-muted"}>
+                    {" · "}
+                    {plan.hoursPerWeekday.toFixed(1)} hrs/weekday
+                  </span>
+                ) : null}
+              </>
+            );
+          })()}
         </p>
       </div>
     </>

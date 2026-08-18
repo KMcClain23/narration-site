@@ -11,7 +11,12 @@ import { ArchiveConfirmDialog, ARCHIVE_REASON_LABEL } from "@/components/board/A
 import { AmazonRefetchButton, type AmazonPreview } from "@/components/board/AmazonRefetchButton";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { TagsField, PersonForm, EMPTY_PERSON, type Person } from "@/components/admin/PersonForm";
-import { estimatedEarnings, parseCoNarrators } from "@/components/admin/board-card-utils";
+import {
+  estimatedEarnings,
+  narrationPlan,
+  parseCoNarrators,
+  WORDS_PER_NARRATION_HOUR,
+} from "@/components/admin/board-card-utils";
 import { CardPaymentsPanel } from "@/components/payments/CardPaymentsPanel";
 import type { NarrationFormat, ArchivedReason } from "@/types/book";
 
@@ -740,6 +745,15 @@ export function CardEditModal(props: CardEditModalProps) {
           : 100;
     const shareLabel = appliedShare !== 100 ? ` × ${appliedShare}% share` : "";
 
+    // What the job costs in time rather than what it pays. Same share as the
+    // earnings figure above, since a duet narrator reads half the book.
+    const plan = narrationPlan(
+      form.word_count,
+      form.narration_format,
+      form.narrator_share_percent,
+      form.deadline || null,
+    );
+
     return (
       <div className="space-y-8">
         {/* Section 1: Production Type */}
@@ -905,6 +919,58 @@ export function CardEditModal(props: CardEditModalProps) {
             )}
           </div>
         )}
+
+        {/* Section 3b: Time. Shown regardless of payment type — a flat-fee
+            book takes exactly as long to read as a per-finished-hour one, and
+            the question this answers is what is left of the week, not what the
+            job pays. */}
+        <div className="rounded-lg border border-surface-border px-4 py-3">
+          <p className={`${adminType.label} mb-1 flex items-center`}>
+            Time to narrate
+            <InfoTooltip variant="inline">
+              <p>
+                Your share of the manuscript at ~{WORDS_PER_NARRATION_HOUR.toLocaleString()} words
+                per hour at the mic, spread over the weekdays left before the deadline. Recording
+                time only: prep, pickups and proofing are on top.
+              </p>
+            </InfoTooltip>
+          </p>
+          {plan ? (
+            <>
+              <p className="text-lg font-bold text-text-primary">
+                {plan.hours.toFixed(1)} hrs
+                <span className="ml-2 text-xs font-normal text-text-muted">
+                  {Math.round(form.word_count * (appliedShare / 100)).toLocaleString()} words ÷{" "}
+                  {WORDS_PER_NARRATION_HOUR.toLocaleString()}/hr
+                  {appliedShare !== 100 ? ` (${appliedShare}% share)` : ""}
+                </span>
+              </p>
+              {plan.hoursPerWeekday != null ? (
+                <p className={`${adminType.small} mt-0.5`}>
+                  <span className="text-text-body">
+                    {plan.hoursPerWeekday.toFixed(1)} hrs per weekday
+                  </span>{" "}
+                  to finish on time · {plan.weekdaysLeft} weekday
+                  {plan.weekdaysLeft === 1 ? "" : "s"} left
+                </p>
+              ) : plan.overdue ? (
+                <p className={`${adminType.small} mt-0.5 text-alert-red`}>
+                  No weekdays left before the deadline.
+                </p>
+              ) : (
+                <p className={`${adminType.small} mt-0.5`}>
+                  Set a deadline to see hours per weekday.
+                </p>
+              )}
+            </>
+          ) : (
+            <p className={adminType.small}>
+              {form.word_count > 0
+                ? "Multicast has no default split — set Narrator Share to see your time"
+                : "Set a word count to see how long this takes"}
+            </p>
+          )}
+        </div>
 
         {/* Section 4: Payments — the estimate above is what the job is worth;
             this is what has actually been invoiced and collected against it.
