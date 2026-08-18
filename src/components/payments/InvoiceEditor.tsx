@@ -7,7 +7,7 @@ import { pdf } from "@react-pdf/renderer";
 import { Mail, Plus, Trash2, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { useModalOpen } from "@/components/admin/AdminModalContext";
-import { BUSINESS } from "@/lib/business-identity";
+import { BUSINESS, grossUpForCard } from "@/lib/business-identity";
 import { CLIENT_PAYMENT_METHODS } from "@/lib/payments";
 import { dateOnlyToPacificNoon, formatFullDate } from "@/lib/timezone";
 import { InvoicePDF, type InvoiceData, type InvoiceLine } from "./InvoicePDF";
@@ -142,7 +142,7 @@ export function InvoiceEditor({
    * payment link all survive, since none of them depend on which shape the
    * invoice takes.
    */
-  function switchShape(whole: boolean) {
+  async function switchShape(whole: boolean) {
     if (!wholeProject) return;
     setBillingWhole(whole);
     setData(d => ({
@@ -150,6 +150,43 @@ export function InvoiceEditor({
       lines: whole ? wholeProject.lines : share.lines,
       notes: whole ? wholeProject.notes : share.notes,
     }));
+    // The amount just changed, so any link raised against the old one now
+    // charges the wrong figure to whoever still holds the URL.
+    await voidLinks();
+  }
+
+  /**
+   * Retire links that no longer match what the invoice bills.
+   *
+   * Silent when there are none to retire. Refuses, loudly, if a provider says
+   * its link was already paid — that invoice needs recording, not re-issuing,
+   * and voiding would throw away the only trace of how the money arrived.
+   */
+  async function voidLinks() {
+    if (!paymentId || (!data.cardLink && !data.paypalLink)) return;
+    setLinkError(null);
+    try {
+      const res = await fetch("/api/payments/void-links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_id: paymentId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setLinkError(json.error ?? "Could not retire the old payment links.");
+        return;
+      }
+      setData(d => ({
+        ...d,
+        cardLink: undefined,
+        cardTotal: undefined,
+        cardFee: undefined,
+        paypalLink: undefined,
+      }));
+      router.refresh();
+    } catch {
+      setLinkError("Could not reach the payment providers to retire the old links.");
+    }
   }
 
   const set = <K extends keyof InvoiceData>(key: K) => (v: InvoiceData[K]) =>
@@ -181,6 +218,14 @@ export function InvoiceEditor({
 
   const subtotal = data.lines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
   const amountDue = Math.max(0, subtotal - (Number(data.amountPaid) || 0));
+
+  // A card link fixes its amount at creation. If the invoice now bills
+  // something else, the link is charging a figure this document no longer
+  // claims — to anyone still holding the URL.
+  const linkStale =
+    Boolean(data.cardLink) &&
+    data.cardTotal != null &&
+    Math.abs(grossUpForCard(amountDue).total - data.cardTotal) > 0.005;
 
   /** Build the PDF once, so the emailed file is the one that was previewed. */
   async function renderPdf(): Promise<{ blob: Blob; filename: string }> {
@@ -364,7 +409,7 @@ export function InvoiceEditor({
                   <input
                     type="checkbox"
                     checked={billingWhole}
-                    onChange={e => switchShape(e.target.checked)}
+                    onChange={e => void switchShape(e.target.checked)}
                     className="mt-0.5 h-4 w-4 shrink-0 rounded border-surface-border bg-background text-accent-amber"
                   />
                   <span>
@@ -467,6 +512,26 @@ export function InvoiceEditor({
                     exists. Raising a link creates a real object at the provider
                     — a live PayPal invoice, no less — so it stays opt-in, and
                     the reason only Venmo shows until then has to be visible. */}
+                {/* A hand-edited amount leaves a raised link charging the old
+                    figure. Not voided automatically the way the toggle is —
+                    an amount is edited a character at a time, and retiring a
+                    link mid-keystroke would be worse than the staleness. */}
+                {linkStale && (
+                  <div className="mt-2 rounded-lg border border-accent-amber/40 bg-accent-amber/10 px-3 py-2">
+                    <p className="text-[13px] text-accent-amber-bright">
+                      The amount changed since these links were created — they still charge{" "}
+                      {money(data.cardTotal ?? 0)}.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void voidLinks()}
+                      className="mt-1 text-[13px] font-medium text-accent-amber-bright hover:underline"
+                    >
+                      Retire them so you can raise new ones
+                    </button>
+                  </div>
+                )}
+
                 <p className={`${adminType.small} mt-1.5`}>
                   Venmo is on every invoice already. Card and PayPal appear on the invoice only
                   once you create their link — each adds its own processing fee on top, so you

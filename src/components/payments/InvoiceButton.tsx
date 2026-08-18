@@ -159,13 +159,24 @@ export function buildInvoice(
   // Null on solo work: there is no whole project to bill differently when one
   // narrator is the whole project, and an option that changes nothing is worse
   // than no option.
+  // "both" reads better than "all" for the two-narrator case, which is most of
+  // them, and is simply wrong past it.
+  const narratorWord = others.length > 1 ? "all narrators" : "both narrators";
+
+  // One line, not two. Itemising editing here would read as a charge added on
+  // top of the narration rather than as part of what the whole project costs —
+  // the opposite of what separating it achieves on a single-share invoice.
+  const wholeDetail = [
+    hrs > 0 && card.pfh_rate ? `${hrs.toFixed(1)} finished hours × $${card.pfh_rate}/PFH` : "",
+    `full narration for ${narratorWord}${editingTotal > 0.005 ? ", including editing and mastering" : ""}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   const wholeProject = !split
     ? null
     : {
-    lines: [
-      { description, detail, amount: grossBase - editingTotal },
-      ...lines.slice(1),
-    ],
+    lines: [{ description, detail: wholeDetail, amount: grossBase }],
     // Nobody else is invoicing, so the note that says otherwise would be wrong.
     notes: `This invoice covers the full narration for this title, including ${
       others.length ? listNames(others) : "all narrators"
