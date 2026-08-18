@@ -183,9 +183,13 @@ begin
   ) then
     alter table board_cards drop constraint board_cards_status_check;
   end if;
+  -- 'recast' belongs to Stage 9, further down this file, but is listed here
+  -- too. This script is cumulative and meant to be re-runnable, and a live row
+  -- already carries that status: without it this block fails on the way past,
+  -- before the statement that would have permitted it is ever reached.
   alter table board_cards
     add constraint board_cards_status_check
-    check (status in ('audition', 'contracted', 'prepping', 'recording', 'editing', 'released'));
+    check (status in ('audition', 'contracted', 'prepping', 'recording', 'editing', 'released', 'recast'));
 end $$;
 
 -- Stage 4.1 (admin redesign — Contacts/Authors): new author profile fields
