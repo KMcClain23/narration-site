@@ -3,8 +3,13 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
+import { parseLocalDate } from "@/components/admin/board-card-utils";
 import { formatMoney, PAYOUT_KIND_LABEL, type MoneyTotals } from "@/lib/payments";
-import { MarkPayoutPaid } from "./MarkPayoutPaid";
+import { MarkPayoutPaid, UndoPayoutPaid } from "./MarkPayoutPaid";
+
+function fmtDate(s: string): string {
+  return parseLocalDate(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
 // What you owe other people, grouped by person.
 //
@@ -51,9 +56,13 @@ function groupByPayee(owedTo: MoneyTotals["owedTo"]): Grouped[] {
 
 export function PayoutsPanel({ totals }: { totals: MoneyTotals }) {
   const [open, setOpen] = useState(false);
+  const [paidOpen, setPaidOpen] = useState(false);
   const groups = groupByPayee(totals.owedTo);
+  const paid = totals.paidTo;
 
-  if (totals.payoutsOwed <= 0 && totals.payoutsPaid <= 0) return null;
+  // Each half stands on its own. Once everything is settled the owed card would
+  // otherwise sit there reading "0 payees, $0 due now", which is noise.
+  if (groups.length === 0 && paid.length === 0) return null;
 
   // Deliberately no closing subtotal here. A payout is settled out of the fee
   // for its own book, so netting it against money collected from unrelated
@@ -61,6 +70,8 @@ export function PayoutsPanel({ totals }: { totals: MoneyTotals }) {
   // netting belongs in the stat strip, where the scope is the whole business.
 
   return (
+    <>
+    {groups.length > 0 && (
     <section className="mt-3 overflow-hidden rounded-xl border border-surface-border">
       <button
         type="button"
@@ -141,5 +152,53 @@ export function PayoutsPanel({ totals }: { totals: MoneyTotals }) {
         </>
       )}
     </section>
+    )}
+
+    {paid.length > 0 && (
+      <section className="mt-3 overflow-hidden rounded-xl border border-surface-border">
+        <button
+          type="button"
+          onClick={() => setPaidOpen(o => !o)}
+          className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 bg-surface px-4 py-3 text-left hover:bg-surface-raised"
+        >
+          {paidOpen ? <ChevronDown size={16} className="text-text-muted" /> : <ChevronRight size={16} className="text-text-muted" />}
+          <span className={adminType.title}>Already paid</span>
+          <span className={`${adminType.monoNum} rounded-full bg-pill-neutral-bg px-2 py-0.5 text-pill-neutral-text`}>
+            {paid.length}
+          </span>
+          <span className="ml-auto flex flex-wrap items-center gap-x-4">
+            <span className={adminType.monoNum}>{formatMoney(totals.payoutsPaid)}</span>
+            <span className={adminType.small}>gone out</span>
+          </span>
+        </button>
+
+        {paidOpen && (
+          <div>
+            {paid.map(p => (
+              <div key={p.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-divider px-4 py-2.5 last:border-0">
+                <span className={adminType.body}>
+                  {p.name || "Unnamed"}
+                  <span className={`${adminType.small} ml-2`}>
+                    {PAYOUT_KIND_LABEL[p.kind] ?? p.kind} · {p.projectTitle}
+                  </span>
+                </span>
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className={adminType.monoNum}>{formatMoney(p.amount)}</span>
+                  <span className={adminType.small}>{fmtDate(p.paidOn)}</span>
+                  {/* Said plainly rather than left blank. A missing method is
+                      not a cosmetic gap: it is the case the 1099 test has to
+                      assume is yours to report. */}
+                  <span className={p.paidVia ? adminType.small : `${adminType.small} text-accent-amber-bright/80`}>
+                    {p.paidVia || "method not recorded"}
+                  </span>
+                  <UndoPayoutPaid id={p.id} />
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    )}
+    </>
   );
 }

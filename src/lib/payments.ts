@@ -439,6 +439,18 @@ export type PayoutObligation = {
   dueAfterRelease: boolean;
 };
 
+/** A payout that has actually gone out, with the two facts a return needs. */
+export type PayoutPaidRecord = {
+  id: string;
+  name: string;
+  kind: PayoutKind;
+  amount: number;
+  projectTitle: string;
+  paidOn: string;
+  /** Empty when it was never recorded, which the panel says rather than hides. */
+  paidVia: string;
+};
+
 export type MoneyTotals = {
   expected: number;
   invoiced: number;
@@ -477,6 +489,14 @@ export type MoneyTotals = {
   /** Every unpaid obligation, for grouping by payee rather than listing raw. */
   owedTo: PayoutObligation[];
   /**
+   * Every payout that has gone out, newest first.
+   *
+   * Marking one paid removes it from `owedTo`, so without this the money looks
+   * like it vanished rather than moved, and a date typed wrongly could only be
+   * found by opening each payment in turn.
+   */
+  paidTo: PayoutPaidRecord[];
+  /**
    * What the whole tracked book of work is worth: fees plus royalties earned,
    * counting each project once whether it has been paid or not.
    *
@@ -510,6 +530,7 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
   let payoutsOwed = 0;
   const payoutsByKind: Record<string, number> = {};
   const owedTo: PayoutObligation[] = [];
+  const paidTo: PayoutPaidRecord[] = [];
   let payoutsOwedNow = 0;
   let payoutsUpcoming = 0;
   let payoutsBurdenTotal = 0;
@@ -560,6 +581,15 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
 
         if (p.paid_on) {
           payoutsPaid += a;
+          paidTo.push({
+            id: p.id,
+            name: p.payee_name,
+            kind: p.kind,
+            amount: a,
+            projectTitle: card.title,
+            paidOn: p.paid_on,
+            paidVia: p.paid_via ?? "",
+          });
         } else if (a > 0) {
           payoutsOwed += a;
           // A payout only becomes a debt once the book has shipped — before
@@ -607,6 +637,8 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
     payoutsOwedNow,
     payoutsUpcoming,
     owedTo: owedTo.sort((a, b) => b.amount - a.amount),
+    // Newest first: a mistyped date is nearly always on the one just entered.
+    paidTo: paidTo.sort((a, b) => b.paidOn.localeCompare(a.paidOn)),
     // Royalties sit outside cardExpected by design — they are history, not a
     // forecast — so they are added here rather than being counted twice.
     projectedGross: projectedGross + royaltiesEarned,

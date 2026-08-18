@@ -128,3 +128,52 @@ export function MarkPayoutPaid({
     </span>
   );
 }
+
+/**
+ * Put a payout back to unpaid.
+ *
+ * The date and the method are both easy to get wrong on a busy day, and until
+ * now the only way back was to open the payment, find the payout and clear the
+ * field by hand. Clearing the method too: a method attached to a payment that
+ * did not happen is worse than no method at all.
+ */
+export function UndoPayoutPaid({ id }: { id: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function undo() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/payments/payouts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, paid_on: null, paid_via: "" }),
+      });
+      if (!res.ok) {
+        setError("Could not undo it.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Could not undo it.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (error) return <span className="text-[13px] text-alert-red">{error}</span>;
+
+  return (
+    <button
+      type="button"
+      onClick={() => void undo()}
+      disabled={busy}
+      className="text-[13px] text-text-muted hover:text-capacity-light disabled:opacity-50"
+      title="Put this back to unpaid"
+    >
+      {busy ? "…" : "Undo"}
+    </button>
+  );
+}
