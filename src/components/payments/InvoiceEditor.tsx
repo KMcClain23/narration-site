@@ -316,6 +316,34 @@ export function InvoiceEditor({
   const subtotal = data.lines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
   const amountDue = Math.max(0, subtotal - (Number(data.amountPaid) || 0));
 
+  /**
+   * What the raised link actually charges, asked of Stripe rather than guessed.
+   *
+   * Inferring it from the invoice was the bug behind a warning that reported a
+   * total appearing on neither the invoice nor the link: a link's amount is
+   * fixed at creation, while the figure it was inferred from moves with every
+   * edit.
+   */
+  useEffect(() => {
+    if (!paymentId || !data.cardLink) return;
+    let cancelled = false;
+    void fetch(`/api/payments/stripe-link?payment_id=${paymentId}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => {
+        if (cancelled || j?.total == null) return;
+        setData(d => ({ ...d, cardTotal: j.total, cardFee: Math.round((j.total - amountDue) * 100) / 100 }));
+      })
+      .catch(() => {
+        // Keeping the previous figure is better than clearing it.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Only when the link itself changes: the amount is a property of the link,
+    // not of whatever the invoice currently says.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentId, data.cardLink]);
+
   // A card link fixes its amount at creation. If the invoice now bills
   // something else, the link is charging a figure this document no longer
   // claims — to anyone still holding the URL.

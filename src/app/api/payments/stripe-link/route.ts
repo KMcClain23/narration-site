@@ -18,6 +18,46 @@ export const dynamic = "force-dynamic";
  * than the narrator. Adding 2.9% would still leave a shortfall, because Stripe
  * takes its percentage of the larger figure as well.
  */
+/**
+ * What the raised link actually charges, read from Stripe.
+ *
+ * The editor used to infer this by re-running the gross-up over whatever the
+ * payment row said the invoice was worth. That is a guess about a fixed fact: a
+ * Payment Link's amount is set at creation and never moves, while the figure it
+ * was inferred from changes every time the invoice is edited. The two diverged
+ * and the staleness warning then reported a total that appeared nowhere —
+ * neither on the invoice nor on the link.
+ */
+export async function GET(req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
+  const paymentId = req.nextUrl.searchParams.get("payment_id");
+  if (!paymentId || !process.env.STRIPE_SECRET_KEY) {
+    return NextResponse.json({ total: null });
+  }
+
+  const { data } = await supabaseAdmin
+    .from("payments")
+    .select("stripe_payment_link_id")
+    .eq("id", paymentId)
+    .maybeSingle();
+
+  const linkId = (data as { stripe_payment_link_id?: string } | null)?.stripe_payment_link_id;
+  if (!linkId) return NextResponse.json({ total: null });
+
+  try {
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const link = await stripe.paymentLinks.retrieve(linkId, { expand: ["line_items"] });
+    const cents = link.line_items?.data?.[0]?.amount_total ?? 0;
+    return NextResponse.json({ total: cents / 100, active: link.active });
+  } catch {
+    // Unreachable Stripe must not block editing an invoice; the caller simply
+    // keeps whatever it had.
+    return NextResponse.json({ total: null });
+  }
+}
+
 export async function POST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;

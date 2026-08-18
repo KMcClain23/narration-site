@@ -130,7 +130,7 @@ export function paypalPayUrl(paypal: string, amount: number): string {
 export function payOptions(
   amountDue: number,
   memo: string,
-  links: { card?: string; paypal?: string } = {},
+  links: { card?: string; paypal?: string; cardTotal?: number } = {},
 ): PayOption[] {
   const out: PayOption[] = [];
   const avoidNote = PAYMENT_METHODS.venmo ? " — Venmo avoids it" : "";
@@ -160,7 +160,12 @@ export function payOptions(
   }
 
   if (links.card && /^https:\/\//.test(links.card)) {
-    const { total, fee } = grossUpForCard(amountDue);
+    // What the link charges wins over what the gross-up would produce. A
+    // Payment Link fixes its amount at creation, so printing a freshly computed
+    // figure beside it would promise the reader one number and then take
+    // another. Where they disagree the editor says so and offers to reissue.
+    const total = links.cardTotal ?? grossUpForCard(amountDue).total;
+    const fee = Math.round((total - amountDue) * 100) / 100;
     out.push({
       // Apple Pay, Google Pay and Link are wallet surfaces on the card rail,
       // not separate providers — Stripe offers whichever the payer's device

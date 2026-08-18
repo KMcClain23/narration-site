@@ -118,7 +118,7 @@ export function InvoicePDF({ data }: { data: InvoiceData }) {
   const balance = subtotal - data.amountPaid;
   const settled = balance <= 0.005;
   const memo = data.invoiceNumber ? `Invoice ${data.invoiceNumber} — ${data.bookTitle}` : data.bookTitle;
-  const options = payOptions(Math.max(0, balance), memo, { card: data.cardLink, paypal: data.paypalLink });
+  const options = payOptions(Math.max(0, balance), memo, { card: data.cardLink, paypal: data.paypalLink, cardTotal: data.cardTotal });
 
   return (
     <Document title={`Invoice ${data.invoiceNumber} — ${data.bookTitle}`} author={BUSINESS.company}>
