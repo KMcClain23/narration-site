@@ -399,7 +399,7 @@ export function InvoiceEditor({
     // a cancellation charge would read as tone-deaf.
     const opening = isPartial
       ? ""
-      : `That's ${data.bookTitle} wrapped — thank you for trusting me with it, and I hope you love how it turned out.\n\n`;
+      : `${data.bookTitle} is finished! Thank you for trusting me with it, and I hope you love how it turned out.\n\n`;
 
     setSendMessage(
       `Hi ${firstName},\n\n` +
