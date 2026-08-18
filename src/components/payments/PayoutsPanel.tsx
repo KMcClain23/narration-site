@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { formatMoney, PAYOUT_KIND_LABEL, type MoneyTotals } from "@/lib/payments";
+import { MarkPayoutPaid } from "./MarkPayoutPaid";
 
 // What you owe other people, grouped by person.
 //
@@ -18,7 +19,7 @@ type Grouped = {
   total: number;
   owedNow: number;
   upcoming: number;
-  items: { projectTitle: string; amount: number; dueAfterRelease: boolean }[];
+  items: { id: string; name: string; projectTitle: string; amount: number; dueAfterRelease: boolean }[];
 };
 
 function groupByPayee(owedTo: MoneyTotals["owedTo"]): Grouped[] {
@@ -36,7 +37,13 @@ function groupByPayee(owedTo: MoneyTotals["owedTo"]): Grouped[] {
     g.total += o.amount;
     if (o.dueAfterRelease) g.upcoming += o.amount;
     else g.owedNow += o.amount;
-    g.items.push({ projectTitle: o.projectTitle, amount: o.amount, dueAfterRelease: o.dueAfterRelease });
+    g.items.push({
+      id: o.id,
+      name: o.name,
+      projectTitle: o.projectTitle,
+      amount: o.amount,
+      dueAfterRelease: o.dueAfterRelease,
+    });
     map.set(key, g);
   }
   return [...map.values()].sort((a, b) => b.total - a.total);
@@ -109,13 +116,21 @@ export function PayoutsPanel({ totals }: { totals: MoneyTotals }) {
                 <div className="mt-1.5 space-y-0.5 border-l border-surface-border pl-3">
                   {g.items
                     .sort((a, b) => Number(a.dueAfterRelease) - Number(b.dueAfterRelease))
-                    .map((it, i) => (
-                      <div key={i} className="flex items-center justify-between gap-3">
+                    .map(it => (
+                      <div key={it.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                         <span className={adminType.small}>
                           {it.projectTitle}
                           {it.dueAfterRelease ? " · not until release" : " · released"}
                         </span>
-                        <span className={adminType.monoNum}>{formatMoney(it.amount)}</span>
+                        <span className="flex items-center gap-3">
+                          <span className={adminType.monoNum}>{formatMoney(it.amount)}</span>
+                          {/* The date is the point, not the fact. A payout is
+                              deductible in the year it was actually paid, and
+                              names a 1099 payee for that year, so recording it
+                              as "today" when it went out in December would put
+                              it in the wrong return. */}
+                          <MarkPayoutPaid id={it.id} name={it.name} amount={it.amount} />
+                        </span>
                       </div>
                     ))}
                 </div>

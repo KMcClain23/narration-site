@@ -388,6 +388,8 @@ export function rowValue(p: PaymentRow, card: MoneyCard, rows: PaymentRow[]): nu
  * owed, but isn't yet.
  */
 export type PayoutObligation = {
+  /** The payout row itself, so it can be marked paid from where it is listed. */
+  id: string;
   name: string;
   kind: PayoutKind;
   amount: number;
@@ -527,6 +529,7 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
             payoutsOwedNow += a;
           }
           owedTo.push({
+            id: p.id,
             name: p.payee_name,
             kind: p.kind,
             amount: a,

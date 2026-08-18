@@ -197,7 +197,7 @@ export function ExpensesClient({
           <p className={adminType.label}>Money in</p>
           <Row label="Narration fees" value={formatMoney(summary.ownEarnings)} muted />
           <Row label="Royalties" value={formatMoney(summary.royalties)} muted />
-          <Row label="Collected for others" value={formatMoney(summary.passedOn)} muted />
+          <Row label="Collected for others" value={formatMoney(summary.collectedForOthers)} muted />
           <div className="border-t border-divider pt-2">
             <Row label="Gross receipts" value={formatMoney(summary.grossReceipts)} />
           </div>

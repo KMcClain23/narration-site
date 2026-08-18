@@ -22,8 +22,17 @@ export type TaxYear = {
   ownEarnings: number;
   royalties: number;
 
-  /** Money that arrived and left again: editors, proofers, co-narrators. */
+  /**
+   * Paid onward this year: the deduction. Dated by when the payment was made,
+   * which is not always the year the matching income arrived.
+   */
   passedOn: number;
+  /**
+   * Collected on someone else's behalf inside this year's receipts. Part of
+   * gross, usually equal to passedOn, but a different question — the money can
+   * arrive in one year and be handed on in the next.
+   */
+  collectedForOthers: number;
   passedOnByPayee: PayeeTotal[];
 
   /** Everything else spent, by both namings. */
@@ -54,20 +63,34 @@ export function buildTaxYear(
   let ownEarnings = 0;
   let royalties = 0;
   let passedOn = 0;
+  let collectedForOthers = 0;
   const payees = new Map<string, number>();
 
   for (const card of cards) {
     for (const r of rowsByCard.get(card.id) ?? []) {
-      // Counted when the money arrived, not when the work was done or the
+      // Income counts when the money arrived, not when the work was done or the
       // invoice raised. A cash-basis return asks what came in this year.
-      if (!inYear(r.received_on, year)) continue;
+      if (inYear(r.received_on, year)) {
+        const got = Number(r.amount_received) || 0;
+        if (r.kind === "royalty") royalties += got;
+        else ownEarnings += got;
 
-      const got = Number(r.amount_received) || 0;
-      if (r.kind === "royalty") royalties += got;
-      else ownEarnings += got;
+        // Part of what landed, so part of gross receipts — even though it was
+        // never the narrator's to keep.
+        for (const p of r.payouts ?? []) {
+          collectedForOthers += Number(p.amount) || 0;
+        }
+      }
 
-      // Only what has actually been paid out. An editor still owed at year end
-      // is not a deduction this year on a cash basis, however certain the bill.
+      /**
+       * Payouts are counted on their own date, not the invoice's.
+       *
+       * These two dates are independent and routinely fall in different years:
+       * an editor paid in December on a book the author settles in January is
+       * deductible now and earns income later. Reading payouts only on rows
+       * already received made the deduction vanish until the client paid, which
+       * is neither cash basis nor accrual — just wrong.
+       */
       for (const p of r.payouts ?? []) {
         if (!inYear(p.paid_on, year)) continue;
         const amount = Number(p.amount) || 0;
@@ -82,9 +105,10 @@ export function buildTaxYear(
   const yearsExpenses = expenses.filter(e => inYear(e.incurred_on, year));
   const expenseTotal = yearsExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
-  // amount_received is the narrator's own share, so what actually landed is
-  // that plus whatever was paid onward out of it.
-  const grossReceipts = ownEarnings + royalties + passedOn;
+  // What actually landed: the narrator's own share plus whatever arrived with
+  // it for other people. Dated by receipt, so a payout made in a different
+  // year can no longer inflate or deflate this one.
+  const grossReceipts = ownEarnings + royalties + collectedForOthers;
 
   const passedOnByPayee: PayeeTotal[] = [...payees.entries()]
     .map(([name, total]) => ({ name, total, needs1099: total >= NEC_THRESHOLD }))
@@ -96,6 +120,7 @@ export function buildTaxYear(
     ownEarnings,
     royalties,
     passedOn,
+    collectedForOthers,
     passedOnByPayee,
     expenses: expenseTotal,
     expensesByLine: byScheduleC(yearsExpenses),
