@@ -5,6 +5,8 @@ import { AcceptingProjectsToggle } from "@/components/schedule/AcceptingProjects
 import { BookingWindowPicker } from "@/components/schedule/BookingWindowPicker";
 import { MonthlyScheduleGrid } from "@/components/schedule/MonthlyScheduleGrid";
 import { DueSoonSection } from "@/components/schedule/DueSoonSection";
+import { CapacityCalendar } from "@/components/schedule/CapacityCalendar";
+import type { CapacityCard } from "@/lib/capacity";
 import { assertAdmin } from "@/lib/require-admin";
 
 // Same "active work" definition /api/board-v2/cards encodes (equivalent to
@@ -28,7 +30,9 @@ export default async function SchedulePage() {
       .in("key", ["accepting_projects", "available_months"]),
     supabaseAdmin
       .from("board_cards")
-      .select("id, title, author, cover_url, deadline, status")
+      // One string literal, not a concatenation: supabase-js infers the row
+      // type from the literal, and splitting it makes every field an error type.
+      .select("id, title, author, cover_url, deadline, status, word_count, narration_format, narrator_share_percent, recording_dates")
       .in("status", ACTIVE_STATUSES)
       .is("archived_at", null),
   ]);
@@ -50,7 +54,23 @@ export default async function SchedulePage() {
     cover_url: string | null;
     deadline: string | null;
     status: string;
+    word_count: number | null;
+    narration_format: string | null;
+    narrator_share_percent: number | null;
+    recording_dates: string[] | null;
   };
+
+  // Every active book, deadline or not: one with chosen recording days occupies
+  // the booth whether or not anyone has written down when it is due.
+  const capacityCards: CapacityCard[] = ((cardsRes.data ?? []) as BoardCardRow[]).map(c => ({
+    id: c.id,
+    title: c.title,
+    word_count: c.word_count,
+    narration_format: c.narration_format,
+    narrator_share_percent: c.narrator_share_percent,
+    deadline: c.deadline,
+    recording_dates: Array.isArray(c.recording_dates) ? c.recording_dates : [],
+  }));
 
   // Cards with no deadline don't factor into the monthly grid or Due Soon —
   // they're already surfaced in Pipeline's "Later" subgroup on the Board.
@@ -71,7 +91,17 @@ export default async function SchedulePage() {
           </div>
         </section>
 
-        {/* Section 2: Monthly Schedule */}
+        {/* Section 2: Capacity. Deliberately above the monthly grid, which
+            says when books are due; this says whether there is room for
+            another one, which is the question asked far more often. */}
+        <section className="mt-8">
+          <h2 className={adminType.titleLg}>Where the time is</h2>
+          <div className="mt-4">
+            <CapacityCalendar cards={capacityCards} />
+          </div>
+        </section>
+
+        {/* Section 3: Monthly Schedule */}
         <section className="mt-8">
           <h2 className={adminType.titleLg}>Monthly Schedule</h2>
           <div className="mt-4">
@@ -79,7 +109,7 @@ export default async function SchedulePage() {
           </div>
         </section>
 
-        {/* Section 3: Due Soon */}
+        {/* Section 4: Due Soon */}
         <section className="mt-8">
           <h2 className={adminType.titleLg}>Due Soon</h2>
           <div className="mt-4">
