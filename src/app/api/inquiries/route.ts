@@ -24,6 +24,15 @@ export async function GET() {
  * PATCH: Admin archives a single active inquiry (dmn_inquiries -> dmn_inquiries_archived)
  */
 export async function PATCH(req: Request) {
+  // Guarded like the GET beside it, which it was not. Archiving takes an id and
+  // nothing else, so an unauthenticated caller could move a client's enquiry out
+  // of the inbox — the message survives in the archive, but it stops being seen,
+  // which for an enquiry is most of the damage.
+  const cookieStore = await cookies();
+  if (cookieStore.get(COOKIE_NAME)?.value !== process.env.ADMIN_SECRET_KEY) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { id } = await req.json();
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
