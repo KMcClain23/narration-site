@@ -332,6 +332,19 @@ export function paymentNarratorShare(
   return base - rowEditingCost(payment) * narratorShare(card);
 }
 
+/**
+ * The whole project fee, across every narrator.
+ *
+ * Derived by undoing the split rather than recomputing from word count, so it
+ * stays tied to agreedFee() and cannot drift from it. Null wherever the share
+ * is unknown or the project has no PFH basis to estimate from.
+ */
+export function projectGrossFee(card: MoneyCard): number | null {
+  const own = agreedFee(card);
+  const share = narratorShare(card);
+  return own == null || share <= 0 ? null : own / share;
+}
+
 /** True when the figure came from real invoices rather than the PFH estimate. */
 export function isCardExpectedActual(rows: PaymentRow[]): boolean {
   return rows.some(r => r.amount_expected != null);

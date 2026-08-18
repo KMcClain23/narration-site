@@ -8,6 +8,7 @@ import {
   invoiceAmount,
   isOffTheTop,
   narratorShare,
+  projectGrossFee,
   type MoneyCard,
   type PaymentRow,
 } from "@/lib/payments";
@@ -39,7 +40,7 @@ export function buildInvoice(
   rows: PaymentRow[],
   author: AuthorRow | null,
   invoiceNumber: string,
-): InvoiceData {
+): InvoiceData & { wholeProject: { lines: InvoiceData["lines"]; notes: string } | null } {
   const amount = invoiceAmount(payment, card, rows) ?? 0;
   const hrs = finishedHours(card.word_count);
   const recast = card.status === "recast";
@@ -96,9 +97,10 @@ export function buildInvoice(
     p => isOffTheTop(p.kind) && Number(p.amount) > 0,
   );
 
+  const share = narratorShare(card);
   const editingTotal = editing.reduce((s, p) => s + Number(p.amount), 0);
   const lines: InvoiceData["lines"] = [
-    { description, detail, amount: amount - editingTotal * narratorShare(card) },
+    { description, detail, amount: amount - editingTotal * share },
   ];
 
   if (editingTotal > 0.005) {
@@ -137,6 +139,39 @@ export function buildInvoice(
         .join(" ")
     : "";
 
+  /**
+   * The same invoice billed for the whole project instead of one share.
+   *
+   * Both shapes happen. Usually each narrator bills the author for their own
+   * half; sometimes one collects everything and pays the others on. The
+   * difference is only ever visible on the invoice, so it is offered there
+   * rather than being settled once as a global rule.
+   *
+   * The editing line is identical either way — it is the same editor being
+   * paid the same fee. Only the narration line changes: the whole distributable
+   * fee rather than this narrator's share of it.
+   */
+  const grossBase =
+    payment.amount_gross != null
+      ? Number(payment.amount_gross)
+      : (projectGrossFee(card) ?? (share > 0 ? amount / share : amount));
+
+  // Null on solo work: there is no whole project to bill differently when one
+  // narrator is the whole project, and an option that changes nothing is worse
+  // than no option.
+  const wholeProject = !split
+    ? null
+    : {
+    lines: [
+      { description, detail, amount: grossBase - editingTotal },
+      ...lines.slice(1),
+    ],
+    // Nobody else is invoicing, so the note that says otherwise would be wrong.
+    notes: `This invoice covers the full narration for this title, including ${
+      others.length ? listNames(others) : "all narrators"
+    }.`,
+  };
+
   return {
     invoiceNumber,
     invoiceDate: payment.invoiced_on || new Date().toISOString().split("T")[0],
@@ -152,6 +187,7 @@ export function buildInvoice(
     amountPaid: payment.amount_gross == null ? Number(payment.amount_received) || 0 : 0,
     method: payment.method,
     notes,
+    wholeProject,
     ...(payment.paypal_payment_link ? { paypalLink: payment.paypal_payment_link } : {}),
     // Carried through so reopening an invoice shows the link it already has
     // rather than offering to raise a second one for the same money.
@@ -184,7 +220,7 @@ export function InvoiceButton({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<InvoiceData | null>(null);
+  const [draft, setDraft] = useState<ReturnType<typeof buildInvoice> | null>(null);
 
   async function handleOpen() {
     setBusy(true);
@@ -270,6 +306,7 @@ export function InvoiceButton({
           onClose={() => setDraft(null)}
           onIssued={handleIssued}
           paymentId={payment.id}
+          wholeProject={draft.wholeProject ?? undefined}
         />
       )}
     </>

@@ -100,6 +100,7 @@ export function InvoiceEditor({
   onClose,
   onIssued,
   paymentId,
+  wholeProject,
 }: {
   initial: InvoiceData;
   onClose: () => void;
@@ -107,6 +108,8 @@ export function InvoiceEditor({
   onIssued?: (next: { invoiceNumber: string; invoicedOn?: string; dueOn?: string }) => void;
   /** Needed to raise (and remember) a Stripe link against this payment. */
   paymentId?: string;
+  /** The same invoice billed for the whole project, when that is a choice. */
+  wholeProject?: { lines: InvoiceData["lines"]; notes: string };
 }) {
   useModalOpen(true);
   const router = useRouter();
@@ -125,6 +128,29 @@ export function InvoiceEditor({
   const [sendBusy, setSendBusy] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
+
+  const [billingWhole, setBillingWhole] = useState(false);
+  // Captured once so switching back restores what was generated, not whatever
+  // the other shape last left behind.
+  const [share] = useState({ lines: initial.lines, notes: initial.notes });
+
+  /**
+   * Swap between billing this narrator's share and billing the whole project.
+   *
+   * Replaces the generated lines and note wholesale, because that is what the
+   * choice means — but only those. A rewritten bill-to, a due date, a raised
+   * payment link all survive, since none of them depend on which shape the
+   * invoice takes.
+   */
+  function switchShape(whole: boolean) {
+    if (!wholeProject) return;
+    setBillingWhole(whole);
+    setData(d => ({
+      ...d,
+      lines: whole ? wholeProject.lines : share.lines,
+      notes: whole ? wholeProject.notes : share.notes,
+    }));
+  }
 
   const set = <K extends keyof InvoiceData>(key: K) => (v: InvoiceData[K]) =>
     setData(d => ({ ...d, [key]: v }));
@@ -330,6 +356,26 @@ export function InvoiceEditor({
                   {subtotal.toLocaleString("en-US", { style: "currency", currency: "USD" })}
                 </span>
               </div>
+
+              {/* Only offered on split work — there is no "whole project" to
+                  bill differently when one narrator is the whole project. */}
+              {wholeProject && (
+                <label className="mb-3 flex items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={billingWhole}
+                    onChange={e => switchShape(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-surface-border bg-background text-accent-amber"
+                  />
+                  <span>
+                    <span className={adminType.body}>Bill the whole project</span>
+                    <span className={`${adminType.small} block`}>
+                      Everything the author owes for this title, for you to pay the others from —
+                      instead of your share alone.
+                    </span>
+                  </span>
+                </label>
+              )}
 
               {data.lines.map((l, i) => (
                 <div key={i} className="rounded-lg border border-surface-border bg-background p-3 space-y-2">
