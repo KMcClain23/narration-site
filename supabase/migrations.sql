@@ -743,3 +743,13 @@ alter table expenses enable row level security;
 drop policy if exists expenses_service_role on expenses;
 create policy expenses_service_role on expenses
   for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+
+-- ---------------------------------------------------------------------------
+-- How a payout was paid.
+--
+-- Not decoration. A payment network that settles a business payment files its
+-- own 1099-K on it, and the payer is told not to report the same money again
+-- on a 1099-NEC. Zelle and cheques are not such networks, so those stay the
+-- payer's to report. Without the method recorded, every payout looks alike and
+-- the $600 question cannot be answered.
+alter table payment_payouts add column if not exists paid_via text not null default '';

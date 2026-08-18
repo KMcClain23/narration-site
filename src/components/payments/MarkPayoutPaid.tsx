@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatMoney } from "@/lib/payments";
+import { formatMoney, PAYOUT_METHODS, processorReported } from "@/lib/payments";
+
+// Whichever way the last payout went, the next one usually goes the same way.
+// Remembering it is the difference between a field that gets filled in and one
+// that gets skipped, and a skipped one is the case the 1099 test has to guess.
+const LAST_METHOD_KEY = "payout-method";
 
 /**
  * Record that a payout has actually gone out.
@@ -26,6 +31,12 @@ export function MarkPayoutPaid({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paidOn, setPaidOn] = useState(new Date().toISOString().split("T")[0]);
+  const [paidVia, setPaidVia] = useState(() => {
+    // Only ever read on the client. The select is behind `open`, so the server
+    // and the first client render agree regardless of what is stored here.
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem(LAST_METHOD_KEY) ?? "";
+  });
 
   async function save() {
     setBusy(true);
@@ -34,12 +45,15 @@ export function MarkPayoutPaid({
       const res = await fetch("/api/payments/payouts", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, paid_on: paidOn }),
+        body: JSON.stringify({ id, paid_on: paidOn, paid_via: paidVia }),
       });
       if (!res.ok) {
         const json = await res.json().catch(() => null);
         setError(json?.error ?? "Could not record it.");
         return;
+      }
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(LAST_METHOD_KEY, paidVia);
       }
       setOpen(false);
       router.refresh();
@@ -72,6 +86,21 @@ export function MarkPayoutPaid({
         onChange={e => setPaidOn(e.target.value)}
         className="rounded-md border border-surface-border bg-surface px-2 py-1 text-[13px] text-text-primary focus:border-accent-amber focus:outline-none"
       />
+      {/* Sent as goods and services, the network files its own 1099-K and this
+          money stops being yours to report. Sent as personal, or by Zelle or
+          cheque, it stays yours. Same button, different form. */}
+      <select
+        value={paidVia}
+        onChange={e => setPaidVia(e.target.value)}
+        className="rounded-md border border-surface-border bg-surface px-2 py-1 text-[13px] text-text-primary focus:border-accent-amber focus:outline-none"
+      >
+        <option value="">How? (optional)</option>
+        {PAYOUT_METHODS.map(m => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
       <button
         type="button"
         onClick={() => void save()}
@@ -88,6 +117,13 @@ export function MarkPayoutPaid({
       >
         Cancel
       </button>
+      {paidVia && (
+        <span className="text-[13px] text-text-muted">
+          {processorReported(paidVia)
+            ? "The network reports this one, so it stays off your 1099-NEC."
+            : "Counts toward their $600."}
+        </span>
+      )}
       {error && <span className="text-[13px] text-alert-red">{error}</span>}
     </span>
   );

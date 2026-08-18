@@ -6,7 +6,7 @@ import { isAdminRequest } from "@/lib/require-admin";
 // proofer. Kept as its own endpoint rather than nested writes on /api/payments
 // so editing one payout doesn't require resubmitting the whole payment.
 
-const SELECT_COLS = "id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, notes";
+const SELECT_COLS = "id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, paid_via, notes";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -49,6 +49,7 @@ export async function POST(req: Request) {
         amount: amountOrNull(body.amount) ?? 0,
         rate_pfh: amountOrNull(body.rate_pfh),
         paid_on: body.paid_on || null,
+        paid_via: String(body.paid_via ?? "").trim(),
         notes: String(body.notes ?? "").trim(),
       })
       .select(SELECT_COLS)
@@ -77,6 +78,7 @@ export async function PATCH(req: Request) {
     if ("amount" in body) patch.amount = amountOrNull(body.amount) ?? 0;
     if ("rate_pfh" in body) patch.rate_pfh = amountOrNull(body.rate_pfh);
     if ("paid_on" in body) patch.paid_on = body.paid_on || null;
+    if ("paid_via" in body) patch.paid_via = String(body.paid_via ?? "").trim();
     if ("notes" in body) patch.notes = String(body.notes ?? "").trim();
 
     const { data, error } = await supabaseAdmin

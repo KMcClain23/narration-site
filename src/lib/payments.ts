@@ -62,8 +62,50 @@ export type PayoutRow = {
   /** Per-finished-hour rate, when the payee bills that way. Populates amount. */
   rate_pfh: number | null;
   paid_on: string | null;
+  /** How it left. Empty until recorded. See PAYOUT_METHODS. */
+  paid_via: string;
   notes: string;
 };
+
+/**
+ * Ways a payout leaves, kept apart from CLIENT_PAYMENT_METHODS because paying
+ * and being paid are not the same list: nobody pays an editor by card link,
+ * and cash never arrives from a publisher.
+ *
+ * Venmo and PayPal appear twice on purpose. The two ways of sending are the
+ * same button to the sender and a different tax form to everyone else, so
+ * collapsing them would throw away the one distinction worth storing.
+ */
+export const PAYOUT_METHODS = [
+  "Venmo (goods & services)",
+  "Venmo (personal)",
+  "PayPal (goods & services)",
+  "PayPal (friends & family)",
+  "Zelle",
+  "Bank transfer",
+  "Check",
+  "Cash",
+  "Card",
+  "Other",
+] as const;
+
+/**
+ * Methods where a payment network reports the money itself, on a 1099-K.
+ *
+ * A payer is told not to report the same payment again on a 1099-NEC, so these
+ * amounts come out before the $600 test. Zelle is deliberately absent: it
+ * settles bank to bank rather than as a third-party network, files nothing,
+ * and so leaves the whole obligation with the payer.
+ */
+const PROCESSOR_REPORTED = new Set<string>([
+  "Venmo (goods & services)",
+  "PayPal (goods & services)",
+  "Card",
+]);
+
+export function processorReported(method: string | null | undefined): boolean {
+  return PROCESSOR_REPORTED.has((method ?? "").trim());
+}
 
 export const PAYOUT_KIND_LABEL: Record<PayoutKind, string> = {
   co_narrator: "Co-narrator",

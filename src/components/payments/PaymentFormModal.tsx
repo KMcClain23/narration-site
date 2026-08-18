@@ -10,6 +10,7 @@ import {
   formatMoney,
   isOffTheTop,
   PAYOUT_KIND_LABEL,
+  PAYOUT_METHODS,
   type PaymentKind,
   type PayoutKind,
   type PayoutRow,
@@ -53,6 +54,8 @@ type DraftPayout = {
   rate_pfh: string;
   /** Blank until the money actually leaves — an unpaid payout is a liability. */
   paid_on: string;
+  /** How it left, which decides who reports it. Blank until recorded. */
+  paid_via: string;
 };
 
 const MILESTONE_SUGGESTIONS = [
@@ -91,6 +94,7 @@ function toDrafts(p: PaymentRow | null): DraftPayout[] {
     amount: r.amount ? String(r.amount) : "",
     rate_pfh: r.rate_pfh != null ? String(r.rate_pfh) : "",
     paid_on: r.paid_on ?? "",
+    paid_via: r.paid_via ?? "",
   }));
 }
 
@@ -221,6 +225,26 @@ function PayoutsEditor({
             {!p.paid_on && Number(p.amount) > 0 && (
               <p className={adminType.small}>Leave blank until you&apos;ve actually paid them — counts as owed.</p>
             )}
+
+            {/* Only once there is a date. Asking how it was sent before it has
+                been sent invites an answer that turns out to be wrong. */}
+            {p.paid_on && (
+              <label className="flex items-center gap-2">
+                <span className={`${adminType.small} shrink-0`}>Paid via</span>
+                <select
+                  className={inputClass}
+                  value={p.paid_via}
+                  onChange={e => update(i, { paid_via: e.target.value })}
+                >
+                  <option value="">Not recorded</option>
+                  {PAYOUT_METHODS.map(m => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
         );
       })}
@@ -228,7 +252,7 @@ function PayoutsEditor({
       <button
         type="button"
         onClick={() =>
-          onChange([...payouts, { id: null, payee_name: "", kind: "editor", amount: "", rate_pfh: "", paid_on: "" }])
+          onChange([...payouts, { id: null, payee_name: "", kind: "editor", amount: "", rate_pfh: "", paid_on: "", paid_via: "" }])
         }
         className="flex items-center gap-1 text-[13px] text-text-muted hover:text-text-primary"
       >
@@ -474,6 +498,7 @@ export function PaymentFormModal({
       amount: Number(p.amount) || 0,
       rate_pfh: p.rate_pfh ? Number(p.rate_pfh) : null,
       paid_on: p.paid_on || null,
+      paid_via: p.paid_via || "",
       notes: "",
     }));
     return computeWaterfall(gross, sharePercent, rows);

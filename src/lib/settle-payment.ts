@@ -19,7 +19,7 @@ const PAYMENT_SELECT =
   "id, card_id, kind, period, label, amount_expected, due_on, invoiced_on, invoice_number, " +
   "amount_received, amount_gross, received_on, method, notes, sort_order, stripe_payment_link, " +
   "stripe_payment_link_id, paypal_payment_link, paypal_invoice_id, payment_links_closed_at, " +
-  "payouts:payment_payouts(id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, notes)";
+  "payouts:payment_payouts(id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, paid_via, notes)";
 
 export type SettleResult = { settled: boolean; reason: string };
 

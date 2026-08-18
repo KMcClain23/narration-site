@@ -1,4 +1,4 @@
-import { isOffTheTop, type MoneyCard, type PaymentRow } from "@/lib/payments";
+import { isOffTheTop, processorReported, type MoneyCard, type PaymentRow } from "@/lib/payments";
 import { byLabel, byScheduleC, type ExpenseRow, type ScheduleCLine } from "@/lib/expenses";
 
 /**
@@ -11,7 +11,22 @@ import { byLabel, byScheduleC, type ExpenseRow, type ScheduleCLine } from "@/lib
  * subtraction between them shown rather than assumed.
  */
 
-export type PayeeTotal = { name: string; total: number; needs1099: boolean };
+export type PayeeTotal = {
+  name: string;
+  total: number;
+  /**
+   * Of that total, what a payment network already reported on its own 1099-K.
+   * Reporting it again on a 1099-NEC would double the payee's income on paper.
+   */
+  viaProcessor: number;
+  /** Paid with no method recorded, so counted as yours until told otherwise. */
+  unrecorded: number;
+  /** total − viaProcessor: what a 1099-NEC from you would actually cover. */
+  reportable: number;
+  needs1099: boolean;
+  /** The methods seen this year, so a mixed payee is visible rather than averaged. */
+  methods: string[];
+};
 
 export type TaxYear = {
   year: number;
@@ -50,6 +65,8 @@ export type TaxYear = {
 /** The IRS threshold for a 1099-NEC to a non-corporate payee. */
 const NEC_THRESHOLD = 600;
 
+type Tally = { total: number; viaProcessor: number; unrecorded: number; methods: Set<string> };
+
 function inYear(date: string | null, year: number): boolean {
   return Boolean(date) && Number(date!.slice(0, 4)) === year;
 }
@@ -64,7 +81,7 @@ export function buildTaxYear(
   let royalties = 0;
   let passedOn = 0;
   let collectedForOthers = 0;
-  const payees = new Map<string, number>();
+  const payees = new Map<string, Tally>();
 
   for (const card of cards) {
     for (const r of rowsByCard.get(card.id) ?? []) {
@@ -96,8 +113,24 @@ export function buildTaxYear(
         const amount = Number(p.amount) || 0;
         if (amount <= 0) continue;
         passedOn += amount;
+
         const name = p.payee_name?.trim() || (isOffTheTop(p.kind) ? "Editor" : "Contractor");
-        payees.set(name, (payees.get(name) ?? 0) + amount);
+        const t = payees.get(name) ?? { total: 0, viaProcessor: 0, unrecorded: 0, methods: new Set<string>() };
+        t.total += amount;
+
+        // How it was sent decides who reports it. A network that settles the
+        // payment files its own 1099-K, and the payer is told not to report the
+        // same money again; Zelle, cheques and cash file nothing, so those stay
+        // the payer's. An unrecorded method counts as the payer's too, which
+        // errs toward being asked a question rather than quietly missing a form.
+        const via = (p.paid_via ?? "").trim();
+        if (!via) t.unrecorded += amount;
+        else {
+          t.methods.add(via);
+          if (processorReported(via)) t.viaProcessor += amount;
+        }
+
+        payees.set(name, t);
       }
     }
   }
@@ -111,7 +144,21 @@ export function buildTaxYear(
   const grossReceipts = ownEarnings + royalties + collectedForOthers;
 
   const passedOnByPayee: PayeeTotal[] = [...payees.entries()]
-    .map(([name, total]) => ({ name, total, needs1099: total >= NEC_THRESHOLD }))
+    .map(([name, t]) => {
+      const reportable = t.total - t.viaProcessor;
+      return {
+        name,
+        total: t.total,
+        viaProcessor: t.viaProcessor,
+        unrecorded: t.unrecorded,
+        reportable,
+        // The threshold applies to what you report, not to what you sent. Pay
+        // an editor $900 entirely through PayPal goods and services and no
+        // 1099-NEC is due from you, even though $900 left.
+        needs1099: reportable >= NEC_THRESHOLD,
+        methods: [...t.methods].sort(),
+      };
+    })
     .sort((a, b) => b.total - a.total);
 
   return {

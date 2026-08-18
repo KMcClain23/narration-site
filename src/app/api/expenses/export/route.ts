@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
       .select(
         "id, card_id, kind, period, label, amount_expected, due_on, invoiced_on, invoice_number, " +
           "amount_received, amount_gross, received_on, method, notes, sort_order, " +
-          "payouts:payment_payouts(id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, notes)",
+          "payouts:payment_payouts(id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, paid_via, notes)",
       ),
   ]);
 
@@ -127,8 +127,26 @@ export async function GET(req: NextRequest) {
     const summary = buildTaxYear(year, cards, rowsByCard, expenses);
     return attachment(
       csv(
-        ["Payee", "Paid this year", "1099-NEC likely due"],
-        summary.passedOnByPayee.map(p => [p.name, p.total.toFixed(2), p.needs1099 ? "Yes" : "No"]),
+        // The accountant's question is not "how much left" but "how much of it
+        // is his to file", so the split is columns rather than a footnote.
+        [
+          "Payee",
+          "Paid this year",
+          "Methods",
+          "Via payment network (1099-K)",
+          "Method not recorded",
+          "Reportable by you",
+          "1099-NEC likely due",
+        ],
+        summary.passedOnByPayee.map(p => [
+          p.name,
+          p.total.toFixed(2),
+          p.methods.join("; "),
+          p.viaProcessor.toFixed(2),
+          p.unrecorded.toFixed(2),
+          p.reportable.toFixed(2),
+          p.needs1099 ? "Yes" : "No",
+        ]),
       ),
       `contractors-${year}.csv`,
     );
@@ -140,7 +158,7 @@ export async function GET(req: NextRequest) {
       ["Gross receipts", s.grossReceipts.toFixed(2)],
       ["  Narration fees", s.ownEarnings.toFixed(2)],
       ["  Royalties", s.royalties.toFixed(2)],
-      ["  Collected for others", s.passedOn.toFixed(2)],
+      ["  Collected for others", s.collectedForOthers.toFixed(2)],
       ["", ""],
       ["Paid to editors and co-narrators", s.passedOn.toFixed(2)],
       ["Other expenses", s.expenses.toFixed(2)],

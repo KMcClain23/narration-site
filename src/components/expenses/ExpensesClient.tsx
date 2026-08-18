@@ -216,9 +216,61 @@ export function ExpensesClient({
       {summary.needs1099.length > 0 && (
         <section className="mt-3 rounded-xl border border-accent-amber/40 bg-accent-amber/10 px-4 py-3">
           <p className="text-[13px] text-accent-amber-bright">
-            Paid $600 or more this year, so a 1099-NEC is likely due:{" "}
-            {summary.needs1099.map(p => `${p.name} (${formatMoney(p.total)})`).join(", ")}.
+            Paid $600 or more this year outside a payment network, so a 1099-NEC is likely due:{" "}
+            {summary.needs1099.map(p => `${p.name} (${formatMoney(p.reportable)})`).join(", ")}.
           </p>
+        </section>
+      )}
+
+      {summary.passedOnByPayee.length > 0 && (
+        <section className="mt-3 overflow-hidden rounded-xl border border-surface-border">
+          <p className={`${adminType.label} border-b border-surface-border bg-surface px-4 py-2.5`}>
+            Paid to contractors
+          </p>
+          {summary.passedOnByPayee.map(p => (
+            <div key={p.name} className="border-b border-divider px-4 py-2.5 last:border-0">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <span className={adminType.body}>
+                  {p.name}
+                  {p.methods.length > 0 && (
+                    <span className={`${adminType.small} ml-2`}>by {p.methods.join(", ")}</span>
+                  )}
+                </span>
+                <span className="flex items-center gap-3">
+                  <span className={adminType.monoNum}>{formatMoney(p.total)}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[12px] ${
+                      p.needs1099
+                        ? "bg-accent-amber/15 text-accent-amber-bright"
+                        : "bg-pill-neutral-bg text-pill-neutral-text"
+                    }`}
+                  >
+                    {p.needs1099
+                      ? "1099-NEC due"
+                      : p.viaProcessor >= p.total - 0.005
+                        ? "Network reports it"
+                        : "Under $600"}
+                  </span>
+                </span>
+              </div>
+
+              {/* Only worth saying when the two numbers differ. Showing "of
+                  which $0 was via a network" on every line would bury the one
+                  payee where it actually changes the filing. */}
+              {p.viaProcessor > 0.005 && p.reportable > 0.005 && (
+                <p className={`${adminType.small} mt-0.5`}>
+                  {formatMoney(p.viaProcessor)} through a payment network, which reports it for you.
+                  Yours to report: {formatMoney(p.reportable)}.
+                </p>
+              )}
+              {p.unrecorded > 0.005 && (
+                <p className={`${adminType.small} mt-0.5 text-accent-amber-bright/80`}>
+                  No method recorded on {formatMoney(p.unrecorded)}, so it is counted as yours to
+                  report. Set it from Mark paid on the payments page.
+                </p>
+              )}
+            </div>
+          ))}
         </section>
       )}
 
