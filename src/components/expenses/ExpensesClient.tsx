@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, Plus, Trash2 } from "lucide-react";
+import { Download, Mail, Plus, Trash2 } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { formatMoney } from "@/lib/payments";
 import { EXPENSE_LABELS, SCHEDULE_C_LABEL, type ExpenseRow } from "@/lib/expenses";
@@ -18,6 +18,9 @@ type Candidate = {
   confidence: "high" | "medium" | "low";
   reason: string;
   include?: boolean;
+  /** Looks like an expense already recorded, usually a second email about one purchase. */
+  likelyDuplicate?: boolean;
+  duplicateOf?: string;
 };
 
 const inputClass =
@@ -109,7 +112,10 @@ export function ExpensesClient({
         setError(json.error ?? "Could not read the mail folder.");
         return;
       }
-      const found: Candidate[] = (json.receipts ?? []).map((r: Candidate) => ({ ...r, include: true }));
+      const found: Candidate[] = (json.receipts ?? []).map((r: Candidate) => ({
+        ...r,
+        include: !r.likelyDuplicate,
+      }));
       setCandidates(found);
       setScanNote(
         `Read ${json.scanned} email${json.scanned === 1 ? "" : "s"}` +
@@ -152,6 +158,25 @@ export function ExpensesClient({
     <div className="mx-auto max-w-[1000px]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={adminType.titleLg}>Expenses &amp; tax</h1>
+        <div className="flex items-center gap-2">
+          {/* Four files rather than one: income, expenses and contractor
+              totals are three different tables, and an accountant asked for
+              "the expenses" wants a sheet whose every row is an expense. */}
+          {[
+            { part: "summary", label: "Summary" },
+            { part: "income", label: "Income" },
+            { part: "expenses", label: "Expenses" },
+            { part: "contractors", label: "1099s" },
+          ].map(x => (
+            <a
+              key={x.part}
+              href={`/api/expenses/export?year=${year}&part=${x.part}`}
+              className="flex items-center gap-1 rounded-lg border border-surface-border px-2.5 py-2 text-[13px] text-text-body hover:border-accent-amber hover:text-text-primary"
+            >
+              <Download size={13} /> {x.label}
+            </a>
+          ))}
+        </div>
         <select
           value={year}
           onChange={e => router.push(`/expenses?year=${e.target.value}`)}
@@ -300,6 +325,12 @@ export function ExpensesClient({
                 className="min-w-[170px] flex-1 rounded-lg border border-surface-border bg-background px-2.5 py-1.5 text-sm text-text-primary focus:border-accent-amber focus:outline-none">
                 {EXPENSE_LABELS.map(o => <option key={o.label} value={o.label}>{o.label}</option>)}
               </select>
+              {c.likelyDuplicate && (
+                <span className="w-full text-[13px] text-accent-amber-bright">
+                  Already recorded? Matches {c.duplicateOf}. Unticked — tick it only if this is a
+                  separate purchase.
+                </span>
+              )}
               {c.confidence !== "high" && (
                 <span className="w-full text-[13px] text-accent-amber-bright">{c.reason || "Worth checking."}</span>
               )}

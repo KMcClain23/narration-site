@@ -165,11 +165,50 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: outcome.error }, { status: outcome.status });
   }
 
+  /**
+   * Flag a receipt that looks like one already recorded.
+   *
+   * Filtering by message id stops the same email importing twice, but a single
+   * purchase often arrives as two: an order confirmation and then a shipping
+   * receipt, from the same vendor, days apart, sometimes for slightly different
+   * amounts after a change. Both are receipts, and only one is an expense.
+   *
+   * Matched on vendor and nearness in time rather than on amount, because the
+   * amount is exactly what differs in the case worth catching. A genuine second
+   * purchase from the same vendor inside a month is flagged too — the cost of
+   * that is a tick box, against silently double-counting a cost.
+   */
+  const { data: existing } = await supabaseAdmin
+    .from("expenses")
+    .select("vendor, amount, incurred_on")
+    .gte("incurred_on", `${new Date().getFullYear() - 1}-01-01`);
+
+  const firstWord = (s: string) => s.trim().toLowerCase().split(/[\s,./]+/)[0] ?? "";
+  const DAYS_30 = 30 * 24 * 60 * 60 * 1000;
+
+  const receipts = (outcome.data.receipts ?? []).map(r => {
+    const match = (existing ?? []).find(e => {
+      const sameVendor = firstWord(e.vendor as string) === firstWord(r.vendor);
+      if (!sameVendor) return false;
+      const gap = Math.abs(
+        new Date(r.incurred_on).getTime() - new Date(e.incurred_on as string).getTime(),
+      );
+      return gap <= DAYS_30;
+    });
+
+    if (!match) return r;
+    return {
+      ...r,
+      likelyDuplicate: true,
+      duplicateOf: `${match.vendor} · ${match.incurred_on} · $${Number(match.amount).toFixed(2)}`,
+    };
+  });
+
   // Nothing is saved here. These are candidates for review, the same contract
   // the royalty importer keeps: money records are not written by a model
   // without someone having looked.
   return NextResponse.json({
-    receipts: outcome.data.receipts ?? [],
+    receipts,
     scanned: messages.length,
     alreadyImported: already.size,
     folder: folder.displayName,
