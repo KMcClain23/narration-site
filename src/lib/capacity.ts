@@ -235,10 +235,17 @@ export function fitBook(
   return { days, finishBy: days[days.length - 1].date, spareAfter, sharedDays };
 }
 
-/** Total free hours across the horizon, which is the headline number. */
+/**
+ * Total free hours across the horizon, which is the headline number.
+ *
+ * Weekdays only, with no exception for a weekend that already has work on it.
+ * Recording one Saturday because a book needed it does not turn every Saturday
+ * into available time, and counting them was inflating the one figure most
+ * likely to be used to say yes to something.
+ */
 export function totalFree(calendar: DayLoad[], availableDays: number[] = DEFAULT_AVAILABLE_DAYS): number {
   return calendar.reduce((sum, d) => {
     const dow = new Date(d.date + "T00:00:00").getDay();
-    return availableDays.includes(dow) || d.committed > 0.005 ? sum + d.free : sum;
+    return availableDays.includes(dow) ? sum + d.free : sum;
   }, 0);
 }

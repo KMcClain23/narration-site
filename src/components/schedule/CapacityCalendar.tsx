@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { parseLocalDate, toISODate } from "@/components/admin/board-card-utils";
@@ -55,6 +55,39 @@ function fmt(iso: string): string {
   return parseLocalDate(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+/** Every day from `a` to `b` inclusive, as ISO strings. */
+function range(a: string, b: string): string[] {
+  const out: string[] = [];
+  const end = parseLocalDate(b);
+  for (const d = parseLocalDate(a); d <= end; d.setDate(d.getDate() + 1)) out.push(toISODate(d));
+  return out;
+}
+
+/**
+ * The book's days after dragging one end of its run to `to`.
+ *
+ * Dragging outward fills in every day crossed, weekends included — a narrator
+ * stretching a run onto Saturday means Saturday, not "Saturday if it fits the
+ * usual pattern". Dragging inward drops the days beyond the new edge and keeps
+ * any gaps that were already in the middle of the run.
+ */
+function resize(dates: string[], edge: "start" | "end", to: string): string[] {
+  const sorted = [...dates].sort();
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+
+  if (edge === "end") {
+    if (to > last) return [...new Set([...sorted, ...range(last, to)])].sort();
+    const kept = sorted.filter(d => d <= to);
+    // Never leave a book with no days at all; one end has to survive.
+    return kept.length ? kept : [first];
+  }
+
+  if (to < first) return [...new Set([...range(to, first), ...sorted])].sort();
+  const kept = sorted.filter(d => d >= to);
+  return kept.length ? kept : [last];
+}
+
 export function CapacityCalendar({
   cards,
   initialBlocks,
@@ -80,9 +113,34 @@ export function CapacityCalendar({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Dates changed here, before the server has been told.
+   *
+   * The calendar has to redraw as the run is dragged, not after a round trip:
+   * the whole point of stretching a book onto another day is watching the
+   * hours per day fall as you do it.
+   */
+  const [edited, setEdited] = useState<Map<string, string[]>>(new Map());
+  // `next` lives on the ref rather than being read back out of state at commit
+  // time: pointerup can land before the last hover's render has settled, and a
+  // stale read would save the run one day short of where it was dropped.
+  const drag = useRef<{ id: string; edge: "start" | "end"; from: string[]; next: string[] } | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
+
+  const liveCards = useMemo(
+    () => cards.map(c => (edited.has(c.id) ? { ...c, recording_dates: edited.get(c.id)! } : c)),
+    [cards, edited],
+  );
+
+  const datesFor = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const c of liveCards) map.set(c.id, [...(c.recording_dates ?? [])].sort());
+    return map;
+  }, [liveCards]);
+
   const calendar = useMemo(
-    () => buildCalendar(cards, HORIZON_DAYS, capacity, today, blocks),
-    [cards, capacity, today, blocks],
+    () => buildCalendar(liveCards, HORIZON_DAYS, capacity, today, blocks),
+    [liveCards, capacity, today, blocks],
   );
   const byDate = useMemo(() => new Map(calendar.map(d => [d.date, d])), [calendar]);
 
@@ -109,6 +167,72 @@ export function CapacityCalendar({
     const d = new Date(cursor.y, cursor.m + delta, 1);
     setCursor({ y: d.getFullYear(), m: d.getMonth() });
   };
+
+  /** Grab one end of a book's run. Which end is decided by the day grabbed. */
+  function startResize(cardId: string, onDate: string) {
+    const dates = datesFor.get(cardId);
+    if (!dates?.length) return;
+    const edge: "start" | "end" =
+      onDate === dates[0] && onDate !== dates[dates.length - 1]
+        ? "start"
+        : onDate === dates[dates.length - 1]
+          ? "end"
+          : // Grabbed in the middle: move whichever end is nearer, so the drag
+            // goes the way the hand is already going.
+            Math.abs(+parseLocalDate(onDate) - +parseLocalDate(dates[0])) <
+              Math.abs(+parseLocalDate(onDate) - +parseLocalDate(dates[dates.length - 1]))
+            ? "start"
+            : "end";
+    drag.current = { id: cardId, edge, from: dates, next: dates };
+    setDragging(cardId);
+  }
+
+  function dragTo(iso: string) {
+    const d = drag.current;
+    if (!d) return;
+    if (iso < toISODate(today)) return;
+    const next = resize(d.from, d.edge, iso);
+    d.next = next;
+    setEdited(m => new Map(m).set(d.id, next));
+  }
+
+  const commitResize = useCallback(async () => {
+    const d = drag.current;
+    drag.current = null;
+    setDragging(null);
+    if (!d) return;
+
+    const next = d.next;
+    if (next.join() === d.from.join()) return;
+
+    try {
+      const res = await fetch("/api/board", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: d.id, recording_dates: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      // Put it back rather than leaving the screen claiming something the
+      // database does not agree with.
+      setEdited(m => {
+        const copy = new Map(m);
+        copy.set(d.id, d.from);
+        return copy;
+      });
+      setError("Could not save that change.");
+    }
+  }, []);
+
+  useEffect(() => {
+    const end = () => void commitResize();
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    return () => {
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+    };
+  }, [commitResize]);
 
   async function addBlock() {
     if (!picked) return;
@@ -220,7 +344,9 @@ export function CapacityCalendar({
           </button>
         </div>
 
-        <div className="grid grid-cols-7 gap-1">
+        {/* select-none so dragging a run does not highlight the date numbers;
+            touch-none so the same gesture on a phone does not scroll away. */}
+        <div className="grid touch-none select-none grid-cols-7 gap-1">
           {DOW.map(d => (
             <span key={d} className="pb-1 text-center text-[11px] text-text-faint">
               {d}
@@ -243,7 +369,13 @@ export function CapacityCalendar({
                 key={iso}
                 role="button"
                 tabIndex={0}
-                onClick={() => setPicked(p => (p === iso ? null : iso))}
+                onClick={() => {
+                  // A drag that ends on a cell must not also open the block
+                  // editor for that day.
+                  if (drag.current) return;
+                  setPicked(p => (p === iso ? null : iso));
+                }}
+                onPointerEnter={() => dragTo(iso)}
                 onKeyDown={e => {
                   if (e.key === "Enter" || e.key === " ") setPicked(p => (p === iso ? null : iso));
                 }}
@@ -278,26 +410,44 @@ export function CapacityCalendar({
 
                 {/* Which book, not just how much. Two fit legibly in a cell;
                     the rest are counted, and the tooltip has them all. */}
-                {day?.commitments.slice(0, 2).map(c => (
-                  <span key={c.id} className="mt-0.5 flex items-center gap-1">
-                    {/* A block is not a book, and reads as a bar rather than a
-                        dot so the difference survives a glance. */}
+                {day?.commitments.slice(0, 2).map(c => {
+                  // Only a book with real chosen dates can be dragged. One
+                  // whose hours are merely assumed has no run to take hold of.
+                  const draggable = !c.isBlock && (datesFor.get(c.id)?.length ?? 0) > 0;
+                  return (
                     <span
-                      className={`shrink-0 ${
-                        c.isBlock
-                          ? "h-1.5 w-1.5 rounded-[1px] bg-text-dim"
-                          : `h-1.5 w-1.5 rounded-full ${colorFor.get(c.id) ?? "bg-text-dim"}`
-                      }`}
-                    />
-                    <span
-                      className={`truncate text-[11px] leading-tight ${
-                        c.isBlock ? "text-text-muted italic" : "text-text-body"
-                      }`}
+                      key={c.id}
+                      onPointerDown={e => {
+                        if (!draggable) return;
+                        // The cell's own click opens the block editor; grabbing
+                        // a book is a different intent.
+                        e.stopPropagation();
+                        startResize(c.id, iso);
+                      }}
+                      title={draggable ? `Drag to change ${c.title}'s recording days` : undefined}
+                      className={`mt-0.5 flex items-center gap-1 ${
+                        draggable ? "cursor-ew-resize" : ""
+                      } ${dragging === c.id ? "opacity-70" : ""}`}
                     >
-                      {c.title}
+                      {/* A block is not a book, and reads as a bar rather than a
+                          dot so the difference survives a glance. */}
+                      <span
+                        className={`shrink-0 ${
+                          c.isBlock
+                            ? "h-1.5 w-1.5 rounded-[1px] bg-text-dim"
+                            : `h-1.5 w-1.5 rounded-full ${colorFor.get(c.id) ?? "bg-text-dim"}`
+                        }`}
+                      />
+                      <span
+                        className={`truncate text-[11px] leading-tight ${
+                          c.isBlock ? "text-text-muted italic" : "text-text-body"
+                        }`}
+                      >
+                        {c.title}
+                      </span>
                     </span>
-                  </span>
-                ))}
+                  );
+                })}
                 {day && books > 2 && (
                   <span className={`mt-0.5 block text-[11px] ${crowded ? "text-alert-red" : "text-text-faint"}`}>
                     +{books - 2} more
