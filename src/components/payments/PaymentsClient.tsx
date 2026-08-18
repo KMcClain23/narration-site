@@ -22,6 +22,7 @@ import {
 } from "@/lib/payments";
 import { PaymentFormModal } from "./PaymentFormModal";
 import { InvoiceButton } from "./InvoiceButton";
+import { MarkPaidButton } from "./MarkPaidButton";
 import { ImportDropZone } from "./ImportDropZone";
 import { RoyaltyLedger } from "./RoyaltyLedger";
 import { PayoutsPanel } from "./PayoutsPanel";
@@ -174,12 +175,20 @@ function ProjectRow({
 
           {primary ? (
             <>
+              {/* Awaiting means the invoice has gone out, so the thing to do
+                  next is record the money, not reissue the document. */}
+              {state === "awaiting" && primary.kind !== "royalty" && (
+                <MarkPaidButton payment={primary} card={card} rows={rows} />
+              )}
               {showInvoice && (
                 <InvoiceButton
                   payment={primary}
                   card={card}
                   rows={rows}
-                  label={state === "paid" ? "Invoice copy" : "Invoice"}
+                  // "Invoice copy" wherever one was actually raised, not only on
+                  // settled work: an awaiting row has already been sent, so the
+                  // action is reproducing it rather than creating one.
+                  label={wasInvoiced ? "Invoice copy" : "Invoice"}
                 />
               )}
               <button

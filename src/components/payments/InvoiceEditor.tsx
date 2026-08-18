@@ -427,7 +427,11 @@ export function InvoiceEditor({
     // a cancellation charge would read as tone-deaf.
     const opening = isPartial
       ? ""
-      : `${data.bookTitle} is finished! Thank you for trusting me with it, and I hope you love how it turned out.\n\n`;
+      // A closed statement, not an opening. "I hope you love how it turned
+      // out" invites a verdict, and invites it in the same breath as asking to
+      // be paid — the one message where a reply beginning "well, actually"
+      // costs money.
+      : `${data.bookTitle} is finished! Thank you for trusting me with it, and it was a pleasure working with you.\n\n`;
 
     setSendMessage(
       `Hi ${firstName},\n\n` +
