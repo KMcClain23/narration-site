@@ -13,7 +13,6 @@ import {
   type Urgency,
   type BoardV2Card,
 } from "./board-card-utils";
-import { useRecordingDays } from "@/lib/recording-days";
 
 // The visual content shared by desktop's BoardCard (drag + mouse long-press)
 // and mobile's MobileBoardCard (swipe + touch long-press) — the two own
@@ -50,7 +49,6 @@ export function BoardCardContent({
   onToggleFirst15: (id: string, complete: boolean) => void;
 }) {
   const coNarrators = parseCoNarrators(card.co_narrator);
-  const recordingDays = useRecordingDays();
   const showFormatPill = card.narration_format && card.narration_format !== "solo";
 
   return (
@@ -139,7 +137,7 @@ export function BoardCardContent({
               card.narration_format,
               card.narrator_share_percent,
               card.deadline,
-              recordingDays,
+              { dates: card.recording_dates },
             );
             if (!plan) return " ";
             return (

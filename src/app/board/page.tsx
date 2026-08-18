@@ -210,6 +210,9 @@ export default function BoardV2Page() {
         is_confidential: updated.is_confidential,
         narration_format: updated.narration_format,
         narrator_share_percent: updated.narrator_share_percent,
+        // Carried through so a card's booth load updates the moment the
+        // calendar is saved, without waiting for a board refetch.
+        recording_dates: updated.recording_dates,
         created_at: updated.created_at,
       };
       return idx === -1 ? [...prev, projected] : prev.map((c, i) => (i === idx ? projected : c));

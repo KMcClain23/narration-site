@@ -180,7 +180,7 @@ export async function PUT(req: Request) {
       "word_count", "first15_due", "pfh_rate", "payment_type",
       "first_15_complete", "script_url", "trigger_warnings", "released_at",
       "is_confidential", "narration_format", "narrator_share_percent", "production_type", "production_company",
-      "archived_at", "archived_reason", "archived_notes",
+      "archived_at", "archived_reason", "archived_notes", "recording_dates",
     ];
     const DATE_FIELDS = new Set(["deadline", "first15_due", "first_15_due", "released_at", "archived_at"]);
 

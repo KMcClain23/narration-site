@@ -802,3 +802,14 @@ create policy editors_service_role on editors
 insert into editors (name, email, venmo, role)
 select 'Marizete', 'marizete.gp@gmail.com', '@Marizete-Garcia', 'editor'
 where not exists (select 1 from editors where lower(name) = 'marizete');
+
+-- ---------------------------------------------------------------------------
+-- The specific days a book gets recorded on.
+--
+-- A weekly pattern could not answer the question that matters: this week has a
+-- conference in it, that one does not. Real dates can, and they belong to the
+-- book rather than to the narrator, because the answer changes per deadline.
+--
+-- jsonb array of "YYYY-MM-DD" strings. Empty means nothing has been chosen and
+-- the display falls back to counting weekdays, which is where it started.
+alter table board_cards add column if not exists recording_dates jsonb not null default '[]'::jsonb;

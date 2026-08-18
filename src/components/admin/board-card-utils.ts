@@ -95,6 +95,25 @@ export function recordingDaysBetween(from: Date, to: Date, days: number[] = DEFA
   return count;
 }
 
+/**
+ * When the recording actually happens.
+ *
+ * Dates win when there are any: a pattern says "Tuesdays", which cannot know
+ * that one of those Tuesdays is a holiday. The pattern remains as the answer
+ * for a book nobody has scheduled yet.
+ */
+export type RecordingSchedule = {
+  dates?: string[] | null;
+  pattern?: number[];
+};
+
+/** "YYYY-MM-DD" for a local date, which is how these are stored and compared. */
+export function toISODate(d: Date): string {
+  const m = `${d.getMonth() + 1}`.padStart(2, "0");
+  const day = `${d.getDate()}`.padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
 export type NarrationPlan = {
   /** Hours at the mic for this narrator's share of the manuscript. */
   hours: number;
@@ -118,7 +137,7 @@ export function narrationPlan(
   narrationFormat: string | null,
   narratorSharePercent: number | null,
   deadline: string | null,
-  recordingDays: number[] = DEFAULT_DAYS,
+  schedule: RecordingSchedule = {},
   today: Date = new Date(),
 ): NarrationPlan | null {
   if (!wordCount || wordCount <= 0) return null;
@@ -126,13 +145,24 @@ export function narrationPlan(
   if (share == null) return null;
 
   const hours = (wordCount * share) / WORDS_PER_NARRATION_HOUR;
+  const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayISO = toISODate(midnight);
+  const chosen = schedule.dates ?? [];
+
+  // Dates that have not happened yet. A day already recorded is not a day the
+  // remaining work can be spread over, whether or not it was used.
+  if (chosen.length) {
+    const ahead = chosen.filter(d => d >= todayISO && (!deadline || d <= deadline));
+    if (ahead.length === 0) return { hours, daysLeft: 0, hoursPerDay: null, overdue: true };
+    return { hours, daysLeft: ahead.length, hoursPerDay: hours / ahead.length, overdue: false };
+  }
+
   if (!deadline) return { hours, daysLeft: null, hoursPerDay: null, overdue: false };
 
   const due = parseLocalDate(deadline);
-  const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   if (due < midnight) return { hours, daysLeft: 0, hoursPerDay: null, overdue: true };
 
-  const daysLeft = recordingDaysBetween(midnight, due, recordingDays);
+  const daysLeft = recordingDaysBetween(midnight, due, schedule.pattern ?? DEFAULT_DAYS);
   // A deadline can fall inside a stretch with no recording day in it at all —
   // a Sunday deadline for someone who records weekdays only. Dividing by zero
   // there would read as Infinity hours a day.
@@ -188,6 +218,8 @@ export type BoardV2Card = {
   is_confidential: boolean;
   narration_format: string | null;
   narrator_share_percent: number | null;
+  /** Chosen recording days, "YYYY-MM-DD". Empty means none picked yet. */
+  recording_dates: string[] | null;
   created_at: string;
 };
 

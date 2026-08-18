@@ -17,8 +17,7 @@ import {
   parseCoNarrators,
   WORDS_PER_NARRATION_HOUR,
 } from "@/components/admin/board-card-utils";
-import { RecordingDaysPicker } from "@/components/admin/RecordingDaysPicker";
-import { useRecordingDays } from "@/lib/recording-days";
+import { RecordingCalendar } from "@/components/admin/RecordingCalendar";
 import { CardPaymentsPanel } from "@/components/payments/CardPaymentsPanel";
 import type { NarrationFormat, ArchivedReason } from "@/types/book";
 
@@ -36,6 +35,8 @@ export type FullBoardCard = {
   author_notes: string;
   narration_format: NarrationFormat | null;
   narrator_share_percent: number | null;
+  /** Days chosen on the calendar, "YYYY-MM-DD". Empty until one is picked. */
+  recording_dates: string[];
   is_confidential: boolean;
   deadline: string;
   released_at: string;
@@ -71,6 +72,7 @@ function mapToFullBoardCard(row: Record<string, unknown>): FullBoardCard {
     author_notes: (row.author_notes as string) ?? "",
     narration_format: (row.narration_format as NarrationFormat) ?? null,
     narrator_share_percent: (row.narrator_share_percent as number) ?? null,
+    recording_dates: Array.isArray(row.recording_dates) ? (row.recording_dates as string[]) : [],
     is_confidential: Boolean(row.is_confidential),
     deadline: (row.deadline as string) ?? "",
     // Stored as a timestamp; the date input needs YYYY-MM-DD.
@@ -102,7 +104,7 @@ function mapToFullBoardCard(row: Record<string, unknown>): FullBoardCard {
 function blankCard(): FullBoardCard {
   return {
     id: "", created_at: "", title: "", subtitle: "", cover_url: "", author: "", co_narrator: "",
-    author_notes: "", narration_format: null, narrator_share_percent: null, is_confidential: false, deadline: "", released_at: "", status: "contracted",
+    author_notes: "", narration_format: null, narrator_share_percent: null, recording_dates: [], is_confidential: false, deadline: "", released_at: "", status: "contracted",
     word_count: 0, payment_type: "pfh", pfh_rate: 0, first15_due: "", first_15_complete: false,
     production_type: null, production_company: null, description: "", tags: [], trigger_warnings: [],
     audible_link: "", ar_link: "", spotify_link: "", script_url: "",
@@ -229,9 +231,6 @@ export function CardEditModal(props: CardEditModalProps) {
   const [loading, setLoading] = useState(mode === "edit");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<FullBoardCard | null>(mode === "create" ? blankCard() : null);
-  // Read at the top level, not inside renderProductionTab: that function returns
-  // early when there is no form, which would make the hook conditional.
-  const recordingDays = useRecordingDays();
   const [savedForm, setSavedForm] = useState<FullBoardCard | null>(mode === "create" ? blankCard() : null);
   const [activeTab, setActiveTab] = useState<TabId>("details");
   const [saving, setSaving] = useState(false);
@@ -757,7 +756,7 @@ export function CardEditModal(props: CardEditModalProps) {
       form.narration_format,
       form.narrator_share_percent,
       form.deadline || null,
-      recordingDays,
+      { dates: form.recording_dates },
     );
 
     return (
@@ -977,12 +976,18 @@ export function CardEditModal(props: CardEditModalProps) {
             </p>
           )}
 
-          {/* The days themselves, right beside the number they divide. A
-              narrator who records Saturdays has more room than one who does
-              not, and this is where that stops being an assumption. */}
+          {/* The days themselves, right beside the number they divide. Every
+              date added or removed re-divides the hours as it is clicked, which
+              is the question actually being asked: does another book fit around
+              this one. */}
           <div className="mt-3 border-t border-surface-border pt-3">
             <p className={`${adminType.label} mb-1.5`}>Days I record</p>
-            <RecordingDaysPicker />
+            <RecordingCalendar
+              value={form.recording_dates}
+              onChange={dates => setForm(p => (p ? { ...p, recording_dates: dates } : p))}
+              deadline={form.deadline || null}
+              hours={plan?.hours ?? 0}
+            />
           </div>
         </div>
 
