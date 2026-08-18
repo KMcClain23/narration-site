@@ -88,7 +88,11 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`shrink-0 min-h-screen sticky top-0 flex flex-col bg-surface border-r border-surface-border transition-[width] duration-150 ${
+      // self-start and h-screen are what make sticky work at all. As a flex
+      // item it was stretching to the full height of the page, and an element
+      // as tall as its containing block has nowhere to slide, so `sticky` sat
+      // there doing nothing on every long admin page.
+      className={`shrink-0 self-start sticky top-0 h-screen flex flex-col bg-surface border-r border-surface-border transition-[width] duration-150 ${
         collapsed ? "w-14" : "w-60"
       }`}
     >

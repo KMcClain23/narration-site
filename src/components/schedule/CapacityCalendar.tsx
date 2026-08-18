@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { parseLocalDate, toISODate } from "@/components/admin/board-card-utils";
 import {
@@ -9,7 +9,9 @@ import {
   fitBook,
   totalFree,
   DEFAULT_DAILY_CAPACITY,
+  MAX_BOOKS_PER_DAY,
   type CapacityCard,
+  type TimeBlock,
 } from "@/lib/capacity";
 
 /**
@@ -25,6 +27,23 @@ import {
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const HORIZON_DAYS = 120;
 
+/**
+ * One colour per book, so a day reads without being hovered.
+ *
+ * Complete class strings, not built at runtime: Tailwind's scanner only sees
+ * literals, and a class assembled from a variable never gets compiled.
+ */
+const BOOK_COLORS = [
+  "bg-sky-400",
+  "bg-emerald-400",
+  "bg-violet-400",
+  "bg-rose-400",
+  "bg-amber-400",
+  "bg-teal-400",
+  "bg-fuchsia-400",
+  "bg-lime-400",
+] as const;
+
 /** Book sizes worth asking about, in hours at the mic. */
 const SIZES = [5, 10, 20];
 
@@ -36,7 +55,13 @@ function fmt(iso: string): string {
   return parseLocalDate(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export function CapacityCalendar({ cards }: { cards: CapacityCard[] }) {
+export function CapacityCalendar({
+  cards,
+  initialBlocks,
+}: {
+  cards: CapacityCard[];
+  initialBlocks: TimeBlock[];
+}) {
   const today = useMemo(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -46,11 +71,28 @@ export function CapacityCalendar({ cards }: { cards: CapacityCard[] }) {
   const [asking, setAsking] = useState<number | null>(null);
   const [cursor, setCursor] = useState(() => ({ y: today.getFullYear(), m: today.getMonth() }));
 
+  // Held locally and updated optimistically: adding a block should redraw the
+  // day under the cursor, not wait for a round trip and a page refresh.
+  const [blocks, setBlocks] = useState<TimeBlock[]>(initialBlocks);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [blockHours, setBlockHours] = useState("1");
+  const [blockLabel, setBlockLabel] = useState("Pickups");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const calendar = useMemo(
-    () => buildCalendar(cards, HORIZON_DAYS, capacity, today),
-    [cards, capacity, today],
+    () => buildCalendar(cards, HORIZON_DAYS, capacity, today, blocks),
+    [cards, capacity, today, blocks],
   );
   const byDate = useMemo(() => new Map(calendar.map(d => [d.date, d])), [calendar]);
+
+  // Assigned once from the card list rather than per day, so a book keeps the
+  // same colour across every month it appears in.
+  const colorFor = useMemo(() => {
+    const map = new Map<string, string>();
+    cards.forEach((c, i) => map.set(c.id, BOOK_COLORS[i % BOOK_COLORS.length]));
+    return map;
+  }, [cards]);
 
   const free = totalFree(calendar);
   const fit = asking ? fitBook(asking, calendar) : null;
@@ -67,6 +109,45 @@ export function CapacityCalendar({ cards }: { cards: CapacityCard[] }) {
     const d = new Date(cursor.y, cursor.m + delta, 1);
     setCursor({ y: d.getFullYear(), m: d.getMonth() });
   };
+
+  async function addBlock() {
+    if (!picked) return;
+    const hours = Number(blockHours);
+    if (!Number.isFinite(hours) || hours <= 0) {
+      setError("Hours must be more than zero.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/time-blocks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ on_date: picked, hours, label: blockLabel.trim() || "Pickups" }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(json?.error ?? "Could not add it.");
+        return;
+      }
+      setBlocks(b => [...b, json.block]);
+      setPicked(null);
+    } catch {
+      setError("Could not add it.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeBlock(id: string) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/time-blocks?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (res.ok) setBlocks(b => b.filter(x => x.id !== id));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="rounded-xl border border-surface-border">
@@ -113,8 +194,11 @@ export function CapacityCalendar({ cards }: { cards: CapacityCard[] }) {
               <span className="text-text-body">
                 Yes, finished by {fmt(fit.finishBy)}
               </span>{" "}
-              over {fit.days.length} day{fit.days.length === 1 ? "" : "s"}, leaving{" "}
-              {fit.spareAfter.toFixed(0)} hrs spare
+              over {fit.days.length} day{fit.days.length === 1 ? "" : "s"}
+              {/* Said plainly, because it is the part worth arguing with. */}
+              {fit.sharedDays > 0
+                ? `, sharing ${fit.sharedDays} of them with another book`
+                : ", every day to itself"}
             </span>
           ) : (
             <span className={`${adminType.small} ml-1 text-alert-red`}>
@@ -148,33 +232,76 @@ export function CapacityCalendar({ cards }: { cards: CapacityCard[] }) {
             const day = byDate.get(iso);
             const proposed = fitDays.get(iso);
             const committed = day?.committed ?? 0;
+            const books = day?.commitments.length ?? 0;
+            // Two things can be wrong with a day, and they are different
+            // problems: out of hours, or too many books in it.
             const full = day ? day.free <= 0.005 : false;
+            const crowded = books > MAX_BOOKS_PER_DAY;
 
             return (
               <div
                 key={iso}
+                role="button"
+                tabIndex={0}
+                onClick={() => setPicked(p => (p === iso ? null : iso))}
+                onKeyDown={e => {
+                  if (e.key === "Enter" || e.key === " ") setPicked(p => (p === iso ? null : iso));
+                }}
                 title={
                   day?.commitments.length
                     ? day.commitments.map(c => `${c.title}: ${c.hours.toFixed(1)} hrs`).join("\n")
                     : undefined
                 }
-                className={`min-h-[52px] rounded-md border px-1.5 py-1 ${
-                  proposed
+                className={`min-h-[64px] cursor-pointer rounded-md border px-1.5 py-1 ${
+                  picked === iso
+                    ? "border-accent-amber-bright bg-surface-raised"
+                    : proposed
                     ? "border-accent-amber bg-accent-amber/15"
-                    : full
-                      ? "border-alert-red/30 bg-alert-red/5"
-                      : committed > 0.005
-                        ? "border-surface-border bg-surface"
-                        : "border-transparent"
+                    : crowded
+                      ? "border-alert-red/40 bg-alert-red/5"
+                      : full
+                        ? "border-alert-red/30 bg-alert-red/5"
+                        : committed > 0.005
+                          ? "border-surface-border bg-surface"
+                          : "border-transparent"
                 } ${!day ? "opacity-40" : ""}`}
               >
-                <span className="text-[12px] text-text-muted">{Number(iso.slice(8, 10))}</span>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[12px] text-text-muted">{Number(iso.slice(8, 10))}</span>
+                  {committed > 0.005 && (
+                    <span className={`text-[11px] ${full ? "text-alert-red" : "text-text-dim"}`}>
+                      {committed.toFixed(1)}
+                      {day?.assumed && <span className="text-text-faint">*</span>}
+                    </span>
+                  )}
+                </div>
 
-                {committed > 0.005 && (
-                  <p className={`text-[12px] leading-tight ${full ? "text-alert-red" : "text-text-body"}`}>
-                    {committed.toFixed(1)}
-                    {day?.assumed && <span className="text-text-faint">*</span>}
-                  </p>
+                {/* Which book, not just how much. Two fit legibly in a cell;
+                    the rest are counted, and the tooltip has them all. */}
+                {day?.commitments.slice(0, 2).map(c => (
+                  <span key={c.id} className="mt-0.5 flex items-center gap-1">
+                    {/* A block is not a book, and reads as a bar rather than a
+                        dot so the difference survives a glance. */}
+                    <span
+                      className={`shrink-0 ${
+                        c.isBlock
+                          ? "h-1.5 w-1.5 rounded-[1px] bg-text-dim"
+                          : `h-1.5 w-1.5 rounded-full ${colorFor.get(c.id) ?? "bg-text-dim"}`
+                      }`}
+                    />
+                    <span
+                      className={`truncate text-[11px] leading-tight ${
+                        c.isBlock ? "text-text-muted italic" : "text-text-body"
+                      }`}
+                    >
+                      {c.title}
+                    </span>
+                  </span>
+                ))}
+                {day && books > 2 && (
+                  <span className={`mt-0.5 block text-[11px] ${crowded ? "text-alert-red" : "text-text-faint"}`}>
+                    +{books - 2} more
+                  </span>
                 )}
                 {/* The proposed book, shown on the days it would actually use
                     rather than as a total somewhere else. */}
@@ -188,9 +315,78 @@ export function CapacityCalendar({ cards }: { cards: CapacityCard[] }) {
           })}
         </div>
 
+        {/* Pickups, retakes, a day that is simply gone. None of it comes from
+            a word count, so without this the calendar promised hours that were
+            already spoken for. */}
+        {picked && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-surface-border bg-surface px-3 py-2">
+            <span className={adminType.small}>Block time on {fmt(picked)}</span>
+            <input
+              type="number"
+              min={0.5}
+              step={0.5}
+              value={blockHours}
+              onChange={e => setBlockHours(e.target.value)}
+              className="w-16 rounded-md border border-surface-border bg-background px-2 py-1 text-[13px] text-text-primary focus:border-accent-amber focus:outline-none"
+            />
+            <span className={adminType.small}>hrs</span>
+            <input
+              value={blockLabel}
+              onChange={e => setBlockLabel(e.target.value)}
+              placeholder="What for"
+              className="w-40 rounded-md border border-surface-border bg-background px-2 py-1 text-[13px] text-text-primary placeholder:text-text-dim focus:border-accent-amber focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => void addBlock()}
+              disabled={busy}
+              className="rounded-md bg-accent-amber px-2.5 py-1 text-[13px] font-medium text-background hover:bg-accent-amber-bright disabled:opacity-50"
+            >
+              {busy ? "…" : "Add"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPicked(null)}
+              className="text-[13px] text-text-muted hover:text-text-primary"
+            >
+              Cancel
+            </button>
+            {error && <span className="text-[13px] text-alert-red">{error}</span>}
+          </div>
+        )}
+
+        {blocks.length > 0 && (
+          <div className="mt-3">
+            <p className={`${adminType.label} mb-1`}>Blocked time</p>
+            <div className="flex flex-wrap gap-1.5">
+              {[...blocks]
+                .sort((a, b) => a.on_date.localeCompare(b.on_date))
+                .map(b => (
+                  <span
+                    key={b.id}
+                    className="flex items-center gap-1.5 rounded-md border border-surface-border px-2 py-1 text-[12px] text-text-muted"
+                  >
+                    {fmt(b.on_date)} · {Number(b.hours)} hrs · {b.label}
+                    <button
+                      type="button"
+                      onClick={() => void removeBlock(b.id)}
+                      disabled={busy}
+                      aria-label={`Remove ${b.label} on ${fmt(b.on_date)}`}
+                      className="text-text-dim hover:text-alert-red disabled:opacity-50"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+            </div>
+          </div>
+        )}
+
         <p className={`${adminType.small} mt-3`}>
-          Numbers are hours already committed that day. An asterisk means the book has no chosen
-          recording days yet, so its hours are spread across weekdays to its deadline.
+          Click any day to block time on it. Numbers are hours already committed that day. An asterisk means the book has no chosen
+          recording days yet, so its hours are spread across weekdays to its deadline. A new book
+          is placed on empty days first and never on a day already holding {MAX_BOOKS_PER_DAY};
+          days in red hold more than that already.
         </p>
       </div>
     </div>

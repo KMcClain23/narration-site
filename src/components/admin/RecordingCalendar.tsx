@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { parseLocalDate, toISODate } from "./board-card-utils";
@@ -66,6 +66,41 @@ export function RecordingCalendar({
     onChange(selected.has(iso) ? value.filter(d => d !== iso) : [...value, iso].sort());
   };
 
+  /**
+   * Drag across days to add or remove a run of them.
+   *
+   * The mode is decided by the day the drag starts on: begin on an empty day
+   * and the drag adds, begin on a chosen one and it clears. That makes one
+   * gesture both "book this week" and "I am away that week", which is how the
+   * question actually arrives.
+   */
+  const dragMode = useRef<"add" | "remove" | null>(null);
+
+  const apply = useCallback(
+    (iso: string) => {
+      const mode = dragMode.current;
+      if (!mode) return;
+      const has = selected.has(iso);
+      if (mode === "add" && !has) onChange([...value, iso].sort());
+      else if (mode === "remove" && has) onChange(value.filter(d => d !== iso));
+    },
+    [onChange, selected, value],
+  );
+
+  // Released anywhere, not just over the grid: a drag that ends off the
+  // calendar must not leave the next hover still painting days.
+  useEffect(() => {
+    const end = () => {
+      dragMode.current = null;
+    };
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    return () => {
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+    };
+  }, []);
+
   const step = (delta: number) => {
     const d = new Date(cursor.y, cursor.m + delta, 1);
     setCursor({ y: d.getFullYear(), m: d.getMonth() });
@@ -105,7 +140,9 @@ export function RecordingCalendar({
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      {/* select-none so dragging paints days instead of highlighting numbers;
+          touch-none so the same gesture on a phone does not scroll the page. */}
+      <div className="grid touch-none select-none grid-cols-7 gap-1">
         {DOW.map(d => (
           <span key={d} className="pb-1 text-center text-[11px] text-text-faint">
             {d}
@@ -123,6 +160,15 @@ export function RecordingCalendar({
               key={iso}
               type="button"
               onClick={() => toggle(iso)}
+              onPointerDown={() => {
+                if (past) return;
+                dragMode.current = selected.has(iso) ? "remove" : "add";
+              }}
+              // Enter rather than move: one event per day crossed, so a fast
+              // drag cannot skip a cell or fire fifty times inside one.
+              onPointerEnter={() => {
+                if (!past) apply(iso);
+              }}
               disabled={past}
               aria-pressed={on}
               title={isDeadline ? "Deadline" : beyond ? "After the deadline" : undefined}

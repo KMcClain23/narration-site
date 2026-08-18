@@ -813,3 +813,30 @@ where not exists (select 1 from editors where lower(name) = 'marizete');
 -- jsonb array of "YYYY-MM-DD" strings. Empty means nothing has been chosen and
 -- the display falls back to counting weekdays, which is where it started.
 alter table board_cards add column if not exists recording_dates jsonb not null default '[]'::jsonb;
+
+-- ---------------------------------------------------------------------------
+-- Time at the mic that is not narrating a manuscript.
+--
+-- Pickups, retakes, a demo, an audition, a day that is simply not available.
+-- None of it comes from a word count, so none of it was visible in the
+-- capacity calendar, which meant the calendar quietly promised hours that were
+-- already spoken for.
+--
+-- card_id is optional and deliberately not a hard requirement: pickups usually
+-- belong to a book, a dentist appointment does not.
+create table if not exists time_blocks (
+  id         uuid        primary key default gen_random_uuid(),
+  on_date    date        not null,
+  hours      numeric(5,2) not null default 1,
+  label      text        not null default '',
+  card_id    uuid        references board_cards(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists time_blocks_date_idx on time_blocks (on_date);
+
+alter table time_blocks enable row level security;
+
+drop policy if exists time_blocks_service_role on time_blocks;
+create policy time_blocks_service_role on time_blocks
+  for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');

@@ -17,6 +17,16 @@ import { narrationPlan, toISODate, type RecordingSchedule } from "@/components/a
 /** A working day at the mic. Long enough to be real, short enough to survive. */
 export const DEFAULT_DAILY_CAPACITY = 6;
 
+/**
+ * Books at the mic in one day: never more than two, ideally one.
+ *
+ * Not a capacity question. Two books in a day means two voices, two accents
+ * and two continuity threads, and the cost of the switch is real even when the
+ * hours fit comfortably. So the cap is hard and one is preferred, which is why
+ * fitting a new book fills empty days before it doubles anything up.
+ */
+export const MAX_BOOKS_PER_DAY = 2;
+
 /** Days a new book could be scheduled on, when no day is already committed. */
 const DEFAULT_AVAILABLE_DAYS = [1, 2, 3, 4, 5];
 
@@ -30,10 +40,22 @@ export type CapacityCard = {
   recording_dates: string[] | null;
 };
 
+/** Booth time that is not narrating a manuscript. */
+export type TimeBlock = {
+  id: string;
+  on_date: string;
+  hours: number;
+  label: string;
+  card_id: string | null;
+};
+
 export type DayLoad = {
   date: string;
-  /** Hours already spoken for, by book. */
-  commitments: { id: string; title: string; hours: number }[];
+  /**
+   * Hours already spoken for. Books and blocks both land here, because an hour
+   * of pickups costs the day exactly what an hour of narrating does.
+   */
+  commitments: { id: string; title: string; hours: number; isBlock?: boolean }[];
   committed: number;
   /** capacity − committed, never below zero. */
   free: number;
@@ -78,6 +100,7 @@ export function buildCalendar(
   horizonDays: number,
   dailyCapacity: number = DEFAULT_DAILY_CAPACITY,
   today: Date = new Date(),
+  blocks: TimeBlock[] = [],
 ): DayLoad[] {
   const horizon = eachDay(today, horizonDays);
   const byDate = new Map<string, DayLoad>(
@@ -108,6 +131,23 @@ export function buildCalendar(
     }
   }
 
+  // Blocks after books, so a day's hours are the sum of both. They do not count
+  // toward the two-book limit: pickups are not a second book to keep in your
+  // head, they are the same book or no book at all.
+  for (const block of blocks) {
+    const day = byDate.get(block.on_date);
+    if (!day) continue;
+    const hours = Number(block.hours) || 0;
+    if (hours <= 0) continue;
+    day.commitments.push({
+      id: block.id,
+      title: block.label || "Blocked",
+      hours,
+      isBlock: true,
+    });
+    day.committed += hours;
+  }
+
   for (const day of byDate.values()) {
     day.free = Math.max(0, dailyCapacity - day.committed);
   }
@@ -121,44 +161,78 @@ export type Fit = {
   finishBy: string;
   /** Free hours still left across the horizon after fitting it. */
   spareAfter: number;
+  /** Days where this would sit alongside another book, which is the compromise. */
+  sharedDays: number;
 };
 
 /**
  * Where a book of `hours` would go, taken earliest-first.
  *
- * Greedy on purpose. A narrator wants to know the soonest it can be done, not
- * the most elegant arrangement, and filling from today gives the earliest
- * honest finish date. Days already carrying work stay available up to capacity,
- * because a day at the mic is a day at the mic.
+ * Two passes, not one. The first fills days with nothing else on them, which
+ * respects the preference for a single book at a time; only if that is not
+ * enough does the second pass double up on days already carrying one. Days
+ * already at the two-book limit are never offered.
+ *
+ * Within each pass it is greedy from today, because the question is the
+ * soonest it can be done, not the most elegant arrangement. The cost of the
+ * preference is an honest one: the finish date can land later than it would if
+ * every free hour were fair game.
  */
+/** Manuscripts on a day, ignoring pickups and other blocked time. */
+export function booksOn(day: DayLoad): number {
+  return day.commitments.filter(c => !c.isBlock).length;
+}
+
 export function fitBook(
   hours: number,
   calendar: DayLoad[],
   availableDays: number[] = DEFAULT_AVAILABLE_DAYS,
+  maxBooksPerDay: number = MAX_BOOKS_PER_DAY,
 ): Fit | null {
   if (hours <= 0) return null;
 
-  let remaining = hours;
-  const days: { date: string; hours: number }[] = [];
-
-  for (const day of calendar) {
-    if (remaining <= 0.005) break;
+  const usable = (day: DayLoad) => {
     const dow = new Date(day.date + "T00:00:00").getDay();
     // A day that already has work on it is a day being recorded, whatever the
     // usual pattern says.
-    const usable = availableDays.includes(dow) || day.committed > 0.005;
-    if (!usable || day.free <= 0.005) continue;
+    return (availableDays.includes(dow) || day.committed > 0.005) && day.free > 0.005;
+  };
 
-    const take = Math.min(day.free, remaining);
-    days.push({ date: day.date, hours: take });
-    remaining -= take;
+  let remaining = hours;
+  const taken = new Map<string, number>();
+
+  for (const pass of [0, 1]) {
+    for (const day of calendar) {
+      if (remaining <= 0.005) break;
+      if (!usable(day)) continue;
+      // Pass 0: days this book would have to itself. Pass 1: days with exactly
+      // one book already, up to the cap. Blocks are excluded from the count —
+      // a morning of pickups does not make the day a two-book day.
+      const books = booksOn(day);
+      if (pass === 0 ? books !== 0 : books === 0 || books >= maxBooksPerDay) continue;
+
+      const take = Math.min(day.free, remaining);
+      taken.set(day.date, take);
+      remaining -= take;
+    }
+    if (remaining <= 0.005) break;
   }
 
   if (remaining > 0.005) return null;
 
-  const used = new Map(days.map(d => [d.date, d.hours]));
-  const spareAfter = calendar.reduce((sum, d) => sum + Math.max(0, d.free - (used.get(d.date) ?? 0)), 0);
-  return { days, finishBy: days[days.length - 1].date, spareAfter };
+  const byDate = new Map(calendar.map(d => [d.date, d]));
+  const days = [...taken.entries()]
+    .map(([date, hrs]) => ({ date, hours: hrs }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const sharedDays = days.filter(d => {
+    const day = byDate.get(d.date);
+    return day ? booksOn(day) > 0 : false;
+  }).length;
+  const spareAfter = calendar.reduce(
+    (sum, d) => sum + Math.max(0, d.free - (taken.get(d.date) ?? 0)),
+    0,
+  );
+  return { days, finishBy: days[days.length - 1].date, spareAfter, sharedDays };
 }
 
 /** Total free hours across the horizon, which is the headline number. */

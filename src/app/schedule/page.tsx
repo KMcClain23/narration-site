@@ -6,7 +6,7 @@ import { BookingWindowPicker } from "@/components/schedule/BookingWindowPicker";
 import { MonthlyScheduleGrid } from "@/components/schedule/MonthlyScheduleGrid";
 import { DueSoonSection } from "@/components/schedule/DueSoonSection";
 import { CapacityCalendar } from "@/components/schedule/CapacityCalendar";
-import type { CapacityCard } from "@/lib/capacity";
+import type { CapacityCard, TimeBlock } from "@/lib/capacity";
 import { assertAdmin } from "@/lib/require-admin";
 
 // Same "active work" definition /api/board-v2/cards encodes (equivalent to
@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SchedulePage() {
   await assertAdmin();
-  const [settingsRes, cardsRes] = await Promise.all([
+  const [settingsRes, cardsRes, blocksRes] = await Promise.all([
     supabaseAdmin
       .from("site_settings")
       .select("key, value")
@@ -35,7 +35,18 @@ export default async function SchedulePage() {
       .select("id, title, author, cover_url, deadline, status, word_count, narration_format, narrator_share_percent, recording_dates")
       .in("status", ACTIVE_STATUSES)
       .is("archived_at", null),
+    // Only what is still ahead: the calendar starts today, so blocks behind it
+    // would be fetched and thrown away.
+    supabaseAdmin
+      .from("time_blocks")
+      .select("id, on_date, hours, label, card_id")
+      .gte("on_date", new Date().toISOString().slice(0, 10)),
   ]);
+
+  const blocks: TimeBlock[] = ((blocksRes.data ?? []) as TimeBlock[]).map(b => ({
+    ...b,
+    hours: Number(b.hours) || 0,
+  }));
 
   const settingsByKey = new Map((settingsRes.data ?? []).map(r => [r.key, r.value]));
   const acceptingProjects = settingsByKey.get("accepting_projects") !== "false";
@@ -97,7 +108,7 @@ export default async function SchedulePage() {
         <section className="mt-8">
           <h2 className={adminType.titleLg}>Where the time is</h2>
           <div className="mt-4">
-            <CapacityCalendar cards={capacityCards} />
+            <CapacityCalendar cards={capacityCards} initialBlocks={blocks} />
           </div>
         </section>
 
