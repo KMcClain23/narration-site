@@ -697,3 +697,45 @@ alter table payments add column if not exists payment_links_closed_at timestampt
 -- ============================================================
 
 alter table payments add column if not exists invoice_draft jsonb;
+
+-- ============================================================
+-- Stage 10: expenses
+--
+-- Business expenses tracked through the year, so the tax report is a query
+-- rather than an evening with a shoebox.
+--
+-- Two category columns on purpose. `label` is what the expense is in plain
+-- terms — "studio gear", "coaching" — and `schedule_c` is the line it files
+-- under. Keeping both means the page reads in the narrator's language while the
+-- report speaks the accountant's, with no translation step in between to drift.
+-- ============================================================
+
+create table if not exists expenses (
+  id            uuid        primary key default gen_random_uuid(),
+  incurred_on   date        not null,
+  vendor        text        not null default '',
+  description   text        not null default '',
+  amount        numeric(10,2) not null default 0,
+  label         text        not null default '',
+  schedule_c    text        not null default 'other',
+  method        text        not null default '',
+  notes         text        not null default '',
+  -- Where it came from, and enough to recognise the same receipt twice: a
+  -- folder rescanned next month must not re-import what it found last month.
+  source        text        not null default 'manual',
+  email_id      text        not null default '',
+  receipt_url   text        not null default '',
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+create index if not exists expenses_incurred_idx on expenses (incurred_on desc);
+create unique index if not exists expenses_email_idx on expenses (email_id) where email_id <> '';
+
+alter table expenses enable row level security;
+
+-- Service-role only, like payments: spending data has no business being
+-- readable by the public site.
+drop policy if exists expenses_service_role on expenses;
+create policy expenses_service_role on expenses
+  for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
