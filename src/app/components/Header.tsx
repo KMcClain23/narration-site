@@ -7,28 +7,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FaTiktok, FaInstagram, FaDiscord } from "react-icons/fa";
 import { HiMenu, HiX } from "react-icons/hi";
 import { usePathname, useRouter } from "next/navigation";
+import { isAdminRoute } from "@/lib/admin-routes";
 import { SiteSearch } from "./SiteSearch";
 import { useCart } from "@/context/CartContext";
 
 const BOOKINGS_URL =
   "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
 
-// Admin (old and new) is its own world with no public chrome — mirrors the
-// route set middleware.ts gates, plus the rest of /admin/* that middleware
-// doesn't need to gate (e.g. /admin/login) but which still shouldn't show
-// the public header.
-function isAdminWorldRoute(pathname: string): boolean {
-  if (pathname.startsWith("/admin")) return true;
-  if (pathname === "/board" || pathname === "/board/archive" || pathname.startsWith("/board/card")) return true;
-  if (pathname === "/schedule") return true;
-  if (pathname.startsWith("/contacts")) return true;
-  if (pathname === "/inquiries") return true;
-  if (pathname.startsWith("/tools")) return true;
-  if (pathname === "/settings") return true;
-  if (pathname === "/payments") return true;
-  if (pathname === "/released") return true;
-  return false;
-}
+// Admin is its own world with no public chrome. Shared with middleware.ts
+// rather than kept as a second copy: the copy that lived here fell a page
+// behind the moment /expenses was added, and put the marketing navigation
+// across the top of a private page.
+const isAdminWorldRoute = isAdminRoute;
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);

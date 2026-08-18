@@ -48,6 +48,7 @@ export function ExpensesClient({
   const [error, setError] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [scanNote, setScanNote] = useState<string | null>(null);
+  const [needsOutlook, setNeedsOutlook] = useState(false);
 
   const [form, setForm] = useState({
     incurred_on: new Date().toISOString().split("T")[0],
@@ -92,6 +93,7 @@ export function ExpensesClient({
   async function scanMail() {
     setBusy(true);
     setError(null);
+    setNeedsOutlook(false);
     setScanNote(null);
     try {
       const res = await fetch("/api/expenses/scan-mail", {
@@ -101,6 +103,9 @@ export function ExpensesClient({
       });
       const json = await res.json();
       if (!res.ok) {
+        // 503 is the route saying the mailbox is not connected, which is the
+        // one failure here with an action attached rather than a cause.
+        setNeedsOutlook(res.status === 503);
         setError(json.error ?? "Could not read the mail folder.");
         return;
       }
@@ -252,7 +257,20 @@ export function ExpensesClient({
           {SCHEDULE_C_LABEL[EXPENSE_LABELS.find(l => l.label === form.label)?.scheduleC ?? "other"]}.
         </p>
         {scanNote && <p className={`${adminType.small} mt-1`}>{scanNote}</p>}
-        {error && <p className="mt-1 text-[13px] text-alert-red">{error}</p>}
+
+        {/* A disconnected mailbox is a thing to fix, not an error to report.
+            The link is the fix, so it goes where the complaint would have. */}
+        {error && needsOutlook ? (
+          <p className="mt-1 text-[13px] text-accent-amber-bright">
+            Outlook isn&rsquo;t connected.{" "}
+            <a href="/api/auth/microsoft" className="font-medium underline">
+              Connect Microsoft 365
+            </a>{" "}
+            and scan again.
+          </p>
+        ) : error ? (
+          <p className="mt-1 text-[13px] text-alert-red">{error}</p>
+        ) : null}
       </section>
 
       {/* Review before anything is saved, same as the royalty importer. */}

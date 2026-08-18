@@ -46,6 +46,6 @@ export const config = {
   matcher: [
     "/admin/:path*", "/board", "/board/archive", "/board/card/:path*",
     "/schedule", "/contacts", "/contacts/:path*",
-    "/inquiries", "/tools", "/tools/:path*", "/settings", "/payments", "/released",
+    "/inquiries", "/tools", "/tools/:path*", "/settings", "/payments", "/expenses", "/released",
   ],
 };
