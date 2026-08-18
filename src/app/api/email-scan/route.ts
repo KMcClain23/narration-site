@@ -4,6 +4,7 @@
 //   MICROSOFT_TENANT_ID
 
 import { NextResponse } from "next/server";
+import { graphToken } from "@/lib/microsoft-graph";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import Anthropic from "@anthropic-ai/sdk";
 import { ADMIN_COOKIE_NAME, isValidAdminKey } from "@/lib/admin-auth";
@@ -26,57 +27,8 @@ function isAdmin(req: Request): boolean {
 
 // ─── token management ─────────────────────────────────────────────────────────
 
-async function getValidAccessToken(): Promise<string | null> {
-  const { data } = await supabaseAdmin
-    .from("admin_integrations")
-    .select("access_token, refresh_token, expires_at")
-    .eq("service", "microsoft")
-    .single();
+const getValidAccessToken = graphToken;
 
-  if (!data?.access_token) return null;
-
-  // Use existing token if it has >5 min left
-  const expiresAt = data.expires_at ? new Date(data.expires_at).getTime() : 0;
-  if (Date.now() < expiresAt - 5 * 60 * 1000) {
-    return data.access_token;
-  }
-
-  if (!data.refresh_token) return null;
-
-  // Refresh
-  const res = await fetch(
-    `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT_ID ?? "common"}/oauth2/v2.0/token`,
-    {
-      method:  "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body:    new URLSearchParams({
-        client_id:     process.env.MICROSOFT_CLIENT_ID    ?? "",
-        client_secret: process.env.MICROSOFT_CLIENT_SECRET ?? "",
-        refresh_token: data.refresh_token,
-        grant_type:    "refresh_token",
-        scope:         "Mail.Read offline_access",
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    console.error("Microsoft token refresh failed:", await res.text());
-    return null;
-  }
-
-  const tokens = await res.json();
-  const newExpiry = new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString();
-
-  await supabaseAdmin.from("admin_integrations")
-    .update({
-      access_token:  tokens.access_token,
-      refresh_token: tokens.refresh_token ?? data.refresh_token,
-      expires_at:    newExpiry,
-    })
-    .eq("service", "microsoft");
-
-  return tokens.access_token as string;
-}
 
 // ─── GET — connection status ───────────────────────────────────────────────────
 

@@ -82,12 +82,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Every expense needs a date." }, { status: 400 });
   }
 
-  // Ignores duplicates rather than failing the batch: rescanning a mail folder
-  // should add what is new and quietly skip what was imported last time.
-  const { data, error } = await supabaseAdmin
-    .from("expenses")
-    .upsert(prepared, { onConflict: "email_id", ignoreDuplicates: true })
-    .select(COLS);
+  /**
+   * Skip receipts already imported, rather than letting the batch fail.
+   *
+   * Checked here rather than with ON CONFLICT because the unique index is
+   * partial — it covers only rows that came from an email — and Postgres will
+   * not infer a partial index unless the statement repeats its WHERE clause,
+   * which PostgREST cannot express. The index still guards against a race; this
+   * is what makes the ordinary case quiet.
+   */
+  const emailIds = prepared.map(r => r.email_id).filter(Boolean);
+  let toInsert = prepared;
+
+  if (emailIds.length) {
+    const { data: seen } = await supabaseAdmin
+      .from("expenses")
+      .select("email_id")
+      .in("email_id", emailIds);
+
+    const already = new Set((seen ?? []).map(r => (r as { email_id: string }).email_id));
+    toInsert = prepared.filter(r => !r.email_id || !already.has(r.email_id));
+  }
+
+  if (!toInsert.length) {
+    return NextResponse.json({ saved: 0, expenses: [], skipped: prepared.length });
+  }
+
+  const { data, error } = await supabaseAdmin.from("expenses").insert(toInsert).select(COLS);
 
   if (error) {
     if (tableMissing(error)) {
@@ -96,7 +117,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ saved: data?.length ?? 0, expenses: data ?? [] });
+  return NextResponse.json({
+    saved: data?.length ?? 0,
+    expenses: data ?? [],
+    skipped: prepared.length - toInsert.length,
+  });
 }
 
 export async function PATCH(req: NextRequest) {

@@ -7,7 +7,7 @@ import { useState } from "react";
 import { BUSINESS, PROFILE_PHOTO_URL, ROLE_LABEL } from "@/lib/business-identity";
 import {
   LayoutGrid, Calendar, CheckCircle2, Users, Mail, Wrench, DollarSign, Settings as SettingsIcon,
-  ChevronLeft, ChevronRight, LogOut,
+  ChevronLeft, ChevronRight, LogOut, Receipt,
 } from "lucide-react";
 import { SidebarSection, type NavItem } from "./SidebarSection";
 import { useUnreadInquiries } from "./useUnreadInquiries";
@@ -21,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Released", href: "/released", icon: CheckCircle2 },
   { label: "Schedule", href: "/schedule", icon: Calendar },
   { label: "Payments", href: "/payments", icon: DollarSign },
+  { label: "Expenses", href: "/expenses", icon: Receipt },
   {
     label: "Contacts", href: "/contacts", icon: Users,
     subItems: [
