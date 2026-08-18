@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { X, Headphones, Settings as SettingsIcon, LogOut } from "lucide-react";
+import {
+  X, Headphones, Settings as SettingsIcon, LogOut,
+  CheckCircle2, DollarSign, Receipt,
+} from "lucide-react";
 import { useModalOpen } from "./AdminModalContext";
 import { useLogout } from "./useLogout";
 import { MoreSheetItem } from "./MoreSheetItem";
@@ -66,6 +69,18 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
         </div>
 
         <div className="px-2 pb-2">
+          {/* The tab bar holds four, and the sidebar's other pages had no
+              mobile route at all: Payments, Expenses and Released could only
+              be reached from a desktop. Grouped here the same way the sidebar
+              groups them. */}
+          <p className="px-4 pb-1 pt-1 text-[11px] font-medium uppercase tracking-[0.08em] text-text-faint">Money</p>
+          <MoreSheetItem icon={DollarSign} label="Payments" href="/payments" />
+          <MoreSheetItem icon={Receipt} label="Expenses" href="/expenses" />
+
+          <div className="my-2 h-px bg-surface-border" />
+          <MoreSheetItem icon={CheckCircle2} label="Released" href="/released" />
+
+          <div className="my-2 h-px bg-surface-border" />
           <p className="px-4 pb-1 pt-1 text-[11px] font-medium uppercase tracking-[0.08em] text-text-faint">Tools</p>
           <MoreSheetItem icon={Headphones} label="Demos" href="/tools/demos" />
           <MoreSheetItem label="Analytics" href="/tools/analytics" />

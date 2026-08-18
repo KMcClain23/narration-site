@@ -13,39 +13,55 @@ import { SidebarSection, type NavItem } from "./SidebarSection";
 import { useUnreadInquiries } from "./useUnreadInquiries";
 import { useLogout } from "./useLogout";
 
-const NAV_ITEMS: NavItem[] = [
-  { label: "Board", href: "/board", icon: LayoutGrid },
-  // The board filters released cards out, so this is the only route to a
-  // shipped title. It was reachable only by the board's drop zone, which meant
-  // a released book could not be found again once it had left the board.
-  { label: "Released", href: "/released", icon: CheckCircle2 },
-  { label: "Schedule", href: "/schedule", icon: Calendar },
-  { label: "Payments", href: "/payments", icon: DollarSign },
-  { label: "Expenses", href: "/expenses", icon: Receipt },
-  {
-    label: "Contacts", href: "/contacts", icon: Users,
-    subItems: [
-      { label: "Authors", href: "/contacts/authors" },
-      { label: "Co-Narrators", href: "/contacts/co-narrators" },
-      { label: "Production Companies", href: "/contacts/production-companies" },
-    ],
-  },
-  { label: "Inquiries", href: "/inquiries", icon: Mail, badge: "inquiries" },
-  {
-    label: "Tools", href: "/tools", icon: Wrench,
-    // Unlike Contacts, clicking Tools should just open the dropdown — there's
-    // no natural "first sub-item" to land on, so deep-linking would silently
-    // pick one (Analytics) that isn't obviously "the" Tools page.
-    deepLinkOnClick: false,
-    subItems: [
-      { label: "Analytics", href: "/tools/analytics" },
-      { label: "Contract Builder", href: "/tools/contract-builder" },
-      { label: "Testimonials", href: "/tools/testimonials" },
-      { label: "Demos", href: "/tools/demos" },
-      { label: "Prepper", href: "/tools/prepper" },
-    ],
-  },
-  { label: "Settings", href: "/settings", icon: SettingsIcon },
+/**
+ * The nav in groups rather than one run of nine.
+ *
+ * Grouped by the question being asked, not by feature: what am I making, what
+ * is it worth, who is it for, everything else. Hairline rules rather than
+ * headed sections, since headings would add more height than the grouping
+ * saves and the icons already carry the meaning.
+ */
+const NAV_GROUPS: NavItem[][] = [
+  [
+    { label: "Board", href: "/board", icon: LayoutGrid },
+    // The board filters released cards out, so this is the only route to a
+    // shipped title. It was reachable only by the board's drop zone, which meant
+    // a released book could not be found again once it had left the board.
+    { label: "Released", href: "/released", icon: CheckCircle2 },
+    { label: "Schedule", href: "/schedule", icon: Calendar },
+  ],
+  [
+    { label: "Payments", href: "/payments", icon: DollarSign },
+    { label: "Expenses", href: "/expenses", icon: Receipt },
+  ],
+  [
+    {
+      label: "Contacts", href: "/contacts", icon: Users,
+      subItems: [
+        { label: "Authors", href: "/contacts/authors" },
+        { label: "Co-Narrators", href: "/contacts/co-narrators" },
+        { label: "Production Companies", href: "/contacts/production-companies" },
+      ],
+    },
+    { label: "Inquiries", href: "/inquiries", icon: Mail, badge: "inquiries" },
+  ],
+  [
+    {
+      label: "Tools", href: "/tools", icon: Wrench,
+      // Unlike Contacts, clicking Tools should just open the dropdown — there's
+      // no natural "first sub-item" to land on, so deep-linking would silently
+      // pick one (Analytics) that isn't obviously "the" Tools page.
+      deepLinkOnClick: false,
+      subItems: [
+        { label: "Analytics", href: "/tools/analytics" },
+        { label: "Contract Builder", href: "/tools/contract-builder" },
+        { label: "Testimonials", href: "/tools/testimonials" },
+        { label: "Demos", href: "/tools/demos" },
+        { label: "Prepper", href: "/tools/prepper" },
+      ],
+    },
+    { label: "Settings", href: "/settings", icon: SettingsIcon },
+  ],
 ];
 
 const COLLAPSE_KEY = "dmn_admin_sidebar_collapsed";
@@ -79,7 +95,7 @@ export function Sidebar() {
           Admin routes suppress the public header entirely (Header.tsx returns
           null for them), so the old "DMN Admin" wordmark left no route out of
           admin except editing the URL. */}
-      <div className={collapsed ? "px-2 py-4" : "px-3 py-4"}>
+      <div className={collapsed ? "px-2 py-3" : "px-3 py-3"}>
         <Link
           href="/"
           title="View public site"
@@ -106,15 +122,22 @@ export function Sidebar() {
       <div className="h-px bg-divider mx-4 mb-2" />
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-2 space-y-0.5">
-        {NAV_ITEMS.map(item => (
-          <SidebarSection
-            key={item.href}
-            item={item}
-            pathname={pathname}
-            collapsed={collapsed}
-            unreadInquiries={unreadInquiries}
-          />
+      <nav className="flex-1 overflow-y-auto px-2">
+        {NAV_GROUPS.map((group, i) => (
+          <div
+            key={group[0].href}
+            className={`space-y-0.5 ${i > 0 ? "mt-1.5 border-t border-divider pt-1.5" : ""}`}
+          >
+            {group.map(item => (
+              <SidebarSection
+                key={item.href}
+                item={item}
+                pathname={pathname}
+                collapsed={collapsed}
+                unreadInquiries={unreadInquiries}
+              />
+            ))}
+          </div>
         ))}
       </nav>
 
