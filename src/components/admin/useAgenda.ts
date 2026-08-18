@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import type { AgendaDue, AgendaItem } from "@/app/api/agenda/route";
 
-export type Agenda = { date: string; items: AgendaItem[]; dueSoon: AgendaDue[] };
+export type Agenda = {
+  date: string;
+  items: AgendaItem[];
+  dueSoon: AgendaDue[];
+  /** Booked hours from today to Sunday, and from today to month end. */
+  weekHours: number;
+  monthHours: number;
+};
 
 /**
  * Today's work, for the sidebar.

@@ -20,6 +20,25 @@ const DUE_SOON_DAYS = 7;
 export type AgendaItem = { id: string; title: string; hours: number | null; isBlock: boolean };
 export type AgendaDue = { id: string; title: string; deadline: string };
 
+/**
+ * Both totals run from today, not from Monday or the first.
+ *
+ * What is already spent is not a decision anyone can still make. The question
+ * a sidebar figure answers is how much of the week is left to give away, so
+ * days behind today are excluded from it.
+ */
+function endOfWeek(from: Date): Date {
+  const d = new Date(from);
+  // Monday-first, matching the calendars: 0 is Monday, 6 is Sunday.
+  const dow = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() + (6 - dow));
+  return d;
+}
+
+function endOfMonth(from: Date): Date {
+  return new Date(from.getFullYear(), from.getMonth() + 1, 0);
+}
+
 export async function GET() {
   const denied = await requireAdmin();
   if (denied) return denied;
@@ -29,16 +48,36 @@ export async function GET() {
   horizon.setDate(horizon.getDate() + DUE_SOON_DAYS);
   const horizonISO = toISODate(horizon);
 
+  const now = new Date();
+  const weekEnd = toISODate(endOfWeek(now));
+  const monthEnd = toISODate(endOfMonth(now));
+  // Whichever runs later bounds the one query that feeds all three figures.
+  const lastDay = weekEnd > monthEnd ? weekEnd : monthEnd;
+
   const [cardsRes, blocksRes] = await Promise.all([
     supabaseAdmin
       .from("board_cards")
       .select("id, title, word_count, narration_format, narrator_share_percent, deadline, recording_dates")
       .in("status", ACTIVE_STATUSES)
       .is("archived_at", null),
-    supabaseAdmin.from("time_blocks").select("id, on_date, hours, label").eq("on_date", today),
+    supabaseAdmin
+      .from("time_blocks")
+      .select("id, on_date, hours, label")
+      .gte("on_date", today)
+      .lte("on_date", lastDay),
   ]);
 
   const cards = cardsRes.data ?? [];
+  const blocks = blocksRes.data ?? [];
+
+  let weekHours = 0;
+  let monthHours = 0;
+
+  const addSpan = (date: string, hours: number) => {
+    if (date < today) return;
+    if (date <= weekEnd) weekHours += hours;
+    if (date <= monthEnd) monthHours += hours;
+  };
 
   // Only books with today actually chosen. A book whose hours are merely
   // spread across every weekday was never planned for today, and listing it
@@ -46,7 +85,7 @@ export async function GET() {
   const items: AgendaItem[] = [];
   for (const c of cards) {
     const dates: string[] = Array.isArray(c.recording_dates) ? c.recording_dates : [];
-    if (!dates.includes(today)) continue;
+    if (dates.length === 0) continue;
     const plan = narrationPlan(
       c.word_count,
       c.narration_format,
@@ -54,16 +93,23 @@ export async function GET() {
       c.deadline,
       { dates },
     );
-    items.push({ id: c.id, title: c.title, hours: plan?.hoursPerDay ?? null, isBlock: false });
+    const perDay = plan?.hoursPerDay ?? null;
+
+    // The week and month totals are the same per-day figure counted across
+    // every day the book occupies inside each span.
+    if (perDay != null) for (const date of dates) addSpan(date, perDay);
+
+    if (dates.includes(today)) {
+      items.push({ id: c.id, title: c.title, hours: perDay, isBlock: false });
+    }
   }
 
-  for (const b of blocksRes.data ?? []) {
-    items.push({
-      id: b.id,
-      title: b.label || "Blocked",
-      hours: Number(b.hours) || 0,
-      isBlock: true,
-    });
+  for (const b of blocks) {
+    const hours = Number(b.hours) || 0;
+    addSpan(b.on_date, hours);
+    if (b.on_date === today) {
+      items.push({ id: b.id, title: b.label || "Blocked", hours, isBlock: true });
+    }
   }
 
   const dueSoon: AgendaDue[] = cards
@@ -71,5 +117,5 @@ export async function GET() {
     .map(c => ({ id: c.id, title: c.title, deadline: c.deadline as string }))
     .sort((a, b) => a.deadline.localeCompare(b.deadline));
 
-  return NextResponse.json({ date: today, items, dueSoon });
+  return NextResponse.json({ date: today, items, dueSoon, weekHours, monthHours });
 }

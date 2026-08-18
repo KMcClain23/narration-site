@@ -67,6 +67,24 @@ export function SidebarAgenda({ agenda }: { agenda: Agenda | null }) {
         </>
       )}
 
+      {/* Both run from today rather than from Monday or the first: hours
+          already spent are not a decision still to be made, and the figure is
+          here to answer what is left to give away. */}
+      <div className="mt-1.5 space-y-0.5 border-t border-divider pt-1.5">
+        <div className="flex items-baseline justify-between">
+          <span className="text-[11px] text-text-muted">Rest of week</span>
+          <span className="text-[12px] tabular-nums text-text-body">
+            {agenda.weekHours.toFixed(1)} hrs
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between">
+          <span className="text-[11px] text-text-muted">Rest of month</span>
+          <span className="text-[12px] tabular-nums text-text-body">
+            {agenda.monthHours.toFixed(1)} hrs
+          </span>
+        </div>
+      </div>
+
       {agenda.dueSoon.length > 0 && (
         <div className="mt-2 border-t border-divider pt-2">
           <span className={adminType.label}>Due this week</span>

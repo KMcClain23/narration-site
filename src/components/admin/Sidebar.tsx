@@ -130,8 +130,12 @@ export function Sidebar() {
       </div>
       <div className="h-px bg-divider mx-4 mb-2" />
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-2">
+      {/* Nav and agenda scroll together as one column. The nav used to be the
+          flex-1 element, which pushed the agenda to the very bottom of the
+          sidebar; now the pair sits directly under the links and the spacer
+          below them holds the footer down. */}
+      <div className="flex-1 overflow-y-auto">
+      <nav className="px-2">
         {NAV_GROUPS.map((group, i) => (
           <div
             key={group[0].href}
@@ -150,10 +154,10 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Today, above the footer so it sits at the bottom of the eye's travel
-          down the nav. Hidden when collapsed: there is no useful 56px version
-          of a list of titles and hours. */}
+      {/* Hidden when collapsed: there is no useful 56px version of a list of
+          titles and hours. */}
       {!collapsed && <SidebarAgenda agenda={agenda} />}
+      </div>
 
       {/* Sign out + Collapse toggle */}
       <div className="p-2 border-t border-surface-border space-y-0.5">
