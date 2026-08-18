@@ -29,11 +29,20 @@ const money = (n: number) =>
 const inputClass =
   "w-full rounded-lg border border-surface-border bg-background px-3 py-2 text-sm text-text-primary placeholder:text-text-dim focus:border-accent-amber focus:outline-none";
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <label className="block">
       <span className={`${adminType.label} block mb-1.5`}>{label}</span>
       {children}
+      {hint && <span className={`${adminType.small} mt-1 block`}>{hint}</span>}
     </label>
   );
 }
@@ -101,6 +110,10 @@ export function InvoiceEditor({
   onIssued,
   paymentId,
   wholeProject,
+  coNarratorEmails = [],
+  initialHours = 0,
+  canRecompute = false,
+  recompute,
 }: {
   initial: InvoiceData;
   onClose: () => void;
@@ -110,6 +123,17 @@ export function InvoiceEditor({
   paymentId?: string;
   /** The same invoice billed for the whole project, when that is a choice. */
   wholeProject?: { lines: InvoiceData["lines"]; notes: string };
+  /** Addresses for the other narrators, to copy in on a whole-project invoice. */
+  coNarratorEmails?: string[];
+  /** Finished hours as estimated from word count, to start the field at. */
+  initialHours?: number;
+  /** False when the project has no PFH rate, so hours cannot rebuild anything. */
+  canRecompute?: boolean;
+  /** Rebuilds both shapes from a corrected runtime. */
+  recompute?: (hours: number) => {
+    share: { lines: InvoiceData["lines"]; notes: string };
+    wholeProject: { lines: InvoiceData["lines"]; notes: string } | null;
+  };
 }) {
   useModalOpen(true);
   const router = useRouter();
@@ -123,6 +147,7 @@ export function InvoiceEditor({
   // client's inbox and cannot be recalled.
   const [composing, setComposing] = useState(false);
   const [sendTo, setSendTo] = useState(initial.billToEmail);
+  const [sendCc, setSendCc] = useState("");
   const [sendSubject, setSendSubject] = useState("");
   const [sendMessage, setSendMessage] = useState("");
   const [sendBusy, setSendBusy] = useState(false);
@@ -130,9 +155,39 @@ export function InvoiceEditor({
   const [sentTo, setSentTo] = useState<string | null>(null);
 
   const [billingWhole, setBillingWhole] = useState(false);
-  // Captured once so switching back restores what was generated, not whatever
-  // the other shape last left behind.
-  const [share] = useState({ lines: initial.lines, notes: initial.notes });
+  // Captured so switching back restores what was generated, not whatever the
+  // other shape last left behind. Replaced wholesale when the hours change,
+  // since both shapes are rebuilt from them.
+  const [shapes, setShapes] = useState({
+    share: { lines: initial.lines, notes: initial.notes },
+    wholeProject: wholeProject ?? null,
+  });
+
+  // Held as text, not a number: "12." is a state a person passes through while
+  // typing 12.9, and coercing it to 12 mid-keystroke fights them.
+  const [hours, setHours] = useState(initialHours ? initialHours.toFixed(1) : "");
+
+  /**
+   * Rebuild the invoice from a corrected runtime.
+   *
+   * The word-count estimate is made before recording and is routinely out by a
+   * tenth of an hour; the delivered file settles it. Both the fee and the
+   * editing move, because both are billed per finished hour — recomputing only
+   * the fee would quietly shift who absorbs the difference.
+   */
+  function applyHours(text: string) {
+    setHours(text);
+    const parsed = Number(text);
+    if (!recompute || !Number.isFinite(parsed) || parsed <= 0) return;
+
+    const next = recompute(parsed);
+    setShapes({ share: next.share, wholeProject: next.wholeProject });
+    setData(d => ({
+      ...d,
+      lines: billingWhole && next.wholeProject ? next.wholeProject.lines : next.share.lines,
+      notes: billingWhole && next.wholeProject ? next.wholeProject.notes : next.share.notes,
+    }));
+  }
 
   /**
    * Swap between billing this narrator's share and billing the whole project.
@@ -143,12 +198,12 @@ export function InvoiceEditor({
    * invoice takes.
    */
   async function switchShape(whole: boolean) {
-    if (!wholeProject) return;
+    if (!shapes.wholeProject) return;
     setBillingWhole(whole);
     setData(d => ({
       ...d,
-      lines: whole ? wholeProject.lines : share.lines,
-      notes: whole ? wholeProject.notes : share.notes,
+      lines: whole ? shapes.wholeProject!.lines : shapes.share.lines,
+      notes: whole ? shapes.wholeProject!.notes : shapes.share.notes,
     }));
     // The amount just changed, so any link raised against the old one now
     // charges the wrong figure to whoever still holds the URL.
@@ -281,6 +336,10 @@ export function InvoiceEditor({
     setSendError(null);
     setSentTo(null);
     setSendTo(data.billToEmail);
+    // Copied in only when this invoice bills their work too. On a share invoice
+    // the other narrators are billing the author themselves, and forwarding
+    // them someone else's invoice serves nothing.
+    setSendCc(billingWhole ? coNarratorEmails.join(", ") : "");
     setSendSubject(
       `Invoice ${data.invoiceNumber || ""} — ${data.bookTitle}`.replace(/\s+—/, " —").trim(),
     );
@@ -309,6 +368,7 @@ export function InvoiceEditor({
       const { blob, filename } = await renderPdf();
       const body = new FormData();
       body.append("to", sendTo.trim());
+      body.append("cc", sendCc.trim());
       body.append("subject", sendSubject);
       body.append("message", sendMessage);
       body.append("filename", filename);
@@ -402,9 +462,28 @@ export function InvoiceEditor({
                 </span>
               </div>
 
+              {/* The delivered runtime, which settles what the word-count
+                  estimate could only guess at. */}
+              {canRecompute && (
+                <div className="mb-3">
+                  <Field
+                    label="Finished hours"
+                    hint="Rebuilds the fee and the editing from your rates. Leave as-is to bill the estimate."
+                  >
+                    <input
+                      className={`${inputClass} max-w-[140px]`}
+                      value={hours}
+                      onChange={e => applyHours(e.target.value)}
+                      inputMode="decimal"
+                      placeholder="12.9"
+                    />
+                  </Field>
+                </div>
+              )}
+
               {/* Only offered on split work — there is no "whole project" to
                   bill differently when one narrator is the whole project. */}
-              {wholeProject && (
+              {shapes.wholeProject && (
                 <label className="mb-3 flex items-start gap-2.5">
                   <input
                     type="checkbox"
@@ -588,6 +667,20 @@ export function InvoiceEditor({
                 <Field label="To">
                   <input className={inputClass} value={sendTo} onChange={e => setSendTo(e.target.value)}
                     placeholder="client@example.com" />
+                </Field>
+                <Field
+                  label="Cc"
+                  hint={
+                    coNarratorEmails.length
+                      ? billingWhole
+                        ? "Your co-narrators, since this invoice bills their work too."
+                        : "Leave empty on a share invoice — they bill the author themselves."
+                      : undefined
+                  }
+                >
+                  <input className={inputClass} value={sendCc}
+                    onChange={e => setSendCc(e.target.value)}
+                    placeholder="Optional — separate several with commas" />
                 </Field>
                 <Field label="Subject">
                   <input className={inputClass} value={sendSubject}

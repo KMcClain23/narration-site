@@ -44,8 +44,20 @@ export async function POST(req: NextRequest) {
   const filename = String(form.get("filename") ?? "invoice.pdf").replace(/[^\w.\-]/g, "_");
   const file = form.get("pdf");
 
+  // Comma-separated, because that is how a Cc field is typed. Every address is
+  // checked: one malformed entry can make a provider reject the whole send, so
+  // a typo in the Cc would silently cost the client their invoice.
+  const cc = String(form.get("cc") ?? "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean);
+
   if (!EMAIL_RE.test(to)) {
     return NextResponse.json({ error: "That doesn't look like an email address." }, { status: 400 });
+  }
+  const badCc = cc.find(a => !EMAIL_RE.test(a));
+  if (badCc) {
+    return NextResponse.json({ error: `"${badCc}" doesn't look like an email address.` }, { status: 400 });
   }
   if (!subject) {
     return NextResponse.json({ error: "A subject is required." }, { status: 400 });
@@ -132,6 +144,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL || `${BUSINESS.name} <${BUSINESS.email}>`,
     to,
+    ...(cc.length ? { cc } : {}),
     replyTo: BUSINESS.email,
     subject,
     html: `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:580px;margin:0 auto;padding:8px;font-size:15px;line-height:1.6;color:${C.body};">${html}</div>`,

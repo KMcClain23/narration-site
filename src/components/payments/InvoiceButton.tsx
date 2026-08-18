@@ -40,10 +40,30 @@ export function buildInvoice(
   rows: PaymentRow[],
   author: AuthorRow | null,
   invoiceNumber: string,
+  /**
+   * Real finished hours, once they are known.
+   *
+   * Everything else here derives from word count ÷ 9,400, which is an estimate
+   * made before recording and routinely out by a tenth of an hour or more. Once
+   * the file is delivered the true runtime is a fact, and it should drive the
+   * invoice rather than the guess that preceded it. Passing it recomputes the
+   * fee and the editing from the rates, instead of scaling whatever figure was
+   * stored.
+   */
+  hoursOverride?: number,
 ): InvoiceData & { wholeProject: { lines: InvoiceData["lines"]; notes: string } | null } {
-  const amount = invoiceAmount(payment, card, rows) ?? 0;
-  const hrs = finishedHours(card.word_count);
+  const share = narratorShare(card);
+  const measured = hoursOverride != null && hoursOverride > 0;
+  const hrs = measured ? hoursOverride : finishedHours(card.word_count);
   const recast = card.status === "recast";
+
+  // A measured runtime only rebuilds the fee where there is a rate to rebuild
+  // it from. Without one the stored figure is still the best information
+  // available, and inventing a number from an hours field would be worse.
+  const amount =
+    measured && card.pfh_rate
+      ? hrs * card.pfh_rate * share
+      : (invoiceAmount(payment, card, rows) ?? 0);
 
   // Not billed by the finished hour — those hours were never delivered — so
   // quoting "6.6 finished hours × $250/PFH" beside a half payment would invite
@@ -97,8 +117,13 @@ export function buildInvoice(
     p => isOffTheTop(p.kind) && Number(p.amount) > 0,
   );
 
-  const share = narratorShare(card);
-  const editingTotal = editing.reduce((s, p) => s + Number(p.amount), 0);
+  // The editor bills by the finished hour too, so a corrected runtime moves
+  // their fee as well — leaving it at the figure computed from the old estimate
+  // would quietly change who absorbs the difference.
+  const editingTotal = editing.reduce(
+    (s, p) => s + (measured && p.rate_pfh ? hrs * Number(p.rate_pfh) : Number(p.amount)),
+    0,
+  );
   const lines: InvoiceData["lines"] = [
     { description, detail, amount: amount - editingTotal * share },
   ];
@@ -152,9 +177,11 @@ export function buildInvoice(
    * fee rather than this narrator's share of it.
    */
   const grossBase =
-    payment.amount_gross != null
-      ? Number(payment.amount_gross)
-      : (projectGrossFee(card) ?? (share > 0 ? amount / share : amount));
+    measured && card.pfh_rate
+      ? hrs * card.pfh_rate
+      : payment.amount_gross != null
+        ? Number(payment.amount_gross)
+        : (projectGrossFee(card) ?? (share > 0 ? amount / share : amount));
 
   // Null on solo work: there is no whole project to bill differently when one
   // narrator is the whole project, and an option that changes nothing is worse
@@ -232,6 +259,9 @@ export function InvoiceButton({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<ReturnType<typeof buildInvoice> | null>(null);
+  const [coNarratorEmails, setCoNarratorEmails] = useState<string[]>([]);
+  // Kept so recompute() can rebuild the invoice without refetching the author.
+  const [author, setAuthor] = useState<AuthorRow | null>(null);
 
   async function handleOpen() {
     setBusy(true);
@@ -246,18 +276,37 @@ export function InvoiceButton({
         if (res.ok) invoiceNumber = (await res.json()).invoice_number;
       }
 
-      let author: AuthorRow | null = null;
+      let resolved: AuthorRow | null = null;
       if (card.author) {
         const res = await fetch("/api/authors");
         if (res.ok) {
           const json = await res.json();
           const key = card.author.trim().toLowerCase();
-          author =
+          resolved =
             (json.authors ?? []).find((a: AuthorRow) => a.name?.trim().toLowerCase() === key) ?? null;
         }
       }
 
-      setDraft(buildInvoice(payment, card, rows, author, invoiceNumber));
+      // Addresses for whoever else narrated it, so a whole-project invoice can
+      // copy them in. Names live on the card; addresses live on the roster, and
+      // not every entry has one — those are simply left out rather than guessed.
+      const names = parseCoNarrators(card.co_narrator);
+      let coNarratorEmails: string[] = [];
+      if (names.length) {
+        const res = await fetch("/api/co-narrators");
+        if (res.ok) {
+          const json = await res.json();
+          const roster: { name?: string; email?: string | null }[] = json.co_narrators ?? [];
+          const wanted = new Set(names.map(n => n.trim().toLowerCase()));
+          coNarratorEmails = roster
+            .filter(c => c.name && wanted.has(c.name.trim().toLowerCase()) && c.email)
+            .map(c => c.email as string);
+        }
+      }
+      setCoNarratorEmails(coNarratorEmails);
+      setAuthor(resolved);
+
+      setDraft(buildInvoice(payment, card, rows, resolved, invoiceNumber));
     } catch {
       setError("Could not prepare the invoice.");
     } finally {
@@ -318,6 +367,15 @@ export function InvoiceButton({
           onIssued={handleIssued}
           paymentId={payment.id}
           wholeProject={draft.wholeProject ?? undefined}
+          coNarratorEmails={coNarratorEmails}
+          initialHours={finishedHours(card.word_count)}
+          canRecompute={Boolean(card.pfh_rate)}
+          // Rebuilds both shapes from a corrected runtime. The editor holds the
+          // hours; everything needed to turn them back into lines lives here.
+          recompute={hours => {
+            const next = buildInvoice(payment, card, rows, author, draft?.invoiceNumber ?? "", hours);
+            return { share: { lines: next.lines, notes: next.notes }, wholeProject: next.wholeProject };
+          }}
         />
       )}
     </>
