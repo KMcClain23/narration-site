@@ -15,9 +15,9 @@ import {
   estimatedEarnings,
   narrationPlan,
   parseCoNarrators,
-  WORDS_PER_NARRATION_HOUR,
 } from "@/components/admin/board-card-utils";
 import { RecordingCalendar } from "@/components/admin/RecordingCalendar";
+import { useStudioSettings } from "@/components/admin/useStudioSettings";
 import { CardPaymentsPanel } from "@/components/payments/CardPaymentsPanel";
 import type { NarrationFormat, ArchivedReason } from "@/types/book";
 
@@ -235,6 +235,11 @@ export function CardEditModal(props: CardEditModalProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<FullBoardCard | null>(mode === "create" ? blankCard() : null);
   const [savedForm, setSavedForm] = useState<FullBoardCard | null>(mode === "create" ? blankCard() : null);
+  const studio = useStudioSettings();
+  // Words or percent: the same stored number, entered whichever way the
+  // answer is actually known. "About two thirds" is a real answer; the word
+  // it lands on is not something anyone tracks.
+  const [progressUnit, setProgressUnit] = useState<"words" | "percent">("percent");
   const [activeTab, setActiveTab] = useState<TabId>("details");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -761,7 +766,9 @@ export function CardEditModal(props: CardEditModalProps) {
       form.deadline || null,
       { dates: form.recording_dates },
       undefined,
-      undefined,
+      // Was left at the default, so this block quietly disagreed with the board
+      // and the schedule the moment the rate in Settings was changed.
+      studio.wordsPerNarrationHour,
       form.words_recorded,
     );
     /** The narrator's own portion, which is what progress is measured against. */
@@ -942,7 +949,7 @@ export function CardEditModal(props: CardEditModalProps) {
             Time to narrate
             <InfoTooltip variant="inline">
               <p>
-                Your share of the manuscript at ~{WORDS_PER_NARRATION_HOUR.toLocaleString()} words
+                Your share of the manuscript at ~{studio.wordsPerNarrationHour.toLocaleString()} words
                 per hour at the mic, spread over the recording days left before the deadline.
                 Recording time only: prep, pickups and proofing are on top.
               </p>
@@ -953,22 +960,59 @@ export function CardEditModal(props: CardEditModalProps) {
               manuscript: on a duet only half the book is ever yours. */}
           {plan && shareWords > 0 && (
             <div className="mb-3 border-b border-surface-border pb-3">
-              <label className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className={`${adminType.small} shrink-0`}>Narrated so far</span>
+
+                {/* One stored number, two ways in. Percent leads because it is
+                    how progress is actually known: nobody records up to word
+                    34,850, they finish somewhere around two thirds. */}
                 <input
                   type="number"
                   min={0}
-                  max={shareWords}
-                  step={500}
-                  value={form.words_recorded || ""}
-                  placeholder="0"
-                  onChange={e =>
-                    setForm(p => (p ? { ...p, words_recorded: Math.max(0, Number(e.target.value) || 0) } : p))
+                  max={progressUnit === "percent" ? 100 : shareWords}
+                  step={progressUnit === "percent" ? 5 : 500}
+                  value={
+                    progressUnit === "percent"
+                      ? form.words_recorded
+                        ? Math.round((form.words_recorded / shareWords) * 100)
+                        : ""
+                      : form.words_recorded || ""
                   }
-                  className={`${INPUT_CLS} w-32`}
+                  placeholder="0"
+                  onChange={e => {
+                    const n = Math.max(0, Number(e.target.value) || 0);
+                    const words =
+                      progressUnit === "percent" ? Math.round((Math.min(n, 100) / 100) * shareWords) : n;
+                    setForm(p => (p ? { ...p, words_recorded: words } : p));
+                  }}
+                  className="w-24 rounded-lg border border-surface-border bg-background px-3 py-2 text-sm text-text-primary placeholder:text-text-dim focus:border-accent-amber-dim focus:outline-none"
                 />
-                <span className={adminType.small}>of {shareWords.toLocaleString()} words</span>
-              </label>
+
+                <div className="flex overflow-hidden rounded-lg border border-surface-border">
+                  {(["percent", "words"] as const).map(u => (
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() => setProgressUnit(u)}
+                      className={`px-2.5 py-2 text-[13px] transition-colors ${
+                        progressUnit === u
+                          ? "bg-accent-amber/15 text-accent-amber-bright"
+                          : "text-text-muted hover:text-text-primary"
+                      }`}
+                    >
+                      {u === "percent" ? "%" : "words"}
+                    </button>
+                  ))}
+                </div>
+
+                {/* The other unit shown as you type, so switching is never
+                    needed just to check what a figure means. */}
+                <span className={adminType.small}>
+                  {progressUnit === "percent"
+                    ? `${(form.words_recorded || 0).toLocaleString()} of ${shareWords.toLocaleString()} words`
+                    : `of ${shareWords.toLocaleString()} words`}
+                </span>
+              </div>
 
               {plan.fractionDone > 0.005 && (
                 <div className="mt-2">
@@ -998,7 +1042,7 @@ export function CardEditModal(props: CardEditModalProps) {
                 {plan.hours.toFixed(1)} hrs{plan.fractionDone > 0.005 ? " left" : ""}
                 <span className="ml-2 text-xs font-normal text-text-muted">
                   {Math.round(form.word_count * (appliedShare / 100)).toLocaleString()} words ÷{" "}
-                  {WORDS_PER_NARRATION_HOUR.toLocaleString()}/hr
+                  {studio.wordsPerNarrationHour.toLocaleString()}/hr
                   {appliedShare !== 100 ? ` (${appliedShare}% share)` : ""}
                 </span>
               </p>
