@@ -40,6 +40,7 @@ export type CapacityCard = {
   recording_dates: string[] | null;
   /** Booth time only counts while the narrating is still ahead. See stillAtMic. */
   status: string | null;
+  words_recorded: number | null;
 };
 
 /** Booth time that is not narrating a manuscript. */
@@ -125,8 +126,10 @@ export function buildCalendar(
       { dates: card.recording_dates } as RecordingSchedule,
       today,
       wordsPerHour,
+      card.words_recorded ?? 0,
     );
-    if (!plan) continue;
+    // Nothing left to record means nothing left to schedule.
+    if (!plan || plan.hours <= 0.005) continue;
 
     const { days, assumed } = daysFor(card, horizon, today);
     if (!days.length) continue;

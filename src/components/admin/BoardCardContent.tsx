@@ -139,11 +139,23 @@ export function BoardCardContent({
               { dates: card.recording_dates },
               undefined,
               studio.wordsPerNarrationHour,
+              card.words_recorded ?? 0,
             );
             if (!plan) return " ";
+            const started = plan.fractionDone > 0.005;
+            if (plan.hours <= 0.005) {
+              return <span className="text-capacity-light">Recording complete</span>;
+            }
             return (
               <>
-                <span className="text-text-muted">{plan.hours.toFixed(1)} hrs at the mic</span>
+                <span className="text-text-muted">
+                  {plan.hours.toFixed(1)} hrs {started ? "left" : "at the mic"}
+                </span>
+                {/* Only once there is progress to report. An untouched book
+                    saying "0% done" is noise on every card in the column. */}
+                {started && (
+                  <span className="text-text-dim"> · {Math.round(plan.fractionDone * 100)}% done</span>
+                )}
                 {plan.overdue ? (
                   <span className="text-alert-red"> · no recording days left</span>
                 ) : plan.hoursPerDay != null ? (

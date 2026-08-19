@@ -37,6 +37,8 @@ export type FullBoardCard = {
   narrator_share_percent: number | null;
   /** Days chosen on the calendar, "YYYY-MM-DD". Empty until one is picked. */
   recording_dates: string[];
+  /** Words of your own share already recorded. */
+  words_recorded: number;
   is_confidential: boolean;
   deadline: string;
   released_at: string;
@@ -73,6 +75,7 @@ function mapToFullBoardCard(row: Record<string, unknown>): FullBoardCard {
     narration_format: (row.narration_format as NarrationFormat) ?? null,
     narrator_share_percent: (row.narrator_share_percent as number) ?? null,
     recording_dates: Array.isArray(row.recording_dates) ? (row.recording_dates as string[]) : [],
+    words_recorded: (row.words_recorded as number) ?? 0,
     is_confidential: Boolean(row.is_confidential),
     deadline: (row.deadline as string) ?? "",
     // Stored as a timestamp; the date input needs YYYY-MM-DD.
@@ -104,7 +107,7 @@ function mapToFullBoardCard(row: Record<string, unknown>): FullBoardCard {
 function blankCard(): FullBoardCard {
   return {
     id: "", created_at: "", title: "", subtitle: "", cover_url: "", author: "", co_narrator: "",
-    author_notes: "", narration_format: null, narrator_share_percent: null, recording_dates: [], is_confidential: false, deadline: "", released_at: "", status: "contracted",
+    author_notes: "", narration_format: null, narrator_share_percent: null, recording_dates: [], words_recorded: 0, is_confidential: false, deadline: "", released_at: "", status: "contracted",
     word_count: 0, payment_type: "pfh", pfh_rate: 0, first15_due: "", first_15_complete: false,
     production_type: null, production_company: null, description: "", tags: [], trigger_warnings: [],
     audible_link: "", ar_link: "", spotify_link: "", script_url: "",
@@ -757,7 +760,12 @@ export function CardEditModal(props: CardEditModalProps) {
       form.narrator_share_percent,
       form.deadline || null,
       { dates: form.recording_dates },
+      undefined,
+      undefined,
+      form.words_recorded,
     );
+    /** The narrator's own portion, which is what progress is measured against. */
+    const shareWords = Math.round(form.word_count * (appliedShare / 100));
 
     return (
       <div className="space-y-8">
@@ -940,10 +948,54 @@ export function CardEditModal(props: CardEditModalProps) {
               </p>
             </InfoTooltip>
           </p>
+          {/* Progress first, because it changes the headline underneath it.
+              Measured in words of your own share rather than of the
+              manuscript: on a duet only half the book is ever yours. */}
+          {plan && shareWords > 0 && (
+            <div className="mb-3 border-b border-surface-border pb-3">
+              <label className="flex flex-wrap items-center gap-2">
+                <span className={`${adminType.small} shrink-0`}>Narrated so far</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={shareWords}
+                  step={500}
+                  value={form.words_recorded || ""}
+                  placeholder="0"
+                  onChange={e =>
+                    setForm(p => (p ? { ...p, words_recorded: Math.max(0, Number(e.target.value) || 0) } : p))
+                  }
+                  className={`${INPUT_CLS} w-32`}
+                />
+                <span className={adminType.small}>of {shareWords.toLocaleString()} words</span>
+              </label>
+
+              {plan.fractionDone > 0.005 && (
+                <div className="mt-2">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-surface-border">
+                    <div
+                      className="h-full rounded-full bg-accent-amber"
+                      style={{ width: `${Math.min(100, plan.fractionDone * 100)}%` }}
+                    />
+                  </div>
+                  <p className={`${adminType.small} mt-1`}>
+                    {Math.round(plan.fractionDone * 100)}% recorded ·{" "}
+                    {(plan.totalHours - plan.hours).toFixed(1)} of {plan.totalHours.toFixed(1)} hrs done
+                  </p>
+                </div>
+              )}
+              {form.words_recorded > shareWords && (
+                <p className={`${adminType.small} mt-1 text-accent-amber-bright`}>
+                  That is more than your share of this book. Counted as finished.
+                </p>
+              )}
+            </div>
+          )}
+
           {plan ? (
             <>
               <p className="text-lg font-bold text-text-primary">
-                {plan.hours.toFixed(1)} hrs
+                {plan.hours.toFixed(1)} hrs{plan.fractionDone > 0.005 ? " left" : ""}
                 <span className="ml-2 text-xs font-normal text-text-muted">
                   {Math.round(form.word_count * (appliedShare / 100)).toLocaleString()} words ÷{" "}
                   {WORDS_PER_NARRATION_HOUR.toLocaleString()}/hr

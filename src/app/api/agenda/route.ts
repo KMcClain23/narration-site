@@ -60,7 +60,7 @@ export async function GET() {
   const [cardsRes, blocksRes] = await Promise.all([
     supabaseAdmin
       .from("board_cards")
-      .select("id, title, word_count, narration_format, narrator_share_percent, deadline, recording_dates")
+      .select("id, title, word_count, narration_format, narrator_share_percent, deadline, recording_dates, words_recorded")
       .in("status", ACTIVE_STATUSES)
       .is("archived_at", null),
     supabaseAdmin
@@ -95,6 +95,9 @@ export async function GET() {
       c.narrator_share_percent,
       c.deadline,
       { dates },
+      new Date(),
+      undefined,
+      Number(c.words_recorded) || 0,
     );
     const perDay = plan?.hoursPerDay ?? null;
 

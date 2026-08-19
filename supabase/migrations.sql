@@ -840,3 +840,15 @@ alter table time_blocks enable row level security;
 drop policy if exists time_blocks_service_role on time_blocks;
 create policy time_blocks_service_role on time_blocks
   for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+
+-- ---------------------------------------------------------------------------
+-- How much of a book has actually been narrated.
+--
+-- Every time figure until now answered "how long does this book take", which
+-- stops being the useful question the moment recording starts. What is left is
+-- what has to fit in the week, and a book three quarters done was still
+-- claiming its full weight in the capacity calendar.
+--
+-- Counted in words of this narrator's own share, not of the manuscript: on a
+-- duet the two halves are recorded separately and only one of them is yours.
+alter table board_cards add column if not exists words_recorded integer not null default 0;

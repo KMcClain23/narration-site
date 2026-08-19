@@ -130,8 +130,18 @@ export function toISODate(d: Date): string {
 }
 
 export type NarrationPlan = {
-  /** Hours at the mic for this narrator's share of the manuscript. */
+  /**
+   * Hours still to record.
+   *
+   * Remaining, not total: once recording has started, what is left is the only
+   * figure that answers anything — how much of the week this needs, whether
+   * another book fits, whether the deadline holds.
+   */
   hours: number;
+  /** The whole job, ignoring progress. For showing what remaining is a share of. */
+  totalHours: number;
+  /** 0 to 1. Zero when nothing has been recorded or nothing is known. */
+  fractionDone: number;
   /** Recording days left including today. Null when the card has no deadline. */
   daysLeft: number | null;
   /** hours ÷ daysLeft. Null with no deadline, or when no day is left. */
@@ -156,13 +166,21 @@ export function narrationPlan(
   today: Date = new Date(),
   /** Overrides the built-in rate with whatever Settings holds. */
   wordsPerHour: number = WORDS_PER_NARRATION_HOUR,
+  /** Words of this narrator's share already recorded. */
+  wordsRecorded: number = 0,
 ): NarrationPlan | null {
   if (!wordCount || wordCount <= 0) return null;
   const share = narratorShareOf(narrationFormat, narratorSharePercent);
   if (share == null) return null;
 
   const rate = wordsPerHour > 0 ? wordsPerHour : WORDS_PER_NARRATION_HOUR;
-  const hours = (wordCount * share) / rate;
+  const shareWords = wordCount * share;
+  // Clamped at both ends: a recorded figure larger than the share would
+  // otherwise produce negative hours left, which reads as time owed back.
+  const done = Math.min(Math.max(wordsRecorded, 0), shareWords);
+  const totalHours = shareWords / rate;
+  const fractionDone = shareWords > 0 ? done / shareWords : 0;
+  const hours = (shareWords - done) / rate;
   const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const todayISO = toISODate(midnight);
   const chosen = schedule.dates ?? [];
@@ -171,22 +189,22 @@ export function narrationPlan(
   // remaining work can be spread over, whether or not it was used.
   if (chosen.length) {
     const ahead = chosen.filter(d => d >= todayISO && (!deadline || d <= deadline));
-    if (ahead.length === 0) return { hours, daysLeft: 0, hoursPerDay: null, overdue: true };
-    return { hours, daysLeft: ahead.length, hoursPerDay: hours / ahead.length, overdue: false };
+    if (ahead.length === 0) return { hours, totalHours, fractionDone, daysLeft: 0, hoursPerDay: null, overdue: true };
+    return { hours, totalHours, fractionDone, daysLeft: ahead.length, hoursPerDay: hours / ahead.length, overdue: false };
   }
 
-  if (!deadline) return { hours, daysLeft: null, hoursPerDay: null, overdue: false };
+  if (!deadline) return { hours, totalHours, fractionDone, daysLeft: null, hoursPerDay: null, overdue: false };
 
   const due = parseLocalDate(deadline);
-  if (due < midnight) return { hours, daysLeft: 0, hoursPerDay: null, overdue: true };
+  if (due < midnight) return { hours, totalHours, fractionDone, daysLeft: 0, hoursPerDay: null, overdue: true };
 
   const daysLeft = recordingDaysBetween(midnight, due, schedule.pattern ?? DEFAULT_DAYS);
   // A deadline can fall inside a stretch with no recording day in it at all —
   // a Sunday deadline for someone who records weekdays only. Dividing by zero
   // there would read as Infinity hours a day.
-  if (daysLeft === 0) return { hours, daysLeft: 0, hoursPerDay: null, overdue: true };
+  if (daysLeft === 0) return { hours, totalHours, fractionDone, daysLeft: 0, hoursPerDay: null, overdue: true };
 
-  return { hours, daysLeft, hoursPerDay: hours / daysLeft, overdue: false };
+  return { hours, totalHours, fractionDone, daysLeft, hoursPerDay: hours / daysLeft, overdue: false };
 }
 
 // Board-card display estimate — same ratio as the Production tab's
@@ -238,6 +256,8 @@ export type BoardV2Card = {
   narrator_share_percent: number | null;
   /** Chosen recording days, "YYYY-MM-DD". Empty means none picked yet. */
   recording_dates: string[] | null;
+  /** Words of this narrator's share already recorded. */
+  words_recorded: number | null;
   created_at: string;
 };
 

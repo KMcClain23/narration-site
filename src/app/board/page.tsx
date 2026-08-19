@@ -213,6 +213,7 @@ export default function BoardV2Page() {
         // Carried through so a card's booth load updates the moment the
         // calendar is saved, without waiting for a board refetch.
         recording_dates: updated.recording_dates,
+        words_recorded: updated.words_recorded,
         created_at: updated.created_at,
       };
       return idx === -1 ? [...prev, projected] : prev.map((c, i) => (i === idx ? projected : c));

@@ -32,7 +32,7 @@ export default async function SchedulePage() {
       .from("board_cards")
       // One string literal, not a concatenation: supabase-js infers the row
       // type from the literal, and splitting it makes every field an error type.
-      .select("id, title, author, cover_url, deadline, status, word_count, narration_format, narrator_share_percent, recording_dates")
+      .select("id, title, author, cover_url, deadline, status, word_count, narration_format, narrator_share_percent, recording_dates, words_recorded")
       .in("status", ACTIVE_STATUSES)
       .is("archived_at", null),
     // Only what is still ahead: the calendar starts today, so blocks behind it
@@ -69,6 +69,7 @@ export default async function SchedulePage() {
     narration_format: string | null;
     narrator_share_percent: number | null;
     recording_dates: string[] | null;
+    words_recorded: number | null;
   };
 
   // Every active book, deadline or not: one with chosen recording days occupies
@@ -82,6 +83,7 @@ export default async function SchedulePage() {
     deadline: c.deadline,
     recording_dates: Array.isArray(c.recording_dates) ? c.recording_dates : [],
     status: c.status,
+    words_recorded: c.words_recorded,
   }));
 
   // Cards with no deadline don't factor into the monthly grid or Due Soon —
