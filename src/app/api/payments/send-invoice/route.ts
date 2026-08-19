@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
 
   const buttons = options
     .map(
-      // Provider colours, matching the PDF: recognised before they are read.
+      // Provider colors, matching the PDF: recognized before they are read.
       o => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 10px;">
               <tr><td style="background:${o.bg};border-radius:5px;">
                 <a href="${esc(o.url)}" style="display:inline-block;padding:13px 26px;color:${o.fg};font-size:15px;font-weight:600;text-decoration:none;">

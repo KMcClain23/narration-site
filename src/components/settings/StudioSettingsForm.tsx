@@ -27,17 +27,17 @@ type Field = {
 const FIELDS: Field[] = [
   {
     key: "wordsPerNarrationHour",
-    label: "Words per hour at the mic",
-    unit: "words",
+    label: "My recording speed",
+    unit: "words/hr",
     effect:
-      "How long a book takes. Changes every hours-per-day figure on the board and every answer the capacity calendar gives.",
+      "TIME. How much manuscript you actually get through in one hour at the mic, retakes included. Sets how long each book takes, the hours-per-day on every card, and what the capacity calendar says will fit.",
   },
   {
     key: "wordsPerFinishedHour",
-    label: "Words per finished hour",
-    unit: "words",
+    label: "Words in a finished hour",
+    unit: "words/hr",
     effect:
-      "What a book is worth. This is the billing unit, not a working rate, and it changes every earnings estimate and invoice line.",
+      "MONEY. The industry unit: how many manuscript words become one hour of finished audio. Your PFH rate is paid per one of these. Sets every earnings estimate and invoice line, and says nothing about how long recording takes.",
   },
   {
     key: "dailyCapacityHours",
@@ -56,7 +56,7 @@ const FIELDS: Field[] = [
     key: "heavyDayHours",
     label: "A heavy day starts at",
     unit: "hrs",
-    effect: "Only a colour on the board. Nothing is calculated from it.",
+    effect: "Only a color on the board. Nothing is calculated from it.",
   },
 ];
 
@@ -144,8 +144,15 @@ export function StudioSettingsForm({ initial }: { initial: StudioSettings }) {
         {saved && !dirty && <span className={adminType.small}>Saved.</span>}
       </div>
 
-      {/* Said once here rather than implied by five separate fields. */}
-      <p className={`${adminType.small} mt-3`}>
+      {/* The two rates are near neighbors numerically and answer completely
+          different questions, which is exactly how they get confused. */}
+      <p className={`${adminType.small} mt-3 max-w-[560px]`}>
+        The first two rates look alike and are not related. Recording speed is a fact about you and
+        can be measured. Words in a finished hour is a fact about audiobooks and is roughly fixed at
+        9,400 across the industry. A book can take you far longer to record than the finished hours
+        it bills for.
+      </p>
+      <p className={`${adminType.small} mt-2`}>
         These are estimates, not records. Changing one moves projections everywhere, but nothing
         already invoiced or recorded is touched.
       </p>

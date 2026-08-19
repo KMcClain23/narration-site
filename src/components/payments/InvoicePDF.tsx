@@ -6,7 +6,7 @@ import { PDF_BRAND as C } from "@/lib/pdf-brand";
 // Carries the brand onto paper: navy and gold spent on structure rather than
 // as a background wash, since a client prints this or reads it on a phone.
 // Shares its palette with ContractPDF so a client who has already signed
-// recognises the invoice as coming from the same business.
+// recognizes the invoice as coming from the same business.
 
 export type InvoiceLine = {
   description: string;
@@ -205,10 +205,10 @@ export function InvoicePDF({ data }: { data: InvoiceData }) {
             {/* Every method is the same shape and carries its own amount, so
                 the choice reads as a choice rather than as one real button
                 beside some fine print. Cheapest first: a payer takes the first
-                option they recognise, and only the last costs anything. */}
+                option they recognize, and only the last costs anything. */}
             {options.map(o => (
               <View key={o.url} style={s.payRow}>
-                {/* Provider colours: a payer recognises the button before
+                {/* Provider colors: a payer recognizes the button before
                     reading it, and the card option wears the brand gold since
                     "card" is nobody's brand. */}
                 <Link src={o.url} style={[s.payButton, { backgroundColor: o.bg, color: o.fg }]}>

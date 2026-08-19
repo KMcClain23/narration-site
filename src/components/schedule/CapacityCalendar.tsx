@@ -27,7 +27,7 @@ const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const HORIZON_DAYS = 120;
 
 /**
- * One colour per book, so a day reads without being hovered.
+ * One color per book, so a day reads without being hovered.
  *
  * Complete class strings, not built at runtime: Tailwind's scanner only sees
  * literals, and a class assembled from a variable never gets compiled.
@@ -107,7 +107,7 @@ export function CapacityCalendar({
   const [asking, setAsking] = useState<number | null>(null);
   const [cursor, setCursor] = useState(() => ({ y: today.getFullYear(), m: today.getMonth() }));
 
-  // Held locally and updated optimistically: adding a block should redraw the
+  // Held locally and updated optimiztically: adding a block should redraw the
   // day under the cursor, not wait for a round trip and a page refresh.
   const [blocks, setBlocks] = useState<TimeBlock[]>(initialBlocks);
   const [picked, setPicked] = useState<string | null>(null);
@@ -148,7 +148,7 @@ export function CapacityCalendar({
   const byDate = useMemo(() => new Map(calendar.map(d => [d.date, d])), [calendar]);
 
   // Assigned once from the card list rather than per day, so a book keeps the
-  // same colour across every month it appears in.
+  // same color across every month it appears in.
   const colorFor = useMemo(() => {
     const map = new Map<string, string>();
     cards.forEach((c, i) => map.set(c.id, BOOK_COLORS[i % BOOK_COLORS.length]));

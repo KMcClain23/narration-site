@@ -79,13 +79,13 @@ export type PayOption = {
   url: string;
   amount: number;
   note?: string;
-  /** The provider's own colour, so a payer recognises the button before reading it. */
+  /** The provider's own color, so a payer recognizes the button before reading it. */
   bg: string;
   fg: string;
 };
 
 /**
- * Provider colours. Venmo and PayPal wear their own so they are recognised at a
+ * Provider colors. Venmo and PayPal wear their own so they are recognized at a
  * glance; the card button wears the brand gold, since "card" is not a brand and
  * the fallback should look like it came from this business.
  */
@@ -124,7 +124,7 @@ export function paypalPayUrl(paypal: string, amount: number): string {
 /**
  * Every way this invoice can be paid, cheapest first.
  *
- * Order is the whole point: a payer takes the first option they recognise, and
+ * Order is the whole point: a payer takes the first option they recognize, and
  * only the last one costs the narrator anything.
  */
 export function payOptions(

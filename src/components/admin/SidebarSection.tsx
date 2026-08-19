@@ -49,7 +49,7 @@ export function SidebarSection({
   const linkHref = item.subItems?.[0]?.href ?? item.href;
 
   // text-left is load-bearing: toggle sections render as <button>, which
-  // centres its text by default, so Tools sat visibly indented from every
+  // centers its text by default, so Tools sat visibly indented from every
   // link beside it.
   const rowClassName = `group relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors ${
     leafActive

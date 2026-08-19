@@ -326,18 +326,18 @@ export function InvoiceEditor({
    */
   useEffect(() => {
     if (!paymentId || !data.cardLink) return;
-    let cancelled = false;
+    let canceled = false;
     void fetch(`/api/payments/stripe-link?payment_id=${paymentId}`)
       .then(r => (r.ok ? r.json() : null))
       .then(j => {
-        if (cancelled || j?.total == null) return;
+        if (canceled || j?.total == null) return;
         setData(d => ({ ...d, cardTotal: j.total, cardFee: Math.round((j.total - amountDue) * 100) / 100 }));
       })
       .catch(() => {
         // Keeping the previous figure is better than clearing it.
       });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
     // Only when the link itself changes: the amount is a property of the link,
     // not of whatever the invoice currently says.

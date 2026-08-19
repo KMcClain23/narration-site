@@ -40,25 +40,25 @@ export function CardPaymentsPanel({
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
 
     void (async () => {
       const res = await fetch(`/api/payments?cardId=${cardId}`);
       // The modal can close, or the board can switch cards, while this is in
       // flight — without the guard a late response writes into a component
       // that has moved on.
-      if (cancelled) return;
+      if (canceled) return;
       if (!res.ok) {
         setPayments([]);
         return;
       }
       const json = await res.json();
-      if (cancelled) return;
+      if (canceled) return;
       setPayments(json.payments ?? []);
     })();
 
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [cardId, reloadKey]);
 

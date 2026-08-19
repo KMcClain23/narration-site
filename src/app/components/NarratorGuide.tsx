@@ -70,8 +70,8 @@ const STEPS: Step[] = [
       "Read the full book before recording a single word — you need to know where the story goes",
       "Build a character voice chart: age, background, accent, emotional register, vocal quality for each character",
       "Record your First 15 as if it's the final product — that's what the author is approving",
-      "Practise cold reading regularly — auditions often require you to perform unrehearsed passages",
-      "Dark romance, romantasy, and intimate scenes require comfort and commitment — practise reading these aloud privately until they feel natural",
+      "Practice cold reading regularly — auditions often require you to perform unrehearsed passages",
+      "Dark romance, romantasy, and intimate scenes require comfort and commitment — practice reading these aloud privately until they feel natural",
       "Take acting or improv classes — even one term will change how you approach character work",
     ],
     resources: [
@@ -137,7 +137,7 @@ const STEPS: Step[] = [
       "Keep auditions under 5 minutes — longer isn't better",
       "Follow up with a brief, professional message if you don't hear back within 2 weeks",
       "Approach royalty share projects with care early on — they can feel like a low-risk entry point, but most indie audiobooks sell fewer than 100 copies. If you do accept RS, look for authors with a strong existing readership or sales history. RS+ (Royalty Share Plus), which adds a small upfront stipend, is a more balanced option worth considering",
-      "Your first few projects matter most for reviews — prioritise authors who communicate clearly",
+      "Your first few projects matter most for reviews — prioritize authors who communicate clearly",
     ],
     resources: [
       { label: "ACX: Browse open projects", href: "https://www.acx.com/auditions" },
@@ -171,7 +171,7 @@ const STEPS: Step[] = [
     title: "Editing & mastering",
     duration: "Per project",
     summary: "ACX-ready audio requires more than a clean recording — editing and mastering are a craft of their own.",
-    detail: "Raw recordings need editing (removing mouth noise, breath sounds, stumbles, and room noise), followed by mastering (RMS normalisation, peak limiting, noise floor reduction, and format export). Many new narrators underestimate how long this takes — editing typically takes 2–3x the recording time. Learn to do this yourself initially so you understand the process, even if you later outsource it. Never outsource mastering to someone who doesn't understand ACX spec — a rejected file wastes everyone's time.",
+    detail: "Raw recordings need editing (removing mouth noise, breath sounds, stumbles, and room noise), followed by mastering (RMS normalization, peak limiting, noise floor reduction, and format export). Many new narrators underestimate how long this takes — editing typically takes 2–3x the recording time. Learn to do this yourself initially so you understand the process, even if you later outsource it. Never outsource mastering to someone who doesn't understand ACX spec — a rejected file wastes everyone's time.",
     tips: [
       "Learn to edit your own audio first — outsourcing before you understand the process means you can't QC it",
       "Mouth noise (clicks, lip smacks) is the most common complaint from authors — address it in your recording environment and in post",
@@ -240,10 +240,10 @@ const STEPS: Step[] = [
     title: "Applying to production houses & expanding your reach",
     duration: "1–3 years in",
     summary: "Once your craft, demos, and portfolio are solid, the next level is getting onto publisher rosters and networking in the wider industry.",
-    detail: "Indie audiobook work through ACX and Authors Republic is a great foundation — but major publishers (Penguin Random House, Macmillan, HarperCollins, Simon & Schuster Audio, Hachette) cast from rosters of vetted narrators, often through agents or casting platforms. Getting onto these rosters opens the door to higher-profile projects, SAG-AFTRA union work, and the kind of career longevity that comes from working with established publishing houses. The path in typically involves: a strong AHAB Talent profile (PRH's casting platform), direct outreach to casting departments, talent agency representation, and in-person presence at industry events. PRH also runs a competitive Narrator Mentorship Program — a 6-month programme for narrators with fewer than 10 titles, with a roughly 1.5% acceptance rate from thousands of applicants.",
+    detail: "Indie audiobook work through ACX and Authors Republic is a great foundation — but major publishers (Penguin Random House, Macmillan, HarperCollins, Simon & Schuster Audio, Hachette) cast from rosters of vetted narrators, often through agents or casting platforms. Getting onto these rosters opens the door to higher-profile projects, SAG-AFTRA union work, and the kind of career longevity that comes from working with established publishing houses. The path in typically involves: a strong AHAB Talent profile (PRH's casting platform), direct outreach to casting departments, talent agency representation, and in-person presence at industry events. PRH also runs a competitive Narrator Mentorship Program — a 6-month program for narrators with fewer than 10 titles, with a roughly 1.5% acceptance rate from thousands of applicants.",
     tips: [
       "Create a profile on AHAB Talent (ahabtalent.com) — it's the primary casting platform used by Penguin Random House Audio and other publishers worldwide",
-      "Apply to the PRH Audio Narrator Mentorship Programme if you have fewer than 10 titles — it's highly competitive but has launched dozens of careers. Applications open annually, usually in August",
+      "Apply to the PRH Audio Narrator Mentorship Program if you have fewer than 10 titles — it's highly competitive but has launched dozens of careers. Applications open annually, usually in August",
       "Email casting departments directly once you have a polished demo and 5–10 completed titles: PRHCasting@penguinrandomhouse.com is publicly listed",
       "Talent agents who specialise in audiobooks can open doors that self-submission can't — research agencies that represent audiobook narrators specifically",
       "The Audio Publishers Association (APA) annual conference is the single best networking event in the industry — producers, publishers, and narrators all attend",

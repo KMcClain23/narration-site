@@ -75,11 +75,11 @@ async function closePayPal(row: PaymentLinkRow, out: LinkClosure): Promise<void>
 
     // Both flags false for the same reason they are on send: PayPal must not
     // email the client on this app's behalf.
-    const cancelled = await paypalFetch(`/v2/invoicing/invoices/${id}/cancel`, {
+    const canceled = await paypalFetch(`/v2/invoicing/invoices/${id}/cancel`, {
       method: "POST",
       json: { send_to_invoicer: false, send_to_recipient: false },
     });
-    if (cancelled.ok) out.closed.push("PayPal invoice cancelled");
+    if (canceled.ok) out.closed.push("PayPal invoice canceled");
     else out.problems.push("Could not cancel the PayPal invoice.");
   } catch {
     out.problems.push("Could not reach PayPal to cancel the invoice.");

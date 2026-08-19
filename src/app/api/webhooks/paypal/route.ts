@@ -42,7 +42,7 @@ async function verify(req: NextRequest, rawBody: string): Promise<boolean> {
       transmission_sig: headers["paypal-transmission-sig"],
       transmission_time: headers["paypal-transmission-time"],
       webhook_id: webhookId,
-      // The body PayPal signed, parsed rather than re-serialised — re-encoding
+      // The body PayPal signed, parsed rather than re-serialized — re-encoding
       // would reorder keys and the signature would no longer match.
       webhook_event: JSON.parse(rawBody),
     },

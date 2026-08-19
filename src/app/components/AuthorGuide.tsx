@@ -40,7 +40,7 @@ const STEPS: Step[] = [
     title: "Cover design",
     duration: "1–3 weeks",
     summary: "Your cover is your #1 marketing tool. It needs to signal genre instantly and look professional at thumbnail size.",
-    detail: "Hire a designer who specialises in your genre. Dark romance covers look nothing like cozy mystery covers — the visual language matters. You'll need separate files optimised for ebook (1600×2400px minimum), print (with bleed and spine), and audiobook (square, 3000×3000px for Audible). Brief your designer with comparable titles ('books with covers like mine should look like X').",
+    detail: "Hire a designer who specialises in your genre. Dark romance covers look nothing like cozy mystery covers — the visual language matters. You'll need separate files optimized for ebook (1600×2400px minimum), print (with bleed and spine), and audiobook (square, 3000×3000px for Audible). Brief your designer with comparable titles ('books with covers like mine should look like X').",
     tips: [
       "Browse bestsellers in your genre on Amazon — your cover should fit the shelf",
       "Don't use a cover designed for ebook on your audiobook — AR and Audible require square format",
@@ -160,7 +160,7 @@ const STEPS: Step[] = [
     phase: "Marketing",
     title: "Launch & marketing",
     duration: "Ongoing",
-    summary: "A coordinated launch amplifies word-of-mouth and maximises your first-week ranking on Amazon and Audible.",
+    summary: "A coordinated launch amplifies word-of-mouth and maximizes your first-week ranking on Amazon and Audible.",
     detail: "A successful launch combines social media, email list, paid ads, and retailer promotions. For romance and dark romance, TikTok (BookTok) and Instagram (Bookstagram) are the highest-ROI organic channels. Build your launch team (readers who share on launch day), coordinate with your ARC readers for review timing, and consider a release day countdown. Paid ads on Amazon (AMS), Facebook/Instagram, and BookBub come after you have at least 10 reviews.",
     tips: [
       "Your email list is your most valuable asset — start building it before your first book",

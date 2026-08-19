@@ -2,10 +2,10 @@
  * The brand, as it survives being printed.
  *
  * Shared by InvoicePDF and ContractPDF so the two documents cannot drift —
- * a client who has signed a contract should recognise the invoice as coming
+ * a client who has signed a contract should recognize the invoice as coming
  * from the same business, which is only true while both read from one palette.
  *
- * The site's colours are inverted here on purpose. On screen the brand is a
+ * The site's colors are inverted here on purpose. On screen the brand is a
  * dark navy ground with gold on top; on paper that would be a full-bleed ink
  * wash, so the document runs light and spends the navy and gold on structure
  * instead — rules, headings, and the one number that matters.

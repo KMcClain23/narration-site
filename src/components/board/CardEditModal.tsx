@@ -264,13 +264,13 @@ export function CardEditModal(props: CardEditModalProps) {
 
   useEffect(() => {
     if (mode !== "edit") return;
-    let cancelled = false;
+    let canceled = false;
     setLoading(true);
     setLoadError(null);
     fetch(`/api/board?id=${cardId}`)
       .then(r => r.json())
       .then(d => {
-        if (cancelled) return;
+        if (canceled) return;
         if (!d.card) throw new Error(d.error || "Card not found.");
         const full = mapToFullBoardCard(d.card);
         setForm(full);
@@ -278,12 +278,12 @@ export function CardEditModal(props: CardEditModalProps) {
         setAuthorQuery(full.author);
       })
       .catch(e => {
-        if (cancelled) return;
+        if (canceled) return;
         if (onLoadError) onLoadError();
         else setLoadError(e instanceof Error ? e.message : "Failed to load card.");
       })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => { if (!canceled) setLoading(false); });
+    return () => { canceled = true; };
     // onLoadError intentionally excluded — this fetch should only re-run when
     // the card being loaded changes, not when the parent re-renders.
     // eslint-disable-next-line react-hooks/exhaustive-deps

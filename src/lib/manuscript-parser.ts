@@ -1881,7 +1881,7 @@ function endsCleanly(text: string): boolean {
  *
  * findChapterStartLine looks for the chapter's heading on its claimed opening
  * page and, finding none, returns line 0 — the top of the page. That is the
- * right default when a heading is merely unrecognisable. It is badly wrong when
+ * right default when a heading is merely unrecognizable. It is badly wrong when
  * the page never was a chapter opening, because the section then starts
  * wherever the previous page happened to break, which is usually mid-sentence.
  *
@@ -2280,7 +2280,7 @@ export const PARSE_BUDGET_MS = 45_000;
 const CLAUDE_CALL_TIMEOUT_MS = 25_000;
 
 /**
- * Per-stage timing, logged as the parse runs rather than summarised at the end.
+ * Per-stage timing, logged as the parse runs rather than summarized at the end.
  *
  * A parse that dies partway leaves no summary, so a log that only prints on
  * success tells you nothing about the run that actually needs explaining. This
