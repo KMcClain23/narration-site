@@ -126,7 +126,7 @@ export default async function ManuscriptReaderPage({ params }: { params: Promise
   const { data: pageHighlights } = hasPdf
     ? await supabaseAdmin
         .from("page_highlights")
-        .select("id, character_id, page, x, y, w, h, note")
+        .select("id, character_id, page, x, y, w, h, note, kind")
         .eq("manuscript_id", id)
     : { data: [] };
 

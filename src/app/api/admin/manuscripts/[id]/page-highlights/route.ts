@@ -6,7 +6,7 @@ import { requireAdmin } from "@/lib/require-admin";
 // cannot be trusted. Coordinates are fractions of the page, so a box drawn at
 // one zoom lands in the same place at any other and on any screen.
 
-const COLS = "id, manuscript_id, character_id, page, x, y, w, h, note";
+const COLS = "id, manuscript_id, character_id, page, x, y, w, h, note, kind";
 
 /** Fractions only: anything outside the page is a bug, not a highlight. */
 function fraction(v: unknown): number | null {
@@ -49,8 +49,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (x === null || y === null || w === null || h === null) {
     return NextResponse.json({ error: "The highlight is off the page." }, { status: 400 });
   }
-  // A box with no area is a stray click, not an intent to mark anything.
-  if (w < 0.005 || h < 0.002) {
+  const kind = body.kind === "voice" ? "voice" : "highlight";
+
+  // A box with no area is a stray click, not an intent to mark anything. A
+  // voice pin is a point rather than a box, so the rule does not apply to it.
+  if (kind === "highlight" && (w < 0.005 || h < 0.002)) {
     return NextResponse.json({ error: "That highlight is too small to keep." }, { status: 400 });
   }
 
@@ -65,6 +68,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       w,
       h,
       note: String(body.note ?? "").trim(),
+      kind,
     })
     .select(COLS)
     .single();

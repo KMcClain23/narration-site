@@ -25,6 +25,11 @@ export type PageHighlight = {
   w: number;
   h: number;
   note: string;
+  /**
+   * "highlight" is a box over dialogue. "voice" is a character dropped into
+   * the margin, there to be clicked and heard while reading past.
+   */
+  kind?: "highlight" | "voice";
 };
 
 type Rect = { x: number; y: number; w: number; h: number };
@@ -75,7 +80,36 @@ export function PageHighlighter({
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const charById = new Map(cast.map(c => [c.id, c]));
-  const onThisPage = highlights.filter(h => h.page === page);
+  const here = highlights.filter(h => h.page === page);
+  const onThisPage = here.filter(h => h.kind !== "voice");
+  const pinsHere = here.filter(h => h.kind === "voice");
+
+  /** A voice pin: a character parked on the page, not a box over dialogue. */
+  async function dropPin(characterId: string, at: { x: number; y: number }) {
+    try {
+      const res = await fetch(`/api/admin/manuscripts/${manuscriptId}/page-highlights`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          page,
+          character_id: characterId,
+          kind: "voice",
+          x: at.x,
+          y: at.y,
+          w: 0,
+          h: 0,
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(json?.error ?? "Could not place that voice.");
+        return;
+      }
+      setHighlights(h => [...h, json.highlight]);
+    } catch {
+      setError("Could not place that voice.");
+    }
+  }
 
   /** One element reused for every sample, so two cannot play at once. */
   function toggleSample(characterId: string, url: string) {
@@ -241,6 +275,40 @@ export function PageHighlighter({
     };
   }
 
+  /**
+   * The wheel turns pages rather than scrolling past the book.
+   *
+   * A page at a time is how this is read, and a wheel that scrolls the
+   * surrounding page instead means reaching for a button after every one.
+   * Attached natively rather than through React so it can be non-passive and
+   * actually prevent the scroll it is replacing.
+   *
+   * Accumulated and rate-limited because one flick of a trackpad emits dozens
+   * of small deltas, which would otherwise skip half a chapter.
+   */
+  useEffect(() => {
+    const el = surfaceRef.current;
+    if (!el) return;
+    let travelled = 0;
+    let lastTurn = 0;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      travelled += e.deltaY;
+
+      const now = Date.now();
+      if (now - lastTurn < 150 || Math.abs(travelled) < 40) return;
+
+      const direction = travelled > 0 ? 1 : -1;
+      travelled = 0;
+      lastTurn = now;
+      setPage(p => Math.min(Math.max(1, p + direction), pageCount || p));
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [pageCount]);
+
   // Number keys pick a speaker without leaving the page. Marking dialogue is
   // hundreds of small actions, and reaching for a dropdown each time is most
   // of the work.
@@ -291,7 +359,8 @@ export function PageHighlighter({
         </span>
 
         <span className="ml-auto text-[13px] text-[#6f6a5e]">
-          {onThisPage.length} on this page · {highlights.length} in the book
+          {onThisPage.length} marked here · {pinsHere.length} voice{pinsHere.length === 1 ? "" : "s"} ·{" "}
+          {highlights.filter(h => h.kind !== "voice").length} in the book
         </span>
       </div>
 
@@ -300,6 +369,15 @@ export function PageHighlighter({
         {cast.map((c, i) => (
           <span
             key={c.id}
+            draggable={Boolean(c.voice_sample_url)}
+            onDragStart={e => {
+              // Only a character with a sample is worth parking on a page:
+              // a pin with nothing to play is a dot that does nothing.
+              if (!c.voice_sample_url) return;
+              e.dataTransfer.setData("text/dmn-character", c.id);
+              e.dataTransfer.effectAllowed = "copy";
+            }}
+            title={c.voice_sample_url ? "Drag onto the page to leave a voice you can click" : undefined}
             className={`flex items-center gap-1.5 rounded-lg border px-1.5 py-1 text-[13px] transition-colors ${
               activeCharacter === c.id
                 ? "border-[#8a6d2f] bg-[#8a6d2f]/15 font-medium text-[#1a1a1a]"
@@ -384,6 +462,19 @@ export function PageHighlighter({
           behavior, with the right-hand margin of every page cut off. */}
       <div
         ref={surfaceRef}
+        onDragOver={e => {
+          if (e.dataTransfer.types.includes("text/dmn-character")) e.preventDefault();
+        }}
+        onDrop={e => {
+          const id = e.dataTransfer.getData("text/dmn-character");
+          if (!id) return;
+          e.preventDefault();
+          const box = surfaceRef.current!.getBoundingClientRect();
+          void dropPin(id, {
+            x: Math.min(1, Math.max(0, (e.clientX - box.left) / box.width)),
+            y: Math.min(1, Math.max(0, (e.clientY - box.top) / box.height)),
+          });
+        }}
         className="relative inline-block max-w-full touch-none select-none bg-white"
         onPointerDown={e => {
           if (!activeCharacter) return;
@@ -432,6 +523,33 @@ export function PageHighlighter({
           );
         })}
 
+        {/* Parked voices. Click to hear, right-click to take away. Sat on top
+            of the highlights so a pin dropped over marked dialogue is still
+            reachable. */}
+        {pinsHere.map(p => {
+          const c = p.character_id ? charById.get(p.character_id) : undefined;
+          if (!c) return null;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onPointerDown={e => e.stopPropagation()}
+              onClick={() => c.voice_sample_url && toggleSample(c.id, c.voice_sample_url)}
+              onContextMenu={e => {
+                e.preventDefault();
+                void remove(p.id);
+              }}
+              title={`${c.name} — click to hear, right-click to remove`}
+              className="absolute z-10 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white shadow-md"
+              style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%`, background: c.color_hex }}
+            >
+              <span className="text-[11px] leading-none text-white">
+                {playing === c.id ? "■" : "▶"}
+              </span>
+            </button>
+          );
+        })}
+
         {drawing && (
           <span
             className="pointer-events-none absolute rounded-[2px] border border-dashed border-black/60 bg-black/10"
@@ -447,7 +565,9 @@ export function PageHighlighter({
 
       <p className="mt-3 text-[13px] text-[#6f6a5e]">
         Drag across a line to mark it for the selected speaker. Number keys switch speaker, arrow
-        keys turn the page. Click a highlight to remove it, right-click to reassign it.
+        keys and the scroll wheel turn the page. Click a highlight to remove it, right-click to reassign
+        it. Drag a
+        character with a voice sample onto the page to leave a pin you can click to hear them.
       </p>
     </div>
   );

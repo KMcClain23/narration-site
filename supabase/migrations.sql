@@ -884,3 +884,21 @@ alter table page_highlights enable row level security;
 drop policy if exists page_highlights_service_role on page_highlights;
 create policy page_highlights_service_role on page_highlights
   for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+
+-- ---------------------------------------------------------------------------
+-- What a mark on the page is: dialogue, or a voice to hear.
+--
+-- A voice pin is a character dropped into the margin so their sample can be
+-- played while reading past. It lives in the same table as the dialogue
+-- highlights because it is the same thing in every other respect -- a place on
+-- a page belonging to a character -- and a second table would double every
+-- query that draws the page.
+alter table page_highlights add column if not exists kind text not null default 'highlight';
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'page_highlights_kind_check') then
+    alter table page_highlights add constraint page_highlights_kind_check
+      check (kind in ('highlight', 'voice'));
+  end if;
+end $$;
