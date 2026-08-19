@@ -28,6 +28,10 @@ export function middleware(req: NextRequest) {
     if (!isValidAdminKey(req.cookies.get(ADMIN_COOKIE_NAME)?.value)) {
       const url = req.nextUrl.clone();
       url.pathname = "/admin/login";
+      // Carry where they were going, so signing in finishes the journey
+      // instead of dropping everyone on the board to navigate again.
+      url.search = "";
+      url.searchParams.set("next", pathname);
       return NextResponse.redirect(url);
     }
 
