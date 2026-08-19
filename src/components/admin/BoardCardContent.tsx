@@ -14,6 +14,7 @@ import {
   type Urgency,
   type BoardV2Card,
 } from "./board-card-utils";
+import { useStudioSettings } from "./useStudioSettings";
 
 // The visual content shared by desktop's BoardCard (drag + mouse long-press)
 // and mobile's MobileBoardCard (swipe + touch long-press) — the two own
@@ -29,13 +30,6 @@ const URGENCY_TEXT = {
   red: "text-alert-red",
 } as const;
 
-/**
- * Hours a day past which a book is eating the week rather than fitting in it.
- * A display threshold only — nothing is calculated from it. Change it here if
- * a four-hour recording day stops feeling heavy.
- */
-const HEAVY_DAY = 4;
-
 function first15Urgency(days: number): Urgency {
   if (days < 0) return "red";
   if (days <= 7) return "yellow";
@@ -50,6 +44,7 @@ export function BoardCardContent({
   onToggleFirst15: (id: string, complete: boolean) => void;
 }) {
   const coNarrators = parseCoNarrators(card.co_narrator);
+  const studio = useStudioSettings();
   const showFormatPill = card.narration_format && card.narration_format !== "solo";
 
   return (
@@ -142,6 +137,8 @@ export function BoardCardContent({
               card.narrator_share_percent,
               card.deadline,
               { dates: card.recording_dates },
+              undefined,
+              studio.wordsPerNarrationHour,
             );
             if (!plan) return " ";
             return (
@@ -150,7 +147,7 @@ export function BoardCardContent({
                 {plan.overdue ? (
                   <span className="text-alert-red"> · no recording days left</span>
                 ) : plan.hoursPerDay != null ? (
-                  <span className={plan.hoursPerDay >= HEAVY_DAY ? "text-accent-amber-bright" : "text-text-muted"}>
+                  <span className={plan.hoursPerDay >= studio.heavyDayHours ? "text-accent-amber-bright" : "text-text-muted"}>
                     {" · "}
                     {plan.hoursPerDay.toFixed(1)} hrs/day
                   </span>

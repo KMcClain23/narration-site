@@ -154,12 +154,15 @@ export function narrationPlan(
   deadline: string | null,
   schedule: RecordingSchedule = {},
   today: Date = new Date(),
+  /** Overrides the built-in rate with whatever Settings holds. */
+  wordsPerHour: number = WORDS_PER_NARRATION_HOUR,
 ): NarrationPlan | null {
   if (!wordCount || wordCount <= 0) return null;
   const share = narratorShareOf(narrationFormat, narratorSharePercent);
   if (share == null) return null;
 
-  const hours = (wordCount * share) / WORDS_PER_NARRATION_HOUR;
+  const rate = wordsPerHour > 0 ? wordsPerHour : WORDS_PER_NARRATION_HOUR;
+  const hours = (wordCount * share) / rate;
   const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const todayISO = toISODate(midnight);
   const chosen = schedule.dates ?? [];

@@ -3,13 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
+import { useStudioSettings } from "@/components/admin/useStudioSettings";
 import { parseLocalDate, toISODate } from "@/components/admin/board-card-utils";
 import {
   buildCalendar,
   fitBook,
   totalFree,
-  DEFAULT_DAILY_CAPACITY,
-  MAX_BOOKS_PER_DAY,
   type CapacityCard,
   type TimeBlock,
 } from "@/lib/capacity";
@@ -100,7 +99,11 @@ export function CapacityCalendar({
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   }, []);
 
-  const [capacity, setCapacity] = useState(DEFAULT_DAILY_CAPACITY);
+  const studio = useStudioSettings();
+  // Seeded from Settings, still adjustable here for a what-if without going
+  // and changing what a full day means everywhere.
+  const [capacity, setCapacity] = useState<number | null>(null);
+  const dayHours = capacity ?? studio.dailyCapacityHours;
   const [asking, setAsking] = useState<number | null>(null);
   const [cursor, setCursor] = useState(() => ({ y: today.getFullYear(), m: today.getMonth() }));
 
@@ -139,8 +142,8 @@ export function CapacityCalendar({
   }, [liveCards]);
 
   const calendar = useMemo(
-    () => buildCalendar(liveCards, HORIZON_DAYS, capacity, today, blocks),
-    [liveCards, capacity, today, blocks],
+    () => buildCalendar(liveCards, HORIZON_DAYS, dayHours, today, blocks, studio.wordsPerNarrationHour),
+    [liveCards, dayHours, today, blocks, studio.wordsPerNarrationHour],
   );
   const byDate = useMemo(() => new Map(calendar.map(d => [d.date, d])), [calendar]);
 
@@ -153,7 +156,7 @@ export function CapacityCalendar({
   }, [cards]);
 
   const free = totalFree(calendar);
-  const fit = asking ? fitBook(asking, calendar) : null;
+  const fit = asking ? fitBook(asking, calendar, undefined, studio.maxBooksPerDay) : null;
   const fitDays = useMemo(() => new Map((fit?.days ?? []).map(d => [d.date, d.hours])), [fit]);
 
   const first = new Date(cursor.y, cursor.m, 1);
@@ -287,7 +290,7 @@ export function CapacityCalendar({
             min={1}
             max={12}
             step={0.5}
-            value={capacity}
+            value={dayHours}
             onChange={e => setCapacity(Math.max(1, Number(e.target.value) || 1))}
             className="w-16 rounded-md border border-surface-border bg-background px-2 py-1 text-[13px] text-text-primary focus:border-accent-amber focus:outline-none"
           />
@@ -326,7 +329,7 @@ export function CapacityCalendar({
             </span>
           ) : (
             <span className={`${adminType.small} ml-1 text-alert-red`}>
-              Not in the next {HORIZON_DAYS} days at {capacity} hrs a day.
+              Not in the next {HORIZON_DAYS} days at {dayHours} hrs a day.
             </span>
           ))}
       </div>
@@ -362,7 +365,7 @@ export function CapacityCalendar({
             // Two things can be wrong with a day, and they are different
             // problems: out of hours, or too many books in it.
             const full = day ? day.free <= 0.005 : false;
-            const crowded = books > MAX_BOOKS_PER_DAY;
+            const crowded = books > studio.maxBooksPerDay;
 
             return (
               <div
@@ -535,7 +538,7 @@ export function CapacityCalendar({
         <p className={`${adminType.small} mt-3`}>
           Click any day to block time on it. Numbers are hours already committed that day. An asterisk means the book has no chosen
           recording days yet, so its hours are spread across weekdays to its deadline. A new book
-          is placed on empty days first and never on a day already holding {MAX_BOOKS_PER_DAY};
+          is placed on empty days first and never on a day already holding {studio.maxBooksPerDay};
           days in red hold more than that already.
         </p>
       </div>

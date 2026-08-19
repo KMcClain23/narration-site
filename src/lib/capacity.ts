@@ -103,6 +103,8 @@ export function buildCalendar(
   dailyCapacity: number = DEFAULT_DAILY_CAPACITY,
   today: Date = new Date(),
   blocks: TimeBlock[] = [],
+  /** From Settings, so the calendar and the board agree on how fast a book reads. */
+  wordsPerHour?: number,
 ): DayLoad[] {
   const horizon = eachDay(today, horizonDays);
   const byDate = new Map<string, DayLoad>(
@@ -122,6 +124,7 @@ export function buildCalendar(
       card.deadline,
       { dates: card.recording_dates } as RecordingSchedule,
       today,
+      wordsPerHour,
     );
     if (!plan) continue;
 
