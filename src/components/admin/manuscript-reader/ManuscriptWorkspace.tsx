@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMarkupMode, setMarkupMode } from "./useMarkupMode";
 import { ManuscriptReader, type ChapterWithSpans } from "./ManuscriptReader";
 import { PageHighlighter, type PageHighlight } from "./PageHighlighter";
 import type { CharacterLite } from "./ParagraphText";
@@ -34,11 +34,13 @@ export function ManuscriptWorkspace({
   hasPdf: boolean;
   initialHighlights: PageHighlight[];
 }) {
-  // Pages leads when there is nothing readable to fall back on, which is the
-  // situation that sends anyone here in the first place.
-  const [mode, setMode] = useState<"text" | "pages">(
-    hasPdf && chapters.length === 0 ? "pages" : "text",
-  );
+  // Text unless there is nothing readable to fall back on. Beyond that the
+  // choice is deliberate and per book, so it is remembered: a manuscript whose
+  // text extracts as gibberish should not reopen in the view that cannot show
+  // it, every time.
+  const fallback = hasPdf && chapters.length === 0 ? "pages" : "text";
+  const mode = useMarkupMode(manuscriptId, fallback);
+  const setMode = (m: "text" | "pages") => setMarkupMode(manuscriptId, m);
 
   return (
     <>
