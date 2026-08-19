@@ -120,6 +120,21 @@ export function StudioSettingsForm({ initial }: { initial: StudioSettings }) {
                 </span>
               </div>
               <p className={`${adminType.small} mt-1 max-w-[520px]`}>{f.effect}</p>
+
+              {/* Narrators think in a ratio, not in words per hour. Showing the
+                  one the two rates imply turns a number you have to trust into
+                  one you can check against how a day actually feels. */}
+              {f.key === "wordsPerNarrationHour" &&
+                (() => {
+                  const speed = Number(values.wordsPerNarrationHour);
+                  const finished = Number(values.wordsPerFinishedHour);
+                  if (!(speed > 0) || !(finished > 0)) return null;
+                  return (
+                    <p className="mt-0.5 text-[12px] text-accent-amber-bright/80">
+                      {(finished / speed).toFixed(1)} hours at the mic per finished hour.
+                    </p>
+                  );
+                })()}
               {/* Only when it differs, so the default case stays quiet. */}
               {changed && (
                 <p className="mt-0.5 text-[12px] text-text-faint">
