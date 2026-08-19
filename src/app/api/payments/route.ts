@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isAdminRequest } from "@/lib/require-admin";
 import { derivePaymentStatus, type PaymentRow } from "@/lib/payments";
 import { closePaymentLinks, type LinkClosure, type PaymentLinkRow } from "@/lib/close-payment-links";
+import { announceSettlement } from "@/lib/settle-payment";
 
 // CRUD for payment milestones. Every write goes through supabaseAdmin
 // (service role) — payments has RLS on with a service-role-only policy and
@@ -130,6 +131,17 @@ export async function PATCH(req: Request) {
     if ("notes" in body) patch.notes = String(body.notes ?? "").trim();
     if ("sort_order" in body) patch.sort_order = Number(body.sort_order) || 0;
 
+    // Read before writing, so "this payment just landed" can be told apart
+    // from "this payment was already recorded and something else was edited".
+    // Without it, correcting a typo on a paid invoice would send the notice
+    // again.
+    const { data: prior } = await supabaseAdmin
+      .from("payments")
+      .select("amount_received")
+      .eq("id", id)
+      .maybeSingle();
+    const wasUnpaid = !(Number(prior?.amount_received) > 0);
+
     const { data, error } = await supabaseAdmin
       .from("payments")
       .update(patch)
@@ -150,6 +162,15 @@ export async function PATCH(req: Request) {
     let links: LinkClosure | null = null;
     if (derivePaymentStatus(data as unknown as PaymentRow) === "paid") {
       links = await closePaymentLinks(data as unknown as PaymentLinkRow);
+
+      // Venmo, Zelle, a cheque: nothing tells the site those arrived, so they
+      // are typed in here rather than arriving through a webhook. The notice
+      // is still worth sending — not as news, but because it carries who is
+      // owed out of this money and how to pay them.
+      const row = data as unknown as PaymentRow & { card_id: string; method: string };
+      if (wasUnpaid) {
+        await announceSettlement(row, Number(row.amount_received) || 0, row.method ?? "");
+      }
     }
 
     return NextResponse.json({ payment: data, ...(links ? { links } : {}) });

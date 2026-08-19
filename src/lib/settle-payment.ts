@@ -94,6 +94,48 @@ async function owedOnProject(rows: PaymentRow[], projectTitle: string): Promise<
     });
 }
 
+/**
+ * Send the "you were paid" notice for a payment that has just settled.
+ *
+ * Shared by the webhooks and by settling one by hand, because most of what
+ * makes the mail useful is not the news that money arrived — for a Venmo
+ * payment typed in by the person who received it, that is not news at all. It
+ * is the list of who is owed out of it, with a way to pay each of them.
+ *
+ * Never throws: a notification that fails must not fail the settlement.
+ */
+export async function announceSettlement(
+  payment: PaymentRow & { card_id: string },
+  amount: number,
+  method: string,
+): Promise<void> {
+  try {
+    const { data: card } = await supabaseAdmin
+      .from("board_cards")
+      .select("title, author")
+      .eq("id", payment.card_id)
+      .single();
+    if (!card) return;
+
+    const { data: siblings } = await supabaseAdmin
+      .from("payments")
+      .select(PAYMENT_SELECT)
+      .eq("card_id", payment.card_id);
+
+    const project = card as { title?: string; author?: string };
+    await notifyPaymentReceived({
+      amount,
+      method: method || "Recorded by hand",
+      projectTitle: project.title ?? "Untitled",
+      author: project.author ?? "",
+      invoiceNumber: payment.invoice_number ?? "",
+      owed: await owedOnProject((siblings ?? []) as unknown as PaymentRow[], project.title ?? ""),
+    });
+  } catch (err) {
+    console.error("settlement notice failed:", err);
+  }
+}
+
 export async function settleFromProvider(paymentId: string, method: string): Promise<SettleResult> {
   const { data: payment } = await supabaseAdmin
     .from("payments")
@@ -151,15 +193,7 @@ export async function settleFromProvider(paymentId: string, method: string): Pro
     method: row.method ?? "",
   });
 
-  const project = card as unknown as { title?: string; author?: string };
-  await notifyPaymentReceived({
-    amount: due,
-    method,
-    projectTitle: project.title ?? "Untitled",
-    author: project.author ?? "",
-    invoiceNumber: row.invoice_number ?? "",
-    owed: await owedOnProject(rows, project.title ?? ""),
-  });
+  await announceSettlement(row, due, method);
 
   return { settled: true, reason: `recorded ${due.toFixed(2)} via ${method}` };
 }
