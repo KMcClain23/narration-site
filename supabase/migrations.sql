@@ -852,3 +852,35 @@ create policy time_blocks_service_role on time_blocks
 -- Counted in words of this narrator's own share, not of the manuscript: on a
 -- duet the two halves are recorded separately and only one of them is yours.
 alter table board_cards add column if not exists words_recorded integer not null default 0;
+
+-- ---------------------------------------------------------------------------
+-- Dialogue marked directly on the page image of a PDF.
+--
+-- The text-based highlighting needs a trustworthy text layer, and a print PDF
+-- typeset with subsetted fonts does not have one: the glyphs draw correctly
+-- but extract as gibberish, so character names come out wrong and nothing can
+-- be matched against them. The page still renders perfectly, which is what a
+-- narrator reads from anyway.
+--
+-- Stored as fractions of the page rather than pixels, so a highlight drawn at
+-- one zoom level lands in the same place at any other.
+create table if not exists page_highlights (
+  id            uuid        primary key default gen_random_uuid(),
+  manuscript_id uuid        not null references manuscripts(id) on delete cascade,
+  character_id  uuid        references characters(id) on delete set null,
+  page          integer     not null,
+  x             numeric(6,5) not null,
+  y             numeric(6,5) not null,
+  w             numeric(6,5) not null,
+  h             numeric(6,5) not null,
+  note          text        not null default '',
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists page_highlights_page_idx on page_highlights (manuscript_id, page);
+
+alter table page_highlights enable row level security;
+
+drop policy if exists page_highlights_service_role on page_highlights;
+create policy page_highlights_service_role on page_highlights
+  for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');

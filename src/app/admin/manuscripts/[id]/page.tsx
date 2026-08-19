@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { adminType } from "@/lib/design-tokens";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { ManuscriptReader, type ChapterWithSpans } from "@/components/admin/manuscript-reader/ManuscriptReader";
+import type { ChapterWithSpans } from "@/components/admin/manuscript-reader/ManuscriptReader";
+import { ManuscriptWorkspace } from "@/components/admin/manuscript-reader/ManuscriptWorkspace";
+import type { PageHighlight } from "@/components/admin/manuscript-reader/PageHighlighter";
 import { assertAdmin } from "@/lib/require-admin";
 
 // Admin data changes constantly — always read fresh, same convention as the
@@ -59,7 +61,7 @@ export default async function ManuscriptReaderPage({ params }: { params: Promise
 
   const { data: manuscript } = await supabaseAdmin
     .from("manuscripts")
-    .select("id, title, author, status")
+    .select("id, title, author, status, source_format")
     .eq("id", id)
     .single();
 
@@ -119,6 +121,15 @@ export default async function ManuscriptReaderPage({ params }: { params: Promise
     spans: spansByChapter.get(ch.id) ?? [],
   }));
 
+  // Only for PDFs: the page view has nothing to render for a .docx or .txt.
+  const hasPdf = manuscript.source_format === "pdf";
+  const { data: pageHighlights } = hasPdf
+    ? await supabaseAdmin
+        .from("page_highlights")
+        .select("id, character_id, page, x, y, w, h, note")
+        .eq("manuscript_id", id)
+    : { data: [] };
+
   return (
     <AdminLayout>
       {/* A dedicated light "page" for the reading surface itself — long-form
@@ -126,12 +137,17 @@ export default async function ManuscriptReaderPage({ params }: { params: Promise
           real reading session, so this floats a paper-toned page on the
           dark chrome rather than reusing the dark admin tokens. */}
       <div className="mx-auto max-w-[820px] rounded-2xl bg-[#f1eee3] p-8 shadow-2xl sm:p-12">
-        <ManuscriptReader
+        <ManuscriptWorkspace
           manuscriptId={manuscript.id}
           title={manuscript.title}
           author={manuscript.author}
           characters={characters ?? []}
           chapters={chaptersWithSpans}
+          hasPdf={hasPdf}
+          initialHighlights={((pageHighlights ?? []) as PageHighlight[]).map(h => ({
+            ...h,
+            x: Number(h.x), y: Number(h.y), w: Number(h.w), h: Number(h.h),
+          }))}
         />
       </div>
     </AdminLayout>
