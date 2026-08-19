@@ -150,6 +150,29 @@ export type NarrationPlan = {
   overdue: boolean;
 };
 
+export type NarrationInput = {
+  wordCount: number | null;
+  narrationFormat: string | null;
+  narratorSharePercent: number | null;
+  deadline: string | null;
+  /**
+   * Required, and required on purpose.
+   *
+   * This was a trailing optional argument with a sensible-looking default, and
+   * three separate surfaces forgot to pass it — the card modal, the sidebar
+   * agenda, and the capacity calendar before it. Each one then answered at the
+   * built-in rate while everything else used the rate from Settings, and every
+   * one of them looked entirely reasonable in isolation. A missing rate is now
+   * a build error rather than a number that is quietly wrong by a factor of
+   * two.
+   */
+  wordsPerHour: number;
+  /** Words of this narrator's share already recorded. */
+  wordsRecorded?: number;
+  schedule?: RecordingSchedule;
+  today?: Date;
+};
+
 /**
  * How long a book takes to narrate, and what that means per working day.
  *
@@ -157,18 +180,18 @@ export type NarrationPlan = {
  * fee book occupies exactly as much of the week as a per-finished-hour one.
  * Today counts as available, since it is a day you can still record in.
  */
-export function narrationPlan(
-  wordCount: number | null,
-  narrationFormat: string | null,
-  narratorSharePercent: number | null,
-  deadline: string | null,
-  schedule: RecordingSchedule = {},
-  today: Date = new Date(),
-  /** Overrides the built-in rate with whatever Settings holds. */
-  wordsPerHour: number = WORDS_PER_NARRATION_HOUR,
-  /** Words of this narrator's share already recorded. */
-  wordsRecorded: number = 0,
-): NarrationPlan | null {
+export function narrationPlan(input: NarrationInput): NarrationPlan | null {
+  const {
+    wordCount,
+    narrationFormat,
+    narratorSharePercent,
+    deadline,
+    wordsPerHour,
+    wordsRecorded = 0,
+    schedule = {},
+    today = new Date(),
+  } = input;
+
   if (!wordCount || wordCount <= 0) return null;
   const share = narratorShareOf(narrationFormat, narratorSharePercent);
   if (share == null) return null;

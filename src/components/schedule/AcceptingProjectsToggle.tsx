@@ -9,7 +9,7 @@ export function AcceptingProjectsToggle({ initial }: { initial: boolean }) {
 
   const toggle = async () => {
     const next = !enabled;
-    setEnabled(next); // optimiztic
+    setEnabled(next); // optimistic
     setSaving(true);
     try {
       const res = await fetch("/api/site-settings", {

@@ -131,16 +131,15 @@ export function BoardCardContent({
             // Nothing to say once the mic work is done. The row keeps its
             // height so cards stay uniform down the column.
             if (!stillAtMic(card.status)) return " ";
-            const plan = narrationPlan(
-              card.word_count,
-              card.narration_format,
-              card.narrator_share_percent,
-              card.deadline,
-              { dates: card.recording_dates },
-              undefined,
-              studio.wordsPerNarrationHour,
-              card.words_recorded ?? 0,
-            );
+            const plan = narrationPlan({
+              wordCount: card.word_count,
+              narrationFormat: card.narration_format,
+              narratorSharePercent: card.narrator_share_percent,
+              deadline: card.deadline,
+              schedule: { dates: card.recording_dates },
+              wordsPerHour: studio.wordsPerNarrationHour,
+              wordsRecorded: card.words_recorded ?? 0,
+            });
             if (!plan) return " ";
             const started = plan.fractionDone > 0.005;
             if (plan.hours <= 0.005) {

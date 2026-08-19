@@ -396,7 +396,7 @@ export function PrepperClient({ initialManuscripts }: { initialManuscripts: Manu
 
   // Clears the recorded failures so extraction picks those chapters up again.
   // Nothing is scheduled here — the cron finds them within a minute. The row
-  // is updated optimiztically so the red line disappears immediately rather
+  // is updated optimistically so the red line disappears immediately rather
   // than lingering until the next poll.
   const handleRetryFailed = async (m: ManuscriptRow) => {
     setRetryingId(m.id);

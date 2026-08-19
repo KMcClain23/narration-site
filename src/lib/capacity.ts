@@ -98,15 +98,25 @@ function daysFor(card: CapacityCard, horizon: string[], today: Date): { days: st
   return { days, assumed: days.length > 0 };
 }
 
-export function buildCalendar(
-  cards: CapacityCard[],
-  horizonDays: number,
-  dailyCapacity: number = DEFAULT_DAILY_CAPACITY,
-  today: Date = new Date(),
-  blocks: TimeBlock[] = [],
-  /** From Settings, so the calendar and the board agree on how fast a book reads. */
-  wordsPerHour?: number,
-): DayLoad[] {
+export type CalendarInput = {
+  cards: CapacityCard[];
+  horizonDays: number;
+  /** From Settings. Required, so no surface can silently use a different one. */
+  wordsPerHour: number;
+  dailyCapacity?: number;
+  today?: Date;
+  blocks?: TimeBlock[];
+};
+
+export function buildCalendar(input: CalendarInput): DayLoad[] {
+  const {
+    cards,
+    horizonDays,
+    wordsPerHour,
+    dailyCapacity = DEFAULT_DAILY_CAPACITY,
+    today = new Date(),
+    blocks = [],
+  } = input;
   const horizon = eachDay(today, horizonDays);
   const byDate = new Map<string, DayLoad>(
     horizon.map(date => [date, { date, commitments: [], committed: 0, free: dailyCapacity, assumed: false }]),
@@ -118,16 +128,16 @@ export function buildCalendar(
     // that genuinely exists.
     if (!stillAtMic(card.status)) continue;
 
-    const plan = narrationPlan(
-      card.word_count,
-      card.narration_format,
-      card.narrator_share_percent,
-      card.deadline,
-      { dates: card.recording_dates } as RecordingSchedule,
+    const plan = narrationPlan({
+      wordCount: card.word_count,
+      narrationFormat: card.narration_format,
+      narratorSharePercent: card.narrator_share_percent,
+      deadline: card.deadline,
+      schedule: { dates: card.recording_dates } as RecordingSchedule,
       today,
       wordsPerHour,
-      card.words_recorded ?? 0,
-    );
+      wordsRecorded: card.words_recorded ?? 0,
+    });
     // Nothing left to record means nothing left to schedule.
     if (!plan || plan.hours <= 0.005) continue;
 
@@ -199,9 +209,13 @@ export function booksOn(day: DayLoad): number {
 export function fitBook(
   hours: number,
   calendar: DayLoad[],
-  availableDays: number[] = DEFAULT_AVAILABLE_DAYS,
-  maxBooksPerDay: number = MAX_BOOKS_PER_DAY,
+  opts: {
+    /** From Settings. Required for the same reason wordsPerHour is. */
+    maxBooksPerDay: number;
+    availableDays?: number[];
+  },
 ): Fit | null {
+  const { maxBooksPerDay, availableDays = DEFAULT_AVAILABLE_DAYS } = opts;
   if (hours <= 0) return null;
 
   const usable = (day: DayLoad) => {

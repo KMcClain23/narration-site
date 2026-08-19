@@ -107,7 +107,7 @@ export function CapacityCalendar({
   const [asking, setAsking] = useState<number | null>(null);
   const [cursor, setCursor] = useState(() => ({ y: today.getFullYear(), m: today.getMonth() }));
 
-  // Held locally and updated optimiztically: adding a block should redraw the
+  // Held locally and updated optimistically: adding a block should redraw the
   // day under the cursor, not wait for a round trip and a page refresh.
   const [blocks, setBlocks] = useState<TimeBlock[]>(initialBlocks);
   const [picked, setPicked] = useState<string | null>(null);
@@ -142,7 +142,7 @@ export function CapacityCalendar({
   }, [liveCards]);
 
   const calendar = useMemo(
-    () => buildCalendar(liveCards, HORIZON_DAYS, dayHours, today, blocks, studio.wordsPerNarrationHour),
+    () => buildCalendar({ cards: liveCards, horizonDays: HORIZON_DAYS, dailyCapacity: dayHours, today, blocks, wordsPerHour: studio.wordsPerNarrationHour }),
     [liveCards, dayHours, today, blocks, studio.wordsPerNarrationHour],
   );
   const byDate = useMemo(() => new Map(calendar.map(d => [d.date, d])), [calendar]);
@@ -156,7 +156,7 @@ export function CapacityCalendar({
   }, [cards]);
 
   const free = totalFree(calendar);
-  const fit = asking ? fitBook(asking, calendar, undefined, studio.maxBooksPerDay) : null;
+  const fit = asking ? fitBook(asking, calendar, { maxBooksPerDay: studio.maxBooksPerDay }) : null;
   const fitDays = useMemo(() => new Map((fit?.days ?? []).map(d => [d.date, d.hours])), [fit]);
 
   const first = new Date(cursor.y, cursor.m, 1);

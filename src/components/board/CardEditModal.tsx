@@ -759,18 +759,15 @@ export function CardEditModal(props: CardEditModalProps) {
 
     // What the job costs in time rather than what it pays. Same share as the
     // earnings figure above, since a duet narrator reads half the book.
-    const plan = narrationPlan(
-      form.word_count,
-      form.narration_format,
-      form.narrator_share_percent,
-      form.deadline || null,
-      { dates: form.recording_dates },
-      undefined,
-      // Was left at the default, so this block quietly disagreed with the board
-      // and the schedule the moment the rate in Settings was changed.
-      studio.wordsPerNarrationHour,
-      form.words_recorded,
-    );
+    const plan = narrationPlan({
+      wordCount: form.word_count,
+      narrationFormat: form.narration_format,
+      narratorSharePercent: form.narrator_share_percent,
+      deadline: form.deadline || null,
+      schedule: { dates: form.recording_dates },
+      wordsPerHour: studio.wordsPerNarrationHour,
+      wordsRecorded: form.words_recorded,
+    });
     /** The narrator's own portion, which is what progress is measured against. */
     const shareWords = Math.round(form.word_count * (appliedShare / 100));
 

@@ -95,16 +95,15 @@ export async function GET() {
   for (const c of cards) {
     const dates: string[] = Array.isArray(c.recording_dates) ? c.recording_dates : [];
     if (dates.length === 0) continue;
-    const plan = narrationPlan(
-      c.word_count,
-      c.narration_format,
-      c.narrator_share_percent,
-      c.deadline,
-      { dates },
-      new Date(),
-      studio.wordsPerNarrationHour,
-      Number(c.words_recorded) || 0,
-    );
+    const plan = narrationPlan({
+      wordCount: c.word_count,
+      narrationFormat: c.narration_format,
+      narratorSharePercent: c.narrator_share_percent,
+      deadline: c.deadline,
+      schedule: { dates },
+      wordsPerHour: studio.wordsPerNarrationHour,
+      wordsRecorded: Number(c.words_recorded) || 0,
+    });
     const perDay = plan?.hoursPerDay ?? null;
 
     // The week and month totals are the same per-day figure counted across
