@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CharacterLite } from "./ParagraphText";
+import { uploadVoiceSample } from "./ManuscriptReader";
 
 /**
  * Mark dialogue on the page itself, for books whose text layer cannot be read.
@@ -65,8 +66,69 @@ export function PageHighlighter({
   const [drawing, setDrawing] = useState<Rect | null>(null);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
 
-  const charById = new Map(characters.map(c => [c.id, c]));
+  // Held locally so a character added here, or a sample attached, appears at
+  // once rather than after a reload.
+  const [cast, setCast] = useState<CharacterLite[]>(characters);
+  const [newName, setNewName] = useState("");
+  const [uploadingFor, setUploadingFor] = useState<string | null>(null);
+  const [playing, setPlaying] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const charById = new Map(cast.map(c => [c.id, c]));
   const onThisPage = highlights.filter(h => h.page === page);
+
+  /** One element reused for every sample, so two cannot play at once. */
+  function toggleSample(characterId: string, url: string) {
+    const audio = (audioRef.current ??= new Audio());
+    if (playing === characterId) {
+      audio.pause();
+      setPlaying(null);
+      return;
+    }
+    audio.pause();
+    audio.src = url;
+    audio.currentTime = 0;
+    audio.onended = () => setPlaying(null);
+    void audio.play().catch(() => {});
+    setPlaying(characterId);
+  }
+
+  async function addCharacter() {
+    const name = newName.trim();
+    if (!name) return;
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/manuscripts/${manuscriptId}/characters`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(json?.error ?? "Could not add that character.");
+        return;
+      }
+      setCast(c => [...c, json.character]);
+      setNewName("");
+      // Newly added is almost always who you are about to mark.
+      setActiveCharacter(json.character.id);
+    } catch {
+      setError("Could not add that character.");
+    }
+  }
+
+  async function attachSample(characterId: string, file: File) {
+    setUploadingFor(characterId);
+    setError(null);
+    try {
+      const url = await uploadVoiceSample(manuscriptId, characterId, file, () => {});
+      setCast(c => c.map(x => (x.id === characterId ? { ...x, voice_sample_url: url } : x)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not attach that sample.");
+    } finally {
+      setUploadingFor(null);
+    }
+  }
 
   // Load the document once. pdfjs is imported here rather than at module level
   // so it never enters a server bundle.
@@ -186,16 +248,16 @@ export function PageHighlighter({
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const n = Number(e.key);
-      if (n >= 1 && n <= 9 && characters[n - 1]) setActiveCharacter(characters[n - 1].id);
+      if (n >= 1 && n <= 9 && cast[n - 1]) setActiveCharacter(cast[n - 1].id);
       if (e.key === "ArrowRight") setPage(p => Math.min(pageCount || p, p + 1));
       if (e.key === "ArrowLeft") setPage(p => Math.max(1, p - 1));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [characters, pageCount]);
+  }, [cast, pageCount]);
 
   if (error && loading) {
-    return <p className="text-sm text-alert-red">{error}</p>;
+    return <p className="text-sm text-[#a3352b]">{error}</p>;
   }
 
   return (
@@ -205,11 +267,11 @@ export function PageHighlighter({
           type="button"
           onClick={() => setPage(p => Math.max(1, p - 1))}
           disabled={page <= 1}
-          className="rounded-lg border border-surface-border px-2.5 py-1.5 text-[13px] text-text-body disabled:opacity-40"
+          className="rounded-lg border border-[#ddd8c9] px-2.5 py-1.5 text-[13px] text-[#26241f] disabled:opacity-40"
         >
           Previous
         </button>
-        <span className="text-[13px] text-text-muted">
+        <span className="text-[13px] text-[#6f6a5e]">
           Page {page}
           {pageCount ? ` of ${pageCount}` : ""}
         </span>
@@ -217,53 +279,112 @@ export function PageHighlighter({
           type="button"
           onClick={() => setPage(p => Math.min(pageCount || p, p + 1))}
           disabled={pageCount > 0 && page >= pageCount}
-          className="rounded-lg border border-surface-border px-2.5 py-1.5 text-[13px] text-text-body disabled:opacity-40"
+          className="rounded-lg border border-[#ddd8c9] px-2.5 py-1.5 text-[13px] text-[#26241f] disabled:opacity-40"
         >
           Next
         </button>
 
         <span className="ml-2 flex items-center gap-1">
-          <button type="button" onClick={() => setScale(s => Math.max(0.6, s - 0.2))} className="rounded-lg border border-surface-border px-2 py-1.5 text-[13px] text-text-body">−</button>
-          <span className="text-[13px] text-text-muted">{Math.round(scale * 100)}%</span>
-          <button type="button" onClick={() => setScale(s => Math.min(3, s + 0.2))} className="rounded-lg border border-surface-border px-2 py-1.5 text-[13px] text-text-body">+</button>
+          <button type="button" onClick={() => setScale(s => Math.max(0.6, s - 0.2))} className="rounded-lg border border-[#ddd8c9] px-2 py-1.5 text-[13px] text-[#26241f]">−</button>
+          <span className="text-[13px] text-[#6f6a5e]">{Math.round(scale * 100)}%</span>
+          <button type="button" onClick={() => setScale(s => Math.min(3, s + 0.2))} className="rounded-lg border border-[#ddd8c9] px-2 py-1.5 text-[13px] text-[#26241f]">+</button>
         </span>
 
-        <span className="ml-auto text-[13px] text-text-muted">
+        <span className="ml-auto text-[13px] text-[#6f6a5e]">
           {onThisPage.length} on this page · {highlights.length} in the book
         </span>
       </div>
 
       {/* Who the next box belongs to. Numbered so the keyboard can reach them. */}
-      <div className="mb-3 flex flex-wrap gap-1.5">
-        {characters.map((c, i) => (
-          <button
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        {cast.map((c, i) => (
+          <span
             key={c.id}
-            type="button"
-            onClick={() => setActiveCharacter(c.id)}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[13px] transition-colors ${
+            className={`flex items-center gap-1.5 rounded-lg border px-1.5 py-1 text-[13px] transition-colors ${
               activeCharacter === c.id
-                ? "border-accent-amber bg-accent-amber/15 text-text-primary"
-                : "border-surface-border text-text-muted hover:text-text-primary"
+                ? "border-[#8a6d2f] bg-[#8a6d2f]/15 font-medium text-[#1a1a1a]"
+                : "border-black/15 text-[#1a1a1a]/60"
             }`}
           >
-            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: c.color_hex }} />
-            {c.name}
-            {i < 9 && <span className="text-text-faint">{i + 1}</span>}
-          </button>
+            {/* The swatch doubles as the play button, which is how the text
+                view already works: hearing the voice you are about to assign
+                is the point of having samples at all. */}
+            <button
+              type="button"
+              onClick={() => c.voice_sample_url && toggleSample(c.id, c.voice_sample_url)}
+              disabled={!c.voice_sample_url}
+              title={c.voice_sample_url ? `Play ${c.name}` : `${c.name} has no voice sample yet`}
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full disabled:cursor-default"
+              style={{ background: c.color_hex }}
+            >
+              {c.voice_sample_url && (
+                <span className="text-[9px] leading-none text-white">
+                  {playing === c.id ? "■" : "▶"}
+                </span>
+              )}
+            </button>
+
+            <button type="button" onClick={() => setActiveCharacter(c.id)} className="hover:text-[#1a1a1a]">
+              {c.name}
+            </button>
+            {i < 9 && <span className="text-[#8a8577]">{i + 1}</span>}
+
+            <label
+              title={c.voice_sample_url ? "Replace the voice sample" : "Add a voice sample"}
+              className="cursor-pointer px-0.5 text-[11px] text-[#8a8577] hover:text-[#1a1a1a]"
+            >
+              {uploadingFor === c.id ? "…" : "♪"}
+              <input
+                type="file"
+                accept="audio/*"
+                className="sr-only"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) void attachSample(c.id, f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </span>
         ))}
-        {characters.length === 0 && (
-          <p className="text-[13px] text-text-muted">
-            No characters yet. Add them first, then their dialogue can be marked.
-          </p>
-        )}
+
+        {/* A book marked up on the page was never parsed, so it has no cast at
+            all. Without this there is nobody to assign dialogue to and the
+            view is useless for exactly the books it exists for. */}
+        <form
+          onSubmit={e => {
+            e.preventDefault();
+            void addCharacter();
+          }}
+          className="flex items-center gap-1"
+        >
+          <input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            placeholder="Add character"
+            className="w-32 rounded-lg border border-black/15 bg-white/60 px-2 py-1 text-[13px] text-[#1a1a1a] placeholder:text-[#8a8577] focus:border-[#8a6d2f] focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={!newName.trim()}
+            className="rounded-lg border border-black/15 px-2 py-1 text-[13px] text-[#6f6a5e] hover:text-[#1a1a1a] disabled:opacity-40"
+          >
+            Add
+          </button>
+        </form>
       </div>
 
-      {error && <p className="mb-2 text-[13px] text-alert-red">{error}</p>}
-      {loading && <p className="text-sm text-text-muted">Opening the PDF…</p>}
+      {error && <p className="mb-2 text-[13px] text-[#a3352b]">{error}</p>}
+      {loading && <p className="text-sm text-[#6f6a5e]">Opening the PDF…</p>}
 
+      {/* The canvas is drawn at full page resolution and scaled down by CSS to
+          fit, rather than rendered small: the text stays sharp, and the
+          highlight overlay is positioned in percentages so it tracks whatever
+          size the page ends up. Overflowing the reading card was the previous
+          behavior, with the right-hand margin of every page cut off. */}
       <div
         ref={surfaceRef}
-        className="relative inline-block touch-none select-none bg-white"
+        className="relative inline-block max-w-full touch-none select-none bg-white"
         onPointerDown={e => {
           if (!activeCharacter) return;
           dragStart.current = point(e);
@@ -282,7 +403,7 @@ export function PageHighlighter({
           if (rect.w > 0.005 && rect.h > 0.002) void save(rect);
         }}
       >
-        <canvas ref={canvasRef} className="block" />
+        <canvas ref={canvasRef} className="block h-auto max-w-full" />
 
         {onThisPage.map(h => {
           const c = h.character_id ? charById.get(h.character_id) : undefined;
@@ -324,7 +445,7 @@ export function PageHighlighter({
         )}
       </div>
 
-      <p className="mt-3 text-[13px] text-text-muted">
+      <p className="mt-3 text-[13px] text-[#6f6a5e]">
         Drag across a line to mark it for the selected speaker. Number keys switch speaker, arrow
         keys turn the page. Click a highlight to remove it, right-click to reassign it.
       </p>

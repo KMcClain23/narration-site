@@ -543,7 +543,7 @@ function TagDialogueControl({
  *  throughout the app (uploadToR2 in demos-shared.ts, uploadManuscript in
  *  PrepperClient.tsx), pointed at the per-character voice-sample route, then
  *  attaches it via PATCH once the PUT to R2 actually finishes. */
-async function uploadVoiceSample(
+export async function uploadVoiceSample(
   manuscriptId: string,
   characterId: string,
   file: File,

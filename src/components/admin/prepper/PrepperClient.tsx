@@ -131,6 +131,9 @@ function UploadModal({
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  // Chosen up front for a book already known to extract as gibberish, so the
+  // parse is skipped rather than run and thrown away.
+  const [pagesOnly, setPagesOnly] = useState(false);
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState<"idle" | "uploading" | "creating">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -170,7 +173,13 @@ function UploadModal({
       const res = await fetch("/api/admin/manuscripts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), author: author.trim() || undefined, key, format }),
+        body: JSON.stringify({
+          title: title.trim(),
+          author: author.trim() || undefined,
+          key,
+          format,
+          pages_only: pagesOnly && format === "pdf",
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to create manuscript");
@@ -178,7 +187,7 @@ function UploadModal({
         id: json.id,
         title: title.trim(),
         author: author.trim() || null,
-        status: "processing",
+        status: pagesOnly && format === "pdf" ? "ready" : "processing",
         source_format: format,
         error_message: null,
         created_at: new Date().toISOString(),
@@ -247,6 +256,27 @@ function UploadModal({
               />
             </div>
           </div>
+
+          {/* Only offered for PDFs: a .docx or .txt has no pages to draw on,
+              and its text extracts reliably anyway. */}
+          {file?.name.toLowerCase().endsWith(".pdf") && (
+            <label className="flex items-start gap-2.5 rounded-lg border border-surface-border p-3">
+              <input
+                type="checkbox"
+                checked={pagesOnly}
+                disabled={busy}
+                onChange={e => setPagesOnly(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-[#D4AF37]"
+              />
+              <span>
+                <span className="block text-sm text-text-body">Skip the parse, mark up on the page</span>
+                <span className={`${adminType.small} block`}>
+                  For a print PDF whose text comes out garbled. Nothing is extracted, so there are
+                  no chapters and no automatic highlights, and the book opens straight in Pages.
+                </span>
+              </span>
+            </label>
+          )}
 
           {stage === "uploading" && (
             <div>

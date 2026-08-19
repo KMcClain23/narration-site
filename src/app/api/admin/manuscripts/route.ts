@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireAdmin } from "@/lib/require-admin";
 
 // The parse runs inside this invocation, after the response has been sent, so
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   const denied = await requireAdmin();
   if (denied) return denied;
   try {
-    const { title, author, key, format } = await req.json();
+    const { title, author, key, format, pages_only } = await req.json();
 
     if (!title || typeof title !== "string") {
       return NextResponse.json({ error: "Missing title" }, { status: 400 });
@@ -23,6 +23,8 @@ export async function POST(req: Request) {
     if (!key || typeof key !== "string") {
       return NextResponse.json({ error: "Missing key" }, { status: 400 });
     }
+    const pagesOnly = pages_only === true && format === "pdf";
+
     if (format !== "pdf" && format !== "docx" && format !== "txt") {
       return NextResponse.json({ error: "format must be 'pdf', 'docx', or 'txt'" }, { status: 400 });
     }
@@ -34,12 +36,19 @@ export async function POST(req: Request) {
         author: typeof author === "string" && author.trim() ? author.trim() : null,
         source_r2_key: key,
         source_format: format,
-        status: "processing",
+        // Skipping the parse means there is nothing to wait for: the book is
+        // ready to mark up on the page as soon as it finishes uploading.
+        status: pagesOnly ? "ready" : "processing",
       })
       .select("id")
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Asked for at upload, for a book already known to extract as gibberish.
+    // Parsing anyway would spend a minute and a model call producing chapters
+    // nobody is going to read.
+    if (pagesOnly) return NextResponse.json({ id: data.id, pagesOnly: true });
 
     // Kicked off with after(), not a floating promise.
     //
