@@ -78,6 +78,21 @@ export function narratorShareOf(
 const DEFAULT_DAYS = [1, 2, 3, 4, 5];
 
 /**
+ * Statuses where the narrating is still ahead of you.
+ *
+ * Everything after Recording is post: editing, released, and recast all mean
+ * the mic work is finished or is not yours any more. Booth figures for those
+ * are not merely useless, they are alarming — a book in Editing showed "no
+ * recording days left" in red, which reads as a missed deadline rather than a
+ * job done.
+ */
+const AT_MIC_STATUSES = new Set(["contracted", "prepping", "recording"]);
+
+export function stillAtMic(status: string | null | undefined): boolean {
+  return AT_MIC_STATUSES.has((status ?? "").trim());
+}
+
+/**
  * Days between `from` and `to` inclusive that fall on a recording day.
  *
  * `days` holds Date.getDay() numbers, 0 for Sunday. Which days those are is a

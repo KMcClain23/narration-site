@@ -12,7 +12,10 @@ import { narrationPlan, toISODate } from "@/components/admin/board-card-utils";
 
 export const dynamic = "force-dynamic";
 
-const ACTIVE_STATUSES = ["contracted", "prepping", "recording", "editing"];
+// Editing is deliberately absent. A book past the mic still has work in it,
+// but none of it happens in the booth, and an agenda that lists it is telling
+// you to record something you have already recorded.
+const ACTIVE_STATUSES = ["contracted", "prepping", "recording"];
 
 /** How far ahead a deadline is worth seeing beside today's work. */
 const DUE_SOON_DAYS = 7;

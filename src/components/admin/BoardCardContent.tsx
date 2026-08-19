@@ -10,6 +10,7 @@ import {
   parseCoNarrators,
   estimatedEarnings,
   narrationPlan,
+  stillAtMic,
   type Urgency,
   type BoardV2Card,
 } from "./board-card-utils";
@@ -132,6 +133,9 @@ export function BoardCardContent({
             stay a uniform height whether or not a word count is set. */}
         <p className="mt-0.5 text-[13px]">
           {(() => {
+            // Nothing to say once the mic work is done. The row keeps its
+            // height so cards stay uniform down the column.
+            if (!stillAtMic(card.status)) return " ";
             const plan = narrationPlan(
               card.word_count,
               card.narration_format,

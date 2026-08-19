@@ -81,6 +81,7 @@ export default async function SchedulePage() {
     narrator_share_percent: c.narrator_share_percent,
     deadline: c.deadline,
     recording_dates: Array.isArray(c.recording_dates) ? c.recording_dates : [],
+    status: c.status,
   }));
 
   // Cards with no deadline don't factor into the monthly grid or Due Soon —

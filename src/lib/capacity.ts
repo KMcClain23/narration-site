@@ -1,4 +1,4 @@
-import { narrationPlan, toISODate, type RecordingSchedule } from "@/components/admin/board-card-utils";
+import { narrationPlan, stillAtMic, toISODate, type RecordingSchedule } from "@/components/admin/board-card-utils";
 
 /**
  * What the booth is already committed to, and what is left.
@@ -38,6 +38,8 @@ export type CapacityCard = {
   narrator_share_percent: number | null;
   deadline: string | null;
   recording_dates: string[] | null;
+  /** Booth time only counts while the narrating is still ahead. See stillAtMic. */
+  status: string | null;
 };
 
 /** Booth time that is not narrating a manuscript. */
@@ -108,6 +110,11 @@ export function buildCalendar(
   );
 
   for (const card of cards) {
+    // A book in editing is off the mic, so it stops occupying the booth and
+    // the days it used become free again. Leaving it in was hiding capacity
+    // that genuinely exists.
+    if (!stillAtMic(card.status)) continue;
+
     const plan = narrationPlan(
       card.word_count,
       card.narration_format,
@@ -165,6 +172,11 @@ export type Fit = {
   sharedDays: number;
 };
 
+/** Manuscripts on a day, ignoring pickups and other blocked time. */
+export function booksOn(day: DayLoad): number {
+  return day.commitments.filter(c => !c.isBlock).length;
+}
+
 /**
  * Where a book of `hours` would go, taken earliest-first.
  *
@@ -178,11 +190,6 @@ export type Fit = {
  * preference is an honest one: the finish date can land later than it would if
  * every free hour were fair game.
  */
-/** Manuscripts on a day, ignoring pickups and other blocked time. */
-export function booksOn(day: DayLoad): number {
-  return day.commitments.filter(c => !c.isBlock).length;
-}
-
 export function fitBook(
   hours: number,
   calendar: DayLoad[],
