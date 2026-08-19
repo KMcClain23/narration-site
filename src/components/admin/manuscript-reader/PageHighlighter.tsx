@@ -61,7 +61,20 @@ export function PageHighlighter({
   const docRef = useRef<{ numPages: number; getPage: (n: number) => Promise<unknown> } | null>(null);
 
   const [pageCount, setPageCount] = useState(0);
-  const [page, setPage] = useState(1);
+  /**
+   * Opens on the last page with anything marked on it, not page 1.
+   *
+   * Marking a book is done in one long pass, so the page you left is the page
+   * you want next. Reopening at the front showed an untouched page 1 and made
+   * a morning's work look lost — the marks were saved the whole time, they
+   * were just twelve pages away.
+   *
+   * Derived from the props rather than stored, so the server and the client
+   * agree on the first render without anything to reconcile.
+   */
+  const [page, setPage] = useState(() =>
+    initialHighlights.length ? Math.max(...initialHighlights.map(h => h.page)) : 1,
+  );
   const [scale, setScale] = useState(1.4);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +96,8 @@ export function PageHighlighter({
   const here = highlights.filter(h => h.page === page);
   const onThisPage = here.filter(h => h.kind !== "voice");
   const pinsHere = here.filter(h => h.kind === "voice");
+  /** Every page carrying a mark, in order, so the work can be found again. */
+  const marked = [...new Set(highlights.map(h => h.page))].sort((a, b) => a - b);
 
   /** A voice pin: a character parked on the page, not a box over dialogue. */
   async function dropPin(characterId: string, at: { x: number; y: number }) {
@@ -358,9 +373,20 @@ export function PageHighlighter({
           <button type="button" onClick={() => setScale(s => Math.min(3, s + 0.2))} className="rounded-lg border border-[#ddd8c9] px-2 py-1.5 text-[13px] text-[#26241f]">+</button>
         </span>
 
-        <span className="ml-auto text-[13px] text-[#6f6a5e]">
+        <span className="ml-auto flex items-center gap-2 text-[13px] text-[#6f6a5e]">
           {onThisPage.length} marked here · {pinsHere.length} voice{pinsHere.length === 1 ? "" : "s"} ·{" "}
           {highlights.filter(h => h.kind !== "voice").length} in the book
+          {/* Somewhere to go when the marks are on a page you are not on,
+              which is what made them look lost in the first place. */}
+          {marked.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setPage(marked[marked.length - 1])}
+              className="rounded border border-black/15 px-1.5 py-0.5 hover:text-[#1a1a1a]"
+            >
+              Last marked: p{marked[marked.length - 1]}
+            </button>
+          )}
         </span>
       </div>
 
