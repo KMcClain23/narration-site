@@ -355,7 +355,10 @@ function ManuscriptCard({
   // Clickable as soon as chapters exist — extraction filling in gradually
   // is a fine degrading experience (plain text where highlighting hasn't
   // landed yet), not a reason to block the reader entirely.
-  const clickable = manuscript.status === "ready";
+  // Failed and processing manuscripts open too. A parse that produced nothing
+  // is exactly when you need to get in and paste the text, and refusing to
+  // open the card made the failure final.
+  const clickable = true;
 
   return (
     <div className="flex items-center gap-2 rounded-xl border border-surface-border bg-surface p-4 transition-colors hover:border-accent-amber-dim/50">

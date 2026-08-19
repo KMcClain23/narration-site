@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Highlighter, ListTree, Mic, Square, Upload, Volume2, X } from "lucide-react";
 import { splitParagraphs, type SpanLite } from "./paragraph-highlight";
 import { ParagraphText, type CharacterLite } from "./ParagraphText";
+import { ChapterTextEditor } from "./ChapterTextEditor";
 import { computeChapterNumbers } from "@/lib/unnumbered-sections";
 
 /** Reconstructs a plain-text character offset within `root` for a DOM
@@ -408,10 +409,24 @@ export function ManuscriptReader({
         />
       )}
 
+      {/* A parse that produced nothing used to end here, with a manuscript
+          that could not even be opened. Pasting one chapter makes it readable,
+          and the usual highlighting works on it from then on. */}
+      {chapters.length === 0 && (
+        <div className="mt-8">
+          <p className="text-sm text-text-muted">
+            Nothing was extracted from this file. That happens with scanned pages, columns, and
+            headings that are images. Paste the text in and the rest of the tool works as usual.
+          </p>
+          <ChapterTextEditor manuscriptId={manuscriptId} onDone={() => {}} />
+        </div>
+      )}
+
       <div className="mt-8">
         {chapters.map((ch, i) => (
           <ChapterSection
             key={ch.id}
+            manuscriptId={manuscriptId}
             chapter={ch}
             displayNumber={chapterMeta[i].number}
             displayTotal={chapterMeta[i].total}
@@ -828,6 +843,7 @@ function EditSpanPopover({
 }
 
 function ChapterSection({
+  manuscriptId,
   chapter,
   displayNumber,
   displayTotal,
@@ -836,6 +852,7 @@ function ChapterSection({
   playingCharacterId,
   onToggleSample,
 }: {
+  manuscriptId: string;
   chapter: ChapterWithSpans;
   displayNumber: number | null;
   displayTotal: number;
@@ -852,12 +869,34 @@ function ChapterSection({
     ? [...charById.values()].find((c) => c.name === chapter.pov_character)
     : undefined;
 
+  // Off by default: fixing text is the exception, and a textarea over every
+  // chapter would bury the reading view it exists to rescue.
+  const [fixing, setFixing] = useState(false);
+
   return (
     <section id={`chapter-${chapter.id}`} className={`mb-16 scroll-mt-24 border-t ${border} pt-10 first:mt-0 first:border-t-0 first:pt-0`}>
       <p className={`${label} ${inkFaint}`}>
         {displayNumber ? `Chapter ${displayNumber} of ${displayTotal}` : "Front / back matter"}
       </p>
-      <h2 className={`mt-1 text-2xl font-bold leading-tight ${ink}`}>{chapter.title || "Untitled"}</h2>
+      <div className="mt-1 flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className={`text-2xl font-bold leading-tight ${ink}`}>{chapter.title || "Untitled"}</h2>
+        <button
+          type="button"
+          onClick={() => setFixing(v => !v)}
+          className={`text-[13px] ${inkFaint} hover:underline`}
+        >
+          {fixing ? "Close" : "Fix text"}
+        </button>
+      </div>
+
+      {fixing && (
+        <ChapterTextEditor
+          manuscriptId={manuscriptId}
+          chapter={{ id: chapter.id, title: chapter.title ?? "", raw_text: chapter.raw_text }}
+          spanCount={chapter.spans.length}
+          onDone={() => setFixing(false)}
+        />
+      )}
 
       {chapter.pov_character && (
         <span className={`mt-3 inline-flex items-center gap-1.5 rounded-full ${border} border px-2.5 py-1 text-xs ${ink}`}>
