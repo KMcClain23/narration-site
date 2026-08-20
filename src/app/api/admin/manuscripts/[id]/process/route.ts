@@ -3,8 +3,8 @@ import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { r2, R2_BUCKETS } from "@/lib/r2";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { parseManuscript, PARSE_BUDGET_MS, toStorableText } from "@/lib/manuscript-parser";
-import { nextCharacterColor } from "@/lib/character-colors";
-import { requireAdmin } from "@/lib/require-admin";
+import { nextCharacterColor } from "@/lib/character-colors";
+import { isAdminOrInternal, internalAuthHeaders } from "@/lib/require-admin";
 
 export const maxDuration = 60;
 
@@ -47,9 +47,14 @@ function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
 // POST: the actual parse job, fired-and-forgotten by /api/admin/manuscripts.
 // Downloads the source file from R2, deletes it (it's a temp upload, not a
 // permanent asset), parses chapters, writes them, and flips manuscripts.status.
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // Reached from the browser and from the upload route calling in. Requiring a
+  // cookie here meant this route answered 401 to its own trigger, silently,
+  // and every manuscript uploaded since sat at "processing" with no chapters
+  // and no error. See isAdminOrInternal.
+  if (!(await isAdminOrInternal(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id } = await params;
 
   const { data: manuscript, error: fetchError } = await supabaseAdmin
@@ -159,7 +164,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     // own resumable per-chapter chain (see extract/route.ts), so this just
     // fires the first hop; nothing here waits on it.
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.dmnarration.com";
-    fetch(`${baseUrl}/api/admin/manuscripts/${id}/extract`, { method: "POST" }).catch(() => {});
+    fetch(`${baseUrl}/api/admin/manuscripts/${id}/extract`, {
+      method: "POST",
+      headers: internalAuthHeaders(),
+    }).catch(() => {});
 
     return NextResponse.json({ ok: true });
   } catch (e) {

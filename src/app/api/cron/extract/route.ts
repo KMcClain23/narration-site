@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalAuthHeaders } from "@/lib/require-admin";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   EXTRACT_TAG,
@@ -69,6 +70,10 @@ async function retriggerStuckParses(): Promise<number> {
       // need to survive to see the outcome.
       await fetch(`${baseUrl}/api/admin/manuscripts/${m.id}/process`, {
         method: "POST",
+        // The sweep exists to rescue stuck manuscripts, and was itself being
+        // turned away at the door: every rescue attempt since the parse route
+        // started requiring a cookie has been a 401 nobody read.
+        headers: internalAuthHeaders(),
         signal: AbortSignal.timeout(5_000),
       }).catch(() => {});
       fired++;

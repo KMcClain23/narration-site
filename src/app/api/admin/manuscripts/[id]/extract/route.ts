@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { EXTRACT_TAG, runExtractionBudget } from "@/lib/extraction-runner";
-import { requireAdmin } from "@/lib/require-admin";
+import { isAdminOrInternal } from "@/lib/require-admin";
 
 export const maxDuration = 60;
 
@@ -19,9 +19,12 @@ const RUN_BUDGET_MS = 50_000;
  * Unlike the cron it reports what it did in the response, because it is called
  * by a person who wants to know.
  */
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // Called by /process and by its own resumable chain, neither of which has a
+  // cookie to send.
+  if (!(await isAdminOrInternal(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id } = await params;
 
   try {

@@ -24,6 +24,37 @@ export async function isAdminRequest(): Promise<boolean> {
 }
 
 /**
+ * Admin cookie, or the app calling itself.
+ *
+ * The parse chain is a sequence of server-to-server requests: uploading a
+ * manuscript triggers /process, which triggers /extract, which chains through
+ * its own chapters. None of those carry a browser's cookies, so once these
+ * routes started requiring one they began answering 401 to their own triggers
+ * — silently, since nothing reads the response. Every manuscript uploaded
+ * after that sat at "processing" forever with no chapters and no error, which
+ * looked exactly like a very slow parse.
+ *
+ * The shared secret is the same one the cookie is checked against, sent as a
+ * bearer between two routes of the same deployment over HTTPS. It is not a
+ * second credential to manage, and it cannot be forged without already having
+ * the admin key.
+ */
+export async function isAdminOrInternal(req: Request): Promise<boolean> {
+  if (await isAdminRequest()) return true;
+
+  const secret = process.env.ADMIN_SECRET_KEY;
+  if (!secret) return false;
+  const header = req.headers.get("authorization") ?? "";
+  return header === `Bearer ${secret}`;
+}
+
+/** Header for one route of this app to call another with. */
+export function internalAuthHeaders(): Record<string, string> {
+  const secret = process.env.ADMIN_SECRET_KEY;
+  return secret ? { authorization: `Bearer ${secret}` } : {};
+}
+
+/**
  * Redirect to the login page unless the request is authenticated.
  *
  * Call at the top of an admin server component, before any data fetching —

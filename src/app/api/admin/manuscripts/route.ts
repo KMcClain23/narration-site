@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { requireAdmin } from "@/lib/require-admin";
+import { requireAdmin, internalAuthHeaders } from "@/lib/require-admin";
 
 // The parse runs inside this invocation, after the response has been sent, so
 // the box has to stay alive as long as the parse route itself may take.
@@ -68,6 +68,9 @@ export async function POST(req: Request) {
       try {
         const res = await fetch(`${baseUrl}/api/admin/manuscripts/${data.id}/process`, {
           method: "POST",
+          // Without this the parse route rejects its own trigger, and the
+          // manuscript sits at "processing" forever.
+          headers: internalAuthHeaders(),
         });
         if (!res.ok) {
           console.error(`[manuscripts POST] parse trigger returned ${res.status} for ${data.id}`);
