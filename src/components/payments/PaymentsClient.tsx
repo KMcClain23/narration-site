@@ -143,7 +143,19 @@ function ProjectRow({
   // sequence, spending one on a document nobody asked for. Where an invoice
   // genuinely was raised, reproducing it is still useful at tax time.
   const wasInvoiced = Boolean(primary?.invoice_number || primary?.invoiced_on);
-  const showInvoice = Boolean(primary) && (state !== "paid" || wasInvoiced);
+
+  /**
+   * Royalties have nobody to invoice.
+   *
+   * A distributor reports what it owes and pays it on its own schedule; there
+   * is no client on the other end to send a document to. Offering the action
+   * anyway is worse than useless — opening the editor reserves the next
+   * invoice number, so a curious click spends one on a document that can never
+   * be sent to anyone.
+   */
+  const isRoyaltyOnly = Boolean(primary) && rows.every(r => r.kind === "royalty");
+  const showInvoice =
+    Boolean(primary) && !isRoyaltyOnly && (state !== "paid" || wasInvoiced);
 
   return (
     <div className="border-b border-divider px-4 py-3 last:border-0">
