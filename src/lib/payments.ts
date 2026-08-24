@@ -573,10 +573,31 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
       if (r.kind === "royalty") {
         royalties += got;
         royaltiesEarned += amt;
-        royaltiesOwed += Math.max(0, amt - got);
-        continue;
+
+        /**
+         * Net of anyone else's share, because that is what will be kept.
+         *
+         * This used to report the whole statement as money coming to the
+         * narrator. On a book split with a co-narrator that is half wrong by
+         * construction: $135.95 earned on a fifty-fifty title is $67.98 of
+         * income and $67.97 held for someone else, and showing $136 under
+         * "money you're owed" invites planning around twice what arrives.
+         */
+        const owedOut = (r.payouts ?? []).reduce(
+          (s, p) => (p.paid_on ? s : s + (Number(p.amount) || 0)),
+          0,
+        );
+        royaltiesOwed += Math.max(0, amt - got - owedOut);
       }
 
+      /**
+       * Payouts count on every row, royalties included.
+       *
+       * A `continue` here skipped this loop entirely for royalty rows, so a
+       * co-narrator's half of a statement never reached "You owe others", the
+       * paid list, or any payout total. The split could be recorded and then
+       * silently did nothing.
+       */
       for (const p of r.payouts ?? []) {
         const a = Number(p.amount) || 0;
         // What you pay vs what it costs you: on a duet the editor's invoice

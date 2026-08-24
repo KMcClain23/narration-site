@@ -755,7 +755,14 @@ export function PaymentFormModal({
               </Field>
 
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Received" hint="Leave 0 until it's actually paid.">
+                <Field
+                  label="Received"
+                  hint={
+                    royaltySplit
+                      ? "Your share after the split — not the whole deposit."
+                      : "Leave 0 until it's actually paid."
+                  }
+                >
                   <input className={inputClass} value={form.amount_received} onChange={set("amount_received")}
                     inputMode="decimal" placeholder="0" />
                 </Field>
@@ -763,6 +770,43 @@ export function PaymentFormModal({
                   <input type="date" className={inputClass} value={form.received_on} onChange={set("received_on")} />
                 </Field>
               </div>
+
+              {/* The deposit and the income are different numbers on a split
+                  book, and the deposit is the one staring at you from the bank.
+                  Recording it here would count the co-narrator's half as
+                  earnings and tax it as yours, so the subtraction is spelled
+                  out and offered rather than left to be remembered. */}
+              {royaltySplit && (
+                <div className="rounded-lg border border-surface-border bg-background px-3 py-2">
+                  <p className={adminType.small}>
+                    {formatMoney(Number(form.amount_expected) || 0)} lands, {royaltySplit.payee} takes{" "}
+                    {formatMoney(royaltySplit.amount)}, so{" "}
+                    <span className="text-text-body">
+                      {formatMoney((Number(form.amount_expected) || 0) - royaltySplit.amount)}
+                    </span>{" "}
+                    is yours.
+                  </p>
+                  {form.amount_received !==
+                    ((Number(form.amount_expected) || 0) - royaltySplit.amount).toFixed(2) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm(f => ({
+                          ...f,
+                          amount_received: (
+                            (Number(f.amount_expected) || 0) - royaltySplit.amount
+                          ).toFixed(2),
+                          received_on: f.received_on || new Date().toISOString().split("T")[0],
+                        }))
+                      }
+                      className="mt-1 text-[13px] text-accent-amber-bright hover:underline"
+                    >
+                      Record {formatMoney((Number(form.amount_expected) || 0) - royaltySplit.amount)} as
+                      received
+                    </button>
+                  )}
+                </div>
+              )}
 
               <Field label="Source" hint="ACX, Findaway, the publisher — whoever the statement came from.">
                 <input className={inputClass} value={form.method} onChange={set("method")} placeholder="ACX" />
