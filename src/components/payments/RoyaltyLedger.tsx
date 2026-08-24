@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
-import { parseLocalDate } from "@/components/admin/board-card-utils";
+import { parseLocalDate, parseCoNarrators } from "@/components/admin/board-card-utils";
 import { formatMoney, type MoneyCard, type PaymentRow } from "@/lib/payments";
 
 // Every royalty statement across every title, newest first.
@@ -29,6 +29,40 @@ function fmtDate(s: string | null): string {
   return parseLocalDate(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+/** Half, unless the book says otherwise. Matches the payment form's default. */
+const DEFAULT_ROYALTY_SPLIT = 50;
+
+/**
+ * What a statement leaves the narrator, and who takes the rest.
+ *
+ * A recorded payout is the truth and is used as-is. Where none has been
+ * recorded yet the book's own arrangement stands in, marked with a tilde: the
+ * money is still owed under the agreement whether or not anyone has typed it
+ * in, and a gross figure on a split title reads as income that is all yours.
+ */
+function shareOf(
+  row: PaymentRow,
+  card: MoneyCard | undefined,
+  earned: number,
+): { yours: number; theirs: number; payee: string; recorded: boolean } | null {
+  if (earned <= 0) return null;
+
+  const recorded = (row.payouts ?? []).filter(p => p.kind === "co_narrator");
+  if (recorded.length) {
+    const theirs = recorded.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    if (theirs <= 0) return null;
+    const payee = recorded.length === 1 ? recorded[0].payee_name.trim() || "co-narrator" : "co-narrators";
+    return { yours: Math.round((earned - theirs) * 100) / 100, theirs, payee, recorded: true };
+  }
+
+  const payee = parseCoNarrators(card?.co_narrator ?? null)[0];
+  if (!payee) return null;
+  const percent = card?.royalty_split_percent ?? DEFAULT_ROYALTY_SPLIT;
+  if (percent <= 0) return null;
+  const theirs = Math.round(earned * (percent / 100) * 100) / 100;
+  return { yours: Math.round((earned - theirs) * 100) / 100, theirs, payee, recorded: false };
+}
+
 export function RoyaltyLedger({
   cards,
   payments,
@@ -42,6 +76,7 @@ export function RoyaltyLedger({
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const titleById = useMemo(() => new Map(cards.map(c => [c.id, c.title])), [cards]);
+  const cardById = useMemo(() => new Map(cards.map(c => [c.id, c])), [cards]);
 
   const rows = useMemo(
     () =>
@@ -54,6 +89,10 @@ export function RoyaltyLedger({
   const earned = rows.reduce((s, r) => s + (Number(r.amount_expected) || 0), 0);
   const paid = rows.reduce((s, r) => s + (Number(r.amount_received) || 0), 0);
   const owed = Math.max(0, earned - paid);
+  const splitOut = rows.reduce((s, r) => {
+    const share = shareOf(r, cardById.get(r.card_id), Number(r.amount_expected) || 0);
+    return s + (share?.theirs ?? 0);
+  }, 0);
 
   if (rows.length === 0) return null;
 
@@ -114,6 +153,7 @@ export function RoyaltyLedger({
               const rowEarned = Number(r.amount_expected) || 0;
               const rowPaid = Number(r.amount_received) || 0;
               const isPaid = rowPaid > 0;
+              const share = shareOf(r, cardById.get(r.card_id), rowEarned);
               return (
                 <div
                   key={r.id}
@@ -123,8 +163,20 @@ export function RoyaltyLedger({
                   <span className={`${adminType.bodyMd} min-w-[160px] flex-1 truncate`}>
                     {titleById.get(r.card_id) ?? "Unknown project"}
                   </span>
-                  <span className={`${adminType.monoNum} w-20 shrink-0 text-right text-text-primary`}>
-                    {formatMoney(rowEarned)}
+                  {/* The statement figure, and underneath it what is actually
+                      kept — the same shape the project rows use for editing
+                      fronted on someone else's behalf. A split title reporting
+                      only its gross reads as money that is all yours. */}
+                  <span className="w-32 shrink-0 text-right">
+                    <span className={`${adminType.monoNum} block text-text-primary`}>
+                      {formatMoney(rowEarned)}
+                    </span>
+                    {share && (
+                      <span className={`${adminType.small} block`}>
+                        {formatMoney(share.yours)} you · {share.recorded ? "" : "~"}
+                        {formatMoney(share.theirs)} {share.payee}
+                      </span>
+                    )}
                   </span>
                   <span className={`${adminType.small} w-28 shrink-0`}>{r.method || ""}</span>
                   <span
@@ -149,8 +201,19 @@ export function RoyaltyLedger({
             })}
           </div>
 
-          <div className="flex items-center justify-end gap-6 border-t border-surface-border bg-surface px-4 py-2.5">
+          <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 border-t border-surface-border bg-surface px-4 py-2.5">
             <span className={adminType.monoNum}>Earned {formatMoney(earned)}</span>
+            {/* The books earned one figure; a different one is the narrator's.
+                Showing only the first invites planning around money that is
+                already promised to someone else. */}
+            {splitOut > 0.005 && (
+              <>
+                <span className={adminType.monoNum}>Split out {formatMoney(splitOut)}</span>
+                <span className={`${adminType.monoNum} text-text-primary`}>
+                  Yours {formatMoney(earned - splitOut)}
+                </span>
+              </>
+            )}
             <span className={adminType.monoNum}>Paid out {formatMoney(paid)}</span>
             <span className={`${adminType.monoNum} text-accent-amber-bright`}>Awaiting {formatMoney(owed)}</span>
           </div>
