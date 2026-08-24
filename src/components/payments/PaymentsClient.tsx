@@ -76,7 +76,7 @@ const GROUP_ACCENT: Record<ProjectState, { edge: string; pill: string }> = {
 };
 
 const GROUP_HINT: Record<ProjectState, string> = {
-  awaiting: "Money you're owed — invoiced work, or royalties earned but not yet paid out.",
+  awaiting: "Invoiced work you are still waiting to be paid for. Royalties live in the statements below.",
   ready: "Billable now — delivered, or canceled with a fee still due.",
   production: "Still recording or prepping — nothing to bill until delivery.",
   paid: "Settled.",
@@ -392,7 +392,22 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
   const grouped = useMemo(() => {
     const m = new Map<ProjectState, Project[]>();
     for (const s of GROUP_ORDER) m.set(s, []);
-    for (const p of projects) m.get(p.state)!.push(p);
+    for (const p of projects) {
+      /**
+       * Royalty-only work belongs to the statements ledger, not up here.
+       *
+       * Both sections were listing the same two books and disagreeing about
+       * them: this one as a single project total with an Edit link, the ledger
+       * as individual statements with periods, a distributor, and a Mark paid
+       * button. The ledger is the better answer to every question either of
+       * them was asked — which month, how much, has it landed — so this stops
+       * competing with it.
+       */
+      if (p.state === "awaiting" && p.rows.length > 0 && p.rows.every(r => r.kind === "royalty")) {
+        continue;
+      }
+      m.get(p.state)!.push(p);
+    }
     return m;
   }, [projects]);
 
