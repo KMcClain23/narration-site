@@ -850,9 +850,10 @@ export function CardEditModal(props: CardEditModalProps) {
                   Royalty split
                   <InfoTooltip variant="inline">
                     <p>
-                      The share of every royalty statement owed to your co-narrator. Set once and
-                      it applies to each statement as it arrives, rather than being worked out by
-                      hand twelve times a year. Leave blank if the royalties are all yours.
+                      The share of every royalty statement owed to your co-narrator, applied to
+                      each one as it arrives. A book with a co-narrator splits fifty-fifty on its
+                      own, so this only needs a number when the arrangement is different. Enter 0
+                      if the royalties are all yours.
                     </p>
                   </InfoTooltip>
                 </label>
@@ -870,7 +871,7 @@ export function CardEditModal(props: CardEditModalProps) {
                         },
                       )
                     }
-                    placeholder="none"
+                    placeholder="50"
                     className={`${INPUT_CLS} w-28`}
                   />
                   <span className={adminType.small}>

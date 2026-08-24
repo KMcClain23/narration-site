@@ -922,3 +922,15 @@ begin
       check (royalty_split_percent is null or (royalty_split_percent between 1 and 99));
   end if;
 end $$;
+
+-- Zero now means "these royalties are not split", which the original 1-99
+-- range had no way to say: a book with a co-narrator splits by default, so
+-- "none" has to be expressible as a value rather than as an empty field.
+do $$
+begin
+  if exists (select 1 from pg_constraint where conname = 'board_cards_royalty_split_check') then
+    alter table board_cards drop constraint board_cards_royalty_split_check;
+  end if;
+  alter table board_cards add constraint board_cards_royalty_split_check
+    check (royalty_split_percent is null or (royalty_split_percent between 0 and 99));
+end $$;

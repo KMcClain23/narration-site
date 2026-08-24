@@ -91,8 +91,33 @@ function toForm(p: PaymentRow | null): FormState {
   };
 }
 
-function toDrafts(p: PaymentRow | null): DraftPayout[] {
-  return (p?.payouts ?? []).map(r => ({
+/**
+ * Half of a royalty statement, unless the book says otherwise.
+ *
+ * A co-narrator on a royalty-share book splits the royalties evenly — that is
+ * what the arrangement is, and it does not change from one statement to the
+ * next. Requiring it to be configured before anything happens would mean
+ * remembering to, on every book, before the first statement arrives; forgetting
+ * is silent and looks exactly like royalties that are entirely yours.
+ *
+ * A number set on the book overrides it. Zero turns the split off.
+ */
+const DEFAULT_ROYALTY_SPLIT = 50;
+
+function royaltySplitFor(card?: CardMoneyContext): { percent: number; payee: string } | null {
+  const payee = parseCoNarrators(card?.co_narrator ?? null)[0];
+  if (!payee) return null;
+  const percent = card?.royalty_split_percent ?? DEFAULT_ROYALTY_SPLIT;
+  if (percent <= 0) return null;
+  return { percent, payee };
+}
+
+function splitAmount(base: number, percent: number): number {
+  return Math.round(base * (percent / 100) * 100) / 100;
+}
+
+function toDrafts(p: PaymentRow | null, card?: CardMoneyContext): DraftPayout[] {
+  const existing: DraftPayout[] = (p?.payouts ?? []).map(r => ({
     id: r.id,
     payee_name: r.payee_name,
     kind: r.kind,
@@ -101,6 +126,29 @@ function toDrafts(p: PaymentRow | null): DraftPayout[] {
     paid_on: r.paid_on ?? "",
     paid_via: r.paid_via ?? "",
   }));
+
+  // Seeded here rather than in an effect, so the row is present on the first
+  // render and there is nothing to reconcile afterwards.
+  if (p?.kind !== "royalty") return existing;
+  const split = royaltySplitFor(card);
+  if (!split) return existing;
+  if (existing.some(d => d.kind === "co_narrator")) return existing;
+
+  const base = Number(p.amount_expected) || Number(p.amount_received) || 0;
+  if (base <= 0) return existing;
+
+  return [
+    ...existing,
+    {
+      id: null,
+      payee_name: split.payee,
+      kind: "co_narrator",
+      amount: splitAmount(base, split.percent).toFixed(2),
+      rate_pfh: "",
+      paid_on: "",
+      paid_via: "",
+    },
+  ];
 }
 
 const inputClass =
@@ -443,7 +491,7 @@ export function PaymentFormModal({
 }) {
   useModalOpen(true);
   const [form, setForm] = useState<FormState>(() => toForm(payment));
-  const [payouts, setPayouts] = useState<DraftPayout[]>(() => toDrafts(payment));
+  const [payouts, setPayouts] = useState<DraftPayout[]>(() => toDrafts(payment, card));
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -493,35 +541,52 @@ export function PaymentFormModal({
    * are months apart on a royalty, and the debt is created by the earning. It
    * still has to be marked paid separately, like every other payout.
    */
+  const splitRule = isRoyalty ? royaltySplitFor(card) : null;
   const royaltySplit = (() => {
-    const percent = card?.royalty_split_percent ?? null;
-    if (!isRoyalty || !percent) return null;
+    if (!splitRule) return null;
     const base = Number(form.amount_expected) || Number(form.amount_received) || 0;
     if (base <= 0) return null;
-    const payee = parseCoNarrators(card?.co_narrator ?? null)[0] ?? "Co-narrator";
-    return { percent, payee, amount: Math.round(base * (percent / 100) * 100) / 100 };
+    return { ...splitRule, amount: splitAmount(base, splitRule.percent) };
   })();
 
-  /** Fills the payout in rather than saving it, so it can still be edited. */
-  const applyRoyaltySplit = () => {
-    if (!royaltySplit) return;
-    const existing = payouts.findIndex(
-      p => p.kind === "co_narrator" && p.payee_name.trim().toLowerCase() === royaltySplit.payee.toLowerCase(),
-    );
-    const row = {
-      id: existing >= 0 ? payouts[existing].id : null,
-      payee_name: royaltySplit.payee,
-      kind: "co_narrator" as PayoutKind,
-      amount: royaltySplit.amount.toFixed(2),
-      rate_pfh: "",
-      paid_on: existing >= 0 ? payouts[existing].paid_on : "",
-      paid_via: existing >= 0 ? payouts[existing].paid_via : "",
-    };
-    // Replaces rather than adds a second one: re-applying after the statement
-    // figure is corrected should fix the split, not duplicate it.
-    handleRemovePayouts(
-      existing >= 0 ? payouts.map((p, i) => (i === existing ? row : p)) : [...payouts, row],
-    );
+  /**
+   * Keep the co-narrator's share in step with the figure being typed.
+   *
+   * The statement amount is usually entered after the row already exists, and
+   * a split that was right for the old number is wrong for the new one. Only
+   * an untouched share is updated: once the amount has been edited by hand, or
+   * the payout has been paid, it is left exactly as it is.
+   */
+  const setEarned = (value: string) => {
+    setForm(f => {
+      if (splitRule) {
+        const before = splitAmount(Number(f.amount_expected) || 0, splitRule.percent).toFixed(2);
+        const after = splitAmount(Number(value) || 0, splitRule.percent).toFixed(2);
+        if (before !== after) {
+          setPayouts(list => {
+            const i = list.findIndex(p => p.kind === "co_narrator" && !p.paid_on);
+            if (i === -1) {
+              // The row is created the moment there is something to split, so
+              // a statement typed into a blank form still ends up split.
+              return Number(value) > 0
+                ? [...list, {
+                    id: null,
+                    payee_name: splitRule.payee,
+                    kind: "co_narrator" as PayoutKind,
+                    amount: after,
+                    rate_pfh: "",
+                    paid_on: "",
+                    paid_via: "",
+                  }]
+                : list;
+            }
+            if (list[i].amount && list[i].amount !== before) return list;
+            return list.map((p, j) => (j === i ? { ...p, amount: after, payee_name: p.payee_name || splitRule.payee } : p));
+          });
+        }
+      }
+      return { ...f, amount_expected: value };
+    });
   };
   const format = card?.narration_format ?? null;
   const isSplit = format === "duet" || format === "dual" || format === "multicast";
@@ -685,7 +750,7 @@ export function PaymentFormModal({
                 label="Earned this period"
                 hint="What the statement says you earned, whether or not it's been paid yet."
               >
-                <input className={inputClass} value={form.amount_expected} onChange={set("amount_expected")}
+                <input className={inputClass} value={form.amount_expected} onChange={e => setEarned(e.target.value)}
                   inputMode="decimal" placeholder="0.00" />
               </Field>
 
@@ -714,15 +779,14 @@ export function PaymentFormModal({
                 onChange={handleRemovePayouts}
               />
 
+              {/* The split is already in the payouts above; this only says
+                  where the figure came from, and admits when there is none. */}
               {royaltySplit && (
-                <button
-                  type="button"
-                  onClick={applyRoyaltySplit}
-                  className="text-[13px] text-accent-amber-bright hover:underline"
-                >
-                  Split {royaltySplit.percent}% to {royaltySplit.payee} ·{" "}
-                  {formatMoney(royaltySplit.amount)}
-                </button>
+                <p className={adminType.small}>
+                  {payouts.some(p => p.kind === "co_narrator")
+                    ? `${royaltySplit.payee} takes ${royaltySplit.percent}% of this statement: ${formatMoney(royaltySplit.amount)}. Edit the amount, or remove the payout, if this one is different.`
+                    : `No split on this statement — ${royaltySplit.payee} would normally take ${royaltySplit.percent}%.`}
+                </p>
               )}
 
               <Field label="Notes">
