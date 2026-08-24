@@ -168,6 +168,14 @@ export type MoneyCard = {
   payment_type: string | null;
   narration_format: string | null;
   narrator_share_percent: number | null;
+  /**
+   * Share of every royalty statement owed to a co-narrator. Null means none.
+   *
+   * Separate from narrator_share_percent, which splits the manuscript and so
+   * the fee. A royalty split is an agreement about income that keeps arriving
+   * for years, and the two figures are not always the same number.
+   */
+  royalty_split_percent: number | null;
   /** JSON-encoded array string — see parseCoNarrators in board-card-utils. */
   co_narrator: string | null;
   production_type: string | null;

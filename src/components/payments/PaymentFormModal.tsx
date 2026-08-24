@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Plus, Trash2, Upload, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
+import { parseCoNarrators } from "@/components/admin/board-card-utils";
 import { useModalOpen } from "@/components/admin/AdminModalContext";
 import {
   computeWaterfall,
@@ -24,6 +25,10 @@ export type CardMoneyContext = {
   pfh_rate: number | null;
   narration_format: string | null;
   narrator_share_percent: number | null;
+  /** Share of every royalty statement owed to a co-narrator. Null means none. */
+  royalty_split_percent?: number | null;
+  /** Who that share goes to, for naming the payout without retyping it. */
+  co_narrator?: string | null;
 };
 
 // Every field is held as a string while editing — a controlled number input
@@ -480,6 +485,44 @@ export function PaymentFormModal({
   // Solo work has nobody to split with, so the co-narrator half of this
   // section is noise there — the fee is simply the narrator's, minus costs.
   const isRoyalty = form.kind === "royalty";
+
+  /**
+   * The share of this statement owed to a co-narrator, ready to record.
+   *
+   * Computed from what was earned rather than what has been received: the two
+   * are months apart on a royalty, and the debt is created by the earning. It
+   * still has to be marked paid separately, like every other payout.
+   */
+  const royaltySplit = (() => {
+    const percent = card?.royalty_split_percent ?? null;
+    if (!isRoyalty || !percent) return null;
+    const base = Number(form.amount_expected) || Number(form.amount_received) || 0;
+    if (base <= 0) return null;
+    const payee = parseCoNarrators(card?.co_narrator ?? null)[0] ?? "Co-narrator";
+    return { percent, payee, amount: Math.round(base * (percent / 100) * 100) / 100 };
+  })();
+
+  /** Fills the payout in rather than saving it, so it can still be edited. */
+  const applyRoyaltySplit = () => {
+    if (!royaltySplit) return;
+    const existing = payouts.findIndex(
+      p => p.kind === "co_narrator" && p.payee_name.trim().toLowerCase() === royaltySplit.payee.toLowerCase(),
+    );
+    const row = {
+      id: existing >= 0 ? payouts[existing].id : null,
+      payee_name: royaltySplit.payee,
+      kind: "co_narrator" as PayoutKind,
+      amount: royaltySplit.amount.toFixed(2),
+      rate_pfh: "",
+      paid_on: existing >= 0 ? payouts[existing].paid_on : "",
+      paid_via: existing >= 0 ? payouts[existing].paid_via : "",
+    };
+    // Replaces rather than adds a second one: re-applying after the statement
+    // figure is corrected should fix the split, not duplicate it.
+    handleRemovePayouts(
+      existing >= 0 ? payouts.map((p, i) => (i === existing ? row : p)) : [...payouts, row],
+    );
+  };
   const format = card?.narration_format ?? null;
   const isSplit = format === "duet" || format === "dual" || format === "multicast";
   const formatLabel = format ? format.charAt(0).toUpperCase() + format.slice(1) : "Split";
@@ -659,6 +702,28 @@ export function PaymentFormModal({
               <Field label="Source" hint="ACX, Findaway, the publisher — whoever the statement came from.">
                 <input className={inputClass} value={form.method} onChange={set("method")} placeholder="ACX" />
               </Field>
+
+              {/* Royalties can be split too. The fee branch has had payouts
+                  since the beginning; this branch never did, so a co-narrator
+                  owed half of every statement had nowhere to be recorded and
+                  the money read as entirely the narrator's. */}
+              <PayoutsEditor
+                payouts={payouts}
+                finishedHrs={finishedHrs}
+                allowCoNarrator
+                onChange={handleRemovePayouts}
+              />
+
+              {royaltySplit && (
+                <button
+                  type="button"
+                  onClick={applyRoyaltySplit}
+                  className="text-[13px] text-accent-amber-bright hover:underline"
+                >
+                  Split {royaltySplit.percent}% to {royaltySplit.payee} ·{" "}
+                  {formatMoney(royaltySplit.amount)}
+                </button>
+              )}
 
               <Field label="Notes">
                 <textarea className={`${inputClass} min-h-[72px]`} value={form.notes} onChange={set("notes")} />

@@ -902,3 +902,23 @@ begin
       check (kind in ('highlight', 'voice'));
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- The share of a book's royalties that belongs to someone else.
+--
+-- A fee is split once, at invoice time, and the waterfall handles it. Royalties
+-- arrive every month for years, and the split has to be applied to each
+-- statement as it lands — which meant doing the arithmetic by hand twelve times
+-- a year, per book, and remembering that it was owed at all.
+--
+-- Stored on the book because that is where the agreement lives: it is the same
+-- fifty percent in July as it was in April.
+alter table board_cards add column if not exists royalty_split_percent integer;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'board_cards_royalty_split_check') then
+    alter table board_cards add constraint board_cards_royalty_split_check
+      check (royalty_split_percent is null or (royalty_split_percent between 1 and 99));
+  end if;
+end $$;

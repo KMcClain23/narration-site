@@ -1962,6 +1962,7 @@ function mergeContinuationChapters(
     // it would skip the numbers of the sections that no longer exist.
     const numbers = computeChapterNumbers(merged.map((c) => c.title));
     merged.forEach((c, i) => { c.number = numbers[i]; });
+    renumberPlainChapterTitles(merged, numbers);
 
     const named = repaired.slice(0, 5).map((t) => `"${t}"`).join(", ");
     const more = repaired.length > 5 ? ` (+${repaired.length - 5} more)` : "";
@@ -1979,6 +1980,31 @@ function mergeContinuationChapters(
   }
 
   return { chapters: merged, warnings: [] };
+}
+
+/**
+ * Keep a plainly-numbered chapter title in step with its own number.
+ *
+ * Merging a false chapter boundary renumbers the sections, but the title
+ * strings kept whatever number they arrived with. The reader shows both, so a
+ * book came out reading "Ch. 3: Chapter 3" then "Ch. 4: Chapter 5" — the
+ * sequence skips a number, and the obvious conclusion is that a chapter went
+ * missing. Nothing was missing; the label was.
+ *
+ * Only touches titles that are nothing but "Chapter N". A real title, a named
+ * section, or front matter is left exactly as the book has it — those carry
+ * meaning that a counter does not.
+ */
+function renumberPlainChapterTitles(
+  chapters: ParsedChapter[],
+  numbers: (number | null)[],
+): void {
+  chapters.forEach((c, i) => {
+    const n = numbers[i];
+    if (n == null) return;
+    if (!/^chapter\s+\d+$/i.test((c.title ?? "").trim())) return;
+    c.title = `Chapter ${n}`;
+  });
 }
 
 function warnRepairedBoundaries(count: number, before: number): void {

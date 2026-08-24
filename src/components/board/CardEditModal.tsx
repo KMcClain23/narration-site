@@ -35,6 +35,8 @@ export type FullBoardCard = {
   author_notes: string;
   narration_format: NarrationFormat | null;
   narrator_share_percent: number | null;
+  /** Share of each royalty statement owed to a co-narrator. Null means none. */
+  royalty_split_percent: number | null;
   /** Days chosen on the calendar, "YYYY-MM-DD". Empty until one is picked. */
   recording_dates: string[];
   /** Words of your own share already recorded. */
@@ -74,6 +76,7 @@ function mapToFullBoardCard(row: Record<string, unknown>): FullBoardCard {
     author_notes: (row.author_notes as string) ?? "",
     narration_format: (row.narration_format as NarrationFormat) ?? null,
     narrator_share_percent: (row.narrator_share_percent as number) ?? null,
+    royalty_split_percent: (row.royalty_split_percent as number) ?? null,
     recording_dates: Array.isArray(row.recording_dates) ? (row.recording_dates as string[]) : [],
     words_recorded: (row.words_recorded as number) ?? 0,
     is_confidential: Boolean(row.is_confidential),
@@ -107,7 +110,7 @@ function mapToFullBoardCard(row: Record<string, unknown>): FullBoardCard {
 function blankCard(): FullBoardCard {
   return {
     id: "", created_at: "", title: "", subtitle: "", cover_url: "", author: "", co_narrator: "",
-    author_notes: "", narration_format: null, narrator_share_percent: null, recording_dates: [], words_recorded: 0, is_confidential: false, deadline: "", released_at: "", status: "contracted",
+    author_notes: "", narration_format: null, narrator_share_percent: null, royalty_split_percent: null, recording_dates: [], words_recorded: 0, is_confidential: false, deadline: "", released_at: "", status: "contracted",
     word_count: 0, payment_type: "pfh", pfh_rate: 0, first15_due: "", first_15_complete: false,
     production_type: null, production_company: null, description: "", tags: [], trigger_warnings: [],
     audible_link: "", ar_link: "", spotify_link: "", script_url: "",
@@ -838,6 +841,45 @@ export function CardEditModal(props: CardEditModalProps) {
               </div>
             </div>
 
+            {/* Only where royalties actually arrive. A flat PFH book has no
+                statements to split, and offering the field there would invite
+                a number that never applies to anything. */}
+            {(form.payment_type === "rs" || form.payment_type === "rs_plus") && (
+              <div>
+                <label className={`${adminType.label} mb-1.5 flex items-center`}>
+                  Royalty split
+                  <InfoTooltip variant="inline">
+                    <p>
+                      The share of every royalty statement owed to your co-narrator. Set once and
+                      it applies to each statement as it arrives, rather than being worked out by
+                      hand twelve times a year. Leave blank if the royalties are all yours.
+                    </p>
+                  </InfoTooltip>
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={form.royalty_split_percent ?? ""}
+                    onChange={e =>
+                      setForm(p =>
+                        p && {
+                          ...p,
+                          royalty_split_percent: e.target.value === "" ? null : Number(e.target.value),
+                        },
+                      )
+                    }
+                    placeholder="none"
+                    className={`${INPUT_CLS} w-28`}
+                  />
+                  <span className={adminType.small}>
+                    % to {parseCoNarrators(form.co_narrator)[0] ?? "a co-narrator"}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {hasRate && (
               <div>
                 <label className={`${adminType.label} mb-1.5 block`}>PFH rate ($)</label>
@@ -1090,7 +1132,20 @@ export function CardEditModal(props: CardEditModalProps) {
             estimate but can still have real money recorded against it. */}
         <div className="rounded-lg border border-surface-border px-4 py-3">
           <p className={`${adminType.label} mb-2`}>Payments</p>
-          <CardPaymentsPanel cardId={form.id} cardTitle={form.title} />
+          {/* The same context the Payments page passes, so a royalty split
+              offers itself here too rather than only from the other screen. */}
+          <CardPaymentsPanel
+            cardId={form.id}
+            cardTitle={form.title}
+            card={{
+              word_count: form.word_count,
+              pfh_rate: form.pfh_rate,
+              narration_format: form.narration_format,
+              narrator_share_percent: form.narrator_share_percent,
+              royalty_split_percent: form.royalty_split_percent,
+              co_narrator: form.co_narrator,
+            }}
+          />
         </div>
       </div>
     );
