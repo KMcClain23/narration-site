@@ -7,6 +7,7 @@ import { ExternalLink, Plus, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { useModalOpen } from "@/components/admin/AdminModalContext";
 import { useIsDesktop } from "@/components/admin/useIsDesktop";
+import { usePrefersReducedMotion } from "@/components/admin/usePrefersReducedMotion";
 import { ArchiveConfirmDialog, ARCHIVE_REASON_LABEL } from "@/components/board/ArchiveConfirmDialog";
 import { AmazonRefetchButton, type AmazonPreview } from "@/components/board/AmazonRefetchButton";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
@@ -163,6 +164,16 @@ const PAYMENT_TYPES = [
 // divisor everywhere has always been 9,400. Fixed the stale string too.
 const WORDS_PER_HOUR = 9400;
 
+// Mobile sheet motion. Entering decelerates into place so the eye can follow
+// it; leaving accelerates away, because nobody wants to wait to watch
+// something they have already dismissed. Both are transform/opacity only.
+const SHEET_ENTER_MS = 250;
+const SHEET_EXIT_MS = 200;
+const EASE_OUT = "cubic-bezier(0, 0, 0.2, 1)";
+const EASE_IN = "cubic-bezier(0.4, 0, 1, 1)";
+/** How far down the sheet must be dragged before release completes the dismiss. */
+const SHEET_DISMISS_FRACTION = 0.4;
+
 const INPUT_CLS = "w-full rounded-lg border border-surface-border bg-background px-3 py-2.5 text-sm text-text-primary placeholder:text-text-dim focus:border-accent-amber-dim focus:outline-none transition-colors";
 
 type TabId = "details" | "production" | "content" | "links";
@@ -269,6 +280,24 @@ export function CardEditModal(props: CardEditModalProps) {
   // dialog has no equivalent and ignores this.
   const [sheetMounted, setSheetMounted] = useState(false);
   useEffect(() => { setSheetMounted(true); }, []);
+
+  const reducedMotion = usePrefersReducedMotion();
+
+  // Exit half of the same transition. The sheet has to still be on screen
+  // while it slides away, so closing is a state the sheet renders in rather
+  // than something onClose can do immediately.
+  const [closing, setClosing] = useState(false);
+  const closingRef = useRef(false);
+
+  // Swipe-down-to-dismiss follows the finger. The offset lives in a ref, not
+  // state, because a re-render per pointermove would mean re-rendering four
+  // tab bodies sixty times a second; only the first frame of a drag and the
+  // release commit to React, and the frames between mutate the transform
+  // directly. dragging is what tells the sheet to drop its transition, so the
+  // finger is not chasing an animation that is chasing the finger.
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const dragYRef = useRef(0);
+  const [dragging, setDragging] = useState(false);
 
   const [loading, setLoading] = useState(mode === "edit");
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -494,26 +523,90 @@ export function CardEditModal(props: CardEditModalProps) {
   // Mobile-only close guard — desktop's Cancel/Escape have never confirmed
   // before discarding edits, and that stays true; this only gates the new
   // mobile close paths (X button, swipe-down-to-dismiss).
-  const handleMobileClose = () => {
-    if (isDirty && !window.confirm("Discard unsaved changes?")) return;
-    onClose();
+  /**
+   * Return the sheet to rest after a drag that is not going to dismiss it.
+   *
+   * Written to the element directly as well as through state. React skips a
+   * style write when the value matches the previous render's, and the frames
+   * between drag start and release move the element without telling React —
+   * so if the drag happened to commit at 0 (a gesture that began upward, say),
+   * React would compare 0 against 0, write nothing, and leave the sheet
+   * stranded wherever the finger left it.
+   */
+  const settleSheet = () => {
+    const el = sheetRef.current;
+    if (el) {
+      el.style.transition = `transform ${SHEET_ENTER_MS}ms ${EASE_OUT}`;
+      el.style.transform = "translate3d(0, 0, 0)";
+    }
+    dragYRef.current = 0;
+    setDragging(false);
+  };
+
+  const requestMobileClose = () => {
+    if (closingRef.current) return;
+    if (isDirty && !window.confirm("Discard unsaved changes?")) {
+      // Declined mid-swipe: put the sheet back rather than leaving it parked
+      // wherever the finger let go.
+      settleSheet();
+      return;
+    }
+    closingRef.current = true;
+    setDragging(false);
+    setClosing(true);
+    // Under reduced motion there is no animation to wait for — globals.css has
+    // already collapsed the transition — so waiting would just be 200ms of the
+    // button appearing not to have worked.
+    if (reducedMotion) { onClose(); return; }
+    window.setTimeout(onClose, SHEET_EXIT_MS);
   };
 
   const TAB_IDS = TABS.map(t => t.id);
+  const activeTabIndex = TAB_IDS.indexOf(activeTab);
+
+  // Which way the incoming panel slides in from. Derived by comparing indices
+  // rather than being set at each call site, so a tap on the tab bar and a
+  // swipe across the body produce the same motion without either knowing
+  // about it. Null on first render — opening the sheet should not also slide
+  // its first tab.
+  const prevTabIndexRef = useRef(activeTabIndex);
+  const [tabDirection, setTabDirection] = useState<"left" | "right" | null>(null);
+  useEffect(() => {
+    if (prevTabIndexRef.current === activeTabIndex) return;
+    setTabDirection(activeTabIndex > prevTabIndexRef.current ? "right" : "left");
+    prevTabIndexRef.current = activeTabIndex;
+  }, [activeTabIndex]);
+  const tabSlideClass =
+    tabDirection === "right" ? "tab-slide-right" : tabDirection === "left" ? "tab-slide-left" : "";
 
   // Swipe-down-from-the-handle-area dismisses the sheet (mobile only) — bound
   // to just the handle+header wrapper, not the whole sheet, so it never
   // fights the body's own vertical scroll or the tab-swipe gesture below.
   const sheetDismissBind = useDrag(
     ({ last, movement: [, my], velocity: [, vy] }) => {
-      if (!last) return;
-      const pastThreshold = my > 80;
+      // Never upward: the sheet is already at the top of its travel.
+      const y = Math.max(0, my);
+
+      if (!last) {
+        dragYRef.current = y;
+        // First frame commits to React so the sheet drops its transition and
+        // renders at the current offset; every frame after moves the element
+        // directly, leaving React out of the hot path entirely.
+        if (!dragging) setDragging(true);
+        else if (sheetRef.current) sheetRef.current.style.transform = `translate3d(0, ${y}px, 0)`;
+        return;
+      }
+
+      const height = sheetRef.current?.offsetHeight ?? window.innerHeight;
+      const pastThreshold = y > height * SHEET_DISMISS_FRACTION;
       // Sign of cumulative movement, not `direction` — that tuple reflects
       // instantaneous velocity and is already back to 0 by the time the
       // pointer has stopped moving on this terminal frame (same fix as
       // tabSwipeBind below).
       const fastFlick = vy > 0.5 && my > 0;
-      if (pastThreshold || fastFlick) handleMobileClose();
+      if (pastThreshold || fastFlick) { requestMobileClose(); return; }
+      // Short of the threshold, it springs back to the top.
+      settleSheet();
     },
     { axis: "y", filterTaps: true }
   );
@@ -1389,19 +1482,30 @@ export function CardEditModal(props: CardEditModalProps) {
     );
   }
 
-  const tabContent = (
+  // `slide` is empty on desktop, which is what keeps this a mobile-only
+  // rendering path — the panels themselves are identical either way.
+  const tabContent = (slide: string) => (
     <>
-      <div className={activeTab === "details" ? "block" : "hidden"}>{renderDetailsTab()}</div>
-      <div className={activeTab === "production" ? "block" : "hidden"}>{renderProductionTab()}</div>
-      <div className={activeTab === "content" ? "block" : "hidden"}>{renderContentTab()}</div>
-      <div className={activeTab === "links" ? "block" : "hidden"}>{renderLinksTab()}</div>
+      <div className={activeTab === "details" ? `block ${slide}` : "hidden"}>{renderDetailsTab()}</div>
+      <div className={activeTab === "production" ? `block ${slide}` : "hidden"}>{renderProductionTab()}</div>
+      <div className={activeTab === "content" ? `block ${slide}` : "hidden"}>{renderContentTab()}</div>
+      <div className={activeTab === "links" ? `block ${slide}` : "hidden"}>{renderLinksTab()}</div>
     </>
   );
 
   if (!isDesktop) {
     return (
-      <div className="fixed inset-0 z-[300] bg-black/60">
+      <div className="fixed inset-0 z-[300]">
         <div
+          aria-hidden
+          className="absolute inset-0 bg-black/60"
+          style={{
+            opacity: sheetMounted && !closing ? 1 : 0,
+            transition: `opacity ${closing ? SHEET_EXIT_MS : SHEET_ENTER_MS}ms ${closing ? EASE_IN : EASE_OUT}`,
+          }}
+        />
+        <div
+          ref={sheetRef}
           style={{
             // dvh, not vh — vh is computed against the browser's largest
             // possible viewport (chrome collapsed), so on a real phone with
@@ -1410,8 +1514,15 @@ export function CardEditModal(props: CardEditModalProps) {
             // own header above the top of the screen. dvh tracks whatever is
             // currently visible.
             height: "94dvh",
-            transform: sheetMounted ? "translateY(0)" : "translateY(100%)",
-            transition: "transform 250ms ease",
+            transform: closing || !sheetMounted
+              ? "translate3d(0, 100%, 0)"
+              : `translate3d(0, ${dragging ? dragYRef.current : 0}px, 0)`,
+            // Dropped entirely while a finger is on the sheet: a transition
+            // here would mean the sheet easing toward a target that moves
+            // again before it arrives, which reads as lag.
+            transition: dragging
+              ? "none"
+              : `transform ${closing ? SHEET_EXIT_MS : SHEET_ENTER_MS}ms ${closing ? EASE_IN : EASE_OUT}`,
           }}
           className="fixed inset-x-0 bottom-0 flex flex-col rounded-t-2xl border-t border-surface-border bg-surface shadow-2xl"
         >
@@ -1432,7 +1543,7 @@ export function CardEditModal(props: CardEditModalProps) {
               <div {...sheetDismissBind()} style={{ touchAction: "pan-x" }} className="shrink-0">
                 <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-surface-border" />
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <button type="button" onClick={handleMobileClose} aria-label="Close" className="shrink-0 text-text-muted hover:text-text-primary">
+                  <button type="button" onClick={requestMobileClose} aria-label="Close" className="shrink-0 text-text-muted hover:text-text-primary">
                     <X size={22} />
                   </button>
                   <h2 className="min-w-0 flex-1 truncate text-center text-[15px] font-bold text-text-primary">
@@ -1450,16 +1561,30 @@ export function CardEditModal(props: CardEditModalProps) {
               </div>
 
               {/* Tab bar */}
-              <div className="flex shrink-0 gap-1 border-b border-t border-surface-border px-2">
-                {TABS.map(t => (
-                  <button key={t.id} type="button" onClick={() => setActiveTab(t.id)}
-                    className={`relative flex-1 px-2 py-3 text-[13px] font-medium transition-colors ${
-                      activeTab === t.id ? "text-accent-amber" : "text-text-muted"
-                    }`}>
-                    {t.label}
-                    {activeTab === t.id && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-accent-amber" />}
-                  </button>
-                ))}
+              <div className="relative shrink-0 border-b border-t border-surface-border px-2">
+                <div className="flex">
+                  {TABS.map(t => (
+                    <button key={t.id} type="button" onClick={() => setActiveTab(t.id)}
+                      className={`flex-1 px-2 py-3 text-[13px] font-medium transition-colors ${
+                        activeTab === t.id ? "text-accent-amber" : "text-text-muted"
+                      }`}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                {/* One underline that slides, rather than four that blink in
+                    and out. The track is inset to match the row's px-2, and
+                    the buttons are flex-1 with no gap between them, so a 25%
+                    width offset by index lands exactly on each tab. */}
+                <div className="pointer-events-none absolute inset-x-2 bottom-0 h-0.5">
+                  <span
+                    className="block h-full w-1/4 bg-accent-amber"
+                    style={{
+                      transform: `translate3d(${activeTabIndex * 100}%, 0, 0)`,
+                      transition: `transform 200ms ${EASE_OUT}`,
+                    }}
+                  />
+                </div>
               </div>
 
               {saveError && (
@@ -1472,7 +1597,7 @@ export function CardEditModal(props: CardEditModalProps) {
               {/* Scrollable body — horizontal swipe changes tabs, vertical
                   scroll behaves natively (touch-action: pan-y) */}
               <div {...tabSwipeBind()} style={{ touchAction: "pan-y" }} className="admin-scrollbar min-h-0 flex-1 select-none overflow-y-auto p-5">
-                {tabContent}
+                {tabContent(tabSlideClass)}
               </div>
             </>
           )}
@@ -1553,7 +1678,7 @@ export function CardEditModal(props: CardEditModalProps) {
             {/* Scrollable body — all four tabs render; inactive ones are
                 display:none (not unmounted), so edits survive tab switches. */}
             <div className="admin-scrollbar min-h-0 flex-1 overflow-y-auto p-6">
-              {tabContent}
+              {tabContent("")}
             </div>
 
             {/* Sticky footer */}

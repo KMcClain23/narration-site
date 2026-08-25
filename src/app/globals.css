@@ -142,6 +142,37 @@ html {
    Entrance animations are neutralised rather than removed, so nothing that
    animates *in* is left stuck at opacity 0 and invisible.
    ────────────────────────────────────────────────────────────────────────── */
+/* ──────────────────────────────────────────────────────────────────────────
+   Admin mobile motion (Mobile Redesign)
+
+   Entrance-only animations for the mobile Book Edit modal's tab panels and the
+   board's long-press menu. Transform + opacity exclusively, so they composite
+   on the GPU and never trigger layout.
+
+   The tab panels are display:none when inactive and display:block when active
+   (the Stage 6.1 pattern, kept so edits survive a tab switch). An element
+   re-entering layout restarts its animations, which is what replays the slide
+   on every switch without remounting the panel or keying it.
+   ────────────────────────────────────────────────────────────────────────── */
+@keyframes admin-slide-in-right {
+  from { opacity: 0; transform: translate3d(24px, 0, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes admin-slide-in-left {
+  from { opacity: 0; transform: translate3d(-24px, 0, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes admin-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.tab-slide-right { animation: admin-slide-in-right 200ms cubic-bezier(0, 0, 0.2, 1) both; }
+.tab-slide-left  { animation: admin-slide-in-left  200ms cubic-bezier(0, 0, 0.2, 1) both; }
+.menu-fade-in    { animation: admin-fade-in 120ms cubic-bezier(0, 0, 0.2, 1) both; }
+
 @media (prefers-reduced-motion: reduce) {
   .logo-track {
     animation: none;
@@ -157,7 +188,10 @@ html {
   .fade-up-1,
   .fade-up-2,
   .fade-up-3,
-  .fade-up-4 {
+  .fade-up-4,
+  .tab-slide-right,
+  .tab-slide-left,
+  .menu-fade-in {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;

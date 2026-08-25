@@ -43,7 +43,7 @@ export function BoardActionMenu({
   return (
     <div
       ref={ref}
-      className="fixed z-[300] w-52 rounded-xl border border-surface-border bg-surface py-1.5 shadow-2xl"
+      className="menu-fade-in fixed z-[300] w-52 rounded-xl border border-surface-border bg-surface py-1.5 shadow-2xl"
       style={{ left: pos.left, top: pos.top }}
       onClick={e => e.stopPropagation()}
     >

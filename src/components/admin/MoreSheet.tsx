@@ -41,8 +41,10 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
   return (
     <>
       <div
-        className={`fixed inset-0 z-[300] bg-black/60 transition-opacity duration-200 ${
-          open ? "opacity-100" : "pointer-events-none opacity-0"
+        className={`fixed inset-0 z-[300] bg-black/60 transition-opacity ${
+          open
+            ? "opacity-100 duration-200 ease-out"
+            : "pointer-events-none opacity-0 duration-150 ease-in"
         }`}
         onClick={onClose}
         aria-hidden={!open}
@@ -52,8 +54,13 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
         aria-modal="true"
         aria-hidden={!open}
         aria-label="More"
-        className={`fixed inset-x-0 bottom-0 z-[310] rounded-t-2xl border-t border-surface-border bg-surface shadow-2xl transition-transform duration-200 ${
-          open ? "translate-y-0" : "pointer-events-none translate-y-full"
+        // Asymmetric on purpose: entering decelerates into place so the eye can
+        // follow it, leaving accelerates away because nobody wants to wait to
+        // watch something they have already dismissed.
+        className={`fixed inset-x-0 bottom-0 z-[310] rounded-t-2xl border-t border-surface-border bg-surface shadow-2xl transition-transform ${
+          open
+            ? "translate-y-0 duration-200 ease-out"
+            : "pointer-events-none translate-y-full duration-150 ease-in"
         }`}
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         onTouchStart={handleTouchStart}
