@@ -3,7 +3,7 @@ import { adminType } from "@/lib/design-tokens";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { AcceptingProjectsToggle } from "@/components/schedule/AcceptingProjectsToggle";
 import { BookingWindowPicker } from "@/components/schedule/BookingWindowPicker";
-import { MonthlyScheduleGrid } from "@/components/schedule/MonthlyScheduleGrid";
+import { ScheduleMonths } from "@/components/schedule/ScheduleMonths";
 import { DueSoonSection } from "@/components/schedule/DueSoonSection";
 import { CapacityCalendar } from "@/components/schedule/CapacityCalendar";
 import type { CapacityCard, TimeBlock } from "@/lib/capacity";
@@ -118,13 +118,15 @@ export default async function SchedulePage() {
           </div>
         </section>
 
-        {/* Section 3: Monthly Schedule */}
-        <section className="mt-8">
-          <h2 className={adminType.titleLg}>Monthly Schedule</h2>
-          <div className="mt-4">
-            <MonthlyScheduleGrid cards={datedCards} />
-          </div>
-        </section>
+        {/* Section 3: Monthly Schedule — a rolling twelve months on desktop, one
+            calendar quarter at a time on a phone. The switch lives inside
+            ScheduleMonths because this page is a server component and cannot
+            ask what size the screen is. Narrowed to the three fields the views
+            actually read, so the rest of each row stays out of the client
+            bundle. */}
+        <ScheduleMonths
+          cards={datedCards.map(c => ({ id: c.id, title: c.title, deadline: c.deadline }))}
+        />
 
         {/* Section 4: Due Soon */}
         <section className="mt-8">
