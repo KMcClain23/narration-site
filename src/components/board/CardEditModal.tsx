@@ -55,6 +55,11 @@ export type FullBoardCard = {
   description: string;
   tags: string[];
   trigger_warnings: string[];
+  /** Amazon star rating, 0-5. Ranks the Completed section of /narrated-works. */
+  amazon_rating: number | null;
+  amazon_review_count: number | null;
+  /** Cron-owned, read-only here — the last time a fetch actually parsed a rating. */
+  amazon_rating_updated_at: string | null;
   audible_link: string;
   ar_link: string;
   spotify_link: string;
@@ -94,6 +99,9 @@ function mapToFullBoardCard(row: Record<string, unknown>): FullBoardCard {
     description: (row.description as string) ?? "",
     tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
     trigger_warnings: Array.isArray(row.trigger_warnings) ? (row.trigger_warnings as string[]) : [],
+    amazon_rating: row.amazon_rating == null ? null : Number(row.amazon_rating),
+    amazon_review_count: row.amazon_review_count == null ? null : Number(row.amazon_review_count),
+    amazon_rating_updated_at: (row.amazon_rating_updated_at as string) ?? null,
     audible_link: (row.audible_link as string) ?? "",
     ar_link: (row.ar_link as string) ?? "",
     spotify_link: (row.spotify_link as string) ?? "",
@@ -113,6 +121,7 @@ function blankCard(): FullBoardCard {
     author_notes: "", narration_format: null, narrator_share_percent: null, royalty_split_percent: null, recording_dates: [], words_recorded: 0, is_confidential: false, deadline: "", released_at: "", status: "contracted",
     word_count: 0, payment_type: "pfh", pfh_rate: 0, first15_due: "", first_15_complete: false,
     production_type: null, production_company: null, description: "", tags: [], trigger_warnings: [],
+    amazon_rating: null, amazon_review_count: null, amazon_rating_updated_at: null,
     audible_link: "", ar_link: "", spotify_link: "", script_url: "",
     archived_at: null, archived_reason: null, archived_notes: null,
   };
@@ -163,6 +172,33 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "content", label: "Content" },
   { id: "links", label: "Links" },
 ];
+
+/**
+ * Amazon fields are validated rather than clamped, unlike the narrator-share
+ * input above. A share typed as 150 can only have meant "as high as possible",
+ * so clamping it to 99 is a reasonable guess. A rating typed as 45 almost
+ * certainly meant 4.5, and clamping it to 5.0 would write a wrong number that
+ * looks right and then ranks the book first. Better to refuse and say so.
+ */
+function validateRating(text: string): { value: number | null; error: string | null } {
+  const t = text.trim();
+  if (!t) return { value: null, error: null };
+  if (!/^\d+(?:\.\d+)?$/.test(t)) {
+    return { value: null, error: t.startsWith("-") ? "Rating must be between 0.0 and 5.0." : "Rating must be a number, like 4.7." };
+  }
+  const n = Number(t);
+  if (n > 5) return { value: null, error: "Rating must be between 0.0 and 5.0." };
+  if (!/^\d+(?:\.\d)?$/.test(t)) return { value: null, error: "Rating can have at most one decimal place." };
+  return { value: n, error: null };
+}
+
+function validateReviewCount(text: string): { value: number | null; error: string | null } {
+  const t = text.trim();
+  if (!t) return { value: null, error: null };
+  if (t.startsWith("-")) return { value: null, error: "Review count can't be negative." };
+  if (!/^\d+$/.test(t)) return { value: null, error: "Review count must be a whole number." };
+  return { value: Number(t), error: null };
+}
 
 function formatArchivedDate(iso: string): string {
   const d = new Date(iso);
@@ -263,6 +299,18 @@ export function CardEditModal(props: CardEditModalProps) {
   const [shareInput, setShareInput] = useState<string | null>(null);
   const [shareClamped, setShareClamped] = useState(false);
 
+  // Raw text for the two Amazon fields, held apart from `form` so an invalid
+  // entry stays on screen to be corrected rather than being dropped or quietly
+  // rounded into something that looks deliberate. Null means "nothing typed
+  // this session", so the stored value shows through.
+  const [ratingText, setRatingText] = useState<string | null>(null);
+  const [countText, setCountText] = useState<string | null>(null);
+
+  const ratingDisplay = ratingText ?? (form?.amazon_rating != null ? String(form.amazon_rating) : "");
+  const countDisplay = countText ?? (form?.amazon_review_count != null ? String(form.amazon_review_count) : "");
+  const ratingCheck = validateRating(ratingDisplay);
+  const countCheck = validateReviewCount(countDisplay);
+
   // Swap-in-place person creation (Stage 6.3). "book" is the normal Book
   // Edit view; the other two replace the entire modal body with PersonForm.
   // Local copies of the name lists so a newly-created person is an instant
@@ -352,6 +400,14 @@ export function CardEditModal(props: CardEditModalProps) {
       setSaveError("Book title is required.");
       return;
     }
+    // Refused rather than corrected — see validateRating. Switches to the tab
+    // holding the bad field, since the error banner renders outside it.
+    const fieldError = ratingCheck.error ?? countCheck.error;
+    if (fieldError) {
+      setActiveTab("content");
+      setSaveError(fieldError);
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     try {
@@ -366,6 +422,8 @@ export function CardEditModal(props: CardEditModalProps) {
       const saved = mapToFullBoardCard(d.card);
       setForm(saved);
       setSavedForm(saved);
+      setRatingText(null);
+      setCountText(null);
       setSaveSuccess(true);
       onSaved(saved);
       setTimeout(onClose, 500);
@@ -1198,6 +1256,66 @@ export function CardEditModal(props: CardEditModalProps) {
         <div>
           <TagsField label="Trigger warnings (public)" value={form.trigger_warnings} onChange={v => setForm(p => p && { ...p, trigger_warnings: v })} />
           <p className={`${adminType.small} mt-1.5`}>Displayed as a collapsible details block on the public book page. Free-form — no controlled vocabulary.</p>
+        </div>
+
+        <div>
+          <p className={`${adminType.label} mb-4`}>Amazon reception</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={`${adminType.label} mb-1.5 block`}>Rating</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={ratingDisplay}
+                onChange={e => {
+                  const v = e.target.value;
+                  setRatingText(v);
+                  const { value, error } = validateRating(v);
+                  // Only a valid entry reaches the form. An invalid one stays
+                  // in the text state, shows its error, and blocks the save.
+                  if (!error) setForm(p => p && { ...p, amazon_rating: value });
+                }}
+                placeholder="4.7"
+                aria-invalid={Boolean(ratingCheck.error)}
+                className={`w-full rounded-lg border bg-background px-3 py-2.5 text-sm text-text-primary placeholder:text-text-dim focus:outline-none transition-colors ${
+                  ratingCheck.error ? "border-alert-red" : "border-surface-border focus:border-accent-amber-dim"
+                }`}
+              />
+              {ratingCheck.error && <p className="mt-1.5 text-[13px] text-alert-red">{ratingCheck.error}</p>}
+            </div>
+
+            <div>
+              <label className={`${adminType.label} mb-1.5 block`}>Review count</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={countDisplay}
+                onChange={e => {
+                  const v = e.target.value;
+                  setCountText(v);
+                  const { value, error } = validateReviewCount(v);
+                  if (!error) setForm(p => p && { ...p, amazon_review_count: value });
+                }}
+                placeholder="342"
+                aria-invalid={Boolean(countCheck.error)}
+                className={`w-full rounded-lg border bg-background px-3 py-2.5 text-sm text-text-primary placeholder:text-text-dim focus:outline-none transition-colors ${
+                  countCheck.error ? "border-alert-red" : "border-surface-border focus:border-accent-amber-dim"
+                }`}
+              />
+              {countCheck.error && <p className="mt-1.5 text-[13px] text-alert-red">{countCheck.error}</p>}
+            </div>
+          </div>
+          <p className={`${adminType.small} mt-1.5`}>
+            Ranks the Completed section of the public Narrated Works page — highest rating first,
+            then most reviewed. Manual entry: the refresh job keeps these up to date once seeded,
+            or you can leave them blank and let it fill them in over time. Amazon blocks this
+            server with a bot check today, so typing them in by hand is the reliable route.
+          </p>
+          {form.amazon_rating_updated_at && (
+            <p className={`${adminType.small} mt-1.5`}>
+              Last updated: {formatArchivedDate(form.amazon_rating_updated_at)}
+            </p>
+          )}
         </div>
       </div>
     );

@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/extract",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/refresh-amazon-rating",
+      "schedule": "0 4,12,20 * * *"
     }
   ]
 }

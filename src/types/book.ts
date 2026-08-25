@@ -20,6 +20,9 @@ export type Book = {
   sort_order?: number;
   slug?: string;
   released_at?: string | null;
+  /** Amazon star rating, 0-5. Ranks the Completed section on /narrated-works. */
+  amazon_rating?: number | null;
+  amazon_review_count?: number | null;
   created_at?: string;
   updated_at?: string;
   is_confidential?: boolean;

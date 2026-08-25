@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Book, BookCategory } from "@/types/book";
 import { requireAdmin } from "@/lib/require-admin";
+import { rankCompleted } from "@/lib/book-ranking";
 
 type CreateBookBody = {
   title?: string;
@@ -38,7 +39,7 @@ const STATUS_TO_CATEGORY: Record<string, BookCategory> = {
   released:   "completed",
 };
 
-type MappedCard = { id: unknown; title: unknown; subtitle: unknown; author: unknown; link: string; ar_link: string; spotify_link: string; cover_url: string; tags: unknown[]; description: string; category: string; co_narrator: unknown[]; sort_order: number; slug: string | null; is_confidential: boolean; narration_format: string | null };
+type MappedCard = { id: unknown; title: unknown; subtitle: unknown; author: unknown; link: string; ar_link: string; spotify_link: string; cover_url: string; tags: unknown[]; description: string; category: string; co_narrator: unknown[]; sort_order: number; slug: string | null; is_confidential: boolean; narration_format: string | null; released_at: string | null; amazon_rating: number | null; amazon_review_count: number | null };
 
 // Under-NDA cards keep their real title/author/cover/links in the DB (Dean
 // still needs those on the admin board) but must never leak them to the
@@ -81,6 +82,13 @@ function mapCards(data: Record<string, unknown>[]): MappedCard[] {
           is_confidential: true,
           // Anonymized like every other identifying field on a confidential card.
           narration_format: null,
+          // Withheld for the same reason: a release date plus a distinctive
+          // rating and review count would identify the book as surely as the
+          // title. The cost is that a confidential release sorts to the end of
+          // Completed, which is the right trade.
+          released_at: null,
+          amazon_rating: null,
+          amazon_review_count: null,
         };
       }
 
@@ -101,6 +109,11 @@ function mapCards(data: Record<string, unknown>[]): MappedCard[] {
         slug:        (card.slug as string) || null,
         is_confidential: false,
         narration_format: (card.narration_format as string) || null,
+        released_at: (card.released_at as string) || null,
+        // Supabase hands numeric back as a string often enough to be worth
+        // coercing here rather than discovering it in a comparator.
+        amazon_rating: card.amazon_rating == null ? null : Number(card.amazon_rating),
+        amazon_review_count: card.amazon_review_count == null ? null : Number(card.amazon_review_count),
       };
     });
 }
@@ -116,7 +129,7 @@ export async function GET() {
 
     const primary = await supabaseAdmin
       .from("board_cards")
-      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, slug, deadline, first15_due, first_15_complete, is_confidential, narration_format")
+      .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, slug, deadline, first15_due, first_15_complete, is_confidential, narration_format, released_at, amazon_rating, amazon_review_count")
       .in("status", STATUS_FILTER)
       .is("archived_at", null)
       .order("sort_order",  { ascending: true })
@@ -129,7 +142,7 @@ export async function GET() {
       // Retry without slug
       const fallback = await supabaseAdmin
         .from("board_cards")
-        .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, deadline, first15_due, first_15_complete, is_confidential, narration_format")
+        .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, deadline, first15_due, first_15_complete, is_confidential, narration_format, released_at")
         .in("status", STATUS_FILTER)
         .is("archived_at", null)
         .order("sort_order", { ascending: true })
@@ -140,7 +153,7 @@ export async function GET() {
         // Retry without is_confidential either (migration not run yet)
         const fallback2 = await supabaseAdmin
           .from("board_cards")
-          .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, deadline, first15_due, first_15_complete")
+          .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, sort_order, status, deadline, first15_due, first_15_complete, released_at")
           .in("status", STATUS_FILTER)
           .is("archived_at", null)
           .order("sort_order", { ascending: true })
@@ -189,6 +202,8 @@ export async function GET() {
       seen.add(key);
       return true;
     });
+
+    rankCompleted(deduped);
 
     return NextResponse.json({ success: true, books: deduped });
   } catch (error) {
