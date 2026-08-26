@@ -1055,6 +1055,14 @@ grant update (
 -- fires — silently inert in exactly the case it exists for. A function body runs
 -- unconditionally. That asymmetry is the whole reason this is an RPC.
 --
+-- WHEN F3 ARRIVES, THE EDITOR GETS ITS OWN FUNCTION. The return type below
+-- carries all eighteen columns, pfh_rate and payment_type among them, and that is
+-- correct precisely because this function is admin-only by assertion. The shorter
+-- change — widening the role test here to admit an editor — hands them every
+-- financial column on the board, because the return type does not narrow with the
+-- caller. Write board_editor_for_session() with its own narrowed return type
+-- instead. Two functions, two shapes, each one enforcing its own.
+--
 -- SECURITY INVOKER, deliberately, not DEFINER. The assertion below is the gate;
 -- RLS stays underneath it as a second, independent one. A DEFINER function would
 -- bypass RLS and make this single raise the only thing standing between an
