@@ -190,6 +190,66 @@ session observer added for bug 5 changed that — a cold start now resolves EDIT
 the editor path. The test never re-ran, so the change was invisible. **A test that passed
 is only evidence about the build it ran against.**
 
+**Commit `6c6b831` is mislabelled — read this before trusting the history.** Its message
+says "delete the other five retry shims", but it also contains **the entire 2A migration**
+— both triggers, the RLS update policy and the column grants — which had been sitting
+uncommitted, plus the doc edits of that round. Nothing is lost and the committed migration
+text is correct; only the attribution is wrong. Deliberately **not** amended: fixing a
+commit message on `main` costs a force-push, and this repo had only just gained an
+off-machine copy. History integrity beats history accuracy. Cause was `git add -A` without
+reading the stage.
+
+**The `GET` retry shim was worse than a widened column list.** The primary board query
+already selected `*`, so nothing widened. What the fallback dropped was
+`.is("archived_at", null)` — meaning any error whose message merely contained
+`archived_at` would have made the board return archived cards among active ones, and the
+Archive view return everything. **A read path that answers a different question when
+something goes wrong is worse than one that fails, because nothing downstream can tell.**
+Two guards in `expenses/route.ts` and `payments/invoice-draft/route.ts` were left
+deliberately: they test a real SQLSTATE first and return a graceful "not migrated" answer
+rather than mutating a payload and retrying. Same instinct, milder consequence.
+
+**Bug 6 — the board showed "No active projects" to a demoted user.** Found by Dean
+mis-tapping during DoD 12. Not a guard failure: `sourceFor` ran and answered correctly for
+the role it was given. `BoardViewModel` caches `role` in a `private var` set once by
+`start()`, and `refresh()` reads that cache — so after a demotion the app asked
+"what may an admin read?" while the live answer was "you are not an admin." RLS evaluates
+`current_app_role()` per request, returned zero rows with HTTP 200, and the success path
+rendered an ordinary empty board.
+
+**The guard could never have caught it.** It compares a cached client copy of a fact the
+server owns and can change underneath it. Rejecting the `board_cards` fallback closed the
+route where the app *knows* it is an editor; this is the route where it does not know yet.
+
+**Three unit tests on the guard passed throughout.** They assert `loadBoard` raises before
+touching the client. Nothing asserted what the screen does with that raise, or what
+happens when the raise never occurs because the premise is stale. The unit was proven;
+the join was not.
+
+Fixed by moving the question to the server: an RPC that returns the board and raises for a
+non-admin, so identity and consequence are answered atomically and no client cache sits in
+the trust path. A cheaper-looking variant — a `security_invoker` view whose predicate calls
+an asserting function — was rejected: if RLS filters rows to zero first the predicate never
+evaluates, so it would be silently inert in exactly the case it exists for. An RPC body
+runs unconditionally.
+
+This does not contradict the design brief's rejection of RPC, which was scoped to *writes*
+that are single-row updates needing no validation the schema cannot express. This is a read
+whose correctness depends on a fact the client cannot trust its own copy of.
+
+**A second, latent fault behind it:** `start()` returns early when `started`, so even a
+re-resolved role would not trigger a reload — `capabilities` would stay stale and the app
+would keep offering gestures the server would then refuse.
+
+**And a near-false-pass worth its own line.** On DoD 14 a tap aimed at the First-15
+checkbox landed on the card body and opened the detail sheet; the screenshots showed the
+expected end state, and only the log — one write across two tests — revealed that the
+second test never ran. **A correct rollback and a tap that never happened are pixel
+identical.** Screens cannot distinguish "the code did the right thing" from "the code
+never ran"; only an execution count can. The hit box measured 78.1 × 48.0 dp, at the
+Material minimum — the sharp edge is that a near-miss inside a 379 × 176 dp clickable card
+produces a confident wrong outcome rather than a no-op.
+
 **A verification that destroys its own precondition.** `connectedAndroidTest` uninstalls
 the app during teardown, taking the persisted session with it — and the write tests depend
 on that session. It would have done this on any run, killed or not. Drive instrumentation

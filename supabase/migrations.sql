@@ -1034,3 +1034,85 @@ grant update (
   status, first_15_complete, released_at,
   archived_at, archived_reason, archived_notes
 ) on public.board_cards to authenticated;
+
+-- ---- the board read ------------------------------------------------------
+--
+-- Stage 2 bug 6: the app asked "what may an admin read?" while the live answer
+-- was "you are not an admin". The client caches the role at sign-in, RLS
+-- evaluates it fresh, and a demoted session therefore received zero rows with
+-- HTTP 200 — rendered as an ordinary empty board reading "No active projects".
+-- A person would believe that. It says "you have no work", not "you cannot see
+-- this", and it is the same silent-wrong-answer the board_cards fallback was
+-- rejected to avoid, reached by a different route.
+--
+-- The fix has to answer the fact and its consequence in one breath, because the
+-- defect is precisely the window between them. Hence a function rather than a
+-- relation.
+--
+-- NOT a security_invoker view whose predicate calls an asserting function, which
+-- looks cheaper and keeps the client's decode path unchanged. If RLS filters the
+-- rows to zero first, the predicate is never evaluated and the assertion never
+-- fires — silently inert in exactly the case it exists for. A function body runs
+-- unconditionally. That asymmetry is the whole reason this is an RPC.
+--
+-- SECURITY INVOKER, deliberately, not DEFINER. The assertion below is the gate;
+-- RLS stays underneath it as a second, independent one. A DEFINER function would
+-- bypass RLS and make this single raise the only thing standing between an
+-- editor and every financial column on the board.
+create or replace function public.board_for_session()
+returns table (
+  id uuid,
+  title text,
+  author text,
+  co_narrator text,
+  cover_url text,
+  status text,
+  deadline date,
+  first15_due date,
+  first_15_complete boolean,
+  word_count integer,
+  pfh_rate numeric,
+  payment_type text,
+  is_confidential boolean,
+  narration_format text,
+  narrator_share_percent smallint,
+  recording_dates jsonb,
+  words_recorded integer,
+  created_at timestamptz
+)
+language plpgsql
+stable
+security invoker
+set search_path to 'public'
+as $$
+begin
+  -- Read live, never from anything the client sent. This is the assertion the
+  -- view form could not make.
+  if coalesce(public.current_app_role(), '') <> 'admin' then
+    -- The marker is matched by the client to produce its not-enabled message.
+    -- Matching a token we control beats matching prose that may be reworded, and
+    -- 42501 is what makes PostgREST answer 403 rather than 400.
+    raise exception 'BOARD_ACCESS_NOT_ENABLED'
+      using errcode = '42501';
+  end if;
+
+  -- The definition of "the board" lives here now rather than in the client, so
+  -- there is one copy of it. Active, non-archived work only: 'released' belongs
+  -- on the Released page and 'audition' is not yet active production.
+  return query
+    select
+      c.id, c.title, c.author, c.co_narrator, c.cover_url, c.status, c.deadline,
+      c.first15_due, c.first_15_complete, c.word_count, c.pfh_rate,
+      c.payment_type, c.is_confidential, c.narration_format,
+      c.narrator_share_percent, c.recording_dates, c.words_recorded, c.created_at
+    from public.board_cards c
+    where c.status in ('contracted', 'prepping', 'recording', 'editing')
+      and c.archived_at is null;
+end;
+$$;
+
+-- Postgres grants EXECUTE to PUBLIC by default, which would put this within
+-- reach of an unauthenticated request. The assertion would refuse it, but the
+-- grant should not depend on the assertion being right.
+revoke execute on function public.board_for_session() from public, anon;
+grant  execute on function public.board_for_session() to authenticated;
