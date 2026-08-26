@@ -28,15 +28,7 @@ export async function GET(req: Request) {
   query = showArchived
     ? query.not("archived_at", "is", null).order("archived_at", { ascending: false })
     : query.is("archived_at", null).order("status").order("sort_order");
-  let { data, error } = await query;
-
-  // archived_at column may not exist yet (migration not run) — retry unfiltered
-  // rather than let the whole board fail to load.
-  if (error && error.message?.includes("archived_at")) {
-    const fallback = await supabaseAdmin.from("board_cards").select("*").order("status").order("sort_order");
-    data = fallback.data;
-    error = fallback.error;
-  }
+  const { data, error } = await query;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ cards: data });
@@ -105,30 +97,11 @@ export async function POST(req: Request) {
     insertData.deadline    = deadline    || null;
     insertData.first15_due = first15_due || null;
 
-    let { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from("board_cards")
       .insert(insertData)
       .select()
       .single();
-
-    // If trigger_warnings column doesn't exist yet (migration not run), retry without it
-    if (error && error.message?.includes("trigger_warnings")) {
-      delete insertData.trigger_warnings;
-      ({ data, error } = await supabaseAdmin.from("board_cards").insert(insertData).select().single());
-    }
-    if (error && error.message?.includes("is_confidential")) {
-      delete insertData.is_confidential;
-      ({ data, error } = await supabaseAdmin.from("board_cards").insert(insertData).select().single());
-    }
-    if (error && error.message?.includes("narration_format")) {
-      delete insertData.narration_format;
-      ({ data, error } = await supabaseAdmin.from("board_cards").insert(insertData).select().single());
-    }
-    if (error && (error.message?.includes("production_type") || error.message?.includes("production_company"))) {
-      delete insertData.production_type;
-      delete insertData.production_company;
-      ({ data, error } = await supabaseAdmin.from("board_cards").insert(insertData).select().single());
-    }
 
     if (error) {
       // Supabase errors are plain objects — never use String(error) or throw them
@@ -182,7 +155,11 @@ export async function PUT(req: Request) {
     // says wherever it is read.
     const atPacificMidday = (v: unknown) =>
       typeof v === "string" ? (dateOnlyToPacificNoon(v) ?? v) : v;
-    const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    // updated_at is not set here any more — board_cards_touch_updated_at owns
+    // it. That matters beyond avoiding two writers of one rule: this route set
+    // it unconditionally, so a manual Amazon Refetch saved through here would
+    // have bumped "last activity" where the trigger deliberately does not.
+    const update: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in fields) {
         // Date columns must be null (not "") — Supabase rejects empty strings for date/timestamptz
@@ -192,30 +169,13 @@ export async function PUT(req: Request) {
       }
     }
 
-    // Snapshot the current row, solely to decide whether released_at should be
-    // auto-stamped. It used to carry description/tags/trigger_warnings for the
-    // Amazon auto-fill, which has been deleted — that scrape had not succeeded
-    // in production for as long as anyone could measure, because Amazon blocks
-    // this server on datacentre IP reputation. The manual Refetch button in the
-    // Content tab remains: user-initiated, and honest about the block.
-    const { data: cur } = await supabaseAdmin
-      .from("board_cards")
-      .select("released_at")
-      .eq("id", id)
-      .single();
-    const existingReleasedAt: string | null = (cur as Record<string, unknown>)?.released_at as string ?? null;
-
-    // Auto-stamp released_at when transitioning to "released" and not already set.
-    // Fires when: key absent from payload OR payload value is empty/null (i.e. the
-    // manual date picker was left blank). Never fires when existingReleasedAt is
-    // already set — that protects manually-entered dates from being overwritten.
-    if (
-      fields.status === "released" &&
-      existingReleasedAt === null &&
-      (!("released_at" in fields) || !fields.released_at)
-    ) {
-      update.released_at = new Date().toISOString();
-    }
+    // The released_at auto-stamp lived here and is now
+    // board_cards_stamp_released_at, which carries the same two guards: only on
+    // the transition into released, and only when nothing is already there. The
+    // snapshot read that fed it went with it.
+    //
+    // Pacific-midday anchoring above stays: it normalises a date a person picked
+    // in a date input, which is an input-format concern, not a derived value.
 
     const { data, error } = await supabaseAdmin
       .from("board_cards").update(update).eq("id", id).select().single();

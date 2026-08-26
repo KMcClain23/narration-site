@@ -168,9 +168,23 @@ Settled by the design brief; neither needs the migration.
    titles carry a refresh stamp after three cron runs, and the same blocked fetch backs
    both callers. Keep the manual **Refetch** button in the Content tab — user-initiated,
    already honest about the block.
-2. **Delete the six retry shims.** Every column they guard exists. They can only swallow
-   real errors now, retrying a constraint violation into a more confusing failure. They
-   are also why `/api/books` silently drops `slug`.
+2. **Delete the retry shims — there are more than six, and not all are in `PUT`.**
+   *Corrected 26 August: the original count came from reading only lines 165–310 of
+   `api/board/route.ts` and describing the whole file from its `PUT` handler.*
+
+   | where | what |
+   |---|---|
+   | `PUT` | six shims — **deleted** |
+   | `GET` line 35 | `archived_at` → retries with **`select("*")`** |
+   | `POST` lines 115–131 | four more, on the insert path |
+
+   Every column they guard exists, so they can only swallow real errors now, retrying a
+   constraint violation into a more confusing failure. They are also why `/api/books`
+   silently drops `slug`.
+
+   **The `GET` one is the priority.** An error-triggered `select("*")` on the board read is
+   the same defect DoD 18 forbids in Android, reachable by any error whose message
+   contains that column name.
 
 ---
 
@@ -242,8 +256,13 @@ Numbers, not pass/fail.
 1. All eight checks in 2A.4, with the two `updated_at` values from (2) and (3) quoted
 2. `grep` finds no `updated_at` assignment left in `PUT /api/board`
 3. `grep` finds no `released_at` auto-stamp block left in `PUT /api/board`
-4. `grep -rn "9400\|fetchAmazonBook" src/` shows the on-save fill gone, Refetch intact
-5. Zero retry shims remain
+4. `grep -rn "fetchAmazonBook" src/` returns **nothing**. `fetchAmazonBookResult` and
+   `fetchAmazonRating` both survive — Refetch reaches the first via
+   `/api/board/amazon-preview`, the cron reaches the second.
+   *Corrected: the original wording folded `9400` into this grep, which cannot pass or
+   fail. Those four occurrences are W1's territory and explicitly out of scope here.*
+5. `grep -c "error.message?.includes" src/app/api/board/route.ts` returns **0** — all
+   shims, in `GET` and `POST` as well as `PUT`
 
 **Android — happy path**
 

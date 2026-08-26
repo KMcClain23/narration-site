@@ -934,3 +934,103 @@ begin
   alter table board_cards add constraint board_cards_royalty_split_check
     check (royalty_split_percent is null or (royalty_split_percent between 0 and 99));
 end $$;
+
+-- ============================================================
+-- Android Stage 2: the write path moves into the database
+--
+-- Until now every rule about a board_cards update lived in
+-- PUT /api/board — which meant a second client writing directly would
+-- silently skip all of them. Rather than reimplement those rules in Kotlin
+-- and keep two copies in step, they move here, where every client gets them
+-- without remembering: the web, Android, a psql session, anything built later.
+--
+-- Spec: NATIVE_ANDROID_STAGE_2.md. Reasoning: NATIVE_ANDROID_STAGE_2_DESIGN.md.
+-- ============================================================
+
+-- ---- updated_at ----------------------------------------------------------
+--
+-- Deliberately NOT an unconditional bump. board_cards.updated_at is read by
+-- contacts/authors, contacts/co-narrators and the board export, and feeds a
+-- visible, sortable "Last activity" column on both contact pages. The ratings
+-- cron touches three books a day; if its writes bumped this, every author with
+-- a released book would read "last activity: today" within about four days and
+-- the column would quietly stop meaning anything — no error, no failing test.
+--
+-- The exclusion list is small and stable. An inclusion list would have to grow
+-- with every future migration and would silently stop tracking any column
+-- nobody remembered to add; this way a new column counts as a human edit by
+-- default, which is the safe direction to fail in.
+create or replace function public.board_cards_touch_updated_at()
+returns trigger language plpgsql set search_path = public as $fn$
+declare
+  ignored text[] := array[
+    'updated_at', 'amazon_rating', 'amazon_review_count', 'amazon_rating_updated_at'
+  ];
+begin
+  if to_jsonb(new) - ignored is distinct from to_jsonb(old) - ignored then
+    new.updated_at := now();
+  end if;
+  return new;
+end $fn$;
+
+drop trigger if exists board_cards_touch_updated_at on public.board_cards;
+create trigger board_cards_touch_updated_at
+  before update on public.board_cards
+  for each row execute function public.board_cards_touch_updated_at();
+
+-- ---- released_at ---------------------------------------------------------
+--
+-- Ported exactly from PUT /api/board: stamp only on the transition INTO
+-- released, and only when nothing is there. A hand-entered release date is
+-- never overwritten — that guard is the whole reason the rule is not simply
+-- "set it when status is released".
+--
+-- Pacific-midday anchoring deliberately stays in TypeScript. That normalises a
+-- date a person picked in a date input, which is an input-format question; this
+-- stamp is an instant and needs no anchoring.
+create or replace function public.board_cards_stamp_released_at()
+returns trigger language plpgsql set search_path = public as $fn$
+begin
+  if new.status = 'released'
+     and coalesce(old.status, '') is distinct from 'released'
+     and new.released_at is null
+  then
+    new.released_at := now();
+  end if;
+  return new;
+end $fn$;
+
+drop trigger if exists board_cards_stamp_released_at on public.board_cards;
+create trigger board_cards_stamp_released_at
+  before update on public.board_cards
+  for each row execute function public.board_cards_stamp_released_at();
+
+-- ---- write access --------------------------------------------------------
+--
+-- Two independent gates, and they fail differently, which the Android client
+-- has to account for: an ungranted column raises permission denied, while a row
+-- RLS refuses simply is not returned — a successful statement affecting zero
+-- rows. A client reading "no exception" as "saved" would show every optimistic
+-- update sticking forever for a user who had lost access.
+--
+-- Both using and with check are required. `using` decides which rows may be
+-- updated; `with check` decides whether the result is still permitted. Without
+-- the latter an admin could write a row they would then be unable to read.
+drop policy if exists "Role update" on public.board_cards;
+create policy "Role update" on public.board_cards
+  for update to authenticated
+  using      ((select public.current_app_role()) in ('admin'))
+  with check ((select public.current_app_role()) in ('admin'));
+
+-- The allowlist, enforced by Postgres rather than asserted in TypeScript.
+-- Only what Stage 2's gestures actually touch: the First-15 toggle, status
+-- moves, and archiving. Everything else stays ungranted and therefore refused.
+--
+-- The TypeScript allowlist in PUT /api/board is NOT redundant. GRANT binds the
+-- authenticated role; the web runs as service_role and bypasses column
+-- privileges entirely, so until F2 migrates it to Supabase Auth that array is
+-- the web's only enforcement.
+grant update (
+  status, first_15_complete, released_at,
+  archived_at, archived_reason, archived_notes
+) on public.board_cards to authenticated;

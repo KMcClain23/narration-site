@@ -160,8 +160,43 @@ returns 200 with `[]`, not an error — and clearing cards on a failed refresh w
 security control, since a revoked user could simply not pull.
 
 ### Native Android Stage 2 — writes
-*Designed 25 August 2026, not started. Five decisions locked in
-`NATIVE_ANDROID_STAGE_2_DESIGN.md`; spec not yet written.*
+*In progress, 25–26 August 2026. Design brief rev. 3 + `NATIVE_ANDROID_STAGE_2.md`.*
+**2A migration applied and verified 8/8. 2B deletions done. 2C not started.**
+
+2A.4 results: `updated_at` advanced on a granted write (`04:13:14` → `04:16:17`) and was
+**unchanged** on an amazon-only write, with a control write moving it — the trigger's
+exclusion works. `released_at` stamps on transition and never overwrites. An ungranted
+column returns `42501 permission denied`; an RLS-refused row returns **zero rows, no
+error**; anon returns `42501`. The role test used one token across three readings —
+1 as admin, 0 as editor, 1 as admin again — so the gate demonstrably moved rather than
+never having been on.
+
+Settled by that run: trigger assignments are **not** checked against column privileges.
+`updated_at` is set by the trigger while `authenticated` holds no grant on it. No extra
+grant needed.
+
+**Two Stage 1 regressions surfaced during this work, both now fixed.**
+`sourceFor(EDITOR)` pointed at `board_cards_editor`, a view that does not exist until F3 —
+recorded in Stage 1 as "unreachable", when it is one `update profiles` away. It now raises
+before touching the client and shows "Board access is not enabled for this account yet",
+deliberately **not** falling back to `board_cards`, where RLS would return zero rows and an
+editor would see an ordinary empty board. Separately, the error surface interpolated the
+PostgREST exception message, putting the request URL, query string, `Authorization` and
+`apikey` on screen; errors shown to a person are now a sentence, with the object logged.
+
+**Stage 1's item 19 was a false pass, and the reason generalises.** It passed on a build
+where a demoted app still held ADMIN in memory and queried `board_cards`. The continuous
+session observer added for bug 5 changed that — a cold start now resolves EDITOR and takes
+the editor path. The test never re-ran, so the change was invisible. **A test that passed
+is only evidence about the build it ran against.**
+
+**A verification that destroys its own precondition.** `connectedAndroidTest` uninstalls
+the app during teardown, taking the persisted session with it — and the write tests depend
+on that session. It would have done this on any run, killed or not. Drive instrumentation
+with `adb shell am instrument` after `installDebug installDebugAndroidTest`; `am instrument`
+does not uninstall. The general shape is worth remembering because nobody checks for it:
+**a check whose side effect consumes the thing it is checking** looks fine the first time
+and is invisible until the second run, or the first interrupted one.
 
 `UPDATE` policies gated on role, the First-15 toggle, status moves, swipe-to-archive,
 the long-press action menu, optimistic updates with rollback.
