@@ -744,3 +744,51 @@ people to ignore it.* A guard with a false-positive history is worse than no gua
 because it produces confident dismissal. The loose-scan version of this check reported
 five columns the cron only ever reads; catching that before it shipped is the reason the
 check can be trusted now.
+
+## Stage 2 polish — closed
+
+**1. Pager arbitration.** `SwipeVersusPagerTest` asserts both halves: a swipe on a card
+archives without paging, and a drag on bare pager surface pages without archiving. The
+mutation result was the finding — deleting the explicit `change.consume()` left **both
+halves green**, so that line was never load-bearing. `detectHorizontalDragGestures`
+consumes the slop crossing itself and descendant-before-ancestor dispatch does the rest.
+The line stays as insurance and is now labelled as insurance rather than as the mechanism,
+because a comment claiming to be load-bearing when it is not is a false landmark. Removing
+the card's swipe handling turns half one red (so it is not vacuous); consuming one level up
+turns both red, half two reporting "the pager must have paged".
+
+**2. Structural nested-scroll guard — and this one IS load-bearing.** `ScrollableContent`
+has a private constructor, and every factory builds the scrolling container itself; the
+caller supplies only what goes inside it. There is deliberately no factory taking an
+arbitrary composable — that would be a promise rather than a proof, and a promise is what
+existed when `state.isEmpty -> Unit` stranded a refused session on a screen with no way
+back short of restarting the app. `blank()` is the only way to say "nothing", and it
+scrolls.
+
+Both illegal constructions were written and neither compiles:
+
+```
+PullToRefreshSurface(isRefreshing = false, onRefresh = {}) { }
+  e: No value passed for parameter 'content'.
+
+ScrollableContent { Box(Modifier) {} }
+  e: Cannot access 'constructor(...)': it is private in 'ScrollableContent'.
+```
+
+`ShimmerList` and `EmptyBoard` became factories. Both already scrolled — by the author
+remembering to, which is exactly the dependency the type removes. Confirmed on the device
+that the blank refused state still recovers by pull, that being the state the original bug
+lived in.
+
+*Note on the two guards together: the pager guard turned out to be a regression test for
+framework behaviour rather than a fix, and the nested-scroll guard turned out to be a real
+compile-time constraint. Both outcomes were worth having, and knowing which is which is
+the point of writing the illegal construction rather than assuming.*
+
+**3. `DmnTextField`** — card radius, raised surface, amber focus ring, Manrope. Stock
+`OutlinedTextField` brings a purple focus ring and a foreign typeface and reads as a
+control borrowed from another app. The sign-in screen still uses the stock control and
+could adopt this; that is Stage 1 and was left alone.
+
+**Stage 2 is closed.** Its DoD was met at the sweep; these were polish and nothing was
+added to them.
