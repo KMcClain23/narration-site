@@ -12,7 +12,20 @@ function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
-/** 42P01 is "relation does not exist" — the migration hasn't run yet. */
+/**
+ * 42P01 is "relation does not exist" — the migration hasn't run yet.
+ *
+ * REMOVAL CONDITION: delete this guard, and the `tableMissing` branches that call
+ * it, once the `expenses` table exists in every environment that runs this route
+ * — production and any preview or local database still in use. After that point
+ * a missing-table error is a real fault and should surface as one, not be
+ * answered with a graceful empty state.
+ *
+ * Recorded because the eleven retry shims deleted in Stage 2B did not arrive at
+ * once. They accumulated because each was reasonable when written and none had
+ * an expiry, so nobody could tell a guard that was still needed from one that had
+ * outlived its migration window. This one has an expiry.
+ */
 function tableMissing(error: { code?: string; message?: string } | null): boolean {
   return error?.code === "42P01" || Boolean(error?.message?.includes("expenses"));
 }

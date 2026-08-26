@@ -24,6 +24,14 @@ export const dynamic = "force-dynamic";
  * Two codes, because the two verbs fail differently: a read reaches Postgres
  * and gets 42703 ("column does not exist"), while a write is rejected earlier
  * by PostgREST against its cached schema, as PGRST204.
+ *
+ * REMOVAL CONDITION: delete this guard and its call sites once the
+ * `invoice_draft` column exists in every environment that reads this table.
+ * Until then a missing column is a migration window, not a fault; afterwards it
+ * is a fault and should be allowed to look like one.
+ *
+ * Recorded because the eleven shims deleted in Stage 2B accumulated exactly for
+ * want of this line: each was reasonable when written and none had an expiry.
  */
 function migrationMissing(error: { code?: string; message?: string } | null): boolean {
   return (

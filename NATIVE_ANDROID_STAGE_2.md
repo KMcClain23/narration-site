@@ -261,8 +261,26 @@ Numbers, not pass/fail.
    `/api/board/amazon-preview`, the cron reaches the second.
    *Corrected: the original wording folded `9400` into this grep, which cannot pass or
    fail. Those four occurrences are W1's territory and explicitly out of scope here.*
-5. `grep -c "error.message?.includes" src/app/api/board/route.ts` returns **0** — all
-   shims, in `GET` and `POST` as well as `PUT`
+5. `grep -rEn "message\??\.includes" src/` returns **exactly 2**, and they are:
+
+   | file | line | guard |
+   |---|---|---|
+   | `src/app/api/expenses/route.ts` | 17 | `42P01` first, then `"expenses"` |
+   | `src/app/api/payments/invoice-draft/route.ts` | 32 | `42703` / `PGRST204` first, then `"invoice_draft"` |
+
+   *Corrected 26 August 2026. As originally written this item was
+   `grep -c "error.message?.includes" src/app/api/board/route.ts` returns **0**, and it
+   had been a check that could not fail since the moment optional chaining entered the
+   file. In a grep pattern `.` is a wildcard, so that string means "error" + any one
+   character + "message?" + any one character + "includes". The code writes
+   `error?.message?.includes` — two characters between `error` and `message` — which the
+   pattern cannot match. It returned 0 while two instances of the very thing it counts sat
+   in the tree, and it would return 0 against eleven new shims tomorrow provided they were
+   written with optional chaining, which is how everyone writes it now. It passed the full
+   sweep on that basis.*
+
+   *A count of zero invites the code to hide below the pattern; a named inventory does
+   not. If this returns anything not in the table above, a shim has been added.*
 
 **Android — happy path**
 

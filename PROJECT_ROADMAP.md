@@ -637,3 +637,72 @@ Pre-existing from July, unrelated to the sweep. It is a live instance of the sta
 genuinely released again the trigger will decline to re-stamp and it will silently carry
 the July date. That is a question about what `released_at` means — first release, or most
 recent — not a defect. Dean's call.
+
+### W2 follow-ons
+
+**The prefix moved the memory dependency; it did not remove it.** The list failed because
+it needed someone to remember to add. The prefix fails if someone names a *human-editable*
+column `amazon_something` — `amazon_asin` and `amazon_url` are both plausible on a book
+record — and then editing it silently stops counting as activity. The trigger was left
+alone, having just been fixed and verified; the drift is made loud instead.
+
+`npm run check-updated-at-exclusions` asserts:
+
+> the columns the trigger excludes == the columns the ratings cron writes, plus `updated_at`
+
+Neither side is hardcoded. The exclusion side comes from `board_cards_exclusion_audit()`,
+which extracts the predicate from `pg_get_functiondef` of the trigger **that is actually
+installed** and applies it over `information_schema.columns`; the cron side is parsed out
+of the cron's own source, scoped to `.update(...)` arguments. A hardcoded expectation would
+be W2 wearing a test's clothes.
+
+*The originally proposed assertion — excluded == not-granted-to-`authenticated`, plus
+`updated_at` — was checked and does not hold: 5 excluded against 37 not-granted. The grant
+list constrains only the Android client. The web writes as `service_role` and bypasses
+column privileges entirely, so `title`, `notes` and `word_count` are all human-editable
+yet ungranted. "Not granted to authenticated" is not a proxy for "no human can write it"
+until F2. The grant check survives as the third arm below, which is the part that does
+hold.*
+
+Mutation-tested in all three directions, each producing its own message:
+
+| mutation | result |
+|---|---|
+| cron stops writing `amazon_rating_attempted_at` | red — "the trigger excludes … which the cron does not write" |
+| cron starts writing `notes` (the W2 shape) | red — "the cron writes notes, which the trigger does NOT exclude. This is W2." |
+| `grant update (amazon_rating) … to authenticated` | red — "excluded as machine-written but IS granted UPDATE to authenticated" |
+
+All three restored; the grant list is back to exactly its original six. **Caveat:** this
+repo has no test runner, so it is a script nothing runs automatically — a check you
+invoke, not a guard that stands watch.
+
+**DoD item 5 was a check that could not fail.** Corrected in the Stage 2 spec. In a grep
+pattern `.` is a wildcard, so `error.message?.includes` means "error" + any one character +
+"message?" + any one character + "includes". The code writes `error?.message?.includes` —
+two characters — which the pattern cannot match. It returned 0 while the two guards it
+exists to count sat in the tree, and would return 0 against eleven new shims tomorrow if
+they used optional chaining, which is how everyone writes it now. It passed the full sweep
+on that basis. Now `grep -rEn "message\??\.includes" src/` returning **exactly 2**, with
+both enumerated by file and line, because a count of zero invites the code to hide below
+the pattern and a named inventory does not.
+
+**The two kept guards now carry removal conditions,** next to the guards themselves:
+delete each once its table/column exists in every environment that reads it, after which a
+missing relation is a real fault and should look like one. The original eleven accumulated
+precisely for want of that line — each reasonable when written, none with an expiry.
+
+**The success path stays probe-only.** `stampAttempt` is the write that caused W2 and the
+only one running today, so the live verification covers the case that matters, but the
+path where `amazon_rating_updated_at` advances alongside a rating change is covered by
+probe alone. It closes itself on the next successful fetch; after one, run:
+
+```sql
+select title, amazon_rating, amazon_rating_updated_at, updated_at,
+       updated_at < amazon_rating_updated_at as clean
+from public.board_cards
+where amazon_rating_updated_at > amazon_rating_attempted_at - interval '1 minute'
+order by amazon_rating_updated_at desc limit 5;
+```
+
+`clean = true` on a row whose rating genuinely moved is the missing half. Until then this
+says probe-only, in those words.
