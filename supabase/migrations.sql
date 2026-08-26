@@ -1010,12 +1010,28 @@ create trigger board_cards_touch_updated_at
 -- Pacific-midday anchoring deliberately stays in TypeScript. That normalises a
 -- date a person picked in a date input, which is an input-format question; this
 -- stamp is an instant and needs no anchoring.
+-- Stage 3: released_at becomes a true release date.
+--
+-- The third clause was `new.released_at is null`, which stamped only the FIRST
+-- release. Dean's decision is that re-releasing re-stamps, so it had to change —
+-- but NOT by deleting the clause, which is the obvious move and the wrong one.
+-- Deleting it makes the trigger clobber a released_at the caller supplied in the
+-- same statement, and released_at is one of the six columns the Android client is
+-- granted. Marking an older book released with its real historical date would
+-- become impossible in one write, silently.
+--
+-- `is not distinct from old.released_at` reads as: stamp now(), unless the caller
+-- supplied a date in this statement. Verified over REST with a real JWT: an
+-- explicitly supplied 2020-05-01 survived where now() would have replaced it.
+--
+-- The first two clauses are unchanged and test the TRANSITION rather than the
+-- state, which is the part usually got wrong.
 create or replace function public.board_cards_stamp_released_at()
 returns trigger language plpgsql set search_path = public as $fn$
 begin
   if new.status = 'released'
      and coalesce(old.status, '') is distinct from 'released'
-     and new.released_at is null
+     and new.released_at is not distinct from old.released_at
   then
     new.released_at := now();
   end if;
@@ -1146,3 +1162,73 @@ $$;
 -- grant should not depend on the assertion being right.
 revoke execute on function public.board_for_session() from public, anon;
 grant  execute on function public.board_for_session() to authenticated;
+
+-- ---- card detail ---------------------------------------------------------
+--
+-- One card in full, for the Android detail screen. Mirrors board_for_session()
+-- deliberately: same guard, same error style, same security posture. Nothing new
+-- is invented here, because a second pattern is a second thing to get wrong.
+--
+-- A RAISE, not zero rows. A direct select would work — RLS answers zero rows to a
+-- non-admin — but zero rows cannot be told apart from an archived card or a bad
+-- id, and the app would have to guess which. That ambiguity is Stage 2's bug 5
+-- again, where a correct rollback and a tap that never happened were pixel
+-- identical. The app already renders this errcode as its refused screen.
+--
+-- SECURITY INVOKER, so RLS still applies underneath the guard.
+--
+-- THE COLUMN LIST IS 35 OF THE TABLE'S 43, CHOSEN. The eight omitted, and why:
+--
+--   slug, sort_order         web routing and board ordering; neither is
+--                            information about the book, and the phone has no
+--                            /narrated-works route to use a slug for.
+--   updated_at               machine bookkeeping. The board already treats it as
+--                            such, and W2 was about keeping it that way.
+--   archived_at,             a detail screen is reached from the board, which
+--   archived_reason,         never shows archived cards. Returning them would add
+--   archived_notes           three columns the screen cannot act on.
+--   amazon_rating_updated_at the cron's rotation bookkeeping, not a fact about
+--   amazon_rating_attempted_at  the book. The rating and review count ARE
+--                            returned, because those are.
+--
+-- A wider return type is a wider surface for F3 to narrow later, which is why the
+-- omissions are written down rather than left implicit.
+create or replace function public.card_detail(p_id uuid)
+returns table (
+  id uuid, title text, subtitle text, author text, co_narrator text, cover_url text,
+  status text, deadline date, first15_due date, first_15_complete boolean,
+  word_count integer, words_recorded integer, pfh_rate numeric, payment_type text,
+  narration_format text, narrator_share_percent smallint, royalty_split_percent integer,
+  is_confidential boolean, production_type text, production_company text,
+  recording_dates jsonb, description text, notes text, tags text[],
+  trigger_warnings text[], chapters jsonb, links jsonb, audible_link text,
+  ar_link text, spotify_link text, script_url text, released_at timestamptz,
+  amazon_rating numeric, amazon_review_count integer, created_at timestamptz
+)
+language plpgsql
+stable
+security invoker
+set search_path to 'public'
+as $fn$
+begin
+  if coalesce(public.current_app_role(), '') <> 'admin' then
+    raise exception 'CARD_ACCESS_NOT_ENABLED'
+      using errcode = '42501';
+  end if;
+
+  return query
+    select
+      c.id, c.title, c.subtitle, c.author, c.co_narrator, c.cover_url, c.status,
+      c.deadline, c.first15_due, c.first_15_complete, c.word_count, c.words_recorded,
+      c.pfh_rate, c.payment_type, c.narration_format, c.narrator_share_percent,
+      c.royalty_split_percent, c.is_confidential, c.production_type,
+      c.production_company, c.recording_dates, c.description, c.notes, c.tags,
+      c.trigger_warnings, c.chapters, c.links, c.audible_link, c.ar_link,
+      c.spotify_link, c.script_url, c.released_at, c.amazon_rating,
+      c.amazon_review_count, c.created_at
+    from public.board_cards c
+    where c.id = p_id;
+end $fn$;
+
+revoke execute on function public.card_detail(uuid) from public, anon;
+grant  execute on function public.card_detail(uuid) to authenticated;
