@@ -956,18 +956,40 @@ end $$;
 -- a released book would read "last activity: today" within about four days and
 -- the column would quietly stop meaning anything — no error, no failing test.
 --
--- The exclusion list is small and stable. An inclusion list would have to grow
--- with every future migration and would silently stop tracking any column
--- nobody remembered to add; this way a new column counts as a human edit by
+-- W2, 26 August 2026: the exclusion was a literal list of four column names, and
+-- the comment here claimed it was "small and stable". It was neither. A fifth
+-- amazon column, amazon_rating_attempted_at, was added later for the cron's
+-- rotation and nobody added it here — so every attempt stamp, including the ones
+-- for books the fetch failed on, bumped updated_at. That is the whole of the
+-- cron's write on a blocked fetch, so in production the column it was written to
+-- protect was being moved by the very job it was written to exclude.
+--
+-- Now matched by prefix. A list of names cannot be kept in step with a schema by
+-- remembering to; the rule "amazon_* is machine-written" is the actual intent and
+-- it holds for columns that do not exist yet. Note this deliberately covers the
+-- two fields the Book Edit modal lets a person type in by hand — that was already
+-- true of the old list and remains the decision: a rating is a fact about the
+-- book's reception, not activity on the project.
+--
+-- An inclusion list would still be wrong in the other direction: it would have to
+-- grow with every future migration and would silently stop tracking any column
+-- nobody remembered to add. A new non-amazon column counts as a human edit by
 -- default, which is the safe direction to fail in.
 create or replace function public.board_cards_touch_updated_at()
 returns trigger language plpgsql set search_path = public as $fn$
 declare
-  ignored text[] := array[
-    'updated_at', 'amazon_rating', 'amazon_review_count', 'amazon_rating_updated_at'
-  ];
+  new_j jsonb := to_jsonb(new);
+  old_j jsonb := to_jsonb(old);
+  k text;
 begin
-  if to_jsonb(new) - ignored is distinct from to_jsonb(old) - ignored then
+  for k in select jsonb_object_keys(new_j) loop
+    if k = 'updated_at' or k like 'amazon\_%' then
+      new_j := new_j - k;
+      old_j := old_j - k;
+    end if;
+  end loop;
+
+  if new_j is distinct from old_j then
     new.updated_at := now();
   end if;
   return new;

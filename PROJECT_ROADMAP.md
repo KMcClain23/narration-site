@@ -522,3 +522,118 @@ different claims and the guard must not be allowed to launder one into the other
    cannot be constructed without a scrollable child. Vigilance already failed once.
 3. **Archive dialog's `OutlinedTextField`.** Stock Material, does not match the app's
    design language. Cosmetic, one dialog, correct as it stands.
+
+## W2 — the ratings cron was moving `updated_at` after all
+
+Found in production data after the sweep. **The DoD item was scoped wrong, and that
+scoping is why the sweep missed it:** DoD 2 read "no `updated_at` assignment in
+`PUT /api/board`". The repo-wide grep the fix demanded was never part of the item. This
+is the second time a route-scoped grep has hidden something — the first cost five of
+eleven retry shims, which lived in `GET` and `POST`.
+
+**Evidence.** `Heir of the Emberscale` carried `amazon_rating_updated_at`
+`04:02:44.989+00` and `updated_at` `04:02:45.076+00` — 87ms apart, which reads as two
+writes but is actually one: the first is a JavaScript timestamp computed before the round
+trip, the second is `now()` inside Postgres when the statement ran.
+
+**The diagnosis was not the expected one.** The hypothesis was that a caller assigns
+`updated_at` by hand. It does not. The repo-wide grep returns 29 hits and **not one of
+them is a `board_cards` write**: every hand-assignment belongs to `editors`, `expenses`,
+`payments`, `payment_payouts` or `site_settings`, tables with no such trigger.
+`settle-payment.ts` was the one real shared-helper candidate — it touches `board_cards`
+and assigns `updated_at` in the same file — but its two `board_cards` uses are selects and
+the assignment sits on the `payments` write. Nothing needed removing from a helper, and
+nothing needed removing from the cron.
+
+**The actual cause was the trigger's exclusion list:**
+
+```
+ignored := ['updated_at', 'amazon_rating', 'amazon_review_count', 'amazon_rating_updated_at']
+```
+
+`amazon_rating_attempted_at` — the fifth amazon column, added later for the cron's
+rotation — was never added to it. Both cron writes carry that column, including
+`stampAttempt`, which on a blocked fetch is the *entire* write. So in production the
+column the exclusion existed to protect was being moved by the one job it existed to
+exclude, on every run, for every book. The comment above the list claimed it was "small
+and stable"; it was neither, and the comment is now a record of how the bug happened.
+
+**Probes.** Dean's three, then the isolating fourth, all rollback-only:
+
+| | write | before | after | |
+|---|---|---|---|---|
+| A | `amazon_review_count` + `amazon_rating_updated_at`, no explicit `updated_at` | `04:02:45.076032` | `04:02:45.076032` | not moved |
+| B | same plus `updated_at = now()` | `04:02:45.076032` | `18:01:31.604791` | moved |
+| C | `amazon_review_count` + `first_15_complete` together | `04:02:45.076032` | `18:02:02.845432` | moved (correct) |
+| D | **`amazon_rating_attempted_at` alone — what `stampAttempt` writes** | `04:02:45.076032` | `18:12:49.036461` | **moved — the bug** |
+
+A is check 3 done non-vacuously: `amazon_review_count` genuinely incremented, so the jsonb
+comparison had something to bite on. The original 2A.4 check could have passed against an
+empty exclusion array. C covers the mixed write. B moved because the *caller* assigned it
+and `updated_at` is itself in the ignored list, so the trigger never overwrote the value —
+which is why B looked like caller-assignment in production and pointed at the wrong
+mechanism. A omitted `amazon_rating_attempted_at`, the column at fault: the same shape of
+scoping miss as the grep.
+
+*One probe is recorded as inconclusive rather than counted.* Re-running the full cron
+success write immediately after D inside the same transaction reported "not moved", but
+`now()` in Postgres is transaction-start time, so it was assigned the identical value it
+already held. It proves nothing either way and is not evidence of the fix.
+
+**Fix: match by prefix, not by list.** `updated_at` or `amazon\_%`, computed over the
+row's actual keys, so a sixth amazon column cannot reintroduce this. A list of names
+cannot be kept in step with a schema by remembering to. Non-amazon columns still count as
+a human edit by default, which is the safe direction to fail in.
+
+**Verified by firing the mechanism, not by the grep.** After the fix, the same row and the
+same baseline `04:02:45.076032`: `amazon_rating_attempted_at` alone → **not moved**; full
+cron success write → **not moved**; control human edit to `notes` on another row →
+**moved**, correctly.
+
+Then the real route, run against the live database with the production `CRON_SECRET`:
+
+```
+{"refreshed":0,"failed":1,"considered":1}
+[amazon-rating] soft-block (interstitial detected)
+[amazon-rating-refresh] book="No One to Hold Me" status=failed:blocked
+```
+
+| `No One to Hold Me` | before | after |
+|---|---|---|
+| `amazon_rating_attempted_at` | `null` | `2026-08-26 18:16:08.142+00` |
+| `updated_at` | `2026-08-25 18:38:30.973+00` | `2026-08-25 18:38:30.973+00` |
+
+The attempt stamp advanced; `updated_at` did not move. **Caveat kept deliberately:** Amazon
+soft-blocked the fetch, so this exercised the `stampAttempt` path — which is the write that
+caused W2 and the only one that runs in production today — but *not* the success path where
+`amazon_rating_updated_at` advances. That half remains covered by probe only.
+
+### DoD 2–5, actual numbers rather than "17 of 17"
+
+| item | measure | result |
+|---|---|---|
+| 2 | `updated_at:` assignments in `src/app/api/board/route.ts` | **0** (1 mention, a comment) |
+| 3 | `released_at` mentions in that file / auto-stamp assignments | **5 / 0** — allowlist, `DATE_FIELDS`, explicit-value handling, comment; no implicit stamp |
+| 4 | `fetchAmazonBook` exact identifier repo-wide | **0** (`fetchAmazonBookResult` 3 sites, `fetchAmazonRating` 3 sites, both required) |
+| 5 | `error.message?.includes` in `api/board/route.ts` / repo-wide | **0 / 0** |
+
+Item 5's zero is the literal DoD string. The two deliberately-kept guards in
+`expenses/route.ts` and `payments/invoice-draft/route.ts` are still present and still test
+a real SQLSTATE first (`42P01`, `42703`, `PGRST204`), using `error?.message?.includes` only
+as a secondary clause — the zero does not mean they were swept away.
+
+### DoD 9 — closed by observation
+
+Dean archived from the app, found the card in the web Archive view, and restored it from
+there. Confirmed clean: zero rows anywhere in the table carry `archived_reason` or
+`archived_notes` with a null `archived_at`. The un-archive clears all three, not just the
+timestamp.
+
+### Recorded, not a defect — `released_at` on a card that went back to editing
+
+`How an Angel Dies: Wrath` — `status = editing`, `released_at = 2026-07-16 17:52+00`.
+Pre-existing from July, unrelated to the sweep. It is a live instance of the state check
+5's idempotence guard creates: released, moved back to editing, stamp kept. If it is ever
+genuinely released again the trigger will decline to re-stamp and it will silently carry
+the July date. That is a question about what `released_at` means — first release, or most
+recent — not a defect. Dean's call.
