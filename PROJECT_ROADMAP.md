@@ -706,3 +706,41 @@ order by amazon_rating_updated_at desc limit 5;
 
 `clean = true` on a row whose rating genuinely moved is the missing half. Until then this
 says probe-only, in those words.
+
+### Recorded, not scheduled — the audit's own blind spots
+
+**A. Both arms of `check-updated-at-exclusions` parse, and neither has been
+mutation-tested on its own parsing.** The three mutations that were run changed what the
+parsers *read* — a column added, a column removed, a grant appearing — and establish that
+the comparison works. None changed the *form* of what is parsed.
+
+The exclusion arm extracts a predicate from `pg_get_functiondef` and re-implements it.
+Rewrite that predicate to something semantically identical but syntactically different —
+the loop as a `case`, `k = any(array[...])`, a second condition — and the extractor meets
+a shape it has never seen. The question is not whether it still gets the right answer; it
+is what it does when it cannot tell. **A parser that skips what it does not understand
+converts an unknown into a pass.**
+
+Same risk on the cron arm, one step further out. It is scoped to `.update(...)`, which is
+right, but a cron that someday writes via `.upsert()`, an RPC, or raw SQL presents a write
+the parser does not collect. The cron's column set silently shrinks, the assertion stays
+green, and the new column is unexcluded — W2 again, with the guard watching.
+
+The construction that closes both: enumerate every candidate — every mutating call in the
+cron source, every branch of the trigger predicate — and fail loudly on any one the parser
+cannot decompose. *"Unrecognised write form at line N"* is a useful red. Silence is not.
+
+The audit is verification machinery now, and this project's rule about verification
+machinery applies to it: two of Stage 1's guard-test holes were found by deliberately
+making the guard fail.
+
+**B. Invoked, not standing watch.** No test runner is being added for this alone. When
+there is next a reason to touch the build, the cheap version is making the check part of
+whatever already runs on the way to production, so it is not something anyone has to
+remember.
+
+**And the principle the first run earned:** *a check that is red for unreal reasons trains
+people to ignore it.* A guard with a false-positive history is worse than no guard,
+because it produces confident dismissal. The loose-scan version of this check reported
+five columns the cron only ever reads; catching that before it shipped is the reason the
+check can be trusted now.
