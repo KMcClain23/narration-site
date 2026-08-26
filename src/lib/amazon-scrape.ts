@@ -244,15 +244,6 @@ export type AmazonFetchResult =
   | { ok: true; data: AmazonBookResult }
   | { ok: false; reason: AmazonFailure; detail: string };
 
-/**
- * Unchanged signature for the save-time auto-fill, which only needs to know
- * whether it got anything.
- */
-export async function fetchAmazonBook(url: string): Promise<AmazonBookResult | null> {
-  const result = await fetchAmazonBookResult(url);
-  return result.ok ? result.data : null;
-}
-
 type AmazonHtmlResult =
   | { ok: true; html: string }
   | { ok: false; reason: AmazonFailure; detail: string };

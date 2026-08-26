@@ -1,20 +1,10 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { dateOnlyToPacificNoon } from "@/lib/timezone";
-import { fetchAmazonBook } from "@/lib/amazon-scrape";
 
 import { requireAdmin } from "@/lib/require-admin";
 
-function isAmazonUrl(url: unknown): url is string {
-  return typeof url === "string" && /^https?:\/\/(www\.)?amazon\.com\//i.test(url.trim());
-}
 
-function isEmptyValue(v: unknown): boolean {
-  if (v === null || v === undefined) return true;
-  if (typeof v === "string") return v.trim() === "";
-  if (Array.isArray(v)) return v.length === 0;
-  return false;
-}
 
 // GET: admin gets all cards
 export async function GET(req: Request) {
@@ -202,12 +192,15 @@ export async function PUT(req: Request) {
       }
     }
 
-    // Snapshot the current row — needed to auto-stamp released_at and check
-    // Amazon-fill eligibility (which requires knowing the CURRENT
-    // description/tags/trigger_warnings, not just this payload).
+    // Snapshot the current row, solely to decide whether released_at should be
+    // auto-stamped. It used to carry description/tags/trigger_warnings for the
+    // Amazon auto-fill, which has been deleted — that scrape had not succeeded
+    // in production for as long as anyone could measure, because Amazon blocks
+    // this server on datacentre IP reputation. The manual Refetch button in the
+    // Content tab remains: user-initiated, and honest about the block.
     const { data: cur } = await supabaseAdmin
       .from("board_cards")
-      .select("released_at, audible_link, description, tags, trigger_warnings")
+      .select("released_at")
       .eq("id", id)
       .single();
     const existingReleasedAt: string | null = (cur as Record<string, unknown>)?.released_at as string ?? null;
@@ -224,81 +217,15 @@ export async function PUT(req: Request) {
       update.released_at = new Date().toISOString();
     }
 
-    // Amazon auto-fill: opportunistic, best-effort fetch to fill in an empty
-    // description/tags/trigger_warnings when this card links to amazon.com.
-    // Fill-empty-only — never overwrites a field that already has content,
-    // whether that content came from this payload or was already saved.
-    let amazonFill: { description: boolean; tags: number; triggerWarnings: number } | null = null;
-    const effectiveLink = "audible_link" in fields ? fields.audible_link : cur?.audible_link;
-    if (isAmazonUrl(effectiveLink)) {
-      const descriptionEligible = isEmptyValue("description" in fields ? fields.description : undefined) && isEmptyValue(cur?.description);
-      const tagsEligible        = isEmptyValue("tags" in fields ? fields.tags : undefined) && isEmptyValue(cur?.tags);
-      const twEligible          = isEmptyValue("trigger_warnings" in fields ? fields.trigger_warnings : undefined) && isEmptyValue(cur?.trigger_warnings);
-
-      if (descriptionEligible || tagsEligible || twEligible) {
-        const scraped = await fetchAmazonBook(effectiveLink);
-        if (scraped) {
-          amazonFill = { description: false, tags: 0, triggerWarnings: 0 };
-          if (descriptionEligible && scraped.description) {
-            update.description = scraped.description;
-            amazonFill.description = true;
-          }
-          if (tagsEligible && scraped.tags.length) {
-            update.tags = scraped.tags;
-            amazonFill.tags = scraped.tags.length;
-          }
-          if (twEligible && scraped.triggerWarnings.length) {
-            update.trigger_warnings = scraped.triggerWarnings;
-            amazonFill.triggerWarnings = scraped.triggerWarnings.length;
-          }
-        }
-      }
-    }
-
-    let { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from("board_cards").update(update).eq("id", id).select().single();
 
-    // Retry shims for columns that may not exist yet (migration not run)
-    if (error && error.message?.includes("trigger_warnings")) {
-      delete update.trigger_warnings;
-      ({ data, error } = await supabaseAdmin
-        .from("board_cards").update(update).eq("id", id).select().single());
-    }
-    if (error && error.message?.includes("released_at")) {
-      delete update.released_at;
-      ({ data, error } = await supabaseAdmin
-        .from("board_cards").update(update).eq("id", id).select().single());
-    }
-    if (error && error.message?.includes("is_confidential")) {
-      delete update.is_confidential;
-      ({ data, error } = await supabaseAdmin
-        .from("board_cards").update(update).eq("id", id).select().single());
-    }
-    if (error && error.message?.includes("narration_format")) {
-      delete update.narration_format;
-      ({ data, error } = await supabaseAdmin
-        .from("board_cards").update(update).eq("id", id).select().single());
-    }
-    if (error && (error.message?.includes("production_type") || error.message?.includes("production_company"))) {
-      delete update.production_type;
-      delete update.production_company;
-      ({ data, error } = await supabaseAdmin
-        .from("board_cards").update(update).eq("id", id).select().single());
-    }
-    if (error && (error.message?.includes("archived_at") || error.message?.includes("archived_reason") || error.message?.includes("archived_notes"))) {
-      delete update.archived_at;
-      delete update.archived_reason;
-      delete update.archived_notes;
-      ({ data, error } = await supabaseAdmin
-        .from("board_cards").update(update).eq("id", id).select().single());
-    }
-
-    if (error) {
+if (error) {
       console.error("PUT /api/board Supabase error:", JSON.stringify(error), "update keys:", Object.keys(update));
       return NextResponse.json({ error: error.message || JSON.stringify(error) }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, card: data, amazonFill });
+    return NextResponse.json({ success: true, card: data });
   } catch (e) {
     const msg = e instanceof Error ? e.message : JSON.stringify(e);
     console.error("PUT /api/board exception:", msg);
