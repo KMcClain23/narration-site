@@ -431,3 +431,94 @@ Stage 0 ──► Android S1 ──► Android S2 ──► Android S3+
 F2 · web admin → Supabase Auth   (after Android is stable;
                                   required before editor web access)
 ```
+
+## Stage 2 — full DoD sweep, 26 August 2026
+
+Run against a single frozen build: `dmn-admin-android` **59015e3**, `narration-site`
+**f6bf3b0**, both trees clean, the emulator confirmed running that APK (no source file
+newer than the installed binary). Nothing was fixed mid-sweep, so every item below ran
+against the same commit and no item needed re-running.
+
+**No inherited passes.** Every item was executed again, including the ones that passed at
+2C.2 and the ones whose failure paths were verified separately from their success paths.
+A test that passed is evidence about the build it ran against, and that build no longer
+existed.
+
+### Result: 17 of 17 pass, 0 fail, 0 could-not-run
+
+**Migration (1–5).** All eight 2A.4 checks re-run live inside a probe that raises at the
+end so the whole thing rolls back — nothing persisted, confirmed afterwards against the
+row. The two `updated_at` values, side by side on the same starting row:
+
+| write | before | after | |
+|---|---|---|---|
+| real change (`first_15_complete`) | `2026-08-18 22:03:30.499+00` | `2026-08-26 17:21:37.128787+00` | advanced |
+| `amazon_rating` only | `2026-08-18 22:03:30.499+00` | `2026-08-18 22:03:30.499+00` | unchanged |
+
+`released_at` stamped `17:22:06.010329` on the transition in, and unchanged when the
+transition repeated. Ungranted column refused with `permission denied`. Demoted update
+affected **0 rows and raised nothing** — the zero-rows contract the client depends on.
+Anon saw **0 rows**. Greps: no `updated_at` assignment in `PUT /api/board` (one comment
+only), no `released_at` auto-stamp (the column is still writable when the client sends
+one explicitly, which is the web's edit form and is intended), `fetchAmazonBook` 0 exact
+occurrences with both survivors present, `error.message?.includes` 0.
+
+*Probe correction worth keeping:* the first attempt ran the amazon-only check as
+`authenticated` and aborted with `permission denied` — because `amazon_rating` is not in
+the column grant. That was the probe being wrong, not the system: those columns are only
+ever written by the cron's service role. Each check now runs under the identity that
+actually performs it.
+
+**Android happy path (6–10).** First-15 toggled, survived a pull-to-refresh, matched the
+row. Status move: Pipeline 9→8, In Production 11→12, card under the RECORDING header,
+server `recording`. Mark as Released: left the board, Released **12→13**, `released_at`
+stamped `17:27:26.148679` by the trigger. Swipe-to-archive: removed, `archived_reason`
+`recasted`, row still returned by the Archive view's filter. Board read 9+11=20 after a
+full cycle out and back on a new pid, matching the server's 20 active rows.
+
+*Two items verified server-side rather than through the web UI:* DoD 8's "increments the
+Released count" was checked as a `count(*)` (12→13) and DoD 9's "findable again via
+search" as the archived-row query the Archive view runs. The data conditions hold; the
+web pages themselves were not opened.
+
+**Android failure paths (11–14)** — where five of the six bugs lived. Offline toggle: 1
+write attempted (counted in the log, since a correct rollback and a tap that never
+happened are pixel-identical), banner shown, cards intact, no sign-in screen, session
+file byte-identical at 3762 bytes with an unchanged mtime. Revoked mid-session: refused,
+rolled back, refusal screen, session file byte-identical, server row untouched; admin
+restored, recovered by pull, write landed again. Lifecycle: mutation survived
+background→foreground→pull and matched the row. Rollback correctness: the already-complete
+card rolled back to **complete** while the incomplete one rolled back to incomplete — each
+restoring its own prior value rather than a shared default.
+
+**Hygiene (15–17).** 122 unit tests, 0 failures. No `role ==` in `ui/`, no `select("*")`.
+0 Kotlin compiler warnings on the release build. A runtime test now walks every patch any
+gesture produces and fails if `released_at` or `updated_at` appears in one, which is
+stronger than the grep it replaces.
+
+**Not in this sweep.** Stage 1 item 14's offline sign-out half stays recorded as
+**untested**. The credential-destruction guard proves how many places can call
+`clearSession()`, not that the call behaves correctly when the network is down. Those are
+different claims and the guard must not be allowed to launder one into the other.
+
+### Deferred, deliberately, so they are not rediscovered cold
+
+1. **`HorizontalPager` drag arbitration.** The card's swipe-to-archive detector sits
+   inside a pager that also claims horizontal drags. It works, and it is probably correct
+   by Compose's dispatch order — a descendant sees the Main pass before its ancestor and a
+   consumed change never reaches the pager's scrollable. But nothing in the source says
+   so and nothing fails if it stops being true, which is the shape of every bug this
+   project has already found. Fix: consume the change explicitly where the swipe commits,
+   plus an instrumented test asserting **both** halves — a swipe on a card fires the
+   archive path AND leaves the pager's page unchanged; a drag on the surrounding surface
+   changes the page AND fires no card action. Half two is not optional: a fix that
+   consumes every horizontal drag in the subtree kills paging and passes half one
+   perfectly.
+2. **Structural nested-scroll guard.** `state.isEmpty -> Unit` left `PullToRefreshBox`
+   with no nested-scroll participant, stranding a refused session with no way back short
+   of restarting the app. That is DoD 19's bug from Stage 1, reintroduced by a different
+   route, in the same state, despite being documented. **Any branch that renders nothing
+   kills the gesture**, and the property is invisible when lost. Wanted: a wrapper that
+   cannot be constructed without a scrollable child. Vigilance already failed once.
+3. **Archive dialog's `OutlinedTextField`.** Stock Material, does not match the app's
+   design language. Cosmetic, one dialog, correct as it stands.
