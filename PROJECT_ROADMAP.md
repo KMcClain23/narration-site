@@ -52,11 +52,15 @@ never that it merely exists.**
 
 ---
 
-## In progress
+## Native Android
 
-### Native Android Stage 1 — scaffolding, auth, Board ✅
-*Closed 25 August 2026, reopened the same day for a fifth bug, closed again after the
-elapsed-time test passed. Outstanding: item 1 only — a run on the physical phone.*
+Repo: `D:\Developer\dmn-admin-android` → **github.com/KMcClain23/dmn-admin-android**
+(private). Separate from the web repo; both now have off-machine copies.
+
+### Native Android Stage 1 — scaffolding, auth, Board ✅ COMPLETE
+*Closed 25 August 2026. Reopened the same day for a fifth bug, closed again after the
+elapsed-time test. **All 21 DoD items verified, nothing outstanding.** Item 1 confirmed on
+the physical phone; the offline sign-out confirmed by hand.*
 
 **Bug 5 — going offline on the board destroyed the session.** Found by Dean on the device,
 not by the suite. Distinct from bug 3 (cold start, already fixed): this was a running app
@@ -105,11 +109,11 @@ Commits: `b521a58` scaffold/theme · `b3e6958` domain+tests · `735546a` auth/bo
 `4f2ea93` elapsed-time test + guard-test hardening.
 70 unit tests, 4 instrumented, 0 failures, 0 release warnings.
 
-**Still unverified end to end:** the deliberate offline sign-out — airplane mode →
-Sign out → network back → relaunch, where a sign-in screen means it worked. Never run,
-because each attempt spends a session only Dean can restore. Low risk (the path is now a
-single guarded call site with a test on it) but genuinely untested, and recorded as such
-rather than assumed.
+**The offline sign-out is now verified.** Airplane mode → Sign out → network back →
+relaunch landed on the sign-in screen, so the local session really is cleared
+unconditionally after a best-effort revoke. It had been recorded as untested rather than
+assumed-passing on the strength of the guard test; the guard proves how many places can
+call it, not that the call works. Both are now true.
 
 Kotlin + Compose, Material 3, dark-only theme ported from the web tokens. Supabase Auth
 sign-in with persisted session, role loaded into app state, capability-based rendering.
@@ -156,16 +160,26 @@ returns 200 with `[]`, not an error — and clearing cards on a failed refresh w
 security control, since a revoked user could simply not pull.
 
 ### Native Android Stage 2 — writes
-*Depends on: Stage 1.*
+*Designed 25 August 2026, not started. Five decisions locked in
+`NATIVE_ANDROID_STAGE_2_DESIGN.md`; spec not yet written.*
 
 `UPDATE` policies gated on role, the First-15 toggle, status moves, swipe-to-archive,
 the long-press action menu, optimistic updates with rollback.
 
 The real design question is not the UI. It is **where the side effects currently owned by
-the Next.js API routes live once two clients can write** — `released_at` stamping,
-`status_change_log` rows, the PUT field allowlist. Today they are enforced in TypeScript
-that the Android app bypasses entirely. Likely answer: Postgres triggers or RPC
-functions, so both clients get them without either having to remember.
+the Next.js API routes live once two clients can write.** Read from source rather than
+remembered, `PUT /api/board` does five things a direct Postgres write would skip:
+`updated_at`, the `released_at` auto-stamp, Pacific-midday date anchoring, an Amazon
+description/tags scrape, and a 30+ column allowlist.
+
+**Correction:** earlier notes named `status_change_log` as one of these. It does not
+exist — `migrations.sql:431` drops it, nothing in `src/` references it, and it is absent
+from the live schema. It was asserted from a `create table` line without checking whether
+anything still used it. Removed here so it is not carried forward again.
+
+Design brief: `NATIVE_ANDROID_STAGE_2_DESIGN.md`. Recommendation is triggers plus
+column-level `GRANT UPDATE`, with the Amazon scrape moved to the existing cron rather than
+living on the write path. Three decisions are open for Dean.
 
 ### Native Android Stage 3+ — the rest of the app
 *Depends on: Stage 2.*
