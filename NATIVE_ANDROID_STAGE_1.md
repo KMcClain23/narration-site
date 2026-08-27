@@ -672,6 +672,26 @@ Stage 2, or on role being admin; do not show it to a session that cannot use it.
     *Try again*. Verify both: they are separate code paths, and the second is reachable
     only by failing, which is exactly why it goes unexamined. Cold-start with the network
     off and confirm you are still signed in afterwards.
+
+    *Updated 27 August 2026 — what is now known, and it is worse than "untested".*
+    Dean twice refused to let the credential-destruction guard stand in for this,
+    saying the guard proves how many places can call `clearSession()`, not that the
+    call works. That objection turned out to be understated. `deleteSession()` returns
+    Unit by the SessionManager contract, and the implementation **swallowed its failure
+    entirely — not even a log**. A store that refused the write produced a sign-out
+    that reported success while the token stayed on disk. Nothing anywhere would have
+    said so.
+
+    Fixed: the manager records the failure, `signOutByUser()` returns a
+    `SignOutOutcome`, the write uses `commit()` rather than `apply()` so there is an
+    answer to record, and the user is told to clear app storage. Verified by asserting
+    the cleared and failed outcomes render differently, and mutation-tested by
+    silencing the message.
+
+    **Still untested end to end**: the offline sign-out itself. Forcing it means
+    destroying Dean's session on the device, and the fix above is verified at the
+    decision rather than through the keystore. Do not upgrade this line without doing
+    that.
 15. An unrecognised role string maps to `UNKNOWN` and shows an error, never a board
 16. A Compose preview or UI test renders a card with `canViewFinancials = false`: the
     earnings suffix is gone, the word count remains, the booth-load line remains, and the
