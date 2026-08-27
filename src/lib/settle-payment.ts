@@ -1,5 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getStudioSettings } from "@/lib/studio-settings-server";
 import { paymentNarratorShare, type MoneyCard, type PaymentRow } from "@/lib/payments";
 import { closePaymentLinks, type PaymentLinkRow } from "@/lib/close-payment-links";
 import { notifyPaymentReceived, type OwedPayee } from "@/lib/notify-payment";
@@ -170,7 +171,15 @@ export async function settleFromProvider(paymentId: string, method: string): Pro
   const rows = (siblings ?? []) as unknown as PaymentRow[];
   // This payment, not the project. A card holding a deposit row and a delivery
   // row must not credit both when one of them is paid.
-  const due = paymentNarratorShare(row, card as unknown as MoneyCard, rows);
+  // Read here rather than defaulted: this settles real money, and a default in this
+  // path is exactly how the invoice comes to disagree with the board again.
+  const studio = await getStudioSettings();
+  const due = paymentNarratorShare(
+    row,
+    card as unknown as MoneyCard,
+    rows,
+    studio.wordsPerFinishedHour,
+  );
 
   if (due == null) return { settled: false, reason: "no amount could be determined" };
 

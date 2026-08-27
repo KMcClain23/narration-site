@@ -285,7 +285,11 @@ export function derivePaymentStatus(p: PaymentRow, now = todayLocal()): PaymentS
  * Mixing the two would double-count — summing a $1,200 deposit row against a
  * $2,400 whole-project estimate reads as $3,600 of work that doesn't exist.
  */
-export function cardExpected(card: MoneyCard, rows: PaymentRow[]): number | null {
+export function cardExpected(
+  card: MoneyCard,
+  rows: PaymentRow[],
+  wordsPerFinishedHour: number,
+): number | null {
   // Royalty statements are history, not a forecast — including them would
   // make "expected" grow every time a statement is entered.
   const explicit = rows.filter(r => r.kind !== "royalty" && r.amount_expected != null);
@@ -304,6 +308,7 @@ export function cardExpected(card: MoneyCard, rows: PaymentRow[]): number | null
     card.payment_type,
     card.narration_format,
     card.narrator_share_percent,
+    wordsPerFinishedHour,
   );
 }
 
@@ -314,13 +319,14 @@ export function cardExpected(card: MoneyCard, rows: PaymentRow[]): number | null
  * needs the original figure to say what the partial fee is a percentage
  * of. Narrator-share basis, same as the board estimate.
  */
-export function agreedFee(card: MoneyCard): number | null {
+export function agreedFee(card: MoneyCard, wordsPerFinishedHour: number): number | null {
   return estimatedEarnings(
     card.word_count,
     card.pfh_rate,
     card.payment_type,
     card.narration_format,
     card.narrator_share_percent,
+    wordsPerFinishedHour,
   );
 }
 
@@ -345,8 +351,12 @@ export function editingCost(rows: PaymentRow[]): number {
  * The invoice is that share net of their half, plus the whole editing fee they
  * front on the project's behalf: base − editing×share + editing.
  */
-export function cardInvoiceTotal(card: MoneyCard, rows: PaymentRow[]): number | null {
-  const base = cardExpected(card, rows);
+export function cardInvoiceTotal(
+  card: MoneyCard,
+  rows: PaymentRow[],
+  wordsPerFinishedHour: number,
+): number | null {
+  const base = cardExpected(card, rows, wordsPerFinishedHour);
   if (base == null) return null;
   return base + editingCost(rows) * (1 - narratorShare(card));
 }
@@ -376,8 +386,9 @@ export function paymentNarratorShare(
   payment: PaymentRow,
   card: MoneyCard,
   rows: PaymentRow[],
+  wordsPerFinishedHour: number,
 ): number | null {
-  const base = invoiceAmount(payment, card, rows);
+  const base = invoiceAmount(payment, card, rows, wordsPerFinishedHour);
   if (base == null) return null;
   return base - rowEditingCost(payment) * narratorShare(card);
 }
@@ -389,8 +400,8 @@ export function paymentNarratorShare(
  * stays tied to agreedFee() and cannot drift from it. Null wherever the share
  * is unknown or the project has no PFH basis to estimate from.
  */
-export function projectGrossFee(card: MoneyCard): number | null {
-  const own = agreedFee(card);
+export function projectGrossFee(card: MoneyCard, wordsPerFinishedHour: number): number | null {
+  const own = agreedFee(card, wordsPerFinishedHour);
   const share = narratorShare(card);
   return own == null || share <= 0 ? null : own / share;
 }
@@ -413,7 +424,12 @@ export function isCardExpectedActual(rows: PaymentRow[]): boolean {
  *      estimate covers the whole job and cannot be split across instalments
  *      without inventing a number.
  */
-export function rowValue(p: PaymentRow, card: MoneyCard, rows: PaymentRow[]): number {
+export function rowValue(
+  p: PaymentRow,
+  card: MoneyCard,
+  rows: PaymentRow[],
+  wordsPerFinishedHour: number,
+): number {
   // A royalty row is worth what the statement says was earned; what has been
   // received against it may still be nothing. There is no estimate to fall
   // back on — that is the nature of royalty share.
@@ -426,7 +442,7 @@ export function rowValue(p: PaymentRow, card: MoneyCard, rows: PaymentRow[]): nu
   if (received > 0) return received;
   // Only the fee rows can claim the project estimate; a royalty row alongside
   // them must not, or the estimate would be counted twice.
-  if (rows.filter(r => r.kind !== "royalty").length === 1) return cardExpected(card, rows) ?? 0;
+  if (rows.filter(r => r.kind !== "royalty").length === 1) return cardExpected(card, rows, wordsPerFinishedHour) ?? 0;
   return 0;
 }
 
@@ -525,7 +541,11 @@ export type MoneyTotals = {
   expectedNet: number;
 };
 
-export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, PaymentRow[]>): MoneyTotals {
+export function computeTotals(
+  cards: MoneyCard[],
+  rowsByCard: Map<string, PaymentRow[]>,
+  wordsPerFinishedHour: number,
+): MoneyTotals {
   let expected = 0;
   let invoiced = 0;
   let received = 0;
@@ -547,7 +567,7 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
 
   for (const card of cards) {
     const rows = rowsByCard.get(card.id) ?? [];
-    const cardEst = cardExpected(card, rows) ?? 0;
+    const cardEst = cardExpected(card, rows, wordsPerFinishedHour) ?? 0;
     expected += cardEst;
 
     // Each project contributes once, at whichever figure is better evidence:
@@ -561,7 +581,7 @@ export function computeTotals(cards: MoneyCard[], rowsByCard: Map<string, Paymen
     projectedGross += Math.max(cardEst, feeReceived);
 
     for (const r of rows) {
-      const amt = rowValue(r, card, rows);
+      const amt = rowValue(r, card, rows, wordsPerFinishedHour);
       const got = Number(r.amount_received) || 0;
       received += got;
 
@@ -730,9 +750,17 @@ export function computeWaterfall(
   };
 }
 
-/** Finished hours a payout's PFH rate applies to. */
-export function finishedHours(wordCount: number | null): number {
-  return wordCount ? wordCount / 9400 : 0;
+/**
+ * Finished hours a payout's PFH rate applies to.
+ *
+ * `wordsPerFinishedHour` is required, not defaulted. This is the file where a
+ * default does the most damage: it feeds invoice line items, so a forgotten rate
+ * here is an invoice that silently disagrees with the board — which is the exact
+ * situation W1 exists to end. Every caller is traced to a component that reads
+ * Settings; if a future one cannot, it should be given a path rather than a default.
+ */
+export function finishedHours(wordCount: number | null, wordsPerFinishedHour: number): number {
+  return wordCount ? wordCount / wordsPerFinishedHour : 0;
 }
 
 /**
@@ -742,10 +770,15 @@ export function finishedHours(wordCount: number | null): number {
  * half — otherwise the narrator's own expected amount, which is correct for
  * solo work and for projects where the client pays each narrator directly.
  */
-export function invoiceAmount(p: PaymentRow, card: MoneyCard, rows: PaymentRow[]): number | null {
+export function invoiceAmount(
+  p: PaymentRow,
+  card: MoneyCard,
+  rows: PaymentRow[],
+  wordsPerFinishedHour: number,
+): number | null {
   if (p.amount_gross != null) return Number(p.amount_gross);
   if (p.amount_expected != null) return Number(p.amount_expected);
-  return cardExpected(card, rows);
+  return cardExpected(card, rows, wordsPerFinishedHour);
 }
 
 /**
@@ -766,7 +799,11 @@ export const PROJECT_STATE_LABEL: Record<ProjectState, string> = {
   untracked: "Released — no payment recorded",
 };
 
-export function projectState(card: MoneyCard, rows: PaymentRow[]): ProjectState {
+export function projectState(
+  card: MoneyCard,
+  rows: PaymentRow[],
+  wordsPerFinishedHour: number,
+): ProjectState {
   const received = rows.reduce((s, r) => s + (Number(r.amount_received) || 0), 0);
   const invoicedRows = rows.filter(r => r.kind !== "royalty" && r.invoiced_on);
 
@@ -779,7 +816,7 @@ export function projectState(card: MoneyCard, rows: PaymentRow[]): ProjectState 
   // statements out of "awaiting payment" entirely.
   if (card.payment_type === "rs" || royalty.length > 0) {
     const owed = royalty.reduce(
-      (s, r) => s + Math.max(0, rowValue(r, card, rows) - (Number(r.amount_received) || 0)),
+      (s, r) => s + Math.max(0, rowValue(r, card, rows, wordsPerFinishedHour) - (Number(r.amount_received) || 0)),
       0,
     );
     // Earned but not yet disbursed is money awaiting payment, not settled work.
@@ -787,7 +824,7 @@ export function projectState(card: MoneyCard, rows: PaymentRow[]): ProjectState 
     if (royalty.length > 0 || received > 0) return "paid";
     return card.status === "released" ? "untracked" : "production";
   }
-  const invoicedTotal = invoicedRows.reduce((s, r) => s + rowValue(r, card, rows), 0);
+  const invoicedTotal = invoicedRows.reduce((s, r) => s + rowValue(r, card, rows, wordsPerFinishedHour), 0);
 
   if (invoicedRows.length > 0) {
     // Cent of tolerance so numeric(10,2) rounding doesn't strand a settled
@@ -842,6 +879,7 @@ export function clientOf(card: MoneyCard): string {
 export function computeByClient(
   cards: MoneyCard[],
   rowsByCard: Map<string, PaymentRow[]>,
+  wordsPerFinishedHour: number,
 ): ClientBreakdown[] {
   const acc = new Map<string, { projects: number; expected: number; received: number; rates: number[] }>();
 
@@ -851,7 +889,7 @@ export function computeByClient(
     const entry = acc.get(key) ?? { projects: 0, expected: 0, received: 0, rates: [] };
 
     entry.projects += 1;
-    entry.expected += cardExpected(card, rows) ?? 0;
+    entry.expected += cardExpected(card, rows, wordsPerFinishedHour) ?? 0;
     entry.received += rows.reduce((s, r) => s + (Number(r.amount_received) || 0), 0);
     if (card.pfh_rate && Number(card.pfh_rate) > 0) entry.rates.push(Number(card.pfh_rate));
 

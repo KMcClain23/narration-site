@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useStudioSettings } from "@/components/admin/useStudioSettings";
 import { FileText } from "lucide-react";
 import {
   agreedFee,
@@ -47,10 +48,13 @@ export function buildInvoice(
   rows: PaymentRow[],
   author: AuthorRow | null,
   invoiceNumber: string,
+  /** From Settings. Required here for the same reason it is everywhere else. */
+  wordsPerFinishedHour: number,
   /**
    * Real finished hours, once they are known.
    *
-   * Everything else here derives from word count ÷ 9,400, which is an estimate
+   * Everything else here derives from word count ÷ the finished-hour divisor in
+   * Settings, which is an estimate
    * made before recording and routinely out by a tenth of an hour or more. Once
    * the file is delivered the true runtime is a fact, and it should drive the
    * invoice rather than the guess that preceded it. Passing it recomputes the
@@ -61,7 +65,7 @@ export function buildInvoice(
 ): InvoiceData & { wholeProject: { lines: InvoiceData["lines"]; notes: string } | null } {
   const share = narratorShare(card);
   const measured = hoursOverride != null && hoursOverride > 0;
-  const hrs = measured ? hoursOverride : finishedHours(card.word_count);
+  const hrs = measured ? hoursOverride : finishedHours(card.word_count, wordsPerFinishedHour);
   const recast = card.status === "recast";
 
   // A measured runtime only rebuilds the fee where there is a rate to rebuild
@@ -70,13 +74,13 @@ export function buildInvoice(
   const amount =
     measured && card.pfh_rate
       ? hrs * card.pfh_rate * share
-      : (invoiceAmount(payment, card, rows) ?? 0);
+      : (invoiceAmount(payment, card, rows, wordsPerFinishedHour) ?? 0);
 
   // Not billed by the finished hour — those hours were never delivered — so
   // quoting "6.6 finished hours × $250/PFH" beside a half payment would invite
   // exactly the query you don't want on this invoice. State the basis instead:
   // what share of the agreed fee this is.
-  const agreed = agreedFee(card);
+  const agreed = agreedFee(card, wordsPerFinishedHour);
   // Only when both figures are denominated the same way. amount_gross is the
   // whole client-side fee while agreedFee() is the narrator's share, so on a
   // split project the percentage would be wrong — and wrong on a document
@@ -188,7 +192,7 @@ export function buildInvoice(
       ? hrs * card.pfh_rate
       : payment.amount_gross != null
         ? Number(payment.amount_gross)
-        : (projectGrossFee(card) ?? (share > 0 ? amount / share : amount));
+        : (projectGrossFee(card, wordsPerFinishedHour) ?? (share > 0 ? amount / share : amount));
 
   // Null on solo work: there is no whole project to bill differently when one
   // narrator is the whole project, and an option that changes nothing is worse
@@ -263,6 +267,7 @@ export function InvoiceButton({
   /** "Invoice copy" on settled work, where the document already exists. */
   label?: string;
 }) {
+  const studio = useStudioSettings();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<ReturnType<typeof buildInvoice> | null>(null);
@@ -314,7 +319,7 @@ export function InvoiceButton({
       setCoNarratorEmails(coNarratorEmails);
       setAuthor(resolved);
 
-      const generated = buildInvoice(payment, card, rows, resolved, invoiceNumber);
+      const generated = buildInvoice(payment, card, rows, resolved, invoiceNumber, studio.wordsPerFinishedHour);
 
       // A saved draft wins over the freshly generated one, because it holds
       // decisions: a corrected runtime, a reworded note, an adjusted figure.
@@ -403,14 +408,14 @@ export function InvoiceButton({
           wholeProject={draft.wholeProject ?? undefined}
           coNarratorEmails={coNarratorEmails}
           isPartial={card.status === "recast"}
-          initialHours={finishedHours(card.word_count)}
+          initialHours={finishedHours(card.word_count, studio.wordsPerFinishedHour)}
           savedHours={savedDraft?.hours}
           savedBillingWhole={savedDraft?.billingWhole}
           canRecompute={Boolean(card.pfh_rate)}
           // Rebuilds both shapes from a corrected runtime. The editor holds the
           // hours; everything needed to turn them back into lines lives here.
           recompute={hours => {
-            const next = buildInvoice(payment, card, rows, author, draft?.invoiceNumber ?? "", hours);
+            const next = buildInvoice(payment, card, rows, author, draft?.invoiceNumber ?? "", studio.wordsPerFinishedHour, hours);
             return { share: { lines: next.lines, notes: next.notes }, wholeProject: next.wholeProject };
           }}
         />

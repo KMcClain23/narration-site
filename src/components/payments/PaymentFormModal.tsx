@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useStudioSettings } from "@/components/admin/useStudioSettings";
 import { Plus, Trash2, Upload, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { parseCoNarrators } from "@/components/admin/board-card-utils";
@@ -489,6 +490,7 @@ export function PaymentFormModal({
   onSaved: (p: PaymentRow) => void;
   onDeleted: (id: string) => void;
 }) {
+  const studio = useStudioSettings();
   useModalOpen(true);
   const [form, setForm] = useState<FormState>(() => toForm(payment));
   const [payouts, setPayouts] = useState<DraftPayout[]>(() => toDrafts(payment, card));
@@ -519,7 +521,7 @@ export function PaymentFormModal({
     setForm(f => (f.invoice_number.trim() ? f : { ...f, invoice_number }));
   }
 
-  const finishedHrs = finishedHours(card?.word_count ?? null);
+  const finishedHrs = finishedHours(card?.word_count ?? null, studio.wordsPerFinishedHour);
 
   const sharePercent =
     card?.narrator_share_percent != null

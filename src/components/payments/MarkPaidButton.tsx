@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useStudioSettings } from "@/components/admin/useStudioSettings";
 import { useRouter } from "next/navigation";
 import { adminType } from "@/lib/design-tokens";
 import {
@@ -28,6 +29,7 @@ export function MarkPaidButton({
   card: MoneyCard;
   rows: PaymentRow[];
 }) {
+  const studio = useStudioSettings();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -43,7 +45,7 @@ export function MarkPaidButton({
    * put it in the wrong place on a return.
    */
   const editing = rowEditingCost(payment);
-  const due = paymentNarratorShare(payment, card, rows) ?? 0;
+  const due = paymentNarratorShare(payment, card, rows, studio.wordsPerFinishedHour) ?? 0;
   const outstanding = Math.max(0, due - (Number(payment.amount_received) || 0));
 
   const [amount, setAmount] = useState(outstanding ? outstanding.toFixed(2) : "");

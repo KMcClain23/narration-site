@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useStudioSettings } from "@/components/admin/useStudioSettings";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
@@ -316,6 +317,7 @@ function Group({
 }
 
 export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; payments: PaymentRow[] }) {
+  const studio = useStudioSettings();
   // Rendered straight from the server payload, never mirrored into local
   // state. A local copy went stale two ways: the payment returned by POST is
   // serialized before its payouts are created, so an added editor fee showed
@@ -339,19 +341,19 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
     return m;
   }, [payments]);
 
-  const totals = useMemo(() => computeTotals(cards, rowsByCard), [cards, rowsByCard]);
-  const byClient = useMemo(() => computeByClient(cards, rowsByCard), [cards, rowsByCard]);
+  const totals = useMemo(() => computeTotals(cards, rowsByCard, studio.wordsPerFinishedHour), [cards, rowsByCard]);
+  const byClient = useMemo(() => computeByClient(cards, rowsByCard, studio.wordsPerFinishedHour), [cards, rowsByCard]);
 
   const projects = useMemo<Project[]>(() => {
     return cards
       .map(card => {
         const rows = rowsByCard.get(card.id) ?? [];
-        const state = projectState(card, rows);
+        const state = projectState(card, rows, studio.wordsPerFinishedHour);
         const received = rows.reduce((s, r) => s + (Number(r.amount_received) || 0), 0);
         // What will be billed, not the narrator's pre-deduction share — see
         // cardInvoiceTotal(). The row sits under "Ready to invoice", so the
         // number on it has to be the one that goes on the invoice.
-        const expected = cardInvoiceTotal(card, rows);
+        const expected = cardInvoiceTotal(card, rows, studio.wordsPerFinishedHour);
         const editing = editingCost(rows);
 
         // cardExpected() excludes royalty rows on purpose — royalties are not
@@ -414,7 +416,7 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
   const estimatedShare = useMemo(() => {
     const actual = cards
       .filter(c => isCardExpectedActual(rowsByCard.get(c.id) ?? []))
-      .reduce((s, c) => s + (cardExpected(c, rowsByCard.get(c.id) ?? []) ?? 0), 0);
+      .reduce((s, c) => s + (cardExpected(c, rowsByCard.get(c.id) ?? [], studio.wordsPerFinishedHour) ?? 0), 0);
     return totals.expected - actual;
   }, [cards, rowsByCard, totals.expected]);
 
