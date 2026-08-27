@@ -162,7 +162,6 @@ const PAYMENT_TYPES = [
 // estimate across this codebase (board/page.tsx, /board/[token], and
 // /board/card/[id]) — a stale tooltip elsewhere said 9,300, but the real
 // divisor everywhere has always been 9,400. Fixed the stale string too.
-const WORDS_PER_HOUR = 9400;
 
 // Mobile sheet motion. Entering decelerates into place so the eye can follow
 // it; leaving accelerates away, because nobody wants to wait to watch
@@ -888,7 +887,7 @@ export function CardEditModal(props: CardEditModalProps) {
   const renderProductionTab = () => {
     if (!form) return null;
     const hasRate = form.payment_type === "pfh" || form.payment_type === "rs_plus";
-    const hours = form.word_count > 0 ? form.word_count / WORDS_PER_HOUR : 0;
+    const hours = form.word_count > 0 ? form.word_count / studio.wordsPerFinishedHour : 0;
     // Uses the shared helper rather than hours × rate so this agrees with the
     // board card face and the Payments page. Computing it locally here meant
     // a duet showed the full project value under a heading that reads as the
@@ -900,6 +899,7 @@ export function CardEditModal(props: CardEditModalProps) {
       form.payment_type,
       form.narration_format,
       form.narrator_share_percent,
+      studio.wordsPerFinishedHour,
     );
     // Spells out the split being applied, so the figure is explicable rather
     // than just smaller than the rate × hours a narrator would work out by hand.

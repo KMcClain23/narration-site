@@ -46,16 +46,14 @@ export function completionUrgency(days: number): Urgency {
   return "default";
 }
 
-const WORDS_PER_FINISHED_HOUR = 9400;
-
 /**
  * Manuscript words got through in an hour at the mic.
  *
- * Not the same idea as WORDS_PER_FINISHED_HOUR above, despite the similar
- * number. That one converts a manuscript into hours of finished audio, which
- * is a billing unit. This one is a working rate: how much of the book actually
- * gets read in an hour of recording. One answers what the job pays, the other
- * how long it takes.
+ * Not the same idea as `wordsPerFinishedHour`, despite the similar number. That
+ * one converts a manuscript into hours of finished audio, which is a billing
+ * unit, and it now comes from Settings rather than from a constant here. This
+ * one is a working rate: how much of the book actually gets read in an hour of
+ * recording. One answers what the job pays, the other how long it takes.
  */
 export const WORDS_PER_NARRATION_HOUR = 9200;
 
@@ -243,6 +241,18 @@ export function estimatedEarnings(
   paymentType: string | null,
   narrationFormat: string | null,
   narratorSharePercent: number | null,
+  /**
+   * Required, and required on purpose — the same reasoning as
+   * `NarrationInput.wordsPerHour` above, which this deliberately mirrors.
+   *
+   * This function used to hold its own finished-hour constant, so no
+   * caller could pass a rate even if it wanted to, and Settings displayed a
+   * finished-hour value that nothing in the app read. An optional parameter with a
+   * default here would recreate exactly that: the compiler is the only thing that
+   * reliably catches a forgotten rate, and this file's own history — a stale 9,300
+   * billing at a different rate than the rest of the app — is what that costs.
+   */
+  wordsPerFinishedHour: number,
 ): number | null {
   if (paymentType !== "pfh" && paymentType !== "rs_plus") return null;
   if (!wordCount || !pfhRate) return null;
@@ -252,7 +262,7 @@ export function estimatedEarnings(
   // narratorSharePercent, contradicting the contract described above.
   const share = narratorShareOf(narrationFormat, narratorSharePercent);
   if (share == null) return null;
-  const hours = wordCount / WORDS_PER_FINISHED_HOUR;
+  const hours = wordCount / wordsPerFinishedHour;
   return hours * pfhRate * share;
 }
 

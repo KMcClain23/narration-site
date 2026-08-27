@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireAdmin } from "@/lib/require-admin";
 import { narrationPlan, toISODate } from "@/components/admin/board-card-utils";
-import { settingsFromRows, SETTING_KEYS } from "@/lib/studio-settings";
+import { getStudioSettings } from "@/lib/studio-settings-server";
 
 // What today asks of you, assembled server-side so the sidebar can show it on
 // every page without each page having to fetch or pass anything down.
@@ -59,7 +59,7 @@ export async function GET() {
   const lastDay = weekEnd > monthEnd ? weekEnd : monthEnd;
 
   const [settingsRes, cardsRes, blocksRes] = await Promise.all([
-    supabaseAdmin.from("site_settings").select("key, value").in("key", Object.values(SETTING_KEYS)),
+    getStudioSettings(),
     supabaseAdmin
       .from("board_cards")
       .select("id, title, word_count, narration_format, narrator_share_percent, deadline, recording_dates, words_recorded")
@@ -77,7 +77,7 @@ export async function GET() {
   // Read rather than defaulted. Left implicit, this endpoint answered at the
   // built-in rate while the board and calendar used the one in Settings, so
   // the sidebar quietly halved every figure once that rate was changed.
-  const studio = settingsFromRows(settingsRes.data ?? []);
+  const studio = settingsRes;
 
   let weekHours = 0;
   let monthHours = 0;

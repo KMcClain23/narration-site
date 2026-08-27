@@ -117,7 +117,7 @@ export function BoardCardContent({
         <p className="mt-2 text-sm text-text-dim">
           {card.word_count
             ? (() => {
-                const earnings = estimatedEarnings(card.word_count, card.pfh_rate, card.payment_type, card.narration_format, card.narrator_share_percent);
+                const earnings = estimatedEarnings(card.word_count, card.pfh_rate, card.payment_type, card.narration_format, card.narrator_share_percent, studio.wordsPerFinishedHour);
                 const words = `${card.word_count.toLocaleString()} words`;
                 return earnings === null ? words : `${words} · ~$${Math.round(earnings).toLocaleString("en-US")}`;
               })()

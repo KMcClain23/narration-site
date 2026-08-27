@@ -1,5 +1,6 @@
 "use client";
 import { formatTimeOfDay } from "@/lib/timezone";
+import { useStudioSettings } from "@/components/admin/useStudioSettings";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
@@ -139,6 +140,7 @@ function Row({ children }: { children: React.ReactNode }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ContractClient() {
+  const studio                        = useStudioSettings();
   const [form, setForm]               = useState<ContractData>(buildDefaults);
   const [previewData, setPreviewData] = useState<ContractData>(buildDefaults);
   const [generating, setGenerating]   = useState(false);
@@ -176,17 +178,20 @@ export default function ContractClient() {
     return () => clearTimeout(t);
   }, [form]);
 
-  // Auto-calculate finishedHours from wordCount. Matches the ratio used
-  // everywhere else in the codebase (board-card-utils.ts, CardEditModal) —
-  // this file's own copy was still using a stale 9,300 until this migration;
-  // the real number has always been 9,400 (see CardEditModal.tsx's own note
-  // on the same historical mismatch).
+  // Auto-calculate finishedHours from wordCount, using the divisor from Settings.
+  //
+  // This comment used to assert "the real number has always been 9,400". That was
+  // never a fact about the code — it was a belief, and this file had already billed
+  // at a stale 9,300 while the rest of the app used something else. It is now false
+  // outright: the number is whatever `studio_words_per_finished_hour` says, and
+  // changing that setting moves this field with everything else. Which is the whole
+  // point of W1 — the value agreed with five hardcodes by coincidence, not by wiring.
   useEffect(() => {
     const wc = parseFloat(form.wordCount);
     if (!wc || isNaN(wc)) return;
-    set("finishedHours", (wc / 9400).toFixed(1));
+    set("finishedHours", (wc / studio.wordsPerFinishedHour).toFixed(1));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.wordCount]);
+  }, [form.wordCount, studio.wordsPerFinishedHour]);
 
   // Keep authorSignatureName in sync with authorName unless manually diverged
   useEffect(() => {

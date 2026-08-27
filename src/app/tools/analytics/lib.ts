@@ -4,8 +4,6 @@
 
 import { estimatedEarnings } from "@/components/admin/board-card-utils";
 
-const WORDS_PER_FINISHED_HOUR = 9400;
-
 export type AnalyticsCard = {
   status: string | null;
   released_at: string | null;
@@ -36,12 +34,17 @@ function shareFor(card: AnalyticsCard): number {
   return 1;
 }
 
-export function computeCareerTotals(cards: AnalyticsCard[]) {
+/**
+ * `wordsPerFinishedHour` is a parameter rather than a constant so this file stays
+ * pure — it is imported by the server page and by client chart components alike, and
+ * a fetch here would break both. The server page reads it once and passes it in.
+ */
+export function computeCareerTotals(cards: AnalyticsCard[], wordsPerFinishedHour: number) {
   const released = cards.filter(c => c.status === "released");
   const booksReleased = released.length;
   const hoursNarrated = released.reduce((sum, c) => {
     if (!c.word_count) return sum;
-    return sum + (c.word_count / WORDS_PER_FINISHED_HOUR) * shareFor(c);
+    return sum + (c.word_count / wordsPerFinishedHour) * shareFor(c);
   }, 0);
   return { booksReleased, hoursNarrated };
 }
@@ -98,13 +101,16 @@ function isEarningsEligible(c: AnalyticsCard): boolean {
   );
 }
 
-function cardEarnings(c: AnalyticsCard): number {
-  return estimatedEarnings(c.word_count, c.pfh_rate, c.payment_type, c.narration_format, c.narrator_share_percent) ?? 0;
+function cardEarnings(c: AnalyticsCard, wordsPerFinishedHour: number): number {
+  return estimatedEarnings(
+    c.word_count, c.pfh_rate, c.payment_type, c.narration_format, c.narrator_share_percent,
+    wordsPerFinishedHour,
+  ) ?? 0;
 }
 
-export function computeEarnings(cards: AnalyticsCard[], quarters: Quarter[]) {
+export function computeEarnings(cards: AnalyticsCard[], quarters: Quarter[], wordsPerFinishedHour: number) {
   const eligible = cards.filter(isEarningsEligible);
-  const totalEarnings = eligible.reduce((sum, c) => sum + cardEarnings(c), 0);
+  const totalEarnings = eligible.reduce((sum, c) => sum + cardEarnings(c, wordsPerFinishedHour), 0);
   const avgPerBook = eligible.length > 0 ? totalEarnings / eligible.length : null;
 
   const released = eligible.filter(c => c.status === "released" && c.released_at);
@@ -114,7 +120,7 @@ export function computeEarnings(cards: AnalyticsCard[], quarters: Quarter[]) {
         const d = new Date(c.released_at as string);
         return d >= qtr.start && d < qtr.end;
       })
-      .reduce((sum, c) => sum + cardEarnings(c), 0);
+      .reduce((sum, c) => sum + cardEarnings(c, wordsPerFinishedHour), 0);
     return { label: qtr.label, value };
   });
 

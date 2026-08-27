@@ -1,6 +1,7 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { adminType } from "@/lib/design-tokens";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getStudioSettings } from "@/lib/studio-settings-server";
 import { VerticalBarChart } from "./VerticalBarChart";
 import { HorizontalBarChart } from "./HorizontalBarChart";
 import { FrequentCollaborators } from "./FrequentCollaborators";
@@ -66,10 +67,14 @@ export default async function ToolsAnalyticsPage({
   const authors = (authorsRes.data ?? []) as AuthorRow[];
   const events = (eventsRes.data ?? []) as AnalyticsEvent[];
 
+  // Read once, here, and passed down: lib.ts is pure by design and a fetch inside it
+  // would break both the server page and the client chart components that import it.
+  const studio = await getStudioSettings();
+
   const quarters = getTrailing5Quarters();
-  const careerTotals = computeCareerTotals(cards);
+  const careerTotals = computeCareerTotals(cards, studio.wordsPerFinishedHour);
   const releasePace = computeReleasePace(cards, quarters);
-  const earnings = computeEarnings(cards, quarters);
+  const earnings = computeEarnings(cards, quarters, studio.wordsPerFinishedHour);
   const genres = computeGenreBreakdown(cards);
   const collaborators = computeFrequentCollaborators(cards, authors);
 
