@@ -1382,3 +1382,95 @@ revoke all on public.expenses  from anon, authenticated;
 
 grant select on public.payments  to authenticated;
 grant select on public.expenses  to authenticated;
+
+-- ============================================================
+-- Stage 8A.2 / 8A.3: read policies and the two session functions
+-- (applied 27 August 2026, AFTER the ceiling above)
+-- ============================================================
+
+-- FOR SELECT, never FOR ALL. With the ceiling closed, `for all` could not grant
+-- a write today -- but it would state an intent this stage does not have, and
+-- the next person to widen a grant would find a policy already agreeing with
+-- them. The grant and the policy have to say the same narrow thing, or the pair
+-- only looks safe.
+
+create policy "Role read" on public.payments
+  for select to authenticated
+  using ((select public.current_app_role()) = 'admin');
+
+create policy "Role read" on public.expenses
+  for select to authenticated
+  using ((select public.current_app_role()) = 'admin');
+
+-- Money that has MOVED. This table does not hold what is owed; that is computed
+-- from the card, the rate and these rows -- see the Stage 8 reconnaissance.
+--
+-- Six actionable-money columns are absent from the return type by design:
+-- stripe_payment_link, paypal_payment_link, stripe_payment_link_id,
+-- paypal_invoice_id, payment_links_closed_at and invoice_draft. A read-only
+-- screen needs none of them, and a live payment URL is the last thing that
+-- should travel to a phone. created_at and updated_at are omitted too: neither
+-- is displayed, and a narrower type is less for a later stage to have to narrow.
+create or replace function public.payments_for_session()
+returns table(
+  id uuid, card_id uuid, label text, kind text, period text,
+  amount_expected numeric, amount_gross numeric, amount_received numeric,
+  due_on date, invoiced_on date, received_on date,
+  invoice_number text, method text, notes text, sort_order integer
+)
+language plpgsql stable
+set search_path = public
+as $fn$
+begin
+  perform public.assert_board_access();
+
+  return query
+    select
+      p.id, p.card_id, p.label, p.kind, p.period,
+      p.amount_expected, p.amount_gross, p.amount_received,
+      p.due_on, p.invoiced_on, p.received_on,
+      p.invoice_number, p.method, p.notes, p.sort_order
+    from public.payments p
+    order by p.received_on desc nulls last, p.sort_order asc, p.label asc;
+end
+$fn$;
+
+-- Expenses, with receipt PRESENCE rather than the URL itself.
+--
+-- Verified 27 August: `receipt_url` is an empty string on ALL 21 rows, so there
+-- is nothing to open and nothing to sign. Returning a boolean rather than the
+-- column means the phone cannot render a link it must not follow, and when
+-- receipts do start arriving the screen already knows they exist without this
+-- function having to hand out storage URLs. `email_id` is omitted: an opaque
+-- mail identifier with no display value.
+--
+-- schedule_c travels as stored. It is a tax category, and nothing in this app
+-- interprets, groups or totals by it -- a tax figure the app invented would be
+-- worse than no tax figure.
+create or replace function public.expenses_for_session()
+returns table(
+  id uuid, incurred_on date, vendor text, description text,
+  amount numeric, label text, schedule_c text, method text,
+  notes text, source text, has_receipt boolean
+)
+language plpgsql stable
+set search_path = public
+as $fn$
+begin
+  perform public.assert_board_access();
+
+  return query
+    select
+      e.id, e.incurred_on, e.vendor, e.description,
+      e.amount, e.label, e.schedule_c, e.method,
+      e.notes, e.source, (e.receipt_url <> '') as has_receipt
+    from public.expenses e
+    order by e.incurred_on desc, e.vendor asc;
+end
+$fn$;
+
+revoke all on function public.payments_for_session() from public, anon;
+grant execute on function public.payments_for_session() to authenticated;
+
+revoke all on function public.expenses_for_session() from public, anon;
+grant execute on function public.expenses_for_session() to authenticated;
