@@ -792,3 +792,62 @@ could adopt this; that is Stage 1 and was left alone.
 
 **Stage 2 is closed.** Its DoD was met at the sweep; these were polish and nothing was
 added to them.
+
+## Stage 3 corrections — the progress denominator, and a backfill that corrupted eight books
+
+**The denominator was wrong, and the spec is where it got in.** `recordedFraction`
+divided by `word_count` while `narrationPlan` divides by `wordCount × narratorShare`,
+so one screen showed A Cowboy's Runaway at **20%** on its progress bar and **40%** by
+its remaining hours. The hours were right and they settle the semantics:
+`narrationPlan` subtracts `words_recorded` from SHARE words, so `words_recorded` means
+the words *this narrator* recorded. That is running code and it predates this work.
+DoD 13 in the Stage 3 spec said "words_recorded / word_count", and it was implemented
+faithfully.
+
+Fixed to take the share from `narratorShareOf` — **the same function `narrationPlan`
+uses**, not a second derivation. `narrator_share_percent` is populated on 1 card in
+33, so the inference from `narration_format` is the real mechanism and duplicating it
+is how two percentages of one book came to sit on one screen. Multicast resolves to
+null and now renders **nothing**, because an equal split is a guess and a confident
+wrong number is worse than a blank.
+
+Asserted directly: for any card, `recordedFraction` must equal
+`narrationPlan(...).fractionDone`. Mutation-tested by passing `word_count` where share
+words belong, which turns that assertion and two others red.
+
+**The backfill.** This statement ran on production:
+
+```sql
+update board_cards set words_recorded = word_count
+ where status in ('editing','released') and words_recorded = 0 and word_count > 0
+```
+
+It touched 9 rows: 6 duet, 1 dual, 1 multicast, 1 solo. Only the solo was correct.
+Eight books claimed a full-manuscript recording of books shared with another narrator.
+The statement was written without consulting `narration_format` at all.
+
+Reversed on the seven whose share resolves, using the same source as above:
+
+| book | format | share | before | after |
+|---|---|---|---|---|
+| Unmasked Hearts | duet | 0.5 | 62,777 | 31,389 |
+| All the Ways I'd Kill for You | duet | 0.5 | 184,221 | 92,111 |
+| Whiskey & Lies | duet | 0.5 | 97,000 | 48,500 |
+| Beating For You | duet | 0.5 | 70,983 | 35,492 |
+| With a Broken Wing | duet | 0.5 | 120,000 | 60,000 |
+| Where My Demons Hide | duet | 0.5 | 117,538 | 58,769 |
+| Swing and a Kiss | dual | 0.5 | 103,241 | 51,621 |
+
+**Stopped on one row, deliberately: `How an Angel Dies: Wrath`** (multicast,
+110,079/110,079, no explicit `narrator_share_percent`). Multicast has no default split,
+so any figure written there would be invented. It is left visibly at a full-manuscript
+figure and renders no percentage in the app. **Dean's to decide.**
+
+`The Final Guardian` (solo) was correct and untouched. None of the four
+`narration_format is null` rows were touched by the backfill, so that hazard did not
+materialise — but the reversal excluded them by rule regardless.
+
+**The lesson, and it is not the arithmetic.** A statement was handed over described as
+"Dean's to run knowingly" while giving him nothing to know. Ownership of a decision is
+not transferred by labelling it — it is transferred by supplying what the decision
+turns on. Here that was one column, `narration_format`, which nobody looked at.
