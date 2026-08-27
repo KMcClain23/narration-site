@@ -3,7 +3,9 @@
 **Repo:** `D:\Developer\narration-site` (the Next.js web admin)
 **Found:** during Native Android Stage 1 discovery, 25 August 2026
 **Size:** small, except for one file that touches invoices
-**Status: DEFERRED, 25 August 2026 — not scheduled. Read the note below before starting.**
+**Status: RESOLVED, 27 August 2026 (Stage 5). The deferral history below is kept
+deliberately — it records why this waited, and the residual risk it names is the thing
+that was finally closed.**
 
 ---
 
@@ -28,30 +30,33 @@ the ⚠️ section is the reason it was deferred, not a reason not to do it.
 
 ---
 
-## ⚠️ Read this before approving the work
+## ⚠️ This section described a money change. It no longer applies.
 
-**This is not only a display fix. It changes what your invoices bill.**
+**As written, this warned that the fix would move every invoice by about +2.2%,**
+because the divisor would go from the hardcoded 9,400 to the stored 9,200. That was
+true on 25 August. It is not true now.
 
-`finishedHours()` in `src/lib/payments.ts` computes billable finished hours from word
-count, and invoice amounts are derived from it. Moving the divisor from 9,400 to your
-stored 9,200 makes every future invoice **about 2.2% larger** for the same manuscript.
+The resolution taken instead was to change the stored setting to 9,400, so by the time
+this work was done **the setting and the five hardcodes already agreed**. W1 therefore
+moved no number at all.
 
-On a 100,000-word book at $250/PFH: $2,659 → $2,717.
+That makes the acceptance test stronger rather than weaker: **the expected difference
+in every figure, before and after, is ZERO.** Any difference is a defect. A test for
+"no change" is far easier to fail than a test for "changed by roughly the right
+amount".
 
-That is almost certainly what you want — you set 9,200 in a field labelled *"MONEY. The
-industry unit… Your PFH rate is paid per one of these"* — but it is worth deciding
-knowingly rather than discovering it on the next invoice. Two specifics:
+Confirmed against a real stored `invoice_draft`: *His For Christmas*, 46,000 words at
+$300/PFH, duet. The rewritten path reproduces the stored whole-project amount
+`1468.0851063829787` to the last digit, hours `"4.9"`, partial `367.02`. At 9,200 it
+would have been `1500.0`.
 
-- **Invoices already sent were computed at 9,400.** Stored `invoice_draft` documents are
-  preserved as-is, but regenerating a draft after this change will produce a different
-  total than the one already in someone's inbox.
-- **If any contract defines finished hours by an external standard**, your billing
-  divisor should match that standard rather than your own measurement. Worth one look at
-  a recent contract before this ships.
+The two specifics below were the reason for caution and are recorded as resolved:
 
-If either gives you pause, the narrower option is to fix the four *display* sites and
-leave `payments.ts` at 9,400 — but then the board's estimate and the invoice disagree,
-which is the situation this fix exists to end. Better to decide once.
+- **Invoices already sent were computed at 9,400** — and still are. Regenerating a
+  draft produces the same total, verified above.
+- **If any contract defines finished hours by an external standard**, the divisor is
+  now a setting rather than a constant, so matching that standard is a Settings change
+  rather than a deploy. Which was the point.
 
 ---
 
@@ -184,20 +189,29 @@ real one to confirm the only change is the expected ~2.2%.
 
 ## Verification
 
-1. Settings shows 9,200; a board card's `~$…` figure matches
-   `word_count / 9200 × pfh_rate × share`, hand-calculated
+*Steps 1–5 said 9,200 throughout and expected a ~2.2% movement. Corrected 27 August:
+the setting is 9,400, the expected movement is zero, and exact equality replaces
+"roughly the right amount".*
+
+1. Settings shows 9,400; a board card's `~$…` figure matches
+   `word_count / 9400 × pfh_rate × share`, hand-calculated
 2. The same card in `CardEditModal`'s Production tab agrees with the board
-3. Analytics "hours narrated" changes by ~2.2% and is internally consistent
-4. Contract builder auto-fills finished hours using 9,200
-5. A regenerated invoice differs from its stored `invoice_draft` **only** by the rate
-   change — no other line moved
+3. Analytics "hours narrated" is **unchanged** and internally consistent
+4. Contract builder auto-fills finished hours using the stored 9,400
+5. A regenerated invoice is **byte-identical** to its stored `invoice_draft` — not
+   "differs only by the rate", identical
 6. **`grep -rn "9400" src/` returns nothing** except `DEFAULT_STUDIO_SETTINGS` in
    `studio-settings.ts`. That single grep is the real acceptance test.
 7. Change the setting to a distinctly different value (say 8,000), reload, confirm every
-   surface above moves together, then set it back to 9,200. The mechanism is not proven
+   surface above moves together, then set it back to 9,400. The mechanism is not proven
    by the number being right once — only by it *following the setting*.
 
-Check 7 is the one that matters. Everything else passes against a codebase where 9,200
+   **Extended 27 August across both clients.** Android is now a second, independent
+   implementation of the same arithmetic, so the phone and the browser must agree on
+   the same book — before, after, and at a changed setting. Two implementations
+   agreeing is evidence; one agreeing with itself is not.
+
+Check 7 is the one that matters. Everything else passes against a codebase where 9,400
 was simply hardcoded in five new places.
 
 ---
