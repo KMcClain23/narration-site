@@ -970,3 +970,42 @@ One carried constraint: the card query **excludes archived and INCLUDES recast**
 His For Christmas disappears and takes a live **$367.02** invoice with it. That is the
 whole reason `recast` exists as a status distinct from the `recasted` archive reason —
 the contract ends, but the partial project fee still has to be billed.
+
+---
+
+## CORRECTION, 27 August 2026 — "His For Christmas carries a live $367.02"
+
+**The claim was wrong, and it survived four documents because each reader trusted the
+last.** Recorded here rather than edited away, because the numbers changing quietly is
+how it propagated in the first place.
+
+**What was claimed** (Stage 6's 6D report, this roadmap, the memory index, and the
+Stage 8 spec): His For Christmas is a recast card carrying a live, unraised $367.02
+invoice, and dropping `recast` from a card query would lose the money.
+
+**What is true**, read from the row on 27 August:
+
+    invoiced_on      2026-08-17
+    amount_expected  367.02
+    amount_received  367.02      method: Card
+    received_on      2026-08-20
+
+It was paid on 20 August — six days before Stage 6 ran. `projectState()` returns
+**`paid`**, not `ready`: the `recast -> ready` branch only fires when nothing has been
+invoiced and nothing received. Repo-wide, **zero** payment rows have
+`amount_received < amount_expected`.
+
+**How it happened, both halves.** Stage 6 read `amount_expected` and reported "$367.02
+expected" without reading `amount_received` in the same row — a true fact whose
+implication was false. Then a later check that *named* `amount_received`, ran, and
+returned 367.02 was read as confirming the claim rather than contradicting it, because
+the claim had already been written down.
+
+**The rule that came out of it:** A CHECK PERFORMED TO CONFIRM IS NOT A CHECK. Its
+value comes entirely from being willing to have it come back the other way.
+
+**What still stands.** The 8B.3 constraint — a card query must exclude archived and
+INCLUDE recast — remains correct, for a weaker reason than the one given. `cardExpected()`
+returns null for recast by design, so a recast card's figure cannot be reconstructed
+from the rate; it exists only as stored payment rows. Dropping recast loses that
+*history*. Nothing is at risk of going unbilled.

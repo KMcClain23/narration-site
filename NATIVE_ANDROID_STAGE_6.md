@@ -140,6 +140,13 @@ and neither does the restore. Do not "helpfully" adjust it.
 
 ## 6D — The recast card
 
+> **CORRECTED 27 August 2026.** The report this section asked for concluded that His
+> For Christmas carried an unraised $367.02 invoice. It did not: the row was invoiced
+> on 17 August and paid on 20 August, six days before this stage ran. The reply read
+> `amount_expected` and never read `amount_received` beside it. The recommendation —
+> nowhere in Stage 6, resolved by Payments — was still right. See the CORRECTION at the
+> end of PROJECT_ROADMAP.md.
+
 One active card has status 'recast'. It is not archived, board_for_session does not
 return it, and it is not released. It appears in no Android view whatsoever.
 

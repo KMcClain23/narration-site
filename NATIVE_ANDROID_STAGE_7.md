@@ -165,6 +165,10 @@ thing to report; a wrongly settled payment is not.
 
 His For Christmas carries a live $367.02. Nothing in this stage touches it.
 
+> **CORRECTED 27 August 2026:** not live. Invoiced 17 August, paid 20 August. The
+> instruction was followed and nothing in Stage 7 touched it, so the outcome stands;
+> the premise did not. See the CORRECTION at the end of PROJECT_ROADMAP.md.
+
 ---
 
 # 4. Definition of done

@@ -1435,14 +1435,14 @@ begin
 end
 $fn$;
 
--- Expenses, with receipt PRESENCE rather than the URL itself.
+-- Expenses. NOTE: this version returned `has_receipt`; it was superseded later
+-- the same day and the reason is recorded at the end of this file. Kept as
+-- written so the sequence of migrations reads as what actually happened.
 --
 -- Verified 27 August: `receipt_url` is an empty string on ALL 21 rows, so there
 -- is nothing to open and nothing to sign. Returning a boolean rather than the
--- column means the phone cannot render a link it must not follow, and when
--- receipts do start arriving the screen already knows they exist without this
--- function having to hand out storage URLs. `email_id` is omitted: an opaque
--- mail identifier with no display value.
+-- column means the phone cannot render a link it must not follow. `email_id` is
+-- omitted: an opaque mail identifier with no display value.
 --
 -- schedule_c travels as stored. It is a tax category, and nothing in this app
 -- interprets, groups or totals by it -- a tax figure the app invented would be
@@ -1501,3 +1501,53 @@ grant execute on function public.expenses_for_session() to authenticated;
 -- refused with "permission denied for table payment_payouts".
 
 revoke all on public.payment_payouts from anon, authenticated;
+
+-- ============================================================
+-- Stage 8, finding 2: has_receipt dropped from expenses_for_session
+-- (applied 27 August 2026)
+-- ============================================================
+--
+-- `receipt_url` is an empty string on ALL 21 expense rows. There are no
+-- receipts. A "receipt exists" indicator would be a control that can never fire,
+-- testable only by constructing the data that would make it fire -- and a state
+-- reachable only by constructing data is a state nobody looks at.
+--
+-- So the field goes too, not just the indicator. A function should not return a
+-- field about a thing that does not exist: the same narrower-return-type
+-- argument that excluded the payment links, turned on this stage's own work.
+-- Carrying `has_receipt` would leave a column false on every row and a reader
+-- wondering which screen consumes it.
+--
+-- The DoD item that asked for the indicator was withdrawn for the same reason.
+-- When receipts do exist, F1 adds the field and the indicator together, beside
+-- the signed-URL work they need anyway.
+--
+-- CREATE OR REPLACE cannot change a return type, so the old function is dropped
+-- first. Nothing called it.
+
+drop function if exists public.expenses_for_session();
+
+create or replace function public.expenses_for_session()
+returns table(
+  id uuid, incurred_on date, vendor text, description text,
+  amount numeric, label text, schedule_c text, method text,
+  notes text, source text
+)
+language plpgsql stable
+set search_path = public
+as $fn$
+begin
+  perform public.assert_board_access();
+
+  return query
+    select
+      e.id, e.incurred_on, e.vendor, e.description,
+      e.amount, e.label, e.schedule_c, e.method,
+      e.notes, e.source
+    from public.expenses e
+    order by e.incurred_on desc, e.vendor asc;
+end
+$fn$;
+
+revoke all on function public.expenses_for_session() from public, anon;
+grant execute on function public.expenses_for_session() to authenticated;

@@ -84,6 +84,16 @@ answer "what have I been paid".
 
 ## 8B.1 — RECONNAISSANCE, then stop. Do not build first.
 
+> **CORRECTED 27 August 2026.** The claim below that His For Christmas "carries a live
+> $367.02" is **wrong**. It was invoiced on 17 August and **paid on 20 August**
+> (`amount_received = 367.02`, method Card), so `projectState()` returns `paid`, not
+> `ready`. Nothing anywhere has `amount_received < amount_expected`. The text is left
+> as written; see the CORRECTION section at the end of PROJECT_ROADMAP.md for how the
+> error propagated and the rule that came out of it — *a check performed to confirm is
+> not a check*. The constraint the claim was supporting still holds for a weaker
+> reason: `cardExpected()` returns null for recast, so the card's figure exists only as
+> stored payment rows and dropping recast loses that history.
+
 The payments table records money that has MOVED. It does not hold what is owed.
 
   24 rows: 17 fee, 7 royalty
@@ -136,6 +146,16 @@ That split is the same one Stage 7 drew, and Android drew before it: gate the fi
 not the screen.
 
 ## 8B.3 — The card query
+
+> **CORRECTED 27 August 2026.** The claim below that His For Christmas "carries a live
+> $367.02" is **wrong**. It was invoiced on 17 August and **paid on 20 August**
+> (`amount_received = 367.02`, method Card), so `projectState()` returns `paid`, not
+> `ready`. Nothing anywhere has `amount_received < amount_expected`. The text is left
+> as written; see the CORRECTION section at the end of PROJECT_ROADMAP.md for how the
+> error propagated and the rule that came out of it — *a check performed to confirm is
+> not a check*. The constraint the claim was supporting still holds for a weaker
+> reason: `cardExpected()` returns null for recast, so the card's figure exists only as
+> stored payment rows and dropping recast loses that history.
 
 EXCLUDES archived, INCLUDES recast.
 

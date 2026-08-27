@@ -30,7 +30,35 @@ import { PayoutsPanel } from "./PayoutsPanel";
 
 // Order is the order of attention: money you're owed, then work you could
 // bill, then everything that needs no decision today.
-const GROUP_ORDER: ProjectState[] = ["awaiting", "ready", "production", "paid", "untracked"];
+/**
+ * Order of attention, and now exhaustive BY THE COMPILER.
+ *
+ * This array is what took /payments down. Adding `unknown` to `ProjectState`
+ * forced every exhaustive Record open — OPEN_BY_DEFAULT, GROUP_ACCENT,
+ * GROUP_HINT — because a Record must name every member. An ARRAY of the union
+ * has no such obligation: it is perfectly well typed while missing a member, so
+ * this one silently kept its five while the union had six.
+ *
+ * `satisfies` plus the Missing check below closes that. Omit a member and
+ * `_groupOrderIsExhaustive` fails to compile, naming the one left out.
+ */
+const GROUP_ORDER = [
+  // First, because it is not a stage of work — it is the page saying it could
+  // not do its arithmetic.
+  "unknown",
+  "awaiting",
+  "ready",
+  "production",
+  "paid",
+  "untracked",
+] as const satisfies readonly ProjectState[];
+
+type MissingFromGroupOrder = Exclude<ProjectState, (typeof GROUP_ORDER)[number]>;
+/** A compile error here means GROUP_ORDER is missing the state named in the type. */
+const _groupOrderIsExhaustive: MissingFromGroupOrder extends never
+  ? true
+  : ["GROUP_ORDER is missing", MissingFromGroupOrder] = true;
+void _groupOrderIsExhaustive;
 
 // Groups that answer "what should I do next" stay open; the rest are counts
 // until asked for. Previously every project was rendered at full weight, so
@@ -274,12 +302,23 @@ function Group({
   state,
   projects,
   total,
+  settingsPending,
   onAddPayment,
   onEditPayment,
 }: {
   state: ProjectState;
   projects: Project[];
   total: number;
+  /**
+   * The settings have not arrived yet, as opposed to having failed.
+   *
+   * `unknown` means "no rate, so no arithmetic", and on the very first render
+   * that is true of every project for a few hundred milliseconds because the
+   * hook starts in `loading`. Announcing "settings unreadable" during that
+   * moment would be alarming and false — and this is the page where a false
+   * alarm about money costs the most.
+   */
+  settingsPending: boolean;
   onAddPayment: (cardId: string) => void;
   onEditPayment: (cardId: string, p: PaymentRow) => void;
 }) {
@@ -296,7 +335,11 @@ function Group({
         className="flex w-full items-center gap-3 bg-surface px-4 py-3 text-left hover:bg-surface-raised"
       >
         {open ? <ChevronDown size={16} className="text-text-muted" /> : <ChevronRight size={16} className="text-text-muted" />}
-        <span className={adminType.title}>{PROJECT_STATE_LABEL[state]}</span>
+        <span className={adminType.title}>
+          {state === "unknown" && settingsPending
+            ? "Working these out…"
+            : PROJECT_STATE_LABEL[state]}
+        </span>
         <span className={`${adminType.monoNum} rounded-full px-2 py-0.5 ${GROUP_ACCENT[state].pill}`}>
           {projects.length}
         </span>
@@ -310,7 +353,11 @@ function Group({
 
       {open && (
         <>
-          <p className={`${adminType.small} border-t border-surface-border px-4 py-2`}>{GROUP_HINT[state]}</p>
+          <p className={`${adminType.small} border-t border-surface-border px-4 py-2`}>
+            {state === "unknown" && settingsPending
+              ? "Still loading the studio settings these are costed from."
+              : GROUP_HINT[state]}
+          </p>
           <div>
             {projects.map(p => (
               <ProjectRow
@@ -415,7 +462,11 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
 
   const grouped = useMemo(() => {
     const m = new Map<ProjectState, Project[]>();
-    for (const s of GROUP_ORDER) m.set(s, []);
+    // Seeded from the exhaustive label Record rather than from GROUP_ORDER, so a
+    // bucket exists for every member of the union whatever the display order
+    // happens to list. Belt to the compile-time braces above: this is the line
+    // that decides whether the page renders at all.
+    for (const s of Object.keys(PROJECT_STATE_LABEL) as ProjectState[]) m.set(s, []);
     for (const p of projects) {
       /**
        * Royalty-only work belongs to the statements ledger, not up here.
@@ -430,7 +481,14 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
       if (p.state === "awaiting" && p.rows.length > 0 && p.rows.every(r => r.kind === "royalty")) {
         continue;
       }
-      m.get(p.state)!.push(p);
+      // No non-null assertion. The `!` here is what let this compile while
+      // `m.get("unknown")` was undefined, and the throw it produced was
+      // "Cannot read properties of undefined (reading 'push')" inside a
+      // useMemo — a whole page down because one operator promised something
+      // the seeding above had not delivered.
+      const bucket = m.get(p.state);
+      if (bucket) bucket.push(p);
+      else m.set(p.state, [p]);
     }
     return m;
   }, [projects]);
@@ -569,6 +627,7 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
             state={state}
             projects={list}
             total={list.reduce((s, p) => s + (p.amount ?? 0), 0)}
+            settingsPending={studioState.status === "loading"}
             onAddPayment={cardId => setEditing({ cardId, payment: null })}
             onEditPayment={(cardId, row) => setEditing({ cardId, payment: row })}
           />
