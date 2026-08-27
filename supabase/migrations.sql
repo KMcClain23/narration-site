@@ -1474,3 +1474,30 @@ grant execute on function public.payments_for_session() to authenticated;
 
 revoke all on function public.expenses_for_session() from public, anon;
 grant execute on function public.expenses_for_session() to authenticated;
+
+-- ============================================================
+-- Stage 8, finding 1: close the ceiling on payment_payouts too
+-- (applied 27 August 2026, its own commit)
+-- ============================================================
+--
+-- The third money table, found while tracing what the "owed" computation
+-- actually depends on. 8 rows, 7 of them unpaid, and both anon and authenticated
+-- held DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE -- the same
+-- default schema grants payments and expenses carried.
+--
+-- NOTHING is granted back. Payments and expenses got SELECT because a policy and
+-- two functions in this stage need it; nothing reads payouts from a session at
+-- all, and a table nothing needs should end at a hard deny rather than at
+-- SELECT-just-in-case. When a later stage wants it, the grant is one line and
+-- will arrive with its reason attached.
+--
+-- Pre-checked independently rather than inferred from the payments result -- the
+-- fact that it held there is not evidence it holds here. All 7 web files
+-- referencing payment_payouts import `supabaseAdmin` (service_role, unaffected),
+-- including `contacts/editors/page.tsx`, which the payments/expenses sweep did
+-- not surface. No REST or rpc reference from client code. Android has none.
+-- Confirmed after: service_role still reads it directly AND through the embedded
+-- `payouts:payment_payouts(...)` select every payments query uses; anon is
+-- refused with "permission denied for table payment_payouts".
+
+revoke all on public.payment_payouts from anon, authenticated;
