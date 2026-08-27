@@ -1232,3 +1232,114 @@ end $fn$;
 
 revoke execute on function public.card_detail(uuid) from public, anon;
 grant  execute on function public.card_detail(uuid) to authenticated;
+
+-- ============================================================
+-- Stage 6: Released + Archive  (applied 26 August 2026)
+-- ============================================================
+
+-- 6A. One admin guard, four callers.
+--
+-- board_for_session() and card_detail() each carried their own copy of the same
+-- three-line check, and Stage 6 adds two more functions that need it. Four
+-- copies kept in step by memory is the shape this project has spent five stages
+-- removing -- the exclusion list, the status ordering, the studio rate defaults.
+--
+-- The marker is a PARAMETER rather than a constant because it is load-bearing:
+-- BoardRepository.kt matches CARD_ACCESS_NOT_ENABLED to tell "this card is not
+-- readable" from "the board is not readable", and flattening the two messages
+-- would silently retarget that branch. Checked before choosing, per 6A.
+create or replace function public.assert_board_access(
+  p_marker text default 'BOARD_ACCESS_NOT_ENABLED'
+) returns void
+language plpgsql stable
+set search_path = public
+as $fn$
+begin
+  -- `using message =` rather than `raise exception p_marker`: the bare form
+  -- reads its argument as a format string, so a '%' in a marker would raise
+  -- "too few arguments for format" instead of the refusal the app matches on.
+  if coalesce(public.current_app_role(), '') <> 'admin' then
+    raise exception using message = p_marker, errcode = '42501';
+  end if;
+end
+$fn$;
+
+revoke all on function public.assert_board_access(text) from public, anon;
+grant execute on function public.assert_board_access(text) to authenticated;
+
+-- board_for_session() and card_detail() were re-created to call it; their
+-- bodies below the guard are unchanged. Both were re-verified over REST with a
+-- real JWT afterwards -- admin returns rows, editor raises 42501 with its own
+-- marker, anon is refused at the ACL -- because an extraction that looks
+-- behaviour-preserving is still a rewrite of a security check.
+
+-- 6A.2. Released, INCLUDING archived ones, with archived_at in the column list.
+--
+-- One query is the source for both "which books are released" questions. The
+-- list filters to non-archived for display and any count applies the same
+-- predicate to the same rows, so the difference between "all-time released" and
+-- "currently visible" is a line of code at the point of use rather than a
+-- difference between two functions that can drift apart unobserved. The web
+-- keeps two routes with two different archived predicates -- deliberately, and
+-- they agree today only because no released book has ever been archived.
+--
+-- Ordering matches /api/released/route.ts exactly, secondary sort included:
+-- `nulls last` is explicit because DESC defaults to NULLS FIRST in Postgres and
+-- the web route overrides it. Without the title tiebreak, two books released on
+-- the same day could swap places between loads with nothing to explain it.
+create or replace function public.released_for_session()
+returns table(
+  id uuid, title text, author text, cover_url text,
+  released_at timestamp with time zone, amazon_rating numeric,
+  amazon_review_count integer, audible_link text,
+  archived_at timestamp with time zone
+)
+language plpgsql stable
+set search_path = public
+as $fn$
+begin
+  perform public.assert_board_access();
+
+  return query
+    select
+      c.id, c.title, c.author, c.cover_url, c.released_at, c.amazon_rating,
+      c.amazon_review_count, c.audible_link, c.archived_at
+    from public.board_cards c
+    where c.status = 'released'
+    order by c.released_at desc nulls last, c.title asc;
+end
+$fn$;
+
+-- Archived, whatever the status. The archive is a recovery screen: a card is
+-- there because it was archived, not because of what it was doing when it was.
+create or replace function public.archived_for_session()
+returns table(
+  id uuid, title text, author text, cover_url text,
+  archived_at timestamp with time zone, archived_reason text,
+  archived_notes text, status text
+)
+language plpgsql stable
+set search_path = public
+as $fn$
+begin
+  perform public.assert_board_access();
+
+  return query
+    select
+      c.id, c.title, c.author, c.cover_url, c.archived_at, c.archived_reason,
+      c.archived_notes, c.status
+    from public.board_cards c
+    where c.archived_at is not null
+    order by c.archived_at desc, c.title asc;
+end
+$fn$;
+
+revoke all on function public.released_for_session() from public, anon;
+grant execute on function public.released_for_session() to authenticated;
+
+revoke all on function public.archived_for_session() from public, anon;
+grant execute on function public.archived_for_session() to authenticated;
+
+-- Un-archiving needs no migration: archived_at, archived_reason and
+-- archived_notes are already in the column grant, and a refused write comes back
+-- as zero rows with HTTP 200 -- the contract the app already reads as Refused.
