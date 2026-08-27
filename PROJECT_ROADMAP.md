@@ -851,3 +851,122 @@ materialise — but the reversal excluded them by rule regardless.
 "Dean's to run knowingly" while giving him nothing to know. Ownership of a decision is
 not transferred by labelling it — it is transferred by supplying what the decision
 turns on. Here that was one column, `narration_format`, which nobody looked at.
+
+---
+
+## Stages 4 to 7 — the record, 27 August 2026
+
+Written after the fact, in one pass, because the four stages ran with a "one report at
+the end" cadence and the reports lived only in the session. Shorter than the entries
+above by intent: what is here is what a later reader needs, not a transcript.
+
+### Stage 4 — first15_due on the agenda, read-only Settings
+
+Both shipped. Settings is read-only by the **schema's** decision, not by convention:
+`site_settings` has a `Role read` policy and **no update policy of any kind**, so a
+write returns zero rows rather than an error. Adding a write path later needs a
+migration that makes the refusal visible first.
+
+### The getOrNull inventory
+
+Dean asked for the inventory before any fixing — "report it even where the answer is
+'this one is fine, and here is why'" — after a previous count of six turned out to be
+eleven. Seven sites, fixed in two groups: three small and independent, then a design
+change to `StudioSettings` making every field nullable with a `SettingIssue` per key.
+That design change is what web Stage 7 later transplanted.
+
+### Stage 5 (W1) — wordsPerFinishedHour wired through the web
+
+A pure refactor whose acceptance test was that **every figure moved by exactly zero**.
+The stored setting had already been changed 9,200 → 9,400 to match the five hardcodes,
+so W1 moved no number and any difference at all would have been a defect.
+
+`estimatedEarnings` took a **required** parameter, not an optional one with a default,
+and the compiler enumerated the call sites: the plan named one line in `payments.ts`
+and the rate threaded through twelve more functions.
+
+Two false landmarks removed: `ContractClient.tsx:180` asserting "the real number has
+always been 9,400", and `board-card-utils.ts`'s `narrationPlan` fallback.
+
+### Stage 6 — Released and Archive
+
+Two screens, two RPCs, and one guard extracted.
+
+`assert_board_access(p_marker text default 'BOARD_ACCESS_NOT_ENABLED')` replaced four
+copies of the same admin check. The marker is a **parameter** because it is
+load-bearing: `BoardRepository.kt` matches `CARD_ACCESS_NOT_ENABLED` to tell an
+unreadable card from an unreadable board. `raise exception using message = p_marker`
+rather than the bare form, which reads its argument as a format string.
+
+**6B.3 stopped the stage, correctly.** The web answers "how many are released" two
+ways — `/api/board-v2/released-count` filters on status alone (a career total, by its
+own comment); `/api/released` also excludes archived. They agree today **only because
+no released book has ever been archived**. Resolution: Android derives both numbers
+from one query with the predicate applied at the point of use; the web keeps both
+routes and its count is now labelled *all-time* so the divergence reads as intentional.
+
+Two defects found on the device, not in review:
+- **`archived_notes`**: Android wrote the raw string, so an empty note stored `''`
+  while the web's `ArchiveConfirmDialog` wrote `null` for the same action. Now matched.
+- **Shelf staleness**: a card archived from the board was missing from the board AND
+  absent from the Archive until a manual pull — it existed in no visible place. A
+  landed board write now marks the shelf stale; the cost is paid on arrival.
+
+**DoD 8 could not be done as written** and was not quietly substituted: its method
+(un-archive the only archived row) is what the amended DoD 9 forbids. Covered by unit
+test instead. **DoD 9's cycle ran on a constructed card**; Leather & Lies was never
+written and still carries its original `updated_at`.
+
+Role verification used a **throwaway user**, created and deleted, rather than demoting
+Dean's account — the same rule as the constructed card, one layer up.
+
+### Stage 7 — settings honesty on the web
+
+W1's residual risk was **relocated, not removed**: the value agreed with the fallback
+by coincidence instead of with five hardcodes by coincidence. Four of the five defaults
+equalled the stored values, so a failed read was invisible precisely where it mattered.
+
+Each rate field is individually nullable. Four rules:
+
+  refuse   settle-payment throws before its only write (one mutation in the file, at
+           line 210; the refusal is at 190). buildInvoice throws in its own right.
+           UI money actions are disabled WITH THE REASON BESIDE THEM — a throw in a
+           component is a white screen, not a refusal, and a silently disabled Invoice
+           button reads as "already invoiced".
+  absent   agenda, board cards, CardEditModal, analytics, contract builder, capacity
+           calendar. Partial sums go null rather than omitting their input silently.
+  say so   Settings shows the stored value beside the reason it is not being used.
+  reject   the writer refuses a bad value with the issue's own description. The only
+           preventive rule of the four: it stops the value existing.
+
+`projectState` gained an `unknown` state so an unreadable rate cannot wear "in
+production" or "not tracked".
+
+**The hook was invisible to the enumeration.** Widening a type finds CONSUMERS of a
+value and never PRODUCERS of one, and `DEFAULT_STUDIO_SETTINGS` was assignable to the
+widened type. Changing the hook's own return type to `loading | loaded | failed`
+enumerated 26 further sites and removed the shape entirely.
+
+Verified by forcing all four layers against the live database — missing key, out of
+range, unparseable, whole read failing — and observing through the real loader with
+`npm run check-settings-honesty`. All seven keys read back at their originals.
+
+**The smallest divergence found:** one stage after the rate was unified across both
+clients, they still printed different sentences about the same rejected setting —
+Android `outside 1000–30000`, the web `outside 1,000–30,000`, from a stray
+`toLocaleString()`, in a sentence both had been told to share.
+
+### Two claims that are NOT verified
+
+1. **Stage 1 item 14, offline sign-out.** Deliberately untested, reason recorded, an
+   upgrade on the guard test's strength refused twice. Correct as it stands.
+2. **Every device confirmation to date has been on the Pixel 8 emulator, API 35.**
+   Physical-phone confirmation is Dean's and remains outstanding. Not a defect — but
+   emulator results must not read as device results.
+
+### Next — Stage 8, Payments and Expenses, unspecified
+
+One carried constraint: the card query **excludes archived and INCLUDES recast**, or
+His For Christmas disappears and takes a live **$367.02** invoice with it. That is the
+whole reason `recast` exists as a status distinct from the `recasted` archive reason —
+the contract ends, but the partial project fee still has to be billed.
