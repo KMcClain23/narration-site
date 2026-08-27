@@ -1,6 +1,6 @@
 "use client";
 import { formatTimeOfDay } from "@/lib/timezone";
-import { useStudioSettings } from "@/components/admin/useStudioSettings";
+import { studioRates, useStudioSettings } from "@/components/admin/useStudioSettings";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
@@ -140,7 +140,10 @@ function Row({ children }: { children: React.ReactNode }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ContractClient() {
-  const studio                        = useStudioSettings();
+  const studioState                        = useStudioSettings();
+  // Nullable rates: loading and failed both yield null, and every figure below
+  // is gated on that rather than computed from a default.
+  const studio                        = studioRates(studioState);
   const [form, setForm]               = useState<ContractData>(buildDefaults);
   const [previewData, setPreviewData] = useState<ContractData>(buildDefaults);
   const [generating, setGenerating]   = useState(false);
@@ -189,7 +192,13 @@ export default function ContractClient() {
   useEffect(() => {
     const wc = parseFloat(form.wordCount);
     if (!wc || isNaN(wc)) return;
-    set("finishedHours", (wc / studio.wordsPerFinishedHour).toFixed(1));
+    // Without the rate the field is left alone rather than filled from a guess.
+    // A contract builder that pre-fills finished hours from a default produces a
+    // document someone signs, and the number would be indistinguishable from one
+    // Dean had worked out.
+    const rate = studio.wordsPerFinishedHour;
+    if (rate == null) return;
+    set("finishedHours", (wc / rate).toFixed(1));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.wordCount, studio.wordsPerFinishedHour]);
 

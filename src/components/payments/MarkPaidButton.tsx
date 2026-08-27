@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useStudioSettings } from "@/components/admin/useStudioSettings";
+import { useEffect, useState } from "react";
+import { studioRates, studioUnavailableReason, useStudioSettings } from "@/components/admin/useStudioSettings";
 import { useRouter } from "next/navigation";
 import { adminType } from "@/lib/design-tokens";
 import {
@@ -29,7 +29,8 @@ export function MarkPaidButton({
   card: MoneyCard;
   rows: PaymentRow[];
 }) {
-  const studio = useStudioSettings();
+  const studioState = useStudioSettings();
+  const studio = studioRates(studioState);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -45,10 +46,32 @@ export function MarkPaidButton({
    * put it in the wrong place on a return.
    */
   const editing = rowEditingCost(payment);
-  const due = paymentNarratorShare(payment, card, rows, studio.wordsPerFinishedHour) ?? 0;
-  const outstanding = Math.max(0, due - (Number(payment.amount_received) || 0));
+  /*
+   * NOT refused, and not zero.
+   *
+   * Amount received is what actually landed in Dean's bank — a fact he knows and
+   * can type. Disabling this because a setting is unreadable would mean a real
+   * payment cannot be recorded, which is worse than the suggestion being missing.
+   * So the rate only seeds the box, and without it the box is simply empty.
+   *
+   * The `?? 0` this replaces predates Stage 7 and had the same shape as the bug
+   * this stage is about: "no amount could be determined" pre-filled 0.00, which
+   * is a number, in a field that gets saved.
+   */
+  const rate = studio.wordsPerFinishedHour;
+  const due = rate == null ? null : paymentNarratorShare(payment, card, rows, rate);
+  const outstanding =
+    due == null ? null : Math.max(0, due - (Number(payment.amount_received) || 0));
 
   const [amount, setAmount] = useState(outstanding ? outstanding.toFixed(2) : "");
+  const [amountTouched, setAmountTouched] = useState(false);
+
+  // The rate arrives after first paint, so the suggestion has to catch up — but
+  // only into a box nobody has typed in. A user's own figure is never replaced.
+  useEffect(() => {
+    if (amountTouched || outstanding == null) return;
+    setAmount(prev => (prev === "" ? outstanding.toFixed(2) : prev));
+  }, [outstanding, amountTouched]);
   const [method, setMethod] = useState("");
   const [receivedOn, setReceivedOn] = useState(new Date().toISOString().split("T")[0]);
 
@@ -107,7 +130,10 @@ export function MarkPaidButton({
         <span className={`${adminType.label} block mb-1`}>You keep</span>
         <input
           value={amount}
-          onChange={e => setAmount(e.target.value)}
+          onChange={e => {
+            setAmountTouched(true);
+            setAmount(e.target.value);
+          }}
           inputMode="decimal"
           className="w-24 rounded-md border border-surface-border bg-surface px-2 py-1.5 text-sm text-text-primary focus:border-accent-amber focus:outline-none"
         />
@@ -155,10 +181,18 @@ export function MarkPaidButton({
         Cancel
       </button>
 
-      {editing > 0.005 && (
+      {editing > 0.005 && due != null && (
         <p className={`${adminType.small} w-full`}>
           The client sends {formatMoney(due + editing)}; {formatMoney(editing)} of it is the
           editor&rsquo;s, so only your {formatMoney(due)} counts as earnings.
+        </p>
+      )}
+      {/* The split explanation needs the rate; the box above does not. Saying why
+          the suggestion is missing keeps an empty field from reading as "nothing
+          is owed", which is the one wrong conclusion available here. */}
+      {due == null && (
+        <p className={`${adminType.small} w-full`}>
+          {studioUnavailableReason(studioState)} Enter what actually arrived.
         </p>
       )}
       {error && <p className="w-full text-[13px] text-alert-red">{error}</p>}

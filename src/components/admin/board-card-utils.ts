@@ -160,7 +160,13 @@ export type NarrationInput = {
    * One answers what the job pays, the other how long it takes. Both now come from
    * Settings rather than from constants in this file.
    */
-  wordsPerHour: number;
+  /**
+   * Null when the rate could not be read at all — a failed settings fetch, a
+   * missing key, a stored value outside the bounds. A rate that could not be
+   * read is not a rate, so the plan is not computable and this returns null
+   * exactly as it does for a missing word count.
+   */
+  wordsPerHour: number | null;
   /** Words of this narrator's share already recorded. */
   wordsRecorded?: number;
   schedule?: RecordingSchedule;
@@ -194,7 +200,7 @@ export function narrationPlan(input: NarrationInput): NarrationPlan | null {
   // should be a build error rather than a number quietly wrong by a factor of two;
   // this line said otherwise and won, silently answering at 9,200 whenever a caller
   // passed nothing usable. A rate that is not known means the plan is not known.
-  if (wordsPerHour <= 0) return null;
+  if (wordsPerHour == null || wordsPerHour <= 0) return null;
   const rate = wordsPerHour;
   const shareWords = wordCount * share;
   // Clamped at both ends: a recorded figure larger than the share would
@@ -253,10 +259,14 @@ export function estimatedEarnings(
    * reliably catches a forgotten rate, and this file's own history — a stale 9,300
    * billing at a different rate than the rest of the app — is what that costs.
    */
-  wordsPerFinishedHour: number,
+  /** Null when it could not be read. No earnings figure, rather than a guessed one. */
+  wordsPerFinishedHour: number | null,
 ): number | null {
   if (paymentType !== "pfh" && paymentType !== "rs_plus") return null;
   if (!wordCount || !pfhRate) return null;
+  // Same rule as narrationPlan: no rate, no figure. Reached when the settings
+  // read failed, the key is missing, or the stored value is outside the bounds.
+  if (wordsPerFinishedHour == null || wordsPerFinishedHour <= 0) return null;
   // Multicast has no knowable DEFAULT split, which is why it bails — but an
   // explicit per-card share is precisely the answer to that question, so it
   // is honored when set. Previously this returned null before ever reading

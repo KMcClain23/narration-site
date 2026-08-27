@@ -101,7 +101,7 @@ export async function GET() {
       narratorSharePercent: c.narrator_share_percent,
       deadline: c.deadline,
       schedule: { dates },
-      wordsPerHour: studio.wordsPerNarrationHour,
+      wordsPerHour: studio.settings.wordsPerNarrationHour,
       wordsRecorded: Number(c.words_recorded) || 0,
     });
     const perDay = plan?.hoursPerDay ?? null;
@@ -128,5 +128,25 @@ export async function GET() {
     .map(c => ({ id: c.id, title: c.title, deadline: c.deadline as string }))
     .sort((a, b) => a.deadline.localeCompare(b.deadline));
 
-  return NextResponse.json({ date: today, items, dueSoon, weekHours, monthHours });
+  // The payload carries the availability and the client renders the gap.
+  //
+  // Failing the whole request would take down a sidebar that is mostly
+  // rate-independent: the deadlines, the due-soon list and which books are on
+  // today are all facts about the schedule and owe nothing to a rate. Only the
+  // hour figures do, and `narrationPlan` already answers null for them, so they
+  // travel as null rather than as a number computed from a guess.
+  const ratesUnavailable = studio.settings.wordsPerNarrationHour == null;
+
+  return NextResponse.json({
+    date: today,
+    items,
+    dueSoon,
+    // Null rather than a blocks-only sum. Without a rate no book contributes,
+    // so these would still add up — to a smaller number, with nothing to say it
+    // was partial. A total that quietly omits most of its input is the harder
+    // version of the bug this stage is about, because it looks answered.
+    weekHours: ratesUnavailable ? null : weekHours,
+    monthHours: ratesUnavailable ? null : monthHours,
+    ratesUnavailable,
+  });
 }

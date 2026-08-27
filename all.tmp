@@ -1,0 +1,30 @@
+src/app/api/agenda/route.ts|104|Property 'wordsPerNarrationHour' does not exist on type 'StudioSettingsRead'.
+src/app/api/studio-settings/route.ts|48|This comparison appears to be unintentional because the types '{ value: number | null; issue?: SettingIssue | undefined; }' and 'number' have no overlap.
+src/app/settings/page.tsx|27|Type 'StudioSettingsRead' is missing the following properties from type 'StudioSettings': wordsPerNarrationHour, wordsPerFinishedHour, dailyCapacityHours, maxBooksPerDay, heavyDayHours
+src/app/tools/analytics/page.tsx|75|Property 'wordsPerFinishedHour' does not exist on type 'StudioSettingsRead'.
+src/app/tools/analytics/page.tsx|77|Property 'wordsPerFinishedHour' does not exist on type 'StudioSettingsRead'.
+src/app/tools/contract-builder/ContractClient.tsx|192|'studio.wordsPerFinishedHour' is possibly 'null'.
+src/components/admin/BoardCardContent.tsx|120|Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/admin/BoardCardContent.tsx|140|Type 'number | null' is not assignable to type 'number'.
+src/components/admin/BoardCardContent.tsx|161|'studio.heavyDayHours' is possibly 'null'.
+src/components/board/CardEditModal.tsx|890|'studio.wordsPerFinishedHour' is possibly 'null'.
+src/components/board/CardEditModal.tsx|902|Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/board/CardEditModal.tsx|922|Type 'number | null' is not assignable to type 'number'.
+src/components/board/CardEditModal.tsx|1143|'studio.wordsPerNarrationHour' is possibly 'null'.
+src/components/board/CardEditModal.tsx|1236|'studio.wordsPerNarrationHour' is possibly 'null'.
+src/components/payments/InvoiceButton.tsx|322|Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/payments/InvoiceButton.tsx|411|Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/payments/InvoiceButton.tsx|418|Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/payments/MarkPaidButton.tsx|48|Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/payments/PaymentFormModal.tsx|524|Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/payments/PaymentsClient.tsx|344|Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/payments/PaymentsClient.tsx|345|Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/payments/PaymentsClient.tsx|351|Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/payments/PaymentsClient.tsx|356|Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/payments/PaymentsClient.tsx|419|Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/schedule/CapacityCalendar.tsx|145|Type 'number | null' is not assignable to type 'number | undefined'.
+src/components/schedule/CapacityCalendar.tsx|145|Type 'number | null' is not assignable to type 'number'.
+src/components/schedule/CapacityCalendar.tsx|159|Type 'number | null' is not assignable to type 'number'.
+src/components/schedule/CapacityCalendar.tsx|293|Type 'number | null' is not assignable to type 'string | number | readonly string[] | undefined'.
+src/components/schedule/CapacityCalendar.tsx|368|'studio.maxBooksPerDay' is possibly 'null'.
+src/lib/settle-payment.ts|181|Property 'wordsPerFinishedHour' does not exist on type 'StudioSettingsRead'.

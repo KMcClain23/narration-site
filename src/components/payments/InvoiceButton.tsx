@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useStudioSettings } from "@/components/admin/useStudioSettings";
+import { studioRates, studioUnavailableReason, useStudioSettings } from "@/components/admin/useStudioSettings";
 import { FileText } from "lucide-react";
 import {
   agreedFee,
@@ -49,7 +49,8 @@ export function buildInvoice(
   author: AuthorRow | null,
   invoiceNumber: string,
   /** From Settings. Required here for the same reason it is everywhere else. */
-  wordsPerFinishedHour: number,
+  /** Null when it could not be read; this function throws rather than guessing. */
+  wordsPerFinishedHour: number | null,
   /**
    * Real finished hours, once they are known.
    *
@@ -63,9 +64,24 @@ export function buildInvoice(
    */
   hoursOverride?: number,
 ): InvoiceData & { wholeProject: { lines: InvoiceData["lines"]; notes: string } | null } {
+  // Refuses in its own right rather than trusting its caller to have checked.
+  // This function produces the document a client is billed from, and the fee,
+  // the agreed total and the whole-project figure all divide by this rate;
+  // there is no partial invoice worth emitting. The Invoice button is already
+  // disabled when the rate is missing, so reaching this line is a bug — and a
+  // thrown error is how a bug should arrive, rather than as a plausible number
+  // on a document someone pays.
+  if (wordsPerFinishedHour == null) {
+    throw new Error(
+      "The words-per-finished-hour setting could not be read, so this invoice cannot be built.",
+    );
+  }
+
   const share = narratorShare(card);
   const measured = hoursOverride != null && hoursOverride > 0;
-  const hrs = measured ? hoursOverride : finishedHours(card.word_count, wordsPerFinishedHour);
+  const hrs = measured
+    ? hoursOverride
+    : (finishedHours(card.word_count, wordsPerFinishedHour) ?? 0);
   const recast = card.status === "recast";
 
   // A measured runtime only rebuilds the fee where there is a rate to rebuild
@@ -267,7 +283,18 @@ export function InvoiceButton({
   /** "Invoice copy" on settled work, where the document already exists. */
   label?: string;
 }) {
-  const studio = useStudioSettings();
+  const studioState = useStudioSettings();
+  /*
+   * REFUSE, in the only form a component has.
+   *
+   * `settle-payment.ts` throws, because it is a server path with a caller to
+   * catch it. Throwing here would be a white screen, not a refusal — so the
+   * action is withheld and says why. An invoice is a document a client is
+   * billed from; producing one at a rate nobody could read is the single worst
+   * outcome available on this page.
+   */
+  const finishedRate = studioRates(studioState).wordsPerFinishedHour;
+  const blockedReason = finishedRate == null ? studioUnavailableReason(studioState) : null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<ReturnType<typeof buildInvoice> | null>(null);
@@ -319,7 +346,13 @@ export function InvoiceButton({
       setCoNarratorEmails(coNarratorEmails);
       setAuthor(resolved);
 
-      const generated = buildInvoice(payment, card, rows, resolved, invoiceNumber, studio.wordsPerFinishedHour);
+      // Re-checked here as well as on the button: `handleOpen` is async and the
+      // state could in principle change between the click and this line.
+      if (finishedRate == null) {
+        setError("The finished-hour rate could not be read, so no invoice can be built.");
+        return;
+      }
+      const generated = buildInvoice(payment, card, rows, resolved, invoiceNumber, finishedRate);
 
       // A saved draft wins over the freshly generated one, because it holds
       // decisions: a corrected runtime, a reworded note, an adjusted figure.
@@ -388,7 +421,8 @@ export function InvoiceButton({
         <button
           type="button"
           onClick={handleOpen}
-          disabled={busy}
+          disabled={busy || blockedReason != null}
+          title={blockedReason ?? undefined}
           className={
             className ??
             "flex items-center gap-1 text-[13px] text-text-muted hover:text-text-primary disabled:opacity-50"
@@ -396,6 +430,14 @@ export function InvoiceButton({
         >
           <FileText size={14} /> {busy ? "Opening…" : label}
         </button>
+        {/* Said out loud beside the button, not left to a disabled state.
+            A greyed-out Invoice control reads as "already invoiced" or "not
+            ready yet" — both ordinary, both wrong. Two states rendering
+            identically is this project's standing bug, and a tooltip nobody
+            hovers is not a distinction. */}
+        {blockedReason && (
+          <span className="text-[13px] text-alert-red">{blockedReason} No invoice can be built.</span>
+        )}
         {error && <span className="text-[13px] text-alert-red">{error}</span>}
       </span>
 
@@ -408,14 +450,14 @@ export function InvoiceButton({
           wholeProject={draft.wholeProject ?? undefined}
           coNarratorEmails={coNarratorEmails}
           isPartial={card.status === "recast"}
-          initialHours={finishedHours(card.word_count, studio.wordsPerFinishedHour)}
+          initialHours={finishedHours(card.word_count, finishedRate) ?? undefined}
           savedHours={savedDraft?.hours}
           savedBillingWhole={savedDraft?.billingWhole}
           canRecompute={Boolean(card.pfh_rate)}
           // Rebuilds both shapes from a corrected runtime. The editor holds the
           // hours; everything needed to turn them back into lines lives here.
           recompute={hours => {
-            const next = buildInvoice(payment, card, rows, author, draft?.invoiceNumber ?? "", studio.wordsPerFinishedHour, hours);
+            const next = buildInvoice(payment, card, rows, author, draft?.invoiceNumber ?? "", finishedRate, hours);
             return { share: { lines: next.lines, notes: next.notes }, wholeProject: next.wholeProject };
           }}
         />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useStudioSettings } from "@/components/admin/useStudioSettings";
+import { studioRates, useStudioSettings } from "@/components/admin/useStudioSettings";
 import { Plus, Trash2, Upload, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { parseCoNarrators } from "@/components/admin/board-card-utils";
@@ -172,7 +172,8 @@ function PayoutsEditor({
   onChange,
 }: {
   payouts: DraftPayout[];
-  finishedHrs: number;
+  /** Null when the rate could not be read — distinct from 0, which means no word count. */
+  finishedHrs: number | null;
   /** False on solo work, where paying a co-narrator is not a thing. */
   allowCoNarrator: boolean;
   onChange: (next: DraftPayout[]) => void;
@@ -196,7 +197,10 @@ function PayoutsEditor({
         // A per-finished-hour rate fills the amount in, but the amount stays
         // editable and authoritative: once money has actually moved it must
         // not shift because a word count was corrected later.
-        const suggested = p.rate_pfh && finishedHrs > 0 ? Number(p.rate_pfh) * finishedHrs : null;
+        const suggested =
+          p.rate_pfh && finishedHrs != null && finishedHrs > 0
+            ? Number(p.rate_pfh) * finishedHrs
+            : null;
         return (
           <div key={p.id ?? `new-${i}`} className="rounded-lg border border-surface-border bg-background p-3 space-y-2">
             <div className="flex items-center gap-2">
@@ -251,13 +255,15 @@ function PayoutsEditor({
                 onClick={() => update(i, { amount: suggested.toFixed(2) })}
                 className="text-[13px] text-accent-amber-bright hover:underline"
               >
-                Use {formatMoney(suggested)} — {finishedHrs.toFixed(1)} finished hrs × ${p.rate_pfh}/hr
+                Use {formatMoney(suggested)} — {finishedHrs?.toFixed(1) ?? "—"} finished hrs × ${p.rate_pfh}/hr
               </button>
             )}
 
             {/* A rate with no hours to multiply can't produce a figure. Saying
                 so beats silently offering nothing, which looks like the
                 calculator is broken. */}
+            {/* Two different reasons the suggestion is missing, and they ask the
+                user to do different things: add a word count, or fix a setting. */}
             {p.rate_pfh && finishedHrs === 0 && (
               <p className={adminType.small}>
                 Can&apos;t calculate from a rate — this project has no word count, so there are no finished
@@ -490,7 +496,8 @@ export function PaymentFormModal({
   onSaved: (p: PaymentRow) => void;
   onDeleted: (id: string) => void;
 }) {
-  const studio = useStudioSettings();
+  const studioState = useStudioSettings();
+  const studio = studioRates(studioState);
   useModalOpen(true);
   const [form, setForm] = useState<FormState>(() => toForm(payment));
   const [payouts, setPayouts] = useState<DraftPayout[]>(() => toDrafts(payment, card));
@@ -521,6 +528,18 @@ export function PaymentFormModal({
     setForm(f => (f.invoice_number.trim() ? f : { ...f, invoice_number }));
   }
 
+  /*
+   * Absent, not refused — reclassified from the checkpoint list by the rule for
+   * borderline sites: a number that GOES OUT is refused, a number that PRE-FILLS
+   * A BOX THE USER WILL OVERWRITE is absent. Every use here is the second kind.
+   * The "Use $X" button is a suggestion, the gross is a placeholder, and the
+   * waterfall is an explanation of a figure Dean types. The document that goes
+   * out is built by InvoiceButton, which refuses.
+   *
+   * Null and 0 are kept apart: 0 finished hours means the project has no word
+   * count, which this form already explains and tells the user how to fix. Null
+   * means the rate could not be read, which is not the user's to fix here.
+   */
   const finishedHrs = finishedHours(card?.word_count ?? null, studio.wordsPerFinishedHour);
 
   const sharePercent =
@@ -594,7 +613,8 @@ export function PaymentFormModal({
   const isSplit = format === "duet" || format === "dual" || format === "multicast";
   const formatLabel = format ? format.charAt(0).toUpperCase() + format.slice(1) : "Split";
 
-  const projectGross = finishedHrs > 0 && card?.pfh_rate ? finishedHrs * card.pfh_rate : 0;
+  const projectGross =
+    finishedHrs != null && finishedHrs > 0 && card?.pfh_rate ? finishedHrs * card.pfh_rate : 0;
   const grossPlaceholder = projectGross > 0 ? `e.g. ${projectGross.toFixed(0)}` : "e.g. 3000";
 
   const waterfall = useMemo(() => {
@@ -935,9 +955,11 @@ export function PaymentFormModal({
               // this project has neither a typed gross nor a word count and
               // rate to derive one from.
               <p className={`${adminType.small} rounded-lg border border-surface-border px-3 py-2.5`}>
-                {finishedHrs > 0
-                  ? "Enter the gross fee above to see where the money goes."
-                  : "No breakdown yet — enter the gross fee above, or set this project's word count and PFH rate to have it calculated."}
+                {finishedHrs == null
+                  ? "No breakdown yet — the words-per-finished-hour setting could not be read, so nothing can be derived. Enter the gross fee above."
+                  : finishedHrs > 0
+                    ? "Enter the gross fee above to see where the money goes."
+                    : "No breakdown yet — enter the gross fee above, or set this project's word count and PFH rate to have it calculated."}
               </p>
             )}
           </div>

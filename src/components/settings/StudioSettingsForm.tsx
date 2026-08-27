@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { adminType } from "@/lib/design-tokens";
 import {
   DEFAULT_STUDIO_SETTINGS,
+  describeIssue,
   SETTING_LIMITS,
   type StudioSettings,
+  type StudioSettingsRead,
 } from "@/lib/studio-settings";
 
 /**
@@ -60,16 +62,28 @@ const FIELDS: Field[] = [
   },
 ];
 
-export function StudioSettingsForm({ initial }: { initial: StudioSettings }) {
+export function StudioSettingsForm({ initial }: { initial: StudioSettingsRead }) {
   const router = useRouter();
+  // An unusable value shows as an EMPTY box carrying the stored text beneath it,
+  // not as a number. Filling the box with the old hardcoded constant made the
+  // page assert that the app was using a figure it had in fact rejected — a
+  // Settings screen displaying a number nothing reads, which is the exact
+  // complaint that started this whole line of work.
   const [values, setValues] = useState<Record<string, string>>(
-    Object.fromEntries(Object.entries(initial).map(([k, v]) => [k, String(v)])),
+    Object.fromEntries(
+      Object.entries(initial.settings).map(([k, v]) => [k, v == null ? "" : String(v)]),
+    ),
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const dirty = FIELDS.some(f => Number(values[f.key]) !== initial[f.key]);
+  const dirty = FIELDS.some(f => {
+    const raw = values[f.key].trim();
+    const was = initial.settings[f.key];
+    if (raw === "") return was != null;
+    return Number(raw) !== was;
+  });
 
   async function save() {
     setBusy(true);
@@ -102,6 +116,7 @@ export function StudioSettingsForm({ initial }: { initial: StudioSettings }) {
         {FIELDS.map(f => {
           const limits = SETTING_LIMITS[f.key];
           const changed = Number(values[f.key]) !== DEFAULT_STUDIO_SETTINGS[f.key];
+          const issue = initial.issues[f.key];
           return (
             <div key={f.key} className="border-b border-divider px-4 py-3 last:border-0">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -119,6 +134,13 @@ export function StudioSettingsForm({ initial }: { initial: StudioSettings }) {
                   <span className={`${adminType.small} w-12`}>{f.unit}</span>
                 </span>
               </div>
+              {/* The stored value and the reason it is not being used, in the
+                  same words Android's Settings screen uses — two clients
+                  describing one stored value differently is a smaller version
+                  of the problem this stage exists to fix. */}
+              {issue && (
+                <p className="mt-1 text-[13px] text-alert-red">{describeIssue(issue)}</p>
+              )}
               <p className={`${adminType.small} mt-1 max-w-[520px]`}>{f.effect}</p>
 
               {/* Narrators think in a ratio, not in words per hour. Showing the

@@ -24,6 +24,9 @@ export function SidebarAgenda({ agenda }: { agenda: Agenda | null }) {
   if (!agenda) return null;
 
   const total = agenda.items.reduce((s, i) => s + (i.hours ?? 0), 0);
+  // An em dash, not "0.0 hrs". A day whose hours cannot be worked out is not a
+  // day with no work in it.
+  const hoursLabel = (h: number | null) => (h == null ? "—" : `${h.toFixed(1)} hrs`);
   const shown = agenda.items.slice(0, MAX_ITEMS);
   const hidden = agenda.items.length - shown.length;
 
@@ -73,16 +76,21 @@ export function SidebarAgenda({ agenda }: { agenda: Agenda | null }) {
       <div className="mt-1.5 space-y-0.5 border-t border-divider pt-1.5">
         <div className="flex items-baseline justify-between">
           <span className="text-[11px] text-text-muted">Rest of week</span>
-          <span className="text-[12px] tabular-nums text-text-body">
-            {agenda.weekHours.toFixed(1)} hrs
-          </span>
+          <span className="text-[12px] tabular-nums text-text-body">{hoursLabel(agenda.weekHours)}</span>
         </div>
         <div className="flex items-baseline justify-between">
           <span className="text-[11px] text-text-muted">Rest of month</span>
-          <span className="text-[12px] tabular-nums text-text-body">
-            {agenda.monthHours.toFixed(1)} hrs
-          </span>
+          <span className="text-[12px] tabular-nums text-text-body">{hoursLabel(agenda.monthHours)}</span>
         </div>
+        {/* The rest of the sidebar is unaffected: what is on today, the
+            deadlines and the due-soon list are facts about the schedule and
+            owe nothing to a rate. Only the hour figures are gone, and they say
+            so rather than reading as a quiet zero. */}
+        {agenda.ratesUnavailable && (
+          <p className="pt-1 text-[11px] text-text-dim">
+            Hours need the words-per-hour setting, which could not be read.
+          </p>
+        )}
       </div>
 
       {agenda.dueSoon.length > 0 && (

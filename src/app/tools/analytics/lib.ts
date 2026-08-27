@@ -39,13 +39,21 @@ function shareFor(card: AnalyticsCard): number {
  * pure — it is imported by the server page and by client chart components alike, and
  * a fetch here would break both. The server page reads it once and passes it in.
  */
-export function computeCareerTotals(cards: AnalyticsCard[], wordsPerFinishedHour: number) {
+export function computeCareerTotals(
+  cards: AnalyticsCard[],
+  wordsPerFinishedHour: number | null,
+) {
   const released = cards.filter(c => c.status === "released");
   const booksReleased = released.length;
-  const hoursNarrated = released.reduce((sum, c) => {
-    if (!c.word_count) return sum;
-    return sum + (c.word_count / wordsPerFinishedHour) * shareFor(c);
-  }, 0);
+  // Books released is a count of rows and needs no rate; hours narrated divides
+  // by one. Gate the figure, not the panel — the count still renders.
+  const hoursNarrated =
+    wordsPerFinishedHour == null
+      ? null
+      : released.reduce((sum, c) => {
+          if (!c.word_count) return sum;
+          return sum + (c.word_count / wordsPerFinishedHour) * shareFor(c);
+        }, 0);
   return { booksReleased, hoursNarrated };
 }
 
@@ -108,8 +116,22 @@ function cardEarnings(c: AnalyticsCard, wordsPerFinishedHour: number): number {
   ) ?? 0;
 }
 
-export function computeEarnings(cards: AnalyticsCard[], quarters: Quarter[], wordsPerFinishedHour: number) {
+export function computeEarnings(
+  cards: AnalyticsCard[],
+  quarters: Quarter[],
+  wordsPerFinishedHour: number | null,
+) {
   const eligible = cards.filter(isEarningsEligible);
+  // Every earnings figure on this page divides by the finished-hour rate, so
+  // without it there is nothing here to salvage — but the release-pace chart,
+  // the genre breakdown and the collaborator list are computed elsewhere and
+  // are unaffected. The page keeps working; this panel goes absent.
+  if (wordsPerFinishedHour == null) {
+    // An EMPTY series, not a series of zeroes. A bar chart of five zero-height
+    // quarters is a claim that Dean earned nothing in any of them, which is the
+    // most confident wrong answer this page could give.
+    return { avgPerBook: null, thisQuarterTotal: null, quarterly: [], unavailable: true };
+  }
   const totalEarnings = eligible.reduce((sum, c) => sum + cardEarnings(c, wordsPerFinishedHour), 0);
   const avgPerBook = eligible.length > 0 ? totalEarnings / eligible.length : null;
 
@@ -126,7 +148,7 @@ export function computeEarnings(cards: AnalyticsCard[], quarters: Quarter[], wor
 
   const thisQuarterTotal = quarterly[quarterly.length - 1]?.value ?? 0;
 
-  return { avgPerBook, thisQuarterTotal, quarterly };
+  return { avgPerBook, thisQuarterTotal, quarterly, unavailable: false };
 }
 
 export function computeGenreBreakdown(cards: AnalyticsCard[]): ChartDatum[] {

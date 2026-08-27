@@ -18,7 +18,7 @@ import {
   parseCoNarrators,
 } from "@/components/admin/board-card-utils";
 import { RecordingCalendar } from "@/components/admin/RecordingCalendar";
-import { useStudioSettings } from "@/components/admin/useStudioSettings";
+import { studioRates, useStudioSettings } from "@/components/admin/useStudioSettings";
 import { CardPaymentsPanel } from "@/components/payments/CardPaymentsPanel";
 import type { NarrationFormat, ArchivedReason } from "@/types/book";
 
@@ -302,7 +302,10 @@ export function CardEditModal(props: CardEditModalProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<FullBoardCard | null>(mode === "create" ? blankCard() : null);
   const [savedForm, setSavedForm] = useState<FullBoardCard | null>(mode === "create" ? blankCard() : null);
-  const studio = useStudioSettings();
+  const studioState = useStudioSettings();
+  // Nullable rates: loading and failed both yield null, and every figure below
+  // is gated on that rather than computed from a default.
+  const studio = studioRates(studioState);
   // Words or percent: the same stored number, entered whichever way the
   // answer is actually known. "About two thirds" is a real answer; the word
   // it lands on is not something anyone tracks.
@@ -887,7 +890,9 @@ export function CardEditModal(props: CardEditModalProps) {
   const renderProductionTab = () => {
     if (!form) return null;
     const hasRate = form.payment_type === "pfh" || form.payment_type === "rs_plus";
-    const hours = form.word_count > 0 ? form.word_count / studio.wordsPerFinishedHour : 0;
+    const finishedRate = studio.wordsPerFinishedHour;
+    const hours =
+      form.word_count > 0 && finishedRate != null ? form.word_count / finishedRate : null;
     // Uses the shared helper rather than hours × rate so this agrees with the
     // board card face and the Payments page. Computing it locally here meant
     // a duet showed the full project value under a heading that reads as the
@@ -1108,7 +1113,18 @@ export function CardEditModal(props: CardEditModalProps) {
             <p className={`${adminType.label} mb-1 flex items-center text-accent-amber-bright/70`}>
               Estimated earnings
               <InfoTooltip variant="inline">
-                <p>Calculated from word count × PFH rate at ~9,400 words per finished hour. Estimate only.</p>
+                {/* Was "~9,400 words per finished hour" as a flat assertion. That
+                    number is stored in site_settings and changing it moves this
+                    figure, so a hardcoded one here is a claim that goes stale
+                    silently — the same false landmark W1 removed from the
+                    contract builder. */}
+                <p>
+                  Calculated from word count × PFH rate at{" "}
+                  {finishedRate == null
+                    ? "the words-per-finished-hour rate, which could not be read"
+                    : `~${finishedRate.toLocaleString()} words per finished hour`}
+                  . Estimate only.
+                </p>
               </InfoTooltip>
             </p>
             {form.word_count > 0 && form.pfh_rate > 0 ? (
@@ -1116,7 +1132,7 @@ export function CardEditModal(props: CardEditModalProps) {
                 <p className="text-lg font-bold text-accent-amber-bright">
                   ${earnings.toLocaleString("en-US", { maximumFractionDigits: 0 })}
                   <span className="ml-2 text-xs font-normal text-text-muted">
-                    ~{hours.toFixed(1)} hrs × ${form.pfh_rate}/hr{form.payment_type === "rs_plus" ? " + royalties" : ""}
+                    ~{hours?.toFixed(1) ?? "—"} hrs × ${form.pfh_rate}/hr{form.payment_type === "rs_plus" ? " + royalties" : ""}
                     {shareLabel}
                   </span>
                 </p>
@@ -1140,8 +1156,11 @@ export function CardEditModal(props: CardEditModalProps) {
             Time to narrate
             <InfoTooltip variant="inline">
               <p>
-                Your share of the manuscript at ~{studio.wordsPerNarrationHour.toLocaleString()} words
-                per hour at the mic, spread over the recording days left before the deadline.
+                Your share of the manuscript at{" "}
+                {studio.wordsPerNarrationHour == null
+                  ? "the words-per-hour rate, which could not be read,"
+                  : `~${studio.wordsPerNarrationHour.toLocaleString()} words per hour`}{" "}
+                at the mic, spread over the recording days left before the deadline.
                 Recording time only: prep, pickups and proofing are on top.
               </p>
             </InfoTooltip>
@@ -1233,7 +1252,7 @@ export function CardEditModal(props: CardEditModalProps) {
                 {plan.hours.toFixed(1)} hrs{plan.fractionDone > 0.005 ? " left" : ""}
                 <span className="ml-2 text-xs font-normal text-text-muted">
                   {Math.round(form.word_count * (appliedShare / 100)).toLocaleString()} words ÷{" "}
-                  {studio.wordsPerNarrationHour.toLocaleString()}/hr
+                  {studio.wordsPerNarrationHour?.toLocaleString() ?? "—"}/hr
                   {appliedShare !== 100 ? ` (${appliedShare}% share)` : ""}
                 </span>
               </p>

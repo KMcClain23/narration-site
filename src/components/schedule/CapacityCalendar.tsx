@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
-import { useStudioSettings } from "@/components/admin/useStudioSettings";
+import { studioRates, useStudioSettings } from "@/components/admin/useStudioSettings";
 import { parseLocalDate, toISODate } from "@/components/admin/board-card-utils";
 import {
   buildCalendar,
@@ -99,10 +99,17 @@ export function CapacityCalendar({
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   }, []);
 
-  const studio = useStudioSettings();
+  const studioState = useStudioSettings();
+  // Nullable rates: loading and failed both yield null, and every figure below
+  // is gated on that rather than computed from a default.
+  const studio = studioRates(studioState);
   // Seeded from Settings, still adjustable here for a what-if without going
   // and changing what a full day means everywhere.
   const [capacity, setCapacity] = useState<number | null>(null);
+  // Per-day, not per-screen: a what-if capacity typed into the box here needs no
+  // studio setting at all, so this is only absent when BOTH are. Blanking every
+  // day because the stored default is unreadable would throw away a figure the
+  // user had just supplied.
   const dayHours = capacity ?? studio.dailyCapacityHours;
   const [asking, setAsking] = useState<number | null>(null);
   const [cursor, setCursor] = useState(() => ({ y: today.getFullYear(), m: today.getMonth() }));
@@ -280,8 +287,16 @@ export function CapacityCalendar({
     <div className="rounded-xl border border-surface-border">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-border px-4 py-3">
         <span className={adminType.monoNum}>
-          <span className="text-accent-amber-bright">{free.toFixed(0)} hrs</span> free over the next{" "}
-          {HORIZON_DAYS} days
+          {free == null ? (
+            <span className="text-text-muted">
+              Free hours need the studio settings, which could not be read
+            </span>
+          ) : (
+            <>
+              <span className="text-accent-amber-bright">{free.toFixed(0)} hrs</span> free over the
+              next {HORIZON_DAYS} days
+            </>
+          )}
         </span>
         <label className="flex items-center gap-2">
           <span className={adminType.small}>A full day is</span>
@@ -290,9 +305,14 @@ export function CapacityCalendar({
             min={1}
             max={12}
             step={0.5}
-            value={dayHours}
+            // Empty string is the null form for a text input. Disabled with the
+            // reason rather than pre-filled from the constant, which would invite
+            // a save of a number nobody chose.
+            value={dayHours ?? ""}
+            disabled={dayHours == null}
+            title={dayHours == null ? "The daily capacity setting could not be read." : undefined}
             onChange={e => setCapacity(Math.max(1, Number(e.target.value) || 1))}
-            className="w-16 rounded-md border border-surface-border bg-background px-2 py-1 text-[13px] text-text-primary focus:border-accent-amber focus:outline-none"
+            className="w-16 rounded-md border border-surface-border bg-background px-2 py-1 text-[13px] text-text-primary focus:border-accent-amber focus:outline-none disabled:opacity-40"
           />
           <span className={adminType.small}>hrs</span>
         </label>
@@ -364,8 +384,11 @@ export function CapacityCalendar({
             const books = day?.commitments.length ?? 0;
             // Two things can be wrong with a day, and they are different
             // problems: out of hours, or too many books in it.
-            const full = day ? day.free <= 0.005 : false;
-            const crowded = books > studio.maxBooksPerDay;
+            // Both are claims about a day being unavailable. Without the figure
+            // behind them the day is drawn plain: the dates and the books on them
+            // are facts about the schedule and survive, the judgements do not.
+            const full = day && day.free != null ? day.free <= 0.005 : false;
+            const crowded = studio.maxBooksPerDay != null && books > studio.maxBooksPerDay;
 
             return (
               <div
@@ -538,8 +561,8 @@ export function CapacityCalendar({
         <p className={`${adminType.small} mt-3`}>
           Click any day to block time on it. Numbers are hours already committed that day. An asterisk means the book has no chosen
           recording days yet, so its hours are spread across weekdays to its deadline. A new book
-          is placed on empty days first and never on a day already holding {studio.maxBooksPerDay};
-          days in red hold more than that already.
+          is placed on empty days first and never on a day already holding{" "}
+          {studio.maxBooksPerDay ?? "the maximum"}; days in red hold more than that already.
         </p>
       </div>
     </div>

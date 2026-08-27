@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useStudioSettings } from "@/components/admin/useStudioSettings";
+import { studioRates, useStudioSettings } from "@/components/admin/useStudioSettings";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
@@ -41,6 +41,9 @@ const OPEN_BY_DEFAULT: Record<ProjectState, boolean> = {
   production: false,
   paid: false,
   untracked: false,
+  // Open: it is not a resting state, it is a fault, and a fault that is
+  // collapsed by default is one nobody sees.
+  unknown: true,
 };
 
 /**
@@ -74,6 +77,12 @@ const GROUP_ACCENT: Record<ProjectState, { edge: string; pill: string }> = {
     edge: "border-l-surface-border",
     pill: "bg-pill-neutral-bg text-pill-neutral-text",
   },
+  // Red, and alone in being red. Every other group is a stage of work; this one
+  // says the page could not do its arithmetic.
+  unknown: {
+    edge: "border-l-alert-red",
+    pill: "bg-alert-red/15 text-alert-red",
+  },
 };
 
 const GROUP_HINT: Record<ProjectState, string> = {
@@ -83,6 +92,8 @@ const GROUP_HINT: Record<ProjectState, string> = {
   paid: "Settled.",
   untracked:
     "Already on sale with nothing recorded yet. Still tracked and still countable — add a payment on any row to backfill what you were paid.",
+  unknown:
+    "The words-per-finished-hour setting could not be read, so nothing on these projects can be costed. Nothing is wrong with the projects themselves — check Settings, then reload.",
 };
 
 type Project = {
@@ -317,7 +328,12 @@ function Group({
 }
 
 export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; payments: PaymentRow[] }) {
-  const studio = useStudioSettings();
+  const studioState = useStudioSettings();
+  const studio = studioRates(studioState);
+  // One rate, read once. Every money figure below is gated on it: the totals and
+  // the per-card expected amounts go absent, and the Invoice action is withheld
+  // rather than offered against a number nobody could compute.
+  const finishedRate = studio.wordsPerFinishedHour;
   // Rendered straight from the server payload, never mirrored into local
   // state. A local copy went stale two ways: the payment returned by POST is
   // serialized before its payouts are created, so an added editor fee showed
@@ -341,19 +357,25 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
     return m;
   }, [payments]);
 
-  const totals = useMemo(() => computeTotals(cards, rowsByCard, studio.wordsPerFinishedHour), [cards, rowsByCard]);
-  const byClient = useMemo(() => computeByClient(cards, rowsByCard, studio.wordsPerFinishedHour), [cards, rowsByCard]);
+  const totals = useMemo(
+    () => (finishedRate == null ? null : computeTotals(cards, rowsByCard, finishedRate)),
+    [cards, rowsByCard, finishedRate],
+  );
+  const byClient = useMemo(
+    () => (finishedRate == null ? null : computeByClient(cards, rowsByCard, finishedRate)),
+    [cards, rowsByCard, finishedRate],
+  );
 
   const projects = useMemo<Project[]>(() => {
     return cards
       .map(card => {
         const rows = rowsByCard.get(card.id) ?? [];
-        const state = projectState(card, rows, studio.wordsPerFinishedHour);
+        const state = projectState(card, rows, finishedRate);
         const received = rows.reduce((s, r) => s + (Number(r.amount_received) || 0), 0);
         // What will be billed, not the narrator's pre-deduction share — see
         // cardInvoiceTotal(). The row sits under "Ready to invoice", so the
         // number on it has to be the one that goes on the invoice.
-        const expected = cardInvoiceTotal(card, rows, studio.wordsPerFinishedHour);
+        const expected = finishedRate == null ? null : cardInvoiceTotal(card, rows, finishedRate);
         const editing = editingCost(rows);
 
         // cardExpected() excludes royalty rows on purpose — royalties are not
@@ -416,9 +438,15 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
   const estimatedShare = useMemo(() => {
     const actual = cards
       .filter(c => isCardExpectedActual(rowsByCard.get(c.id) ?? []))
-      .reduce((s, c) => s + (cardExpected(c, rowsByCard.get(c.id) ?? [], studio.wordsPerFinishedHour) ?? 0), 0);
-    return totals.expected - actual;
-  }, [cards, rowsByCard, totals.expected]);
+      .reduce(
+        (s, c) =>
+          s + (finishedRate == null
+            ? 0
+            : cardExpected(c, rowsByCard.get(c.id) ?? [], finishedRate) ?? 0),
+        0,
+      );
+    return totals == null ? null : totals.expected - actual;
+  }, [cards, rowsByCard, totals]);
 
   function handleSaved() {
     setEditing(null);
@@ -430,7 +458,7 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
     router.refresh();
   }
 
-  const owed = totals.outstanding;
+
 
   return (
     <div className="mx-auto max-w-[1000px]">
@@ -439,13 +467,31 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
       {/* One compact strip rather than four large tiles. Three of the four
           were restating the same single payment, and the only actionable
           number — what you're owed — was the one reading $0. */}
+      {totals == null ? (
+        /* The money summary is gone; everything below it — the project groups,
+           the statements, the import drop zone — is a list of rows and renders
+           exactly as it always did. Gate the figure, not the screen. */
+        <section className="mt-5 rounded-xl border border-alert-red/40 bg-alert-red/10 px-5 py-4">
+          <p className="text-[13px] text-alert-red">
+            Totals need the words-per-finished-hour setting, which could not be read.
+            The projects below are still listed; their amounts are not.
+          </p>
+        </section>
+      ) : (
+        <>
       <section className="mt-5 flex flex-wrap items-start gap-x-10 gap-y-4 rounded-xl border border-surface-border bg-surface px-5 py-4">
         <Stat
           label="Owed to you"
-          value={formatMoney(owed)}
+          value={formatMoney(totals.outstanding)}
           primary
-          tone={totals.overdue > 0 ? "red" : owed > 0 ? "amber" : undefined}
-          hint={totals.overdue > 0 ? `${formatMoney(totals.overdue)} overdue` : owed === 0 ? "Nothing outstanding" : undefined}
+          tone={totals.overdue > 0 ? "red" : totals.outstanding > 0 ? "amber" : undefined}
+          hint={
+            totals.overdue > 0
+              ? `${formatMoney(totals.overdue)} overdue`
+              : totals.outstanding === 0
+                ? "Nothing outstanding"
+                : undefined
+          }
         />
         <Stat label="Collected" value={formatMoney(totals.received)} />
         {/* Marked as an estimate in the label, not just a footnote — the
@@ -459,8 +505,8 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
           hint={
             totals.expected - totals.expectedNet > 0.005
               ? `${formatMoney(totals.expected)} before editing`
-              : estimatedShare < totals.expected
-                ? `${formatMoney(totals.expected - estimatedShare)} from invoices`
+              : estimatedShare != null && estimatedShare < totals.expected
+                ? `${formatMoney(totals.expected - (estimatedShare ?? 0))} from invoices`
                 : undefined
           }
         />
@@ -511,6 +557,8 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
       </section>
 
       <PayoutsPanel totals={totals} />
+        </>
+      )}
 
       <ImportDropZone cards={cards} onImported={() => router.refresh()} />
       {GROUP_ORDER.map(state => {
@@ -533,6 +581,7 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
           things demanding attention. */}
       <p className={`${adminType.label} mt-10 border-t border-divider pt-5`}>Reference</p>
 
+      {byClient != null && (
       <section className="mt-3 mb-4 overflow-hidden rounded-xl border border-surface-border">
         <button
           type="button"
@@ -571,6 +620,7 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
           </div>
         )}
       </section>
+      )}
 
       {/* Last on the page, below the project work and the client analytics.
           Royalty statements arrive monthly, pay out in cents, and rarely

@@ -174,11 +174,33 @@ export async function settleFromProvider(paymentId: string, method: string): Pro
   // Read here rather than defaulted: this settles real money, and a default in this
   // path is exactly how the invoice comes to disagree with the board again.
   const studio = await getStudioSettings();
+  const rate = studio.settings.wordsPerFinishedHour;
+
+  // REFUSE, and refuse BEFORE the first write below.
+  //
+  // A rate that could not be read is not a rate. Every alternative here writes
+  // a number into `amount_received` that nobody can audit and that no later
+  // reader can distinguish from a figure Dean chose — and this is the one path
+  // in the app where that number is money leaving a real invoice.
+  //
+  // A settle is retryable: PayPal resends events it thinks went unacknowledged,
+  // and the duplicate guard above means a later retry settles correctly once
+  // the setting is readable again. Refusing costs a retry; guessing costs a
+  // wrong figure that looks deliberate forever.
+  if (rate == null) {
+    return {
+      settled: false,
+      reason: studio.failure
+        ? `the finished-hour rate could not be read (${studio.failure})`
+        : "the finished-hour rate is not usable, so no amount could be worked out",
+    };
+  }
+
   const due = paymentNarratorShare(
     row,
     card as unknown as MoneyCard,
     rows,
-    studio.wordsPerFinishedHour,
+    rate,
   );
 
   if (due == null) return { settled: false, reason: "no amount could be determined" };

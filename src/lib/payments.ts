@@ -759,8 +759,17 @@ export function computeWaterfall(
  * situation W1 exists to end. Every caller is traced to a component that reads
  * Settings; if a future one cannot, it should be given a path rather than a default.
  */
-export function finishedHours(wordCount: number | null, wordsPerFinishedHour: number): number {
-  return wordCount ? wordCount / wordsPerFinishedHour : 0;
+export function finishedHours(
+  wordCount: number | null,
+  wordsPerFinishedHour: number | null,
+): number | null {
+  // Null, not zero. Zero finished hours is a real answer for a book with no word
+  // count and a false one for a book whose rate could not be read, and callers
+  // guard on `> 0` — so an unreadable rate used to render as "no hours yet",
+  // which is a different and entirely plausible-looking state.
+  if (!wordCount) return 0;
+  if (wordsPerFinishedHour == null || wordsPerFinishedHour <= 0) return null;
+  return wordCount / wordsPerFinishedHour;
 }
 
 /**
@@ -789,7 +798,16 @@ export function invoiceAmount(
  * sections, which meant a project with a payment row but no invoice date
  * appeared in both — describing the same thing twice in different words.
  */
-export type ProjectState = "awaiting" | "ready" | "production" | "paid" | "untracked";
+/**
+ * `unknown` exists so an unreadable rate cannot wear another state's clothes.
+ *
+ * Without it a project whose finished-hour rate could not be read would land in
+ * "production" or "untracked" — states that look ordinary and mean something
+ * specific. A disabled Invoice button beside "Ready to invoice" and a disabled
+ * one beside "Not tracked" ask the reader to conclude different things, and only
+ * one of them would have been true.
+ */
+export type ProjectState = "awaiting" | "ready" | "production" | "paid" | "untracked" | "unknown";
 
 export const PROJECT_STATE_LABEL: Record<ProjectState, string> = {
   awaiting: "Awaiting payment",
@@ -797,13 +815,20 @@ export const PROJECT_STATE_LABEL: Record<ProjectState, string> = {
   production: "In production",
   paid: "Paid",
   untracked: "Released — no payment recorded",
+  // Deliberately not a state about the project. Every other label describes
+  // where the money is; this one says the app could not find out, which is the
+  // distinction the whole state exists to preserve.
+  unknown: "Cannot be worked out — settings unreadable",
 };
 
 export function projectState(
   card: MoneyCard,
   rows: PaymentRow[],
-  wordsPerFinishedHour: number,
+  wordsPerFinishedHour: number | null,
 ): ProjectState {
+  // Answered first: every branch below reasons about amounts, and an amount
+  // computed from a rate nobody could read is not evidence about anything.
+  if (wordsPerFinishedHour == null) return "unknown";
   const received = rows.reduce((s, r) => s + (Number(r.amount_received) || 0), 0);
   const invoicedRows = rows.filter(r => r.kind !== "royalty" && r.invoiced_on);
 

@@ -7,9 +7,17 @@ export type Agenda = {
   date: string;
   items: AgendaItem[];
   dueSoon: AgendaDue[];
-  /** Booked hours from today to Sunday, and from today to month end. */
-  weekHours: number;
-  monthHours: number;
+  /**
+   * Booked hours from today to Sunday, and from today to month end.
+   *
+   * Null when the narration rate could not be read, because without it no book
+   * contributes any hours and the sum would be a blocks-only total wearing the
+   * label of a full one.
+   */
+  weekHours: number | null;
+  monthHours: number | null;
+  /** True when the rate is unavailable, so the sidebar can say why the hours are gone. */
+  ratesUnavailable?: boolean;
 };
 
 /**

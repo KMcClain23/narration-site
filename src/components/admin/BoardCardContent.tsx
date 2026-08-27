@@ -14,7 +14,7 @@ import {
   type Urgency,
   type BoardV2Card,
 } from "./board-card-utils";
-import { useStudioSettings } from "./useStudioSettings";
+import { studioRates, useStudioSettings } from "./useStudioSettings";
 
 // The visual content shared by desktop's BoardCard (drag + mouse long-press)
 // and mobile's MobileBoardCard (swipe + touch long-press) — the two own
@@ -44,7 +44,10 @@ export function BoardCardContent({
   onToggleFirst15: (id: string, complete: boolean) => void;
 }) {
   const coNarrators = parseCoNarrators(card.co_narrator);
-  const studio = useStudioSettings();
+  const studioState = useStudioSettings();
+  // Nullable rates: loading and failed both yield null, and every figure below
+  // is gated on that rather than computed from a default.
+  const studio = studioRates(studioState);
   const showFormatPill = card.narration_format && card.narration_format !== "solo";
 
   return (
@@ -158,7 +161,17 @@ export function BoardCardContent({
                 {plan.overdue ? (
                   <span className="text-alert-red"> · no recording days left</span>
                 ) : plan.hoursPerDay != null ? (
-                  <span className={plan.hoursPerDay >= studio.heavyDayHours ? "text-accent-amber-bright" : "text-text-muted"}>
+                  // The threshold is an emphasis, not a figure. Without it the day
+                  // renders unhighlighted, which is the ordinary state and asserts
+                  // nothing — a highlight derived from a guessed threshold would
+                  // claim a day is heavy on no authority at all.
+                  <span
+                    className={
+                      studio.heavyDayHours != null && plan.hoursPerDay >= studio.heavyDayHours
+                        ? "text-accent-amber-bright"
+                        : "text-text-muted"
+                    }
+                  >
                     {" · "}
                     {plan.hoursPerDay.toFixed(1)} hrs/day
                   </span>

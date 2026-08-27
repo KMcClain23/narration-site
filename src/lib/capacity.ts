@@ -60,8 +60,14 @@ export type DayLoad = {
    */
   commitments: { id: string; title: string; hours: number; isBlock?: boolean }[];
   committed: number;
-  /** capacity − committed, never below zero. */
-  free: number;
+  /**
+   * capacity − committed, never below zero.
+   *
+   * Null when the daily capacity could not be read. Zero and unknown are
+   * different facts and used to be the same number: zero says the day is full,
+   * which is a claim about Dean's schedule that nobody made.
+   */
+  free: number | null;
   /** No dates were chosen for at least one book landing here, so this is inferred. */
   assumed: boolean;
 };
@@ -102,8 +108,14 @@ export type CalendarInput = {
   cards: CapacityCard[];
   horizonDays: number;
   /** From Settings. Required, so no surface can silently use a different one. */
-  wordsPerHour: number;
-  dailyCapacity?: number;
+  /** Null when the rate could not be read. Days still exist; their hour loads do not. */
+  wordsPerHour: number | null;
+  /**
+   * Null when it could not be read. Days still exist and books still land on
+   * them; what is unknown is how much room each day had to begin with, so
+   * `free` comes back null rather than as a number derived from a constant.
+   */
+  dailyCapacity?: number | null;
   today?: Date;
   blocks?: TimeBlock[];
 };
@@ -113,7 +125,10 @@ export function buildCalendar(input: CalendarInput): DayLoad[] {
     cards,
     horizonDays,
     wordsPerHour,
-    dailyCapacity = DEFAULT_DAILY_CAPACITY,
+    // No default. `DEFAULT_DAILY_CAPACITY` is the seed for an unconfigured
+    // install, not an answer to a failed read — supplying it here is how a
+    // calendar comes to assert six free hours a day that nobody configured.
+    dailyCapacity = null,
     today = new Date(),
     blocks = [],
   } = input;
@@ -172,7 +187,7 @@ export function buildCalendar(input: CalendarInput): DayLoad[] {
   }
 
   for (const day of byDate.values()) {
-    day.free = Math.max(0, dailyCapacity - day.committed);
+    day.free = dailyCapacity == null ? null : Math.max(0, dailyCapacity - day.committed);
   }
   return [...byDate.values()];
 }
@@ -211,18 +226,29 @@ export function fitBook(
   calendar: DayLoad[],
   opts: {
     /** From Settings. Required for the same reason wordsPerHour is. */
-    maxBooksPerDay: number;
+    /** Null when it could not be read, in which case no book is placed. */
+    maxBooksPerDay: number | null;
     availableDays?: number[];
   },
 ): Fit | null {
   const { maxBooksPerDay, availableDays = DEFAULT_AVAILABLE_DAYS } = opts;
   if (hours <= 0) return null;
+  // Without the cap there is no rule for how many books share a day, so there
+  // is no answer to give — and an answer computed from a guessed cap is worse
+  // than none on a screen Dean plans real work from.
+  if (maxBooksPerDay == null) return null;
 
   const usable = (day: DayLoad) => {
     const dow = new Date(day.date + "T00:00:00").getDay();
     // A day that already has work on it is a day being recorded, whatever the
     // usual pattern says.
-    return (availableDays.includes(dow) || day.committed > 0.005) && day.free > 0.005;
+    // A day whose free hours are unknown is not usable: placing a book in it
+    // would be guessing at room that nobody has said exists.
+    return (
+      (availableDays.includes(dow) || day.committed > 0.005) &&
+      day.free != null &&
+      day.free > 0.005
+    );
   };
 
   let remaining = hours;
@@ -238,7 +264,7 @@ export function fitBook(
       const books = booksOn(day);
       if (pass === 0 ? books !== 0 : books === 0 || books >= maxBooksPerDay) continue;
 
-      const take = Math.min(day.free, remaining);
+      const take = Math.min(day.free ?? 0, remaining);
       taken.set(day.date, take);
       remaining -= take;
     }
@@ -256,7 +282,7 @@ export function fitBook(
     return day ? booksOn(day) > 0 : false;
   }).length;
   const spareAfter = calendar.reduce(
-    (sum, d) => sum + Math.max(0, d.free - (taken.get(d.date) ?? 0)),
+    (sum, d) => sum + Math.max(0, (d.free ?? 0) - (taken.get(d.date) ?? 0)),
     0,
   );
   return { days, finishBy: days[days.length - 1].date, spareAfter, sharedDays };
@@ -270,9 +296,15 @@ export function fitBook(
  * into available time, and counting them was inflating the one figure most
  * likely to be used to say yes to something.
  */
-export function totalFree(calendar: DayLoad[], availableDays: number[] = DEFAULT_AVAILABLE_DAYS): number {
-  return calendar.reduce((sum, d) => {
+export function totalFree(
+  calendar: DayLoad[],
+  availableDays: number[] = DEFAULT_AVAILABLE_DAYS,
+): number | null {
+  return calendar.reduce<number | null>((sum, d) => {
     const dow = new Date(d.date + "T00:00:00").getDay();
-    return availableDays.includes(dow) ? sum + d.free : sum;
+    if (!availableDays.includes(dow)) return sum;
+    // One unknown day makes the total unknown. A partial sum presented as "the
+    // headline number" would understate the horizon without saying so.
+    return sum == null || d.free == null ? null : sum + d.free;
   }, 0);
 }

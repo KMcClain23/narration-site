@@ -72,9 +72,9 @@ export default async function ToolsAnalyticsPage({
   const studio = await getStudioSettings();
 
   const quarters = getTrailing5Quarters();
-  const careerTotals = computeCareerTotals(cards, studio.wordsPerFinishedHour);
+  const careerTotals = computeCareerTotals(cards, studio.settings.wordsPerFinishedHour);
   const releasePace = computeReleasePace(cards, quarters);
-  const earnings = computeEarnings(cards, quarters, studio.wordsPerFinishedHour);
+  const earnings = computeEarnings(cards, quarters, studio.settings.wordsPerFinishedHour);
   const genres = computeGenreBreakdown(cards);
   const collaborators = computeFrequentCollaborators(cards, authors);
 
@@ -97,7 +97,9 @@ export default async function ToolsAnalyticsPage({
               <p className={`${adminType.small} mt-1`}>Books released</p>
             </div>
             <div className="rounded-2xl border border-surface-border bg-surface p-6">
-              <p className={adminType.titleLg}>{numberFmt(careerTotals.hoursNarrated)}</p>
+              <p className={adminType.titleLg}>
+                {careerTotals.hoursNarrated == null ? "—" : numberFmt(careerTotals.hoursNarrated)}
+              </p>
               <p className={`${adminType.small} mt-1`}>Hours narrated (share-adjusted)</p>
             </div>
             <div className="rounded-2xl border border-surface-border bg-surface p-6">
@@ -105,7 +107,9 @@ export default async function ToolsAnalyticsPage({
               <p className={`${adminType.small} mt-1`}>Average earnings per book</p>
             </div>
             <div className="rounded-2xl border border-surface-border bg-surface p-6">
-              <p className={adminType.titleLg}>{currency(earnings.thisQuarterTotal)}</p>
+              <p className={adminType.titleLg}>
+                {earnings.thisQuarterTotal == null ? "—" : currency(earnings.thisQuarterTotal)}
+              </p>
               <p className={`${adminType.small} mt-1`}>Earnings this quarter</p>
             </div>
           </div>
@@ -123,7 +127,15 @@ export default async function ToolsAnalyticsPage({
           <div>
             <h2 className={`${adminType.label} mb-4`}>Earnings by Quarter</h2>
             <div className="rounded-2xl border border-surface-border bg-surface p-5">
-              <VerticalBarChart data={earnings.quarterly} height={220} format="currency" />
+              {earnings.unavailable ? (
+                // The chart is gone; Release Pace beside it is a count of books
+                // and renders exactly as it always did.
+                <p className={`${adminType.small} py-12 text-center`}>
+                  Earnings need the words-per-finished-hour setting, which could not be read.
+                </p>
+              ) : (
+                <VerticalBarChart data={earnings.quarterly} height={220} format="currency" />
+              )}
             </div>
           </div>
         </section>
