@@ -1343,3 +1343,42 @@ grant execute on function public.archived_for_session() to authenticated;
 -- Un-archiving needs no migration: archived_at, archived_reason and
 -- archived_notes are already in the column grant, and a refused write comes back
 -- as zero rows with HTTP 200 -- the contract the app already reads as Refused.
+
+-- ============================================================
+-- Stage 8A.1: close the ceiling BEFORE opening the door
+-- (applied 27 August 2026, in its own commit, before any policy)
+-- ============================================================
+--
+-- payments and expenses had RLS on and one service_role policy each, so nothing
+-- was exposed: RLS denies when no policy matches. But both tables granted anon
+-- AND authenticated the full seven privileges -- DELETE, INSERT, REFERENCES,
+-- SELECT, TRIGGER, TRUNCATE, UPDATE -- inherited from the default schema grants
+-- and never narrowed, because board_cards got its ceiling in Stage 0 and these
+-- two never did.
+--
+-- Stage 8 adds a policy for authenticated to these exact tables. A `for all`
+-- policy, which is the shortcut everyone reaches for, would have made DELETE and
+-- TRUNCATE live on Dean's financial records the moment it was written -- not as
+-- a bug anyone would notice, but as a silent widening of what a mistake
+-- elsewhere could do. A grant is a ceiling; a policy is a role check. The
+-- ceiling goes back first, so the policy that follows can only ever narrow.
+--
+-- anon is revoked as well, which goes beyond the letter of the plan for the same
+-- reason it names: leaving the unauthenticated public role holding TRUNCATE on
+-- the payments table while closing authenticated would be indefensible. Unlike
+-- board_cards, which grants SELECT to both, nothing should ever read these two
+-- as anon.
+--
+-- Checked before running, because this breaks billing if it is wrong:
+--   * all 14 web files touching either table import `supabaseAdmin`, which is
+--     service_role, and these revokes do not affect service_role;
+--   * `supabaseBrowser`, the anon-key client, has ZERO consumers in the repo;
+--   * Android has no reference to either table.
+-- Confirmed afterwards over REST: service_role still reads both tables, and anon
+-- is now refused with "permission denied for table" rather than an empty result.
+
+revoke all on public.payments  from anon, authenticated;
+revoke all on public.expenses  from anon, authenticated;
+
+grant select on public.payments  to authenticated;
+grant select on public.expenses  to authenticated;
