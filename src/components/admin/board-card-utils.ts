@@ -47,17 +47,6 @@ export function completionUrgency(days: number): Urgency {
 }
 
 /**
- * Manuscript words got through in an hour at the mic.
- *
- * Not the same idea as `wordsPerFinishedHour`, despite the similar number. That
- * one converts a manuscript into hours of finished audio, which is a billing
- * unit, and it now comes from Settings rather than from a constant here. This
- * one is a working rate: how much of the book actually gets read in an hour of
- * recording. One answers what the job pays, the other how long it takes.
- */
-export const WORDS_PER_NARRATION_HOUR = 9200;
-
-/**
  * The fraction of a manuscript this narrator actually reads.
  *
  * Null means genuinely unknown rather than "all of it": multicast has no
@@ -163,6 +152,13 @@ export type NarrationInput = {
    * one of them looked entirely reasonable in isolation. A missing rate is now
    * a build error rather than a number that is quietly wrong by a factor of
    * two.
+   *
+   * Manuscript words got through in an hour at the mic — not the same idea as
+   * `wordsPerFinishedHour`, despite the similar number. That one converts a
+   * manuscript into hours of finished audio, which is a billing unit. This one is a
+   * working rate: how much of the book actually gets read in an hour of recording.
+   * One answers what the job pays, the other how long it takes. Both now come from
+   * Settings rather than from constants in this file.
    */
   wordsPerHour: number;
   /** Words of this narrator's share already recorded. */
@@ -194,7 +190,12 @@ export function narrationPlan(input: NarrationInput): NarrationPlan | null {
   const share = narratorShareOf(narrationFormat, narratorSharePercent);
   if (share == null) return null;
 
-  const rate = wordsPerHour > 0 ? wordsPerHour : WORDS_PER_NARRATION_HOUR;
+  // No fallback. The comment on wordsPerHour above has always said a missing rate
+  // should be a build error rather than a number quietly wrong by a factor of two;
+  // this line said otherwise and won, silently answering at 9,200 whenever a caller
+  // passed nothing usable. A rate that is not known means the plan is not known.
+  if (wordsPerHour <= 0) return null;
+  const rate = wordsPerHour;
   const shareWords = wordCount * share;
   // Clamped at both ends: a recorded figure larger than the share would
   // otherwise produce negative hours left, which reads as time owed back.
