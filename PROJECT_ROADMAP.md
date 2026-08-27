@@ -1009,3 +1009,198 @@ INCLUDE recast — remains correct, for a weaker reason than the one given. `car
 returns null for recast by design, so a recast card's figure cannot be reconstructed
 from the rate; it exists only as stored payment rows. Dropping recast loses that
 *history*. Nothing is at risk of going unbilled.
+
+---
+
+## Stage 8 and after — the record, 27 August 2026
+
+Findings and reasons. Written after the fact for the same cause as the last backfill:
+a one-report cadence leaves the reports in the session and nothing in the repo.
+
+### Stage 8 — Payments and Expenses, READ-ONLY
+
+**The first step was a revoke, not a policy.** `payments` and `expenses` had RLS on
+with one service_role policy each, so nothing was exposed — and both granted **anon
+AND authenticated** all seven privileges including DELETE and TRUNCATE, inherited from
+the default schema grants and never narrowed. `board_cards` got its ceiling in Stage 0;
+these never did. Adding a read policy first would have opened a window where a
+wide-open ceiling and a live policy were both true, and a `for all` policy — the
+shortcut everyone reaches for — would have made deletion of financial records
+reachable from a session token.
+
+Order: revoke alone (`bfaff79`), then policies and functions (`e1b3287`). anon was
+revoked entirely rather than reduced to SELECT: `board_cards` grants both roles SELECT
+because some of it is public, and none of this is.
+
+**`payment_payouts` was the same, and was found by tracing what "owed" depends on**
+(`8577efa`). 8 rows, 7 unpaid, both roles holding TRUNCATE. **Nothing granted back** —
+a table nothing reads should end at a hard deny rather than at SELECT-just-in-case.
+Its pre-check was run independently rather than inferred from the payments result, and
+surfaced a seventh file (`contacts/editors/page.tsx`) the first sweep had missed.
+
+**The owed computation was measured, then declined.** 16 functions, 683 lines, across
+**three** tables — the migration exposes one of them. The deciding argument was not
+the size: **nothing is outstanding today**, so a correct port and a broken one would
+render the same $0.00 on every project and *no data exists that would tell them apart*.
+The screen answers "what have I been paid" and says in a sentence that it does not
+compute what is owed — an absence legible as a decision rather than as a gap.
+
+**DoD 11 was withdrawn mid-stage.** `receipt_url` is an empty string on all 21 rows, so
+a "receipt exists" indicator was a control that could never fire. `has_receipt` was
+dropped from `expenses_for_session()` too, not just from the UI: a function should not
+return a field about a thing that does not exist.
+
+**Capabilities finally gated something.** `canSeeMoney` hides two whole destinations
+rather than a field — absent, not disabled and not empty. Kept separate from
+`canViewFinancials` on purpose: same answer for every role today, but merging them
+would mean a future role allowed to see a rate on a card silently gained the ledger.
+
+### The bottom nav rebuild (`45f4ce4`)
+
+Three defects, one of them structural.
+
+**The grey capsule floating above "Board" was the selection indicator with an empty
+icon slot.** `NavigationBarItem` draws the indicator BEHIND the icon; an empty icon
+slot left it with nothing in it. Every destination now has an icon and it reads as a
+selection.
+
+**Seven destinations left no width**, so "Released" broke as "Release / d" and
+"Settings" as "Setting / s" — words split mid-character. Material's guidance is three
+to five. Four now: Today, Board, History, Money.
+
+**The grouping was already in the code.** `ShelfViewModel` loads Released and Archive
+together; `MoneyViewModel` loads Payments and Expenses together; both pairs already
+fail independently. The nav had simply been more granular than the model behind it.
+Inside each destination, the Board's own tab row — extracted rather than copied.
+
+**"Shelf" was rejected.** A released book is on a shelf; an abandoned one is not, so
+half the contents would have been misdescribed by the group label. **"History"** is
+true of both — work that shipped and work that stopped. The tabs inside say which is
+which, so the group name only has to be a true superset.
+
+**Settings became its own button, then moved.** Built as a floating button as asked;
+the emulator showed it sitting on a payment row with the amount behind it — the figure
+half-covered by the gear. Bottom padding does not fix that: padding clears the END of
+the list while the overlap happens mid-scroll. It sits beside the bar instead. Still
+not a destination, still no label.
+
+**The fix was made a property rather than a fact about today's labels.**
+`NavigationBarFitTest` renders the bar at 320dp — the narrowest width Android phones
+ship at — and asserts `lineCount == 1` and no visual overflow for every label.
+`maxLines` is deliberately UNSET on the bar so a label cannot pass by being truncated.
+Its second case feeds the exact seven labels this replaced and asserts at least one
+still wraps, so the check cannot quietly become vacuous. Mutation-run before landing:
+restoring the seven gave `"Released" wraps at 320.0.dp expected:<1> but was:<2>`.
+
+**A process note worth keeping.** The first UI dump read five tabs and several steps
+went into chasing a capability bug that did not exist. Instrumenting showed
+`entries=7 canSeeMoney=true` and a node-level dump showed all seven present. The
+five-tab reading was never reproduced and no logic changed between the two — recorded
+as a bad observation rather than as a fix.
+
+### The /payments outage (`264715b`)
+
+Production `TypeError: Cannot read properties of undefined (reading 'push')`, whole
+page down. **Two changes composed and neither alone would have done it.**
+
+Stage 8 added `unknown` to `ProjectState`. The compiler forced every exhaustive Record
+open — `OPEN_BY_DEFAULT`, `GROUP_ACCENT`, `GROUP_HINT` — because a `Record` must name
+every member. `GROUP_ORDER`, an ARRAY of that union, has no such obligation: it stayed
+at five while the union had six, and typechecked perfectly.
+
+Stage 7 made `useStudioSettings` start in `loading` rather than returning defaults on
+first render. So on first paint the rate is null, `projectState()` answers `"unknown"`
+for EVERY project, and the grouping `useMemo` pushed into a Map with no such key.
+**The non-null assertion is what let it compile.**
+
+**This is the FOURTH enumeration blind spot**, alongside the three from Stage 7: a
+union widening propagates into exhaustive Records and silently *not* into arrays of the
+union. The fix makes the array checkable — `as const satisfies readonly ProjectState[]`
+plus an `Exclude<>` guard that fails to compile naming the missing member — and seeds
+the Map from the exhaustive label Record rather than from the display-order array.
+Loading was also separated from unreadable: "Cannot be worked out — settings
+unreadable" against every project for the first few hundred milliseconds would have
+been alarming and false.
+
+**Reproduced before fixing**: the shipped version returned HTTP 500 with the exact
+reported error; the fix returned 200. It was failing in SSR too, not only in the
+browser. `npm run check-first-render` (`3a88ab1`) now fetches eight rate-reading routes
+— an SSR fetch IS the loading pass, because `useEffect` does not run server-side — and
+is mutation-tested against the pre-fix file.
+
+### Swipe-to-archive removed (`51b17be`), card kebab added (`e30e082`)
+
+The swipe took horizontal drags away from the pager, so paging between Pipeline and In
+Production only worked from the gaps between cards. That behaviour was pinned in a test
+twice and **nobody ever asked whether it was the behaviour we wanted.**
+
+**It was a removal, not a build.** Long-press had opened an action sheet since Stage 2,
+and that sheet already offered Archive — dispatching to the same state and the same
+confirmation dialog the swipe used. The swipe was a second, hidden route to a menu item
+already present. Nothing was added; the sheet's contents, ordering, dialog and Stage 2
+write discipline are untouched.
+
+Dead code went with it rather than outliving the gesture as apparent tuning:
+`SwipeToArchive`'s thresholds, `ArchiveAffordance`, and 12 threshold tests.
+`ArchiveAffordance` was never a hint — it drew DURING the drag, so only someone already
+performing the gesture ever saw it.
+
+`SwipeVersusPagerTest` was **inverted, not deleted**, and keeps its name: the question
+"who owns a horizontal drag" is unchanged and only the answer flipped. Its header says
+why the name outlived the gesture. Half one now asserts a drag starting ON A CARD
+reaches the pager and fires no card action.
+
+The kebab (`e30e082`) is a second ENTRY POINT to the same handler, not a second code
+path — bottom-end, diagonally opposite the confidential lock and 108dp clear of the
+First-15 checkbox, gated on `canEdit`. Its empty-actions guard is unreachable today and
+is recorded as such rather than left looking load-bearing.
+
+### The Money reconciliation (`2b594be`)
+
+The screen showed `$6,844.98 across 24 payments` over `2026 $6,716.08` and
+`2025 $8.90` — years summing to $6,724.98. Eight rows, a third of the table, carry an
+`amount_received` with `received_on` null, so $120.00 sat in the total and in neither
+year. **Every individual figure was correct against the database.**
+
+Fixed by making the invariant structural: `receivedBreakdown()` returns the buckets AND
+a total that is the sum of them, so a forgotten bucket cannot leave the total unchanged
+— it moves the total, which is visible. `totalReceived()` and
+`receivedInYear()`/`yearsWithPayments()` as independent functions were the shape that
+allowed it. Undated money gets its own labelled line rather than the total being
+narrowed to what is dated: dropping those rows would understate what Dean has been paid
+and hide eight payments.
+
+**The family, and this is the fourth instance:** `weekHours` as a blocks-only total,
+the all-zero earnings chart, `totalFree` summing only known days, and this. The pattern
+is always **the parts and the whole computed by separate code paths, fixed by deriving
+one from the other rather than checking them against each other afterwards.**
+
+### A DoD item that was the wrong SHAPE for its defect
+
+Stage 8's DoD said *"quote the screen's values against a server-side read"*. That is a
+**per-figure** check, and a per-figure check cannot detect that figures do not relate to
+each other. Every number on the Money screen passed it. The reconciliation defect
+survived a verification that looked thorough because the item was the wrong shape for
+the class of defect it stood in front of.
+
+This is a sibling of the rule about DoD items naming things the system does not have:
+there the noun was missing; here the *relation* was. Ask of a DoD item not only "which
+one, and where in the thing under test" but "what would this fail to notice".
+
+### The board's date buckets — checked, unchanged
+
+`THIS MONTH` means "within 30 days", not "within the calendar month", which is why a
+Sep 24 deadline is in it on 27 August and Sep 30 is not. **Android did not invent
+this.** The web's `board-filters.ts` and Android's `BoardFilters.kt` are identical —
+no deadline goes to Later, `days <= 7` This Week, `days <= 30` This Month, else Later,
+with the same three labels. Dean's established language, left alone.
+
+### The two claims that are still NOT verified
+
+1. **Stage 1 item 14, offline sign-out.** Unchanged. Deliberately untested with the
+   reason recorded, an upgrade on the guard test's strength refused twice.
+2. **Physical-device pass.** Every check this session ran on the Pixel 8 emulator via
+   `adb` against `emulator-5554`; Dean's phone was never connected to this machine.
+   Whether the screenshots Dean took were the phone or the emulator is his to say, and
+   is deliberately NOT inferred from the images looking like a device. Until he says
+   otherwise this stays open.
