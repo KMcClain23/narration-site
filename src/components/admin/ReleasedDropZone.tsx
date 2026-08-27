@@ -34,7 +34,15 @@ export function ReleasedDropZone({
       <Link href="/released" className="w-full">
         <p className="text-[18px] font-bold leading-tight text-text-body">Released</p>
       </Link>
-      <p className={`${adminType.small} mt-1`}>{releasedCount} released</p>
+      {/* "all-time" is load-bearing, not decoration. This number comes from
+          /api/board-v2/released-count, which filters on status alone and
+          deliberately does NOT exclude archived books; the /released page it
+          links to excludes them. The two agree today only because no released
+          book has ever been archived, and the first time one is, a bare
+          "12 released" beside a list of 11 reads as a bug — which someone would
+          then "fix" by adding the archived filter and quietly destroy the
+          career total. Saying which population it counts is what stops that. */}
+      <p className={`${adminType.small} mt-1`}>{releasedCount} released all-time</p>
 
       <div className={`mt-8 flex flex-1 flex-col items-center justify-center gap-2 ${isDragActive ? "animate-pulse" : ""}`}>
         <Archive size={28} className="text-text-faint" />

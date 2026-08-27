@@ -79,7 +79,10 @@ export function MobileBoardList({
           href="/released"
           className="shrink-0 rounded-full border border-surface-border px-3 py-1.5 text-[13px] font-medium text-text-muted transition-colors hover:text-text-primary"
         >
-          Released ({releasedCount})
+          {/* All-time, including archived releases — the same distinction the
+              desktop drop zone spells out. The page this links to shows the
+              non-archived ones. */}
+          Released · {releasedCount} all-time
         </Link>
       </div>
 
