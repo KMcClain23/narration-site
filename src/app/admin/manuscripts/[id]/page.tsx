@@ -136,7 +136,7 @@ export default async function ManuscriptReaderPage({ params }: { params: Promise
           prose on the admin shell's dark navy is hard on the eyes over a
           real reading session, so this floats a paper-toned page on the
           dark chrome rather than reusing the dark admin tokens. */}
-      <div className="mx-auto max-w-[820px] rounded-2xl bg-[#f1eee3] p-8 shadow-2xl sm:p-12">
+      <div className="mx-auto max-w-[1400px] rounded-2xl bg-[#f1eee3] p-8 shadow-2xl sm:p-12">
         <ManuscriptWorkspace
           manuscriptId={manuscript.id}
           title={manuscript.title}

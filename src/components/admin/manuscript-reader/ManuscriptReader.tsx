@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, Highlighter, ListTree, Mic, Square, Upload, Volume2, X } from "lucide-react";
+import { ALargeSmall, Download, Highlighter, ListTree, Mic, Square, Upload, Volume2, X } from "lucide-react";
 import { splitParagraphs, type SpanLite } from "./paragraph-highlight";
 import { ParagraphText, type CharacterLite } from "./ParagraphText";
 import { ChapterTextEditor } from "./ChapterTextEditor";
@@ -33,6 +33,40 @@ const inkFaint = "text-[#8a8577]";
 const border = "border-[#ddd8c9]";
 const cardBg = "bg-[#e7e2d2]";
 const label = "text-[11px] font-medium uppercase tracking-[0.08em]";
+
+/**
+ * Reading size for the manuscript body only.
+ *
+ * The classes are written out in full rather than composed from a number:
+ * Tailwind scans source text for literal class names, so `text-[${px}px]`
+ * would produce markup no stylesheet has a rule for. Medium is the size the
+ * reader has always used; small and large are ~91% and ~115% of it.
+ *
+ * Nothing else scales. Chapter titles, section labels, sidebar tags and the
+ * Fix text buttons are chrome, and chrome that grows with the prose stops
+ * being chrome.
+ */
+type TextSize = "small" | "medium" | "large";
+
+const PROSE_SIZE: Record<TextSize, string> = {
+  small: "text-[15.5px]",
+  medium: "text-[17px]",
+  large: "text-[19.5px]",
+};
+
+const TEXT_SIZE_ORDER: TextSize[] = ["small", "medium", "large"];
+const TEXT_SIZE_LABEL: Record<TextSize, string> = {
+  small: "Small",
+  medium: "Medium",
+  large: "Large",
+};
+
+/** Shared across every manuscript — a reading preference, not a per-book one. */
+const TEXT_SIZE_KEY = "dmn_admin_reader_text_size";
+
+function isTextSize(v: string | null): v is TextSize {
+  return v === "small" || v === "medium" || v === "large";
+}
 
 /** Legible text color for a filled chip background — same luminance check
  *  used for the throwaway QA review tool this reader's rendering is based on. */
@@ -75,6 +109,24 @@ export function ManuscriptReader({
   characters: CharacterLite[];
   chapters: ChapterWithSpans[];
 }) {
+  // Lazy initializer reads the persisted choice directly, matching Sidebar's
+  // convention — SSR has no window/localStorage, so it falls back to medium
+  // there and the first client render already has the real value.
+  const [textSize, setTextSize] = useState<TextSize>(() => {
+    if (typeof window === "undefined") return "medium";
+    const stored = localStorage.getItem(TEXT_SIZE_KEY);
+    return isTextSize(stored) ? stored : "medium";
+  });
+
+  // The write stays OUT of the state updater: React may invoke an updater more
+  // than once for a single call, and a setter with a side effect in it is the
+  // kind of thing that works until it quietly does not.
+  const cycleTextSize = () => {
+    const next = TEXT_SIZE_ORDER[(TEXT_SIZE_ORDER.indexOf(textSize) + 1) % TEXT_SIZE_ORDER.length];
+    localStorage.setItem(TEXT_SIZE_KEY, next);
+    setTextSize(next);
+  };
+
   const containerRef = useRef<HTMLDivElement>(null);
   const visibilityRef = useRef(new Map<Element, string[]>());
   const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
@@ -379,6 +431,16 @@ export function ManuscriptReader({
           <Download size={16} />
           {generatingPdf ? "Generating…" : "Download PDF"}
         </button>
+        <button
+          type="button"
+          onClick={cycleTextSize}
+          title={`Text size: ${TEXT_SIZE_LABEL[textSize]}`}
+          aria-label={`Text size: ${TEXT_SIZE_LABEL[textSize]}. Click to change.`}
+          className={`flex items-center gap-2 rounded-full ${border} border bg-[#e7e2d2] px-4 py-3 text-sm font-medium ${ink} shadow-2xl transition hover:bg-[#ddd8c9]`}
+        >
+          <ALargeSmall size={16} />
+          {TEXT_SIZE_LABEL[textSize]}
+        </button>
         <VoicesControl
           manuscriptId={manuscriptId}
           characters={characters}
@@ -434,6 +496,7 @@ export function ManuscriptReader({
             onMarkClick={handleMarkClick}
             playingCharacterId={playingCharacterId}
             onToggleSample={toggleVoiceSample}
+            textSize={textSize}
           />
         ))}
       </div>
@@ -851,6 +914,7 @@ function ChapterSection({
   onMarkClick,
   playingCharacterId,
   onToggleSample,
+  textSize,
 }: {
   manuscriptId: string;
   chapter: ChapterWithSpans;
@@ -860,6 +924,7 @@ function ChapterSection({
   onMarkClick: (span: SpanLite, chapterId: string, text: string) => void;
   playingCharacterId: string | null;
   onToggleSample: (characterId: string, url: string) => void;
+  textSize: TextSize;
 }) {
   const blocks = useMemo(
     () => splitParagraphs(chapter.raw_text, chapter.spans),
@@ -960,7 +1025,7 @@ function ChapterSection({
                 data-manuscript-prose="true"
                 data-chapter-id={chapter.id}
                 data-block-start={block.start}
-                className={`text-[17px] leading-[1.75] ${ink}`}
+                className={`${PROSE_SIZE[textSize]} leading-[1.75] ${ink}`}
                 style={{ fontFamily: "Charter, Iowan Old Style, Georgia, ui-serif, serif" }}
               >
                 <ParagraphText
