@@ -1551,3 +1551,40 @@ $fn$;
 
 revoke all on function public.expenses_for_session() from public, anon;
 grant execute on function public.expenses_for_session() to authenticated;
+
+-- ============================================================
+-- Stage 9A: site_settings becomes writable, with the rule in the database
+-- (applied 27 August 2026)
+-- ============================================================
+--
+-- See check_site_setting(), validate_site_setting() and the grants below.
+-- Recorded here in the order applied:
+--
+--   1. check_site_setting(key, value) -- the rule, as a plain function so it can
+--      be exercised from a SELECT without writing a row.
+--   2. validate_site_setting() -- the trigger, reduced to plumbing: it calls the
+--      rule and stamps updated_at, which `authenticated` has no grant for.
+--   3. site_settings_validate -- BEFORE INSERT OR UPDATE, fires for every role.
+--   4. grant update (value) -- the ceiling. `key` is never writable from a
+--      client: renaming a setting from a phone would orphan every reader.
+--   5. "Role write" -- FOR UPDATE, admin only, mirroring "Role read".
+--
+-- WHY A TRIGGER RATHER THAN ROUTE VALIDATION. The rule was said to live in
+-- api/studio-settings/route.ts. It did, but that was never the only writer:
+-- /api/site-settings accepts ANY key with ANY value and validates NOTHING, so a
+-- bad rate could already be stored from the web. Two write paths, one validated,
+-- before a phone existed. A trigger covers every writer including psql.
+--
+-- THE MESSAGE IS THE SENTENCE THE CLIENTS DISPLAY, raised with SQLSTATE 22023 so
+-- PostgREST answers 400 and callers can tell a rule from a transport failure.
+-- Clients show what the database said rather than composing their own wording --
+-- that is what makes "the phone and the web say the same thing" a property
+-- instead of two people keeping two strings in step.
+--
+-- NON-CONTIGUOUS available_months IS ACCEPTED, deliberately, and this differs
+-- from what the Stage 9 plan asked for. The web's BookingWindowPicker is a free
+-- toggle grid over twelve rolling months, so two clicks produce a gap; its
+-- formatter collapses any selection to a range and never errors, and Android
+-- lists the months instead. A rule against gaps would break a picker that ships
+-- today. An EMPTY list is accepted too: both clients render it as "None", which
+-- means Dean is taking no work.

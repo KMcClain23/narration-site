@@ -3,6 +3,11 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireAdmin } from "@/lib/require-admin";
 
+/** check_site_setting() raises 22023; anything else is a genuine failure. */
+function isValidationRefusal(e: unknown): boolean {
+  return typeof e === "object" && e !== null && (e as { code?: string }).code === "22023";
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const key = searchParams.get("key");
@@ -33,8 +38,12 @@ export async function PATCH(req: Request) {
     revalidatePath("/");
     return NextResponse.json({ success: true });
   } catch (e) {
+    // A validation refusal from check_site_setting() is the user's to fix, not
+    // a server fault. This route validated NOTHING before Stage 9 — it accepts
+    // any key with any value — so the trigger is the only rule it has ever had.
     const msg = e instanceof Error ? e.message : "Failed to update setting";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const status = isValidationRefusal(e) ? 400 : 500;
+    return NextResponse.json({ error: msg }, { status });
   }
 }
 
@@ -53,7 +62,11 @@ export async function POST(req: Request) {
     revalidatePath("/");
     return NextResponse.json({ success: true });
   } catch (e) {
+    // A validation refusal from check_site_setting() is the user's to fix, not
+    // a server fault. This route validated NOTHING before Stage 9 — it accepts
+    // any key with any value — so the trigger is the only rule it has ever had.
     const msg = e instanceof Error ? e.message : "Failed to update setting";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const status = isValidationRefusal(e) ? 400 : 500;
+    return NextResponse.json({ error: msg }, { status });
   }
 }

@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireAdmin } from "@/lib/require-admin";
-import {
-  describeIssue,
-  parseSetting,
-  SETTING_KEYS,
-  type StudioSettingField,
-} from "@/lib/studio-settings";
+import { SETTING_KEYS, type StudioSettingField } from "@/lib/studio-settings";
 import { getStudioSettings } from "@/lib/studio-settings-server";
 
 // All five studio numbers in one call. /api/site-settings answers one key per
@@ -41,30 +36,19 @@ export async function PATCH(req: Request) {
 
     for (const field of Object.keys(SETTING_KEYS) as StudioSettingField[]) {
       if (!(field in body)) continue;
-      // Parsed through the same rule the reader uses, so a value that would be
-      // rejected on the way out is refused on the way in rather than stored and
-      // silently overridden.
+      // No validation here any more. The rule lives in the database, in
+      // check_site_setting(), and this route DEFERS to it.
       //
-      // This is the most valuable of the four rules and the only one that is
-      // preventive: it stops the bad value existing at all. A validator that
-      // quietly normalises out-of-range input is the same disease as a loader
-      // that quietly defaults it, moved to the entry point.
+      // It used to hold the only copy — which was never actually true:
+      // /api/site-settings accepts any key with any value and validates
+      // nothing, so a bad rate could already be stored from the web without
+      // passing through here. Two write paths, one validated. Adding a phone
+      // would have made three.
       //
-      // The refusal now quotes the stored value and what it was measured
-      // against, using the same sentence Settings and Android show, instead of
-      // a generic "outside the range this figure allows".
-      const { value, issue } = parseSetting(field, String(body[field]));
-      if (issue || value === null) {
-        return NextResponse.json(
-          {
-            error: issue
-              ? `${field}: ${describeIssue(issue)}`
-              : `${field} could not be read as a number.`,
-          },
-          { status: 400 },
-        );
-      }
-      rows.push({ key: SETTING_KEYS[field], value: String(value), updated_at: now });
+      // A trigger fires for every writer: this route, that one, the phone, and
+      // psql. The refusal it raises is the sentence every client displays, so
+      // "both clients say the same thing" is a property rather than a habit.
+      rows.push({ key: SETTING_KEYS[field], value: String(body[field]), updated_at: now });
     }
 
     if (rows.length === 0) {
@@ -74,7 +58,15 @@ export async function PATCH(req: Request) {
     const { error } = await supabaseAdmin
       .from("site_settings")
       .upsert(rows, { onConflict: "key" });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // 22023 is invalid_parameter_value, which is what check_site_setting()
+    // raises. It is the seam that lets a refusal be answered as a 400 the user
+    // can act on rather than a 500 that reads as the server being broken —
+    // and the message is passed through untouched, because rewording it here
+    // would be the second copy of the rule coming back by the side door.
+    if (error) {
+      const status = error.code === "22023" ? 400 : 500;
+      return NextResponse.json({ error: error.message }, { status });
+    }
 
     const saved = await getStudioSettings();
     if (saved.failure) return NextResponse.json({ error: saved.failure }, { status: 500 });
