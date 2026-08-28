@@ -1204,3 +1204,114 @@ with the same three labels. Dean's established language, left alone.
    Whether the screenshots Dean took were the phone or the emulator is his to say, and
    is deliberately NOT inferred from the images looking like a device. Until he says
    otherwise this stays open.
+
+---
+
+## Stage 9A — Settings editing, 28 August 2026
+
+### The rule moved into the database, and the premise needed correcting first
+
+The plan said every rule about a valid setting lived in `api/studio-settings/route.ts`.
+It did — and that was never the only writer. **`/api/site-settings` accepts any key
+with any value and validates nothing.** It is admin-only, it is how `available_months`
+and `accepting_projects` are written, and it could store `"abc"` in
+`studio_words_per_finished_hour` from a browser. There were already two web write
+paths and one was validated. The trigger closed a live hole rather than pre-empting a
+phone.
+
+**The lesson, and it is Dean's: LOCATING A RULE TELLS YOU NOTHING ABOUT WHO BYPASSES
+IT.** "Where is the validation" and "who else writes to this table" are different
+questions, and only the first was asked.
+
+The shape: `check_site_setting(key, value)` holds the rule as a plain function — split
+out from the trigger so it can be exercised from a `SELECT` without writing a row, and
+so a route could call it directly if a friendlier first line were ever wanted, without
+a second copy. `validate_site_setting()` is the trigger, reduced to calling the rule
+and stamping `updated_at` (which `authenticated` has no grant for, so a phone write
+would otherwise keep the previous writer's timestamp).
+
+It raises **the sentence the clients already display**, with SQLSTATE `22023` so
+PostgREST answers 400 by itself and callers can tell a rule from a transport failure.
+Clients show what the database said rather than composing their own wording — that is
+what makes "the phone and the web say the same thing" a property instead of two people
+keeping two strings in step.
+
+Three mechanisms, three questions: `grant update (value)` is the ceiling (`key` is
+never writable — renaming a setting from a phone would orphan every reader), the
+`Role write` FOR UPDATE policy is the role check, the trigger is the rule.
+
+### The Android write path is a mechanism, not a screen
+
+`FieldWrite` carries the four outcomes — Saving, Saved, Refused, Failed — with Refused
+a case rather than an error because zero rows arrives wearing HTTP 200.
+`serverRefusalMessage()` digs the database's sentence back out of the PostgREST body.
+Nothing in the client validates a setting, deliberately: a client that checked the
+range itself would be the second copy of a rule just moved into one place.
+
+### WITHDRAWN: the non-contiguous months rule
+
+The DoD asked for a non-contiguous `available_months` to be refused. **Not built, and
+it should not be.** The web's `BookingWindowPicker` is a free toggle grid over twelve
+rolling months, so a gap is two clicks away; `formatBookingWindow` sorts and collapses
+any selection to a range without ever erroring; Android lists the months instead. Empty
+is legitimate too — both clients render "None". A rule against gaps would break a
+picker that ships today. Dean's own note: a validation rule was specified without
+checking whether the shipped UI could produce the state it outlawed.
+
+### CORRECTED: `[11,12,1,2]` is click order
+
+An earlier comment claimed the stored order deliberately expressed a window crossing
+the year. **That was invented.** The picker appends each month as it is tapped and
+never sorts. Preserving the order is still right — it is data the user produced, and
+reordering it would rewrite what they entered — and sorting would still render one
+window as two. But the effect was real while the account of the cause was not.
+Corrected in `SiteSettings.kt` and `SettingsScreen.kt`.
+
+### The emulator save was an environment artifact
+
+Nine attempts on the emulator could not get a tap on Save to reach the handler;
+instrumenting proved `save()` was never called. A long stretch went into cycling
+hypotheses on the device — keyboard occlusion, scrolling, overlay hit-testing — which
+is the same failure as the five-tab reading in the nav rebuild.
+
+**This time the contradicting observation exists.** Dean installed the APK on his
+physical phone, changed "a full day at the mic" from 6 to 5, saw it reflect on the
+site, and set it back. `studio_daily_capacity_hours` reads `6` with `updated_at`
+`2026-08-28 17:58:43`, so both writes passed the trigger and the value is restored.
+The code was never wrong. Closed as an environment artifact; do not reinvestigate.
+
+Two things survive it:
+
+- **`imePadding()` at the app root** stays, on its own merits. `adjustResize` was
+  declared but only `SignInScreen` had it, and Settings is the first screen outside
+  sign-in with a text input. Every editable screen after this needs it.
+- **A known property, not a defect to chase:** with the Settings overlay open, the
+  board's header button is still in the semantics tree underneath. The overlay draws
+  on top without being modal. It did not cause the save problem. A modifier to block
+  it was written and **reverted** — it was added on a hypothesis never confirmed, and
+  this project does not ship those. If a stray tap ever lands through an overlay, that
+  is where the next person starts.
+
+### What the physical-device test proved, and what it did not
+
+**PROVEN, on real hardware, 28 August 2026:** the UI-to-server hop for a NUMBER
+setting. DoD 6 has genuine evidence for that type.
+
+**NOT PROVEN, all still needing the phone:** DoD 7's phone half (an invalid value typed
+into the app, refused with the route's sentence — Dean typed a valid one), DoD 9 (a
+refused write rolling the field back to its own prior value), DoD 10
+(`studio_words_per_finished_hour` changed from the phone moving the `~$` figures on
+both clients — daily capacity drives no money). The boolean and the months array are
+also unexercised from the UI; one number was edited.
+
+### The physical-device claim is CLOSED
+
+Open since Stage 1. **Done, 28 August 2026**, on Dean's physical phone, against the
+debug build at Android HEAD `67c16ac`.
+
+**Scope, stated plainly: it covers a Settings write and nothing else.** Every other
+screen — board, agenda, card detail, released, archive, payments, expenses, the nav —
+remains emulator-verified only. That is not a caveat weakening the result; it is the
+scope one test earned.
+
+Stage 1 item 14, the offline sign-out, is unchanged and stays deliberately untested.
