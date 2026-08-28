@@ -47,6 +47,9 @@ export type FullBoardCard = {
   released_at: string;
   status: string;
   word_count: number;
+  /** Page progress. Nullable — most books have neither. */
+  total_pages: number | null;
+  current_page: number | null;
   payment_type: string;
   pfh_rate: number;
   first15_due: string;
@@ -91,6 +94,8 @@ function mapToFullBoardCard(row: Record<string, unknown>): FullBoardCard {
     released_at: ((row.released_at as string) ?? "").slice(0, 10),
     status: (row.status as string) ?? "contracted",
     word_count: (row.word_count as number) ?? 0,
+    total_pages: (row.total_pages as number) ?? null,
+    current_page: (row.current_page as number) ?? null,
     payment_type: (row.payment_type as string) ?? "pfh",
     pfh_rate: (row.pfh_rate as number) ?? 0,
     first15_due: (row.first15_due as string) ?? "",
@@ -120,7 +125,7 @@ function blankCard(): FullBoardCard {
   return {
     id: "", created_at: "", title: "", subtitle: "", cover_url: "", author: "", co_narrator: "",
     author_notes: "", narration_format: null, narrator_share_percent: null, royalty_split_percent: null, recording_dates: [], words_recorded: 0, is_confidential: false, deadline: "", released_at: "", status: "contracted",
-    word_count: 0, payment_type: "pfh", pfh_rate: 0, first15_due: "", first_15_complete: false,
+    word_count: 0, total_pages: null, current_page: null, payment_type: "pfh", pfh_rate: 0, first15_due: "", first_15_complete: false,
     production_type: null, production_company: null, description: "", tags: [], trigger_warnings: [],
     amazon_rating: null, amazon_review_count: null, amazon_rating_updated_at: null,
     audible_link: "", ar_link: "", spotify_link: "", script_url: "",
@@ -987,6 +992,41 @@ export function CardEditModal(props: CardEditModalProps) {
                   placeholder="e.g. 90000"
                   className={INPUT_CLS}
                 />
+              </div>
+              {/* Pages sit beside Word count, matching where the phone puts
+                  them. Writing either one moves words_recorded, by trigger —
+                  the phone and this form reach the same rule, so the two
+                  cannot compute progress differently. */}
+              <div>
+                <label className={`${adminType.label} mb-1.5 block`}>Total pages</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={form.total_pages ?? ""}
+                  onChange={e => {
+                    const digits = e.target.value.replace(/\D/g, "");
+                    setForm(p => p && { ...p, total_pages: digits ? parseInt(digits, 10) : null });
+                  }}
+                  placeholder="e.g. 320"
+                  className={INPUT_CLS}
+                />
+              </div>
+              <div>
+                <label className={`${adminType.label} mb-1.5 block`}>Current page</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={form.current_page ?? ""}
+                  onChange={e => {
+                    const digits = e.target.value.replace(/\D/g, "");
+                    setForm(p => p && { ...p, current_page: digits ? parseInt(digits, 10) : null });
+                  }}
+                  placeholder="e.g. 143"
+                  className={INPUT_CLS}
+                />
+                <p className={`${adminType.small} mt-1.5`}>
+                  Updates words recorded. Editing words recorded directly clears this.
+                </p>
               </div>
               <div>
                 <label className={`${adminType.label} mb-1.5 block`}>Payment type</label>

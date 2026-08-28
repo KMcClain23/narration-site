@@ -146,6 +146,12 @@ export async function PUT(req: Request) {
       "is_confidential", "narration_format", "narrator_share_percent", "production_type", "production_company",
       "archived_at", "archived_reason", "archived_notes", "recording_dates", "words_recorded", "royalty_split_percent",
       "amazon_rating", "amazon_review_count",
+      // Page progress. THIS LIST IS WHY THE MODAL ALONE IS NOT ENOUGH: a field
+      // the form sends and this filter drops is written nowhere, and Save still
+      // reports success — a silent no-op, which is this project's signature
+      // failure. Added here BEFORE the modal, and verified by writing and
+      // reading back rather than by reading the diff.
+      "total_pages", "current_page",
     ];
     const DATE_FIELDS = new Set(["deadline", "first15_due", "first_15_due", "released_at", "archived_at"]);
 
