@@ -1,5 +1,5 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import { splitParagraphs, type SpanLite } from "./paragraph-highlight";
+import { narrowToQuotes, splitParagraphs, type SpanLite } from "./paragraph-highlight";
 import type { CharacterLite } from "./ParagraphText";
 
 export interface PrepPDFChapter {
@@ -60,7 +60,9 @@ const s = StyleSheet.create({
 /** Same offset-slicing approach as ParagraphText.tsx, targeting react-pdf's
  *  nested-Text-run model instead of DOM <mark> elements. */
 function renderProseSegments(block: ReturnType<typeof splitParagraphs>[number], charById: Map<string, CharacterLite>) {
-  const spans = [...block.spans].sort((a, b) => a.start_offset - b.start_offset);
+  // Narrowed to the quoted material before painting: a stored span covers a
+  // speaker's whole turn, attribution and intervening narration included.
+  const spans = narrowToQuotes(block.spans, block.text, block.start);
   const nodes: React.ReactNode[] = [];
   let cursor = block.start;
 
