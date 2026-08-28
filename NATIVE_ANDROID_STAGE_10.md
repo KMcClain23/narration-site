@@ -149,3 +149,128 @@ dropping one.
 
 Device confirmation, and the physical-phone pass now covers a Settings write only —
 this stage is the second thing worth doing on real hardware.
+
+---
+
+# Stage 10 continued — appended 28 August 2026
+
+Token: wheatear-4201-pages-and-fields (confirmed against this file before starting)
+
+10A is accepted and verified. Everything below builds on it. One report at the end.
+
+## 10A-bis — the share bound, first and in its own commit
+
+Answered from the data rather than from principle:
+
+    narrator_share_percent   33 null · 0 zeros · one value (99) · none out of range
+    royalty_split_percent    34 null · nothing set at all
+
+Bound them: 1–100, NULL ALLOWED, ZERO REFUSED. Same trigger family, same sentence
+style, route defers as before.
+
+The asymmetry with word_count is deliberate and is written down so it does not read
+as inconsistency. 0 stayed legal there because thirteen rows use it to mean "not
+entered" and refusing it would have frozen them. Here nothing holds 0, and null
+already means "not set" — allowing 0 would create a SECOND SPELLING OF ONE STATE,
+which is how a screen ends up unable to say which one it is looking at.
+
+Same principle both times: the bound goes around what the data holds, not around what
+sounds tidy.
+
+Done before 10B, since 10B is what makes those fields reachable.
+
+## 10B — The card editor
+
+Lives in card detail. That screen has been read-only since Stage 3 and it is the
+natural home — "no read-only fields" starts there.
+
+**Per-field editing, not a whole-form modal.** Tap a value, change it, save that one
+field. A DELIBERATE DIVERGENCE from the web, which PUTs the entire form, and it goes
+in the divergence list with its reason: a whole-form write makes "was this sent" and
+"was this changed" indistinguishable, which is the trap the page rule already had to
+work around with `is distinct from`. Per-field writes do not have that ambiguity, and
+FieldWrite was built for them.
+
+Scope: every scalar in the 28-column grant that CardEditModal exposes. Port its
+labels, grouping and order — it made those decisions against real data.
+
+word_count gets prominence. It is the field Dean named and the reason for the stage.
+
+The three deferred shapes — tags, trigger_warnings, recording_dates (arrays) and
+cover_url (upload) — must be VISIBLE AS DEFERRED, showing their values read-only with
+something that says editing them is not here yet. Not silently absent. A field that
+vanishes reads as data that does not exist.
+
+amazon_rating and amazon_review_count stay excluded and read-only, cron-owned.
+
+## 10C — Page progress
+
+total_pages is editable on the card, like any other scalar.
+
+current_page is settable from Today, on the recording-today card, where Dean will
+actually be when he needs it.
+
+The display rule, which resolves what looked like a conflict in Dean's answer:
+
+    The PERCENTAGE is always shown, from words_recorded — the single store.
+    The PAGE LINE ("page 143 of 320") appears additionally when total_pages is set.
+
+He does not want a word-count progress figure and does not get one — no raw word
+numbers per book. But he did ask for "the percentage of the book I have completed",
+and the percentage is not a word count. Nothing disappears for books with no
+total_pages, and the page line is context on top rather than a rival measure.
+
+Hexes & Heartbreakers has no word_count, so pages give it a percentage and no word
+contribution to 10D. Correct and honest.
+
+Setting a page on a book with no total_pages asks for total_pages rather than
+failing — that is the moment Dean has the book in front of him.
+
+## 10D — The career total
+
+Sum of words_recorded, not computeCareerTotals: different column, different
+population, different unit.
+
+THREE categories, and the third is the point:
+
+    exact         released + editing carrying words_recorded — narrated in full
+    estimated     recording, derived from page position
+    not counted   books with no data, WITH THE BOOK COUNT NAMED
+
+Today: roughly 420,194 exact across 9 books, 23,460 estimated across 1, and NINE
+released books not counted — three quarters of the released catalogue.
+
+That third line turns a silently-low number into something actionable. Nine word
+counts entered and the figure becomes real. A total that omits them without saying so
+looks answered, and looking answered is the failure this project has found five times.
+
+Assert that the three categories account for every non-archived book. Mutation-test by
+dropping one.
+
+Placement: History, above Released — a record of completed work, on the screen for
+that. If the layout argues for Today instead, say so; a "running total" glanced at
+daily is a defensible reading.
+
+## Definition of done — Stage 10 continued
+
+1.  Share bound: 1–100, null accepted, 0 refused. Phone and route refuse identically.
+    Quote both sentences and the existing 99 surviving untouched.
+2.  word_count corrected from the phone end to end, reflected on the web. Quote both.
+3.  Every granted scalar is editable; quote the list and confirm it matches the grant.
+4.  The three deferred shapes render read-only with a stated reason.
+5.  Setting current_page updates words_recorded; quote before/after.
+6.  A whole-form web save carrying an unchanged words_recorded leaves current_page
+    intact. Re-verify after 10B exists, since 10B adds a second writer.
+7.  A book with total_pages shows the page line; one without shows the percentage
+    alone and no empty page row.
+8.  Setting a page with no total_pages asks for it rather than failing.
+9.  The three career categories account for every non-archived board card. Quote the
+    counts and the assertion, and confirm the mutation turns it red.
+10. No role == in ui/; no select("*"); all tests green; 0 release warnings.
+11. Every value touched restored and quoted, before and after.
+
+## Work only Dean can do
+
+Device confirmation on the physical phone. The Stage 1 claim currently covers a
+Settings write only, and this stage adds card writes and page entry — the two things
+he asked for. A short checklist, as last time.

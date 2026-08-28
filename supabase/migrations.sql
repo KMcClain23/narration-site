@@ -1629,3 +1629,71 @@ grant execute on function public.expenses_for_session() to authenticated;
 --     and amazon_review_count (cron-owned, client-only validation), and
 --     words_recorded -- because the trigger owns it and granting it would give
 --     the phone a second way to set the figure this stage exists to keep single.
+
+-- ============================================================
+-- Stage 10A-bis: the share bound (applied 28 August 2026)
+-- ============================================================
+--
+-- check_card_share_percent(label, value) guards narrator_share_percent and
+-- royalty_split_percent from inside apply_card_rules(). 1-100, NULL ACCEPTED,
+-- ZERO REFUSED.
+--
+-- THE ASYMMETRY WITH check_card_word_count IS DELIBERATE. There, 0 is legal and
+-- means "not entered": 13 of 34 cards hold it, and refusing it would have made
+-- those rows unupdatable. Here the data says the opposite --
+--
+--     narrator_share_percent   33 null, 0 zeros, one value (99), none out of range
+--     royalty_split_percent    34 null, nothing set at all
+--
+-- -- and null already means "not set". Allowing 0 as well would give one state
+-- two spellings, and a screen reading such a column cannot then say which one it
+-- is looking at.
+--
+-- Same principle producing opposite answers: the bound goes around what the data
+-- holds, not around what sounds tidy.
+--
+-- Zero is refused with its own sentence rather than folded into the range,
+-- because "outside 1-100" is true but useless to someone who means "no share".
+-- The sentence says what to do instead: leave it empty.
+--
+--   0    -> Stored value "0" is not a narrator share. Leave it empty to mean not set.
+--   101  -> Stored value "101" is outside 1–100 and is not being used.
+--
+-- IMMUTABLE and callable from a SELECT, like check_card_word_count, so the rule
+-- can be exercised without writing a row.
+--
+-- /api/board needs no change: its error branch keys on SQLSTATE 22023 rather
+-- than on a list of rules, so it already defers to this one.
+
+create or replace function public.check_card_share_percent(p_label text, p_share integer)
+returns void
+language plpgsql
+immutable
+set search_path to 'public'
+as $function$
+begin
+  if p_share is null then
+    return;
+  end if;
+
+  if p_share = 0 then
+    raise exception using
+      message = format(
+        'Stored value "0" is not a %s. Leave it empty to mean not set.', p_label
+      ),
+      errcode = '22023';
+  end if;
+
+  if p_share < 1 or p_share > 100 then
+    raise exception using
+      message = format(
+        'Stored value "%s" is outside 1–100 and is not being used.', p_share
+      ),
+      errcode = '22023';
+  end if;
+end
+$function$;
+
+-- apply_card_rules() gains the two calls at the top, alongside the word_count
+-- check. See the live definition for the full body -- the page and
+-- words_recorded rules below them are unchanged from 10A.
