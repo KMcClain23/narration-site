@@ -1697,3 +1697,47 @@ $function$;
 -- apply_card_rules() gains the two calls at the top, alongside the word_count
 -- check. See the live definition for the full body -- the page and
 -- words_recorded rules below them are unchanged from 10A.
+
+-- ============================================================
+-- Stage 10C step 1: the page columns reach their surfaces (28 August 2026)
+-- ============================================================
+--
+-- board_for_session() and card_detail(uuid) now return total_pages and
+-- current_page. 10A created those columns knowing 10C would display them and
+-- did not widen the read path; this finishes that rather than extending it.
+--
+-- TWO functions, enumerated before either was altered. The full list, and why
+-- the other four are untouched:
+--
+--   board_for_session      Board AND Today  -> widened. AgendaScreen is built
+--                          from the board fetch, so Today's page line is fed
+--                          from here, not from a screen-specific query.
+--   card_detail            Card detail      -> widened.
+--   released_for_session   History/Released -> no page progress. NOTE for 10D:
+--                          it carries neither words_recorded nor word_count,
+--                          and board_for_session filters to contracted/
+--                          prepping/recording/editing, so RELEASED BOOKS ARE
+--                          REACHABLE FROM NEITHER. A career total needs its own
+--                          function.
+--   archived_for_session   History/Archive  -> no page progress.
+--   payments_for_session   Money            -> no page progress.
+--   expenses_for_session   Money            -> no page progress.
+--
+-- DROP then CREATE, because Postgres will not change a function's return type
+-- in place.
+--
+-- AND THE THING THAT WENT WRONG, kept because the next person will hit it:
+-- dropping a function discards its grants, and CREATE FUNCTION then grants
+-- EXECUTE to PUBLIC by default. anon inherits from PUBLIC, so recreating these
+-- two silently REINSTATED the anon grant Stage 8 revoked — while the migration's
+-- own comment claimed it had not. Re-granting the three roles by name did not
+-- prevent it, because the widening did not arrive through a named grant.
+--
+-- It was caught by listing grantees for ALL SIX functions rather than the two
+-- that changed: the four untouched ones showed authenticated/postgres/
+-- service_role, and the two recreated ones showed anon as well. The comparison
+-- is what made it visible; checking only the changed pair would have shown
+-- three expected roles plus one, with nothing to compare against.
+--
+-- Fixed by revoking from PUBLIC (the actual holder) and from anon by name.
+-- A recreated function is a NEW function as far as privileges are concerned.
