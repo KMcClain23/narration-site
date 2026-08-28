@@ -14,7 +14,8 @@
     "check-updated-at-exclusions": "npx --yes tsx scripts/check-updated-at-exclusions.ts",
     "check-settings-honesty": "npx --yes tsx --env-file=.env.local scripts/check-settings-honesty.ts",
     "check-first-render": "npx --yes tsx --env-file=.env.local scripts/check-first-render.ts",
-    "check-dialogue-highlights": "npx --yes tsx --env-file=.env.local scripts/check-dialogue-highlights.ts"
+    "check-dialogue-highlights": "npx --yes tsx --env-file=.env.local scripts/check-dialogue-highlights.ts",
+    "check-payments-costed": "npx --yes tsx --env-file=.env.local scripts/check-payments-costed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

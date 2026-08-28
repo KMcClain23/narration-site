@@ -472,7 +472,14 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
         };
       })
       .sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0));
-  }, [cards, rowsByCard]);
+    // finishedRate is IN these deps because it changes after mount. Before the
+    // settings hook had a loading state it did not: the rate arrived complete on
+    // the first render and never moved, so omitting it here was harmless. Once
+    // it began arriving as null and becoming 9400 a beat later, this memo kept
+    // the answer it computed while the rate was still null — projectState reads
+    // `wordsPerFinishedHour == null` as "unknown", so all 33 projects stayed
+    // uncostable and the page blamed the settings for it.
+  }, [cards, rowsByCard, finishedRate]);
 
   const grouped = useMemo(() => {
     const m = new Map<ProjectState, Project[]>();
@@ -518,7 +525,9 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
         0,
       );
     return totals == null ? null : totals.expected - actual;
-  }, [cards, rowsByCard, totals]);
+    // Same reason as `projects` above: this reads finishedRate, so it has to
+    // recompute when finishedRate arrives.
+  }, [cards, rowsByCard, totals, finishedRate]);
 
   function handleSaved() {
     setEditing(null);
