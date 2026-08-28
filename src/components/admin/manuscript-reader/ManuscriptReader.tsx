@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ALargeSmall, Download, Highlighter, ListTree, Mic, Square, Upload, Volume2, X } from "lucide-react";
 import { splitParagraphs, type SpanLite } from "./paragraph-highlight";
 import { ParagraphText, type CharacterLite } from "./ParagraphText";
+import { stripChapterHeading } from "./ChapterHeadingStripper";
 import { ChapterTextEditor } from "./ChapterTextEditor";
 import { computeChapterNumbers } from "@/lib/unnumbered-sections";
 
@@ -926,9 +927,12 @@ function ChapterSection({
   onToggleSample: (characterId: string, url: string) => void;
   textSize: TextSize;
 }) {
+  // The heading is hidden from the first block only, and only for display —
+  // raw_text still holds it. See ChapterHeadingStripper for why this is
+  // anchored to the stored title rather than to capitalisation.
   const blocks = useMemo(
-    () => splitParagraphs(chapter.raw_text, chapter.spans),
-    [chapter.raw_text, chapter.spans]
+    () => stripChapterHeading(splitParagraphs(chapter.raw_text, chapter.spans), chapter.title),
+    [chapter.raw_text, chapter.spans, chapter.title]
   );
   const povChar = chapter.pov_character
     ? [...charById.values()].find((c) => c.name === chapter.pov_character)
