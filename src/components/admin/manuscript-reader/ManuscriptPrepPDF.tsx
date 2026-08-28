@@ -23,6 +23,16 @@ function hexToRgba(hex: string, alpha: number): string {
 
 const UNMATCHED_BG = "rgba(200, 90, 90, 0.18)";
 
+/**
+ * How much room must remain below a chapter heading for it to stay on the page.
+ *
+ * A heading stranded at the foot of a page with its first paragraph overleaf is
+ * the "break-inside: avoid" case; react-pdf spells it minPresenceAhead. One inch
+ * is about four lines of body text at 10.5/1.6 — enough that the title is
+ * demonstrably attached to something.
+ */
+const CHAPTER_HEADER_PRESENCE_AHEAD = 72;
+
 const s = StyleSheet.create({
   titlePage: { fontFamily: "Times-Roman", padding: 72, justifyContent: "center", alignItems: "center" },
   bookTitle: { fontFamily: "Times-Bold", fontSize: 28, textAlign: "center", marginBottom: 8 },
@@ -123,11 +133,17 @@ export function ManuscriptPrepPDF({
           const blocks = splitParagraphs(ch.raw_text, ch.spans);
           return (
             <View key={ch.id} break={i > 0} wrap>
-              <Text style={s.chapterLabel}>
-                CHAPTER {i + 1} OF {chapters.length}
-              </Text>
-              <Text style={s.chapterTitle}>{ch.title || "Untitled"}</Text>
-              {ch.pov_character && <Text style={s.povPill}>POV: {ch.pov_character}</Text>}
+              {/* Label, title and POV travel together and are all short. The
+                  summary is deliberately NOT in here: it is free text of unknown
+                  length, and a wrap={false} view taller than a page is exactly
+                  the failure this change exists to remove. */}
+              <View wrap={false} minPresenceAhead={CHAPTER_HEADER_PRESENCE_AHEAD}>
+                <Text style={s.chapterLabel}>
+                  CHAPTER {i + 1} OF {chapters.length}
+                </Text>
+                <Text style={s.chapterTitle}>{ch.title || "Untitled"}</Text>
+                {ch.pov_character && <Text style={s.povPill}>POV: {ch.pov_character}</Text>}
+              </View>
               {ch.summary && <Text style={s.summaryBox}>{ch.summary}</Text>}
 
               {blocks.map((block, bi) => {
@@ -140,7 +156,7 @@ export function ManuscriptPrepPDF({
                   )
                 );
                 return (
-                  <View key={bi} style={s.paraRow} wrap={false}>
+                  <View key={bi} style={s.paraRow}>
                     <View style={s.marginCol}>
                       {speakerIds.map((id) => {
                         const c = charById.get(id);
@@ -153,7 +169,9 @@ export function ManuscriptPrepPDF({
                       })}
                     </View>
                     <View style={s.proseCol}>
-                      <Text style={s.prose}>{renderProseSegments(block, charById)}</Text>
+                      <Text style={s.prose} orphans={2} widows={2}>
+                        {renderProseSegments(block, charById)}
+                      </Text>
                     </View>
                   </View>
                 );
