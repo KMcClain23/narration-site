@@ -1304,6 +1304,41 @@ refused write rolling the field back to its own prior value), DoD 10
 both clients — daily capacity drives no money). The boolean and the months array are
 also unexercised from the UI; one number was edited.
 
+### DoD 9 — verified below the device, and NOT RUN CHEAPLY above it
+
+Recorded as verified at the REST and unit layers, with the device half explicitly
+not run. What IS verified: an editor's write to `site_settings` returns `[]` with
+HTTP 200 — the zero-rows shape — with the stored value untouched, and
+`FieldWrite.Refused` maps that shape under test.
+
+**Not run cheaply, rather than not runnable.** It needs a device where signing out is
+acceptable, and Dean has one phone with one session. The door is expensive, not
+locked: a future reader with a spare handset can close this in a minute. Same
+treatment as Stage 1 item 14, different reason — that one is deliberately untested,
+this one is affordable to anyone with a second device.
+
+### 9B — five money-screen fixes, and a naming question that answered itself
+
+Built, in the order Dean set: bottom clearance on both lists (the nav bar was slicing
+the last Expenses row mid-value); the Expenses year breakdown via `spentBreakdown()`,
+same derive-the-total-from-the-buckets shape as payments and mattering more because
+the year boundary on expenses is a TAX boundary; Schedule C out of the accent colour;
+vendor over description; tap-to-expand on payment notes.
+
+**The Schedule C labels did not need proposing.** The web already had
+`SCHEDULE_C_LABEL` — twelve lines, named as the tax form names them, with
+`SCHEDULE_C_LABEL[x] ?? x` already implementing the unmapped-renders-raw rule. Ported
+verbatim rather than invented, and all TWELVE rather than the six the data uses, so
+the seventh category Dean files does not render as a slug on the phone while the web
+names it properly.
+
+That is [[the same lesson as the settings rule]] one turn later: check whether the
+thing already exists before designing it. The instinct to propose six labels would
+have produced a second, smaller vocabulary alongside a complete one.
+
+Expense rows now carry BOTH names an expense has — the everyday label Dean picked
+while typing, then the line it files under — in the web's order.
+
 ### The physical-device claim is CLOSED
 
 Open since Stage 1. **Done, 28 August 2026**, on Dean's physical phone, against the
