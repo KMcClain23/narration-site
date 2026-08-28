@@ -30,7 +30,7 @@ export type StudioSettingsState =
       settings: StudioSettings;
       issues: Partial<Record<StudioSettingField, SettingIssue>>;
     }
-  | { status: "failed"; reason: string };
+  | { status: "failed"; reason: string; httpStatus: number | null };
 
 const NO_RATES: StudioSettings = {
   wordsPerNarrationHour: null,
@@ -67,10 +67,42 @@ export function studioUnavailableReason(state: StudioSettingsState): string | nu
     case "loading":
       return "Still loading the studio settings.";
     case "failed":
-      return "The studio settings could not be read.";
+      // The state's OWN reason, not a fixed sentence. A 401 and a 500 are not
+      // the same situation and must not read as the same situation — see
+      // describeSettingsFailure.
+      return state.reason;
     case "loaded":
       return null;
   }
+}
+
+/** Carries the HTTP status out of the fetch so the catch can act on it. */
+class SettingsRequestError extends Error {
+  constructor(readonly httpStatus: number) {
+    super(`The studio settings request failed (${httpStatus}).`);
+  }
+}
+
+/**
+ * What a failed settings read means, and what to do about it.
+ *
+ * This existed as ONE sentence for every non-2xx: "The studio settings request
+ * failed (N)". Three unrelated situations rendered identically, and only one of
+ * them was about settings at all — a signed-out session produced "settings
+ * unreadable" on /payments, which sends someone to the Settings page to look at
+ * a value that is perfectly fine. That is the two-states-rendering-identically
+ * failure, inside the code written to keep states apart.
+ *
+ * Each branch says what to DO, matching how the rest of Stage 7's surfaces are
+ * worded. The status is kept on the state as well, so a caller that needs to
+ * branch on it does not have to parse this sentence back apart.
+ */
+export function describeSettingsFailure(httpStatus: number | null): string {
+  if (httpStatus === null) return "Could not reach the server. Check your connection and try again.";
+  if (httpStatus === 401) return "You are signed out. Sign in again to see these figures.";
+  if (httpStatus === 403) return "This account does not have permission to read the studio settings.";
+  if (httpStatus >= 500) return "The server could not read the studio settings. Try again shortly.";
+  return `The studio settings request failed (${httpStatus}).`;
 }
 
 /**
@@ -89,7 +121,7 @@ export function useStudioSettings(): StudioSettingsState {
     let live = true;
     fetch("/api/studio-settings")
       .then(async r => {
-        if (!r.ok) throw new Error(`The studio settings request failed (${r.status}).`);
+        if (!r.ok) throw new SettingsRequestError(r.status);
         return r.json();
       })
       .then(data => {
@@ -102,9 +134,13 @@ export function useStudioSettings(): StudioSettingsState {
         // Was `.catch(() => {})`, which kept the defaults on screen forever and
         // left no trace anywhere that the fetch had ever failed.
         if (!live) return;
+        // A transport failure and a malformed body have no HTTP status, and are
+        // deliberately not described as if they did.
+        const httpStatus = e instanceof SettingsRequestError ? e.httpStatus : null;
         setState({
           status: "failed",
-          reason: e instanceof Error ? e.message : "The studio settings could not be read.",
+          httpStatus,
+          reason: describeSettingsFailure(httpStatus),
         });
       });
     return () => {

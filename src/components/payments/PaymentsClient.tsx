@@ -303,6 +303,7 @@ function Group({
   projects,
   total,
   settingsPending,
+  settingsFailure,
   onAddPayment,
   onEditPayment,
 }: {
@@ -319,6 +320,15 @@ function Group({
    * alarm about money costs the most.
    */
   settingsPending: boolean;
+  /**
+   * Why the settings could not be read, or null when they were.
+   *
+   * The group's own label says "settings unreadable", which is true for a 500
+   * and MISLEADING for a 401 — it sends someone to the Settings page to check a
+   * value that is fine, when the thing to do is sign in again. The hook already
+   * knows which; this carries it to the one place that says otherwise.
+   */
+  settingsFailure: string | null;
   onAddPayment: (cardId: string) => void;
   onEditPayment: (cardId: string, p: PaymentRow) => void;
 }) {
@@ -338,7 +348,9 @@ function Group({
         <span className={adminType.title}>
           {state === "unknown" && settingsPending
             ? "Working these out…"
-            : PROJECT_STATE_LABEL[state]}
+            : state === "unknown" && settingsFailure
+              ? "Cannot be worked out"
+              : PROJECT_STATE_LABEL[state]}
         </span>
         <span className={`${adminType.monoNum} rounded-full px-2 py-0.5 ${GROUP_ACCENT[state].pill}`}>
           {projects.length}
@@ -356,7 +368,9 @@ function Group({
           <p className={`${adminType.small} border-t border-surface-border px-4 py-2`}>
             {state === "unknown" && settingsPending
               ? "Still loading the studio settings these are costed from."
-              : GROUP_HINT[state]}
+              : state === "unknown" && settingsFailure
+                ? settingsFailure
+                : GROUP_HINT[state]}
           </p>
           <div>
             {projects.map(p => (
@@ -628,6 +642,7 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
             projects={list}
             total={list.reduce((s, p) => s + (p.amount ?? 0), 0)}
             settingsPending={studioState.status === "loading"}
+            settingsFailure={studioState.status === "failed" ? studioState.reason : null}
             onAddPayment={cardId => setEditing({ cardId, payment: null })}
             onEditPayment={(cardId, row) => setEditing({ cardId, payment: row })}
           />
