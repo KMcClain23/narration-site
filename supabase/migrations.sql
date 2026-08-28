@@ -1741,3 +1741,51 @@ $function$;
 --
 -- Fixed by revoking from PUBLIC (the actual holder) and from anon by name.
 -- A recreated function is a NEW function as far as privileges are concerned.
+
+-- ============================================================
+-- function_grant_audit() — the standing grant guard (28 August 2026)
+-- ============================================================
+--
+-- Returns every function in `public` that PUBLIC or anon can EXECUTE, with a
+-- `callable` flag. Empty result is the pass. `npm run check-function-grants`
+-- reads it.
+--
+-- WHY IT EXISTS. CREATE OR REPLACE preserves a function's ACL; DROP + CREATE
+-- resets it and grants EXECUTE to PUBLIC. Postgres will not change a
+-- table-returning function's return type in place, so widening an RPC REQUIRES
+-- drop-and-create, and the new function starts open. Re-granting the intended
+-- roles by name does not close it: the grant arrives through PUBLIC, and no
+-- named grant touches PUBLIC. "I re-granted the right roles" and "only the
+-- right roles can execute this" are different statements.
+--
+-- WHY THE WHOLE SCHEMA. Listing grantees for the two functions that changed
+-- would have shown four roles with nothing to say the fourth was wrong. The
+-- four untouched RPCs were the control. A verification of the thing you
+-- changed carries no control; a verification across the whole class carries
+-- its own.
+--
+-- PUBLIC is grantee OID 0 in aclexplode() and matches no row in pg_roles, so a
+-- plain join drops it in silence — the way a check for exactly this reports
+-- clean while the grant sits there. Left join; null rolname IS PUBLIC.
+--
+-- TRIGGER FUNCTIONS ARE FLAGGED, NOT DROPPED. Postgres refuses to invoke one
+-- directly whoever holds EXECUTE — verified against this database:
+--   select public.apply_card_rules()
+--   ERROR: trigger functions can only be called as triggers
+-- so their grant is inert. They are reported separately rather than failing the
+-- check, because twenty inert rows would bury the callable ones and a guard
+-- that is mostly noise gets ignored. They are not filtered out: narrowing a
+-- check until it passes is how a check stops being one.
+--
+-- Mutation-tested: a throwaway function granted to anon appeared as
+-- "zz_guard_probe <- anon", the run went from 11 failures to 12, and dropping
+-- it returned the count to 11.
+--
+-- OPEN FINDING, for Dean rather than for me to act on. Six CALLABLE functions
+-- are open to PUBLIC/anon and predate this guard:
+--   check_card_share_percent, check_card_word_count, check_site_setting,
+--   current_app_role, site_setting_refusal, validate_site_setting
+-- None returns data; they raise or return refusal text. current_app_role is
+-- referenced by six RLS policies, ALL scoped to {authenticated} — so revoking
+-- it from anon would not affect them. Not revoked here: a revoke is the most
+-- consequential command in this project and this one was not asked for.
