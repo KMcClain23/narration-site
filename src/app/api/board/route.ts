@@ -182,7 +182,14 @@ export async function PUT(req: Request) {
 
 if (error) {
       console.error("PUT /api/board Supabase error:", JSON.stringify(error), "update keys:", Object.keys(update));
-      return NextResponse.json({ error: error.message || JSON.stringify(error) }, { status: 500 });
+      // 22023 is what check_card_word_count() and the page rules raise. Stage 10
+      // moved the word_count bound into the database because it existed in NO
+      // client, no route and no constraint, while feeding hours, earnings,
+      // page-derived progress and the career total. This route DEFERS to it: the
+      // message is the database's and is passed through untouched, so the phone
+      // and the web refuse in the same words.
+      const status = error.code === "22023" ? 400 : 500;
+      return NextResponse.json({ error: error.message || JSON.stringify(error) }, { status });
     }
 
     return NextResponse.json({ success: true, card: data });

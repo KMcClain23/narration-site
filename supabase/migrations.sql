@@ -1588,3 +1588,44 @@ grant execute on function public.expenses_for_session() to authenticated;
 -- lists the months instead. A rule against gaps would break a picker that ships
 -- today. An EMPTY list is accepted too: both clients render it as "None", which
 -- means Dean is taking no work.
+
+-- ============================================================
+-- Stage 10A: card editing, page progress (applied 28 August 2026)
+-- ============================================================
+--
+-- Applied in two migrations; see the live definitions for full bodies.
+--
+--  1. total_pages, current_page      -- both nullable. A STORED fact, not a
+--     derivation: only 4 of 20 board cards have chapters, and chapter page sums
+--     are wrong on 2 of the 10 that do (Restrict 21 pages / 11 chapters).
+--
+--  2. check_card_word_count()        -- the bound, callable from a SELECT.
+--     ZERO IS LEGAL and means "not entered": 13 of 34 cards hold 0 today,
+--     including nine released books. Refusing it would make 13 rows
+--     unupdatable. Otherwise 1000-500000, deliberately wide -- to catch a
+--     slipped keystroke, not to have an opinion about book length. Dean's
+--     shortest real manuscript is 14,410 and his longest 184,221; the upper
+--     bound sits past the longest single-volume novels anyone narrates.
+--
+--  3. apply_card_rules()             -- ONE WRITER of words_recorded. Pages
+--     moving derives it; writing it directly clears current_page, because the
+--     page is then no longer known to be accurate. The `is distinct from` there
+--     is load-bearing: CardEditModal PUTs the whole form on every save and
+--     words_recorded is in that payload even when untouched, so testing
+--     presence rather than change would clear the page every time Dean edited
+--     a title.
+--
+--  4. anchor_card_dates()            -- the Pacific-noon rule, moved out of
+--     /api/board. Only released_at and archived_at can drift; deadline and
+--     first15_due are `date` columns with no instant. Verified: a bare
+--     '2026-09-24' into a timestamptz reads as 2026-09-23 in Pacific, while the
+--     web's 20:00Z rule reads as 2026-09-24. The heuristic is "exactly midnight
+--     UTC", which is the signature of a date-only string and not a time anyone
+--     sets a release to.
+--
+--  5. The grant widened to 28 columns -- exactly the SCALARS CardEditModal
+--     exposes plus the two page columns. NOT granted: tags, trigger_warnings
+--     and recording_dates (arrays), cover_url (signed upload), amazon_rating
+--     and amazon_review_count (cron-owned, client-only validation), and
+--     words_recorded -- because the trigger owns it and granting it would give
+--     the phone a second way to set the figure this stage exists to keep single.
