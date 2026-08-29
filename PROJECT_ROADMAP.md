@@ -2606,3 +2606,93 @@ the board." **A file read from a device is evidence only if this run wrote it.**
    and refuses cleanly until `FIREBASE_APP_ID` exists.
 6. **`lastPublishedVersionCode` stays 0** until something is genuinely published.
    Update it in the same commit as the release that went out.
+
+---
+
+## V — the first real signed release, and a distribution that went out (2026-08-29)
+
+Dean supplied the real upload key, the Firebase project and the tester group.
+
+### V1 — unsigned is now a build failure, not an artifact
+
+The U stage left `assembleRelease` producing an unsigned artifact deliberately,
+with only the publish tasks refusing. That is the wrong place for the refusal: an
+unsigned .aab looks finished and is rejected by Play much later, by which time
+the cause is nowhere near the effect. `assembleRelease` and `bundleRelease` now
+depend on the signing gate.
+
+Configuration is still absent-not-fatal. Verified BOTH ways by removing the four
+keys from local.properties and restoring them: release failed with the missing
+key names listed, debug built normally.
+
+`SUPABASE_URL` and `SUPABASE_ANON_KEY` confirmed present in the release DEX of
+the actual shipped .apk, by extracting `classes*.dex` and searching for the real
+values — because "they are in defaultConfig so they should be there" is not
+evidence.
+
+### V3 — the CLI, and why
+
+The Gradle plugin was tried first, as instructed, and **fails to apply on this
+project**: `Extension of type 'AppExtension' does not exist`. It reaches for
+AGP's legacy variant API, which AGP 9 removed. `publishToFirebase` drives the
+already-authenticated CLI instead — same one command, no plugin, nothing added
+to the binary.
+
+### W — what was verified
+
+- **W1** apksigner: the .apk verifies, one signer, APK Signature Scheme v2.
+  `jarsigner -verify`: the .aab verifies. Certificate
+  `CN=Dean Miller, OU=Dean Miller Narration, ST=Oregon, C=US`, SHA-256
+  `2787a91c64e0c91109ef907812c04c17d3633847357bd25aa434058c08f61f43`.
+- **W4** `publishToFirebase` ran end to end: uploaded release **0.1.0 (43)**,
+  added release notes, distributed. The group listing then showed `editors` with
+  **2 testers and 1 release** — confirmed against the listing rather than against
+  the CLI's own success line.
+- **W3** The payload boundary, with a positive control: the EDITOR payload
+  carries 17 keys and none of `pfh_rate`, `payment_type`,
+  `narrator_share_percent`, `royalty_split_percent`; the ADMIN payload from
+  `board_for_session()` carries all three. Same query shape, different function.
+- **W5** The guard fails on purpose and recovers: 2 failures naming exactly the
+  staged fake keystore and the staged password file, 0 after reverting.
+
+### THE PREVIOUS STAGE'S TEST COUNT WAS WRONG, AND THIS IS THE CORRECTION
+
+`ReleaseSecretsGuardTest` carried a literal `KEYSTORE_PASSWORD=<value>` example
+inside its own doc comment. While the file was UNTRACKED, `git ls-files` could
+not see it and the guard passed. The moment it was committed, the guard matched
+its own documentation and went red on a clean tree — and the "294 tests, 0
+failures" reported at the end of the U stage had been measured in the window
+before the commit.
+
+Fixed by describing the shape instead of writing one. **Not** by exempting the
+file: a self-exemption is the one hole a guard like this cannot afford, because
+this is precisely the file someone would paste a real password into while
+"testing the guard". 294/0 now holds with the file tracked.
+
+### The stale-dump trap, caught a second time
+
+Reading the device again produced a screen showing a sign-in error from a
+previous run, on a freshly installed app that could not have had it. Same cause
+as last time: `uiautomator dump` writes to a fixed path, and reading that path
+gives you whatever is there. The discipline that fixes it is to **delete the file
+first and confirm the delete**, so the only thing that can be read is what this
+run wrote. Done that way, the real first screen is the clean sign-in screen.
+
+### NOT DONE — and both need Dean
+
+1. **W2 and W3 on a real device, signed in.** Everything ran on an emulator, and
+   sign-in needs a password that was deliberately not shared. What IS proven on
+   the signed artifact: it installs, launches, renders, and a wrong password
+   produces the app's own "That email and password do not match an account" —
+   which means HTTPS, Ktor and kotlinx-serialization all work in release. What is
+   NOT proven: the board rendering, a card's detail, or the editor's session on
+   the phone.
+2. **Nothing was uploaded to Play.** The .aab is built and signed and waiting.
+
+### The numbers
+
+- versionCode **43**, versionName 0.1.0, recorded in `version.properties` as
+  published to Firebase. Play has burned nothing — the first Play upload also
+  enrols Play App Signing, which is Dean's decision to accept.
+- `.apk` `D:\Developer\dmn-admin-android\app\build\outputs\apk\release\app-release.apk`
+- `.aab` `D:\Developer\dmn-admin-android\app\build\outputs\bundle\release\app-release.aab`
