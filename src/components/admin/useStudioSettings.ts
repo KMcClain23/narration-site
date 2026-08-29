@@ -173,27 +173,57 @@ const getSnapshot = () => snapshot;
 const LOADING: StudioSettingsState = { status: "loading" };
 const getServerSnapshot = () => LOADING;
 
+/**
+ * One retry, with a short backoff, before the store gives up.
+ *
+ * Consolidating eight fetches into one also consolidates the FAILURE. A single
+ * 500 now takes all eight consumers at once, where before it might have taken
+ * one — so a transient failure that used to be survivable is worth one more
+ * attempt before the page says it could not read the settings.
+ *
+ * Not more than one and not indefinitely: the failed state is honest and
+ * actionable, and a store that retries forever turns a readable error into a
+ * spinner that never resolves.
+ */
+const RETRY_LIMIT = 1;
+const RETRY_DELAY_MS = 1200;
+
+async function fetchSettingsOnce(): Promise<StudioSettingsState> {
+  try {
+    const r = await fetch("/api/studio-settings");
+    if (!r.ok) throw new SettingsRequestError(r.status);
+    const data = await r.json();
+    const read = data?.settings;
+    if (!read?.settings) throw new Error("The studio settings response had no settings.");
+    return { status: "loaded", settings: read.settings, issues: read.issues ?? {} };
+  } catch (e: unknown) {
+    // Was `.catch(() => {})`, which kept the defaults on screen forever and
+    // left no trace anywhere that the fetch had ever failed.
+    //
+    // A transport failure and a malformed body have no HTTP status, and are
+    // deliberately not described as if they did.
+    const httpStatus = e instanceof SettingsRequestError ? e.httpStatus : null;
+    return { status: "failed", httpStatus, reason: describeSettingsFailure(httpStatus) };
+  }
+}
+
 function loadOnce(): void {
   if (inFlight) return;
-  inFlight = fetch("/api/studio-settings")
-    .then(async r => {
-      if (!r.ok) throw new SettingsRequestError(r.status);
-      return r.json();
-    })
-    .then(data => {
-      const read = data?.settings;
-      if (!read?.settings) throw new Error("The studio settings response had no settings.");
-      publish({ status: "loaded", settings: read.settings, issues: read.issues ?? {} });
-    })
-    .catch((e: unknown) => {
-      // Was `.catch(() => {})`, which kept the defaults on screen forever and
-      // left no trace anywhere that the fetch had ever failed.
-      //
-      // A transport failure and a malformed body have no HTTP status, and are
-      // deliberately not described as if they did.
-      const httpStatus = e instanceof SettingsRequestError ? e.httpStatus : null;
-      publish({ status: "failed", httpStatus, reason: describeSettingsFailure(httpStatus) });
-    });
+  inFlight = (async () => {
+    for (let attempt = 0; ; attempt++) {
+      const result = await fetchSettingsOnce();
+
+      // A 401 is not transient: the session is gone, and retrying only delays
+      // telling the person to sign in again.
+      const signedOut = result.status === "failed" && result.httpStatus === 401;
+
+      if (result.status === "loaded" || signedOut || attempt >= RETRY_LIMIT) {
+        publish(result);
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+    }
+  })();
 }
 
 /**
@@ -223,4 +253,10 @@ export function useStudioSettings(): StudioSettingsState {
 export function resetStudioSettingsCache(): void {
   inFlight = null;
   publish({ status: "loading" });
+  // RE-READS immediately rather than waiting for a consumer to mount. Nothing
+  // necessarily remounts after a save — the settings form stays on screen — so
+  // a reset that only cleared the cache would leave every consumer in `loading`
+  // until the next navigation, which is a worse outcome than the stale numbers
+  // it was meant to fix.
+  loadOnce();
 }

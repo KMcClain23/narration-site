@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { resetStudioSettingsCache } from "@/components/admin/useStudioSettings";
 import { adminType } from "@/lib/design-tokens";
 import {
   DEFAULT_STUDIO_SETTINGS,
@@ -102,6 +103,13 @@ export function StudioSettingsForm({ initial }: { initial: StudioSettingsRead })
         return;
       }
       setSaved(true);
+      // The shared store holds the PRE-SAVE numbers until told otherwise.
+      // router.refresh() re-renders server components; it does not touch a
+      // client-side cache, so without this every settings-derived figure on
+      // every other screen would keep quoting the old rate until a hard reload
+      // — which is the staleness a shared cache buys in exchange for a single
+      // loading window, and the reason the escape hatch exists.
+      resetStudioSettingsCache();
       router.refresh();
     } catch {
       setError("Could not save.");
