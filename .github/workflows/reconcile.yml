@@ -1,0 +1,44 @@
+# The H1 reconciliation check, run on every push and pull request.
+#
+# WHAT THIS IS AND IS NOT. This is a signal on the repository, not a deploy
+# gate. Vercel builds from GitHub independently of Actions, so a red run here
+# does NOT stop a deploy. Treating it as a gate would be the same mistake the
+# check itself exists to prevent: something that looks like it is holding a
+# line and is not.
+#
+# CREDENTIALS. The check reads the database with the service-role key, so it
+# needs two repository secrets:
+#     NEXT_PUBLIC_SUPABASE_URL
+#     SUPABASE_SERVICE_ROLE_KEY
+# Settings -> Secrets and variables -> Actions. Until they are added this
+# workflow FAILS — deliberately. It does not skip when the secrets are absent,
+# because a skipped run reports green, and a green tick that checked nothing is
+# worse than a red one that says so out loud.
+#
+# It runs against the LIVE database, which is what makes it worth anything: the
+# figures it reconciles are the real ones. That also means it can go red because
+# the data changed rather than because the code did. When it does, the output
+# names the card and both figures.
+name: Reconcile card economics
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: TypeScript and the database must agree on every card
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run check-card-economics:ci

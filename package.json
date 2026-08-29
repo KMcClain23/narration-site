@@ -17,7 +17,8 @@
     "check-dialogue-highlights": "npx --yes tsx --env-file=.env.local scripts/check-dialogue-highlights.ts",
     "check-payments-costed": "npx --yes tsx --env-file=.env.local scripts/check-payments-costed.ts",
     "check-function-grants": "npx --yes tsx --env-file=.env.local scripts/check-function-grants.ts",
-    "check-card-economics": "npx --yes tsx --env-file=.env.local scripts/check-card-economics-reconciles.ts"
+    "check-card-economics": "npx --yes tsx --env-file=.env.local scripts/check-card-economics-reconciles.ts",
+    "check-card-economics:ci": "npx --yes tsx scripts/check-card-economics-reconciles.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

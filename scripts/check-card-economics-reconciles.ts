@@ -14,18 +14,25 @@
  * cannot change a number. That is the whole argument for running it first: it
  * turns "verify the totals did not move" into "the totals cannot move".
  *
- * WHERE IT CAN RUN, stated plainly because it changes what the test is worth:
- * it needs SUPABASE service-role credentials, so it runs LOCALLY and in any CI
- * that carries them as secrets. It is NOT wired into a pipeline today. Until it
- * is, this is a check someone has to remember to run, which is most of a
- * guard's value gone — treat that as an open item, not as a passing gate.
+ * WHERE IT RUNS, stated plainly because it changes what the test is worth: it
+ * needs SUPABASE service-role credentials, so it runs locally via
+ * `npm run check-card-economics`, and on GitHub Actions
+ * (.github/workflows/reconcile.yml) via `npm run check-card-economics:ci`,
+ * which carries them as repository secrets.
+ *
+ * IT IS A SIGNAL, NOT A DEPLOY GATE. Vercel builds from GitHub independently of
+ * Actions, so a red run here does not stop a deploy. Calling it a gate would be
+ * the same failure it exists to catch — something that looks like it is holding
+ * a line and is not. If the secrets are absent the run FAILS rather than skips,
+ * because a skipped run reports green and a green tick that checked nothing is
+ * worse than no tick at all.
  *
  * The comparison calls the SAME functions the app calls. It does not
  * reimplement them: a reconciliation test that reimplements one side is
  * comparing two copies of the thing it is trying to prove has only one.
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { narratorShareOf } from "@/components/admin/board-card-utils";
 import {
   cardExpected,
@@ -71,6 +78,61 @@ function compare(title: string, field: string, ts: number | null, db: number | n
   console.log(`         TypeScript ${show(ts)}   database ${show(db)}`);
 }
 
+/**
+ * rs_plus is a live branch in BOTH implementations — board-card-utils.ts guards
+ * `paymentType !== "pfh" && paymentType !== "rs_plus"`, the database guards
+ * `payment_type not in ('pfh', 'rs_plus')` — and no card in Dean's data uses
+ * it. A branch nothing reaches is a branch nothing checks: the two lists could
+ * drift apart and every run would still say "All cards reconcile."
+ *
+ * The fixture has to be a REAL unarchived row, because the function reads
+ * board_cards directly and filters `archived_at is null`. There is no hidden
+ * corner to put it in. So it is created, compared, and deleted.
+ *
+ * STATED PLAINLY, because it is a real cost: for the few seconds a run takes, a
+ * card that is not Dean's exists on the live board and inside the live totals.
+ * A leftover from a killed run is swept at the start of the next one.
+ */
+const FIXTURE_TITLE = "ZZZ reconciliation fixture — rs_plus (auto-deleted)";
+
+async function sweepFixture(db: SupabaseClient): Promise<void> {
+  const { error } = await db.from("board_cards").delete().eq("title", FIXTURE_TITLE);
+  // A sweep that cannot run means the delete at the end probably cannot either,
+  // and this must not leave a card behind quietly.
+  if (error) throw new Error(`could not sweep the rs_plus fixture: ${error.message}`);
+}
+
+async function createFixture(db: SupabaseClient): Promise<string> {
+  const { data, error } = await db
+    .from("board_cards")
+    .insert({
+      title: FIXTURE_TITLE,
+      status: "recording",
+      payment_type: "rs_plus",
+      // Round numbers, so a mismatch reads as a formula difference rather than
+      // as floating-point noise.
+      word_count: 100000,
+      pfh_rate: 250,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(`could not create the rs_plus fixture: ${error.message}`);
+  return data.id as string;
+}
+
+async function removeFixture(db: SupabaseClient, id: string | null): Promise<void> {
+  if (!id) return;
+  const { error } = await db.from("board_cards").delete().eq("id", id);
+  if (error) {
+    // Loud, and by title, so it can be removed by hand.
+    console.error("");
+    console.error(`  COULD NOT DELETE THE FIXTURE (${error.message}).`);
+    console.error(
+      `  Delete the card titled "${FIXTURE_TITLE}" by hand — it is in the live totals until you do.`,
+    );
+  }
+}
+
 async function main() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -91,6 +153,18 @@ async function main() {
     process.exit(2);
   }
 
+  // The fixture exists for the whole comparison, so BOTH sides see it.
+  await sweepFixture(db);
+  let fixtureId: string | null = null;
+  try {
+    fixtureId = await createFixture(db);
+    return await runComparison(db, divisor);
+  } finally {
+    await removeFixture(db, fixtureId);
+  }
+}
+
+async function runComparison(db: SupabaseClient, divisor: number): Promise<number> {
   const { data: cards, error: cardsErr } = await db
     .from("board_cards")
     .select(
@@ -98,8 +172,7 @@ async function main() {
     )
     .is("archived_at", null);
   if (cardsErr) {
-    console.error(`board_cards: ${cardsErr.message}`);
-    process.exit(2);
+    throw new Error(`board_cards: ${cardsErr.message}`);
   }
 
   const { data: payments, error: payErr } = await db
@@ -108,16 +181,14 @@ async function main() {
       "id, card_id, kind, period, label, amount_expected, amount_gross, amount_received, due_on, invoiced_on, invoice_number, method, notes, sort_order",
     );
   if (payErr) {
-    console.error(`payments: ${payErr.message}`);
-    process.exit(2);
+    throw new Error(`payments: ${payErr.message}`);
   }
 
   const { data: payouts, error: poErr } = await db
     .from("payment_payouts")
     .select("id, payment_id, payee_name, kind, amount, paid_on");
   if (poErr) {
-    console.error(`payment_payouts: ${poErr.message}`);
-    process.exit(2);
+    throw new Error(`payment_payouts: ${poErr.message}`);
   }
 
   // Payouts hang off payment rows, the same shape lib/payments.ts expects.
@@ -138,8 +209,8 @@ async function main() {
   const { data: econ, error: econErr } = await db.rpc("card_economics_for_session");
   if (econErr) {
     // A check that cannot run is NOT a check that passed.
-    console.error(`card_economics_for_session: ${econErr.message}`);
-    process.exit(2);
+    // Thrown, not exited: process.exit would skip the fixture delete.
+    throw new Error(`card_economics_for_session: ${econErr.message}`);
   }
   const byId = new Map<string, EconRow>();
   for (const e of (econ ?? []) as EconRow[]) byId.set(e.card_id, e);
@@ -191,6 +262,20 @@ async function main() {
     const tsInvoice =
       tsIncome == null ? null : tsIncome + tsEditing * (1 - (tsShare ?? 1));
 
+    // The fixture reconciling is not enough. If BOTH sides returned null for
+    // rs_plus — which is exactly what a dropped rs_plus would look like on the
+    // side that dropped it — null equals null and the run passes having proved
+    // nothing. The fixture must produce a real figure on both sides.
+    if (card.title === FIXTURE_TITLE) {
+      if (tsIncome == null || dbRow.income == null) {
+        failures++;
+        console.log("  FAIL the rs_plus fixture earned nothing on one side:");
+        console.log(`         TypeScript ${show(tsIncome)}   database ${show(dbRow.income)}`);
+        console.log("       Both null reconciles and proves nothing — rs_plus has been");
+        console.log("       dropped from one of the two lists.");
+      }
+    }
+
     compare(card.title, "share", tsShare, dbRow.share);
     compare(card.title, "income", tsIncome, dbRow.income);
     compare(card.title, "editing_cost", tsEditing, dbRow.editing_cost);
@@ -212,6 +297,14 @@ async function main() {
     const n = covered.get(name) ?? 0;
     console.log(`  ${n > 0 ? "covered " : "NO ROWS "} ${String(n).padStart(2)}  ${name}`);
   }
+  if (!(covered.get("payment_type rs_plus") ?? 0)) {
+    failures++;
+    console.log("");
+    console.log("  FAIL the rs_plus fixture was not compared. It is created before the");
+    console.log("       fetch and deleted after, so an empty bucket means it never reached");
+    console.log("       one of the two sides — and this run proves nothing about rs_plus.");
+  }
+
   const uncovered = EDGE_CASES.filter(e => !(covered.get(e) ?? 0));
   if (uncovered.length) {
     console.log(
@@ -225,10 +318,12 @@ async function main() {
       ? "\nAll cards reconcile."
       : `\n${failures} mismatch(es). Do NOT migrate — report both figures and let Dean decide which side is right.`,
   );
-  process.exit(failures === 0 ? 0 : 1);
+  return failures === 0 ? 0 : 1;
 }
 
-main().catch(e => {
-  console.error(e);
-  process.exit(1);
-});
+main()
+  .then(code => process.exit(code))
+  .catch(e => {
+    console.error(e);
+    process.exit(1);
+  });

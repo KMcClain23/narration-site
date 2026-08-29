@@ -1651,3 +1651,150 @@ Not process decoration — each of these found something in this stretch:
    on the strength of the guard test, and the reason holds: the guard proves how many
    places can call sign-out, not that the call works with no network. Those are
    different claims and only one of them is tested.
+
+---
+
+## Cleanup batch J1-J8 (2026-08-29)
+
+### Manuscript-derived page counts, and the two controls
+
+Ten page counts applied to cards that had none: With a Broken Wing 440, Blood on the
+Asphalt 392, Heir of the Emberscale 255, Beating For You 231, Merciless Punks 224,
+His For Christmas 180, Unbound 174, The Circle 133, No One to Hold Me 131, The Final
+Guardian 46. Unarchived cards with no `total_pages`: **18 before, 8 after**.
+
+None of the ten had a `current_page`, so the `apply_card_rules` trigger had nothing to
+derive from and `words_recorded` could not move. That was checked before the write
+rather than inferred from it afterwards.
+
+**Control 1 - money.** `word_count` sum 2,346,308, `pfh_rate` sum 5,965,
+`narrator_share_percent` sum 299, `royalty_split_percent` sum null; payments 25 rows,
+expected 521.09, received 6,844.98. Identical before and after.
+
+**Control 2 - career.** 33 books, 27 with a word count, `word_count` sum 2,346,308,
+`words_recorded` sum 458,239. Identical before and after.
+
+Both controls read the BASE TABLES, not `card_economics_for_session()` or
+`career_totals_for_session()`. That is deliberate: a control computed by the same
+function whose output it is vouching for cannot detect a fault in that function.
+
+### `books` is write-only - evidence, not impression
+
+- `GET /api/books` reads **`board_cards`**, and says so in the code: "Source of truth
+  is board_cards."
+- All four `from("books")` sites in `src/app/api/books/route.ts` are **writes** -
+  insert, update, update, delete. There is no `select` against `books` anywhere in the
+  application or in any `.sql` file in the repo.
+- `/admin/books` is **linked from no navigation**. The only mention outside its own
+  directory is a comment in `src/app/admin/login/page.tsx`.
+- Its 20 rows carry **no unique data**: every title also exists in `board_cards`; its
+  two extra columns are `category` (which maps onto `status`: coming-soon, completed,
+  in-progress) and `link`, and all 20 links duplicate a link already on the card.
+
+An unlinked admin screen editing a table nothing reads, beside the same data's real
+source of truth. **Recommendation: delete the table and the screen.** Not acted on -
+Dean decides.
+
+### The backup table is PARTIAL, and was nearly recorded as if it were not
+
+`books_pre_cleanup_20260829` holds **8 rows**, against 20 currently in `books` - and
+**4 of its rows are no longer in `books`** at all (Beating For You, Blood on the
+Asphalt, Restrict, Tease). It is a snapshot of the rows one cleanup touched, not a
+snapshot of the table. All four also exist as `board_cards`, so nothing is unique to
+it, but "there is a backup" would have been a misleading sentence to leave behind.
+
+### The career-total attribution catch
+
+The career total moved 23,444 to 39,073 and the obvious culprit was the 17:50
+migration. It was not: the change came from Dean's own page entry at 06:45, which took
+a book from page 132 to page 220. The migration ran eleven hours later. A figure moving
+near a change is not a figure moving *because of* it, and the timestamps were what
+settled it.
+
+### Two new verification rules
+
+1. **A fixture that reconciles as `null == null` proves nothing.** The `rs_plus` branch
+   had no card exercising it, so a fixture was added - but a fixture is only worth
+   something if it produces a REAL figure on both sides. Had `rs_plus` been dropped from
+   one list, that side would return null, null would equal null, and the run would have
+   reported "All cards reconcile." The check now asserts the fixture's income is
+   non-null on both sides, and that assertion was mutation-tested: removing `rs_plus`
+   from `board-card-utils.ts` produces three failures reporting `TypeScript null` against
+   `database 2659.5745`.
+2. **A pipeline that skips when its secrets are missing reports green.** The workflow
+   fails when the credentials are absent rather than skipping, because a green tick that
+   checked nothing is worse than no tick at all - and it is documented as a SIGNAL, not
+   a gate, since Vercel deploys independently of Actions.
+
+### Open items 2, 3 and 6 above are now closed
+
+- **2 - `supabaseBrowser`:** deleted. It had zero importers.
+- **3 - `co_narrator` in two shapes:** normalised to JSON array strings after every
+  reader was confirmed to handle both. 32 rows are now arrays; 2 empty strings were left
+  alone, since both parsers already yield `[]` for them.
+- **6 - DoD 8:** built. See below.
+
+### DoD 8: what it actually did, which was worse than failing
+
+Recording a page on a book with no `total_pages` did **not** fail. `apply_card_rules`
+returned early:
+
+```sql
+if new.total_pages is null or new.total_pages <= 0
+   or new.current_page is null or new.current_page < 0 then
+  return new;
+end if;
+```
+
+The write was accepted in full, the page was stored, `words_recorded` never moved, and
+nothing said so - and `pageLine()` renders nothing without a total, so the screen looked
+like it had saved. The roadmap had this recorded as "should prompt rather than fail",
+which was wrong about the starting point: it never failed.
+
+It now asks, naming the book and the page:
+
+> Set the total page count for "Santa Promised" before recording page 50. Without the
+> total there is nothing to measure the page against, so words recorded cannot be worked
+> out.
+
+Five cases were checked in a rolled-back transaction: a page with no total is **refused**;
+setting a total alone still works; clearing a page still works; a page past the last page
+is still refused by the pre-existing guard; and a normal page write still derives. The
+early return is retained for the clearing case, which is legitimate and must stay silent.
+
+### The `co_narrator` reader survey (done BEFORE normalising)
+
+Every reader was checked first, because normalising against an unsurveyed reader is how
+a data migration breaks a page nobody was looking at.
+
+- **`parseCoNarrators`** (`board-card-utils.ts:308`) - handles array strings, bare text
+  and JSON scalars. Used by the co-narrator contact pages, `BoardCardContent`,
+  `CardEditModal`, `InvoiceButton`, `PaymentFormModal` and `RoyaltyLedger`.
+- **The public book page** (`narrated-works/[slug]/page.tsx:207`) - its own inline copy
+  of the same logic, handling all three shapes.
+- **`narrationPlan` does NOT read `co_narrator`.** It uses `narratorShareOf`, off format
+  and percent. The roadmap and the brief both assumed otherwise.
+- **The agenda API does not read it either.**
+- **`parseMaybeJsonArray`** (`api/board/export/route.ts:38`) - the one gap, and it is
+  LATENT, not live: a valid-JSON *scalar* (a quoted name) falls past the `Array.isArray`
+  test and returns `[]`, dropping the name. No row has that shape, and normalisation has
+  now made it less reachable still. Left as found and reported rather than fixed unasked.
+
+### Open items carried forward (updated)
+
+1. **Web migration onto `card_economics_for_session`.** Unchanged. `/payments` reads the
+   function; six surfaces still compute in TypeScript, pinned by the reconciliation check.
+2. **The `books` table and `/admin/books`.** Recommendation above; awaiting Dean.
+3. **The share rule's fallback is still `else 1`.** Unchanged, still a recorded trap.
+4. **DoD 2 - `word_count` from the phone, end to end.** Still needs Dean's hardware.
+5. **Stage 1 item 14, offline sign-out - stays DELIBERATELY UNTESTED.** Unchanged.
+6. **The reconciliation workflow has no credentials yet.** `.github/workflows/reconcile.yml`
+   needs `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as repository secrets.
+   Until Dean adds them **it will fail on every push**, which is the intended behaviour and
+   not a broken workflow.
+7. **The reconciliation fixture is visible while it runs.** `card_economics_for_session()`
+   filters `archived_at is null` and reads `board_cards` directly, so there is no hidden
+   place to put an `rs_plus` fixture. It is created, compared, and deleted - meaning for
+   the few seconds a run takes, a card that is not Dean's exists on the live board and
+   inside the live totals. A leftover from a killed run is swept at the start of the next.
+   Verified clean after both a passing and a deliberately failing run.
