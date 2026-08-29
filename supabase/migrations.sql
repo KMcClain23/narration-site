@@ -1892,3 +1892,48 @@ $function$;
 -- Drop-and-create, so the ACL reset and the revokes below are not optional.
 -- check-function-grants confirmed clean afterwards — the guard earning its
 -- keep on the first widening after it was built.
+
+-- ============================================================
+-- Payouts: an admin-only read (28 August 2026)
+-- ============================================================
+--
+-- Stage 8 closed payment_payouts to a hard deny and said "any future Payouts
+-- screen starts with a grant and a reason". This is that. The reason: nine
+-- payments carry money going OUT to an editor, and the app rendered them as $0
+-- with no explanation.
+--
+-- SELECT ONLY to authenticated, plus a "Role read" policy copying payments and
+-- expenses verbatim — including the (select current_app_role()) wrapper, which
+-- is the InitPlan-caching form evaluated once per statement rather than once
+-- per row.
+--
+-- payouts_for_session() is SECURITY INVOKER like the rest of the family. As
+-- invoker it reads the table AS THE CALLING SESSION, so the policy decides the
+-- answer and a non-admin gets zero rows from RLS rather than an error. Definer
+-- would read with the owner's privileges and make the grant decorative.
+--
+-- CREATE OR REPLACE, never DROP + CREATE: a drop resets the ACL and re-grants
+-- EXECUTE to PUBLIC. The CREATE still grants PUBLIC on a new function, which is
+-- why the revoke is not optional.
+--
+-- VERIFIED, and the negative test needed a control before it meant anything:
+--
+--   V1 admin session          payouts_for_session() -> 9 rows
+--   V2 non-admin session      -> 0 rows, HTTP 200, no error
+--   V3 anon                   no SELECT on the table, no EXECUTE on the rpc
+--   V4 authenticated          SELECT and only SELECT
+--   V5 full audit clean       all 8 read functions authenticated/postgres/
+--                             service_role, no anon, no PUBLIC
+--   V6 payments_for_session   still INVOKER, still returns card_title
+--
+-- V2 FIRST CAME BACK WRONG — 9 rows for a demoted session — and the fault was
+-- the harness. The MCP connection runs as postgres, which has rolbypassrls, so
+-- RLS never applied. The control caught it: the same test against `payments`,
+-- whose policy is identical and known-good, ALSO returned all 25 rows. Re-run
+-- under `set local role authenticated`, both filtered to zero.
+--
+-- A NEGATIVE TEST THAT CANNOT DISTINGUISH ITS SUBJECT FROM ITS HARNESS IS NOT A
+-- TEST. The control is what made the difference readable.
+--
+-- Dean's profile was never committed as changed: the demotion ran inside a
+-- transaction that raises at the end. profiles still reads admin.
