@@ -2,11 +2,16 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isAdminRequest } from "@/lib/require-admin";
 
-// Payouts attached to a payment: a co-narrator's half, an editor's fee, a
-// proofer. Kept as its own endpoint rather than nested writes on /api/payments
-// so editing one payout doesn't require resubmitting the whole payment.
+// Payouts belong to a BOOK: a co-narrator's half, an editor's fee, a proofer.
+// Kept as its own endpoint rather than nested writes on /api/payments so
+// editing one payout doesn't require resubmitting the whole payment.
+//
+// card_id is required; payment_id is OPTIONAL and only says which payment
+// settles the cost. It used to be the other way round, which is why recording
+// an editor meant inventing a payment first — and why eight $0 payments exist.
 
-const SELECT_COLS = "id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, paid_via, notes";
+const SELECT_COLS =
+  "id, card_id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, paid_via, notes";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -21,8 +26,13 @@ function amountOrNull(v: unknown): number | null {
 export async function GET(req: Request) {
   if (!(await isAdminRequest())) return unauthorized();
 
-  const paymentId = new URL(req.url).searchParams.get("paymentId");
+  const params = new URL(req.url).searchParams;
+  const paymentId = params.get("paymentId");
+  const cardId = params.get("cardId");
   let query = supabaseAdmin.from("payment_payouts").select(SELECT_COLS);
+  // By card is the primary lookup now: a cost recorded against a book with no
+  // payment yet is invisible to a payment-keyed query.
+  if (cardId) query = query.eq("card_id", cardId);
   if (paymentId) query = query.eq("payment_id", paymentId);
 
   const { data, error } = await query.order("created_at", { ascending: true });
@@ -36,14 +46,18 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    if (!body.payment_id) {
-      return NextResponse.json({ error: "payment_id required." }, { status: 400 });
+    if (!body.card_id) {
+      return NextResponse.json({ error: "card_id required." }, { status: 400 });
     }
 
     const { data, error } = await supabaseAdmin
       .from("payment_payouts")
       .insert({
-        payment_id: body.payment_id,
+        card_id: body.card_id,
+        // Optional. Null means the cost is recorded against the book but is not
+        // yet tied to a payment. The database refuses a payment for a different
+        // book, so this cannot drift.
+        payment_id: body.payment_id ?? null,
         payee_name: String(body.payee_name ?? "").trim(),
         kind: body.kind || "co_narrator",
         amount: amountOrNull(body.amount) ?? 0,

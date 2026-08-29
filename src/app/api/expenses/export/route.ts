@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
       .select(
         "id, card_id, kind, period, label, amount_expected, due_on, invoiced_on, invoice_number, " +
           "amount_received, amount_gross, received_on, method, notes, sort_order, " +
-          "payouts:payment_payouts(id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, paid_via, notes)",
+          "payouts:payment_payouts(id, card_id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, paid_via, notes)",
       ),
   ]);
 

@@ -1,7 +1,7 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PaymentsClient } from "@/components/payments/PaymentsClient";
-import type { CardEconomics, MoneyCard, PaymentRow } from "@/lib/payments";
+import type { CardEconomics, LoosePayout, MoneyCard, PaymentRow } from "@/lib/payments";
 import { assertAdmin } from "@/lib/require-admin";
 
 // Admin data changes constantly and staleness has zero acceptable UX here —
@@ -16,7 +16,7 @@ export default async function PaymentsPage() {
   // card is worth: card_economics_for_session() is the same formula the six
   // remaining TypeScript surfaces implement, and check-card-economics pins them
   // to each other.
-  const [cardsRes, paymentsRes, econRes] = await Promise.all([
+  const [cardsRes, paymentsRes, econRes, looseRes] = await Promise.all([
     supabaseAdmin
       .from("board_cards")
       .select(
@@ -33,9 +33,19 @@ export default async function PaymentsPage() {
       .from("payments")
       .select(
         "id, card_id, kind, period, label, amount_expected, due_on, invoiced_on, invoice_number, amount_received, amount_gross, received_on, method, notes, sort_order, stripe_payment_link, paypal_payment_link, " +
-          "payouts:payment_payouts(id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, paid_via, notes)"
+          "payouts:payment_payouts(id, card_id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, paid_via, notes)"
       ),
     supabaseAdmin.rpc("card_economics_for_session"),
+    // Costs recorded against a BOOK that no payment settles yet. They cannot
+    // arrive through the nested read above — that one hangs payouts off
+    // payments, and these have no payment. Before this fetch existed, adding an
+    // editor to a book with no payment row wrote a row nothing on the page
+    // could display: a cost that was recorded and invisible, which is the worst
+    // of the three states.
+    supabaseAdmin
+      .from("payment_payouts")
+      .select("id, card_id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, paid_via, notes")
+      .is("payment_id", null),
   ]);
 
   const cards = (cardsRes.data ?? []) as MoneyCard[];
@@ -46,10 +56,16 @@ export default async function PaymentsPage() {
   // tell "no economics" from "economics that say nothing" — an empty list
   // meaning "the call failed" is the ambiguity this project keeps paying for.
   const economics = econRes.error ? null : ((econRes.data ?? []) as CardEconomics[]);
+  const unsettledPayouts = (looseRes.data ?? []) as unknown as LoosePayout[];
 
   return (
     <AdminLayout>
-      <PaymentsClient cards={cards} payments={payments} economics={economics} />
+      <PaymentsClient
+        cards={cards}
+        payments={payments}
+        economics={economics}
+        unsettledPayouts={unsettledPayouts}
+      />
     </AdminLayout>
   );
 }

@@ -24,7 +24,7 @@ const SELECT_COLS =
   // Embedded so a payment always arrives with its payouts — every consumer
   // needs them to compute the waterfall, and a second round-trip per payment
   // would be pure overhead.
-  "payouts:payment_payouts(id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, paid_via, notes)";
+  "payouts:payment_payouts(id, card_id, payment_id, payee_name, kind, amount, rate_pfh, paid_on, paid_via, notes)";
 
 /** Date columns reject "" — Supabase needs an explicit null for an empty date. */
 function dateOrNull(v: unknown): string | null {

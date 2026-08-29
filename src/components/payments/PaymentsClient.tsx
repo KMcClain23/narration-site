@@ -5,8 +5,8 @@ import { studioRates, useStudioSettings } from "@/components/admin/useStudioSett
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
-import { parseLocalDate } from "@/components/admin/board-card-utils";
-import type { CardEconomics } from "@/lib/payments";
+import { narratorShareOf, parseLocalDate } from "@/components/admin/board-card-utils";
+import type { CardEconomics, LoosePayout } from "@/lib/payments";
 import {
   cardExpected,
   clientOf,
@@ -27,6 +27,7 @@ import { MarkPaidButton } from "./MarkPaidButton";
 import { ImportDropZone } from "./ImportDropZone";
 import { RoyaltyLedger } from "./RoyaltyLedger";
 import { PayoutsPanel } from "./PayoutsPanel";
+import { AddEditorButton } from "./AddEditorButton";
 
 // Order is the order of attention: money you're owed, then work you could
 // bill, then everything that needs no decision today.
@@ -124,6 +125,33 @@ const GROUP_HINT: Record<ProjectState, string> = {
     "The words-per-finished-hour setting could not be read, so nothing on these projects can be costed. Nothing is wrong with the projects themselves — check Settings, then reload.",
 };
 
+/**
+ * Why a project shows no figure.
+ *
+ * Six rows used to render the same em dash for four different causes, and the
+ * screen could not tell Dean which of them he could fix. A missing word count
+ * is a five-second edit; a multicast split is hidden by design and nothing to
+ * act on. One glyph for both is the worst of the three states — present,
+ * absent, plausible — because it looks answered.
+ *
+ * The order below MIRRORS the order estimatedEarnings() actually bails in, so
+ * the sentence names the FIRST thing standing in the way rather than a later
+ * one that happens to also be true. Derived from the card every time; there is
+ * no list of titles here to go stale.
+ */
+function noIncomeReason(card: MoneyCard, wordsPerFinishedHour: number | null): string {
+  if (card.status === "recast") return "recast — fee is a negotiation";
+  const t = card.payment_type;
+  if (t !== "pfh" && t !== "rs_plus") return "royalty share — no fee to estimate";
+  if (!card.word_count) return "needs a word count";
+  if (!card.pfh_rate) return "needs a rate";
+  if (wordsPerFinishedHour == null || wordsPerFinishedHour <= 0) return "studio rate unreadable";
+  if (narratorShareOf(card.narration_format, card.narrator_share_percent) == null) {
+    return "multicast — split not recorded";
+  }
+  return "no figure";
+}
+
 type Project = {
   card: MoneyCard;
   rows: PaymentRow[];
@@ -132,6 +160,10 @@ type Project = {
   isEstimate: boolean;
   /** Editing fronted on this project, already inside `amount`. */
   editing: number;
+  /** Why `amount` is null. Null when there IS a figure. */
+  noFigureBecause: string | null;
+  /** Costs on this book that no payment settles yet. */
+  loose: LoosePayout[];
 };
 
 function fmtDate(s: string | null): string {
@@ -174,7 +206,7 @@ function ProjectRow({
   onAddPayment: () => void;
   onEditPayment: (p: PaymentRow) => void;
 }) {
-  const { card, rows, amount, isEstimate, state, editing } = project;
+  const { card, rows, amount, isEstimate, state, editing, noFigureBecause, loose } = project;
   const primary = rows[0];
 
   // Settled work has nothing left to bill. Most of it was never invoiced at
@@ -216,8 +248,17 @@ function ProjectRow({
             <span
               className={`${adminType.monoNum} block ${isEstimate ? "text-text-dim" : "text-text-primary"}`}
             >
-              {amount != null ? `${isEstimate ? "~" : ""}${formatMoney(amount)}` : "—"}
+              {amount != null
+                ? `${isEstimate ? "~" : ""}${formatMoney(amount)}`
+                : noFigureBecause
+                  ? ""
+                  : "—"}
             </span>
+            {/* The dash alone said nothing: four different causes rendered
+                identically, and only some of them are Dean's to fix. */}
+            {noFigureBecause && (
+              <span className={`${adminType.small} block text-text-dim`}>{noFigureBecause}</span>
+            )}
             {amount != null && editing > 0.005 && state !== "paid" && (
               <span className={`${adminType.small} block`}>
                 {formatMoney(amount - editing)} you · {formatMoney(editing)} editing
@@ -225,6 +266,11 @@ function ProjectRow({
             )}
           </span>
 
+          {/* An editing cost belongs to the BOOK, so it is offered on every
+              in-production row — including the ones showing no figure. It
+              does NOT create a payment: needing one first is what produced
+              the eight hollow $0 rows. */}
+          {state === "production" && <AddEditorButton cardId={card.id} title={card.title} />}
           {primary ? (
             <>
               {/* Awaiting means the invoice has gone out, so the thing to do
@@ -262,6 +308,21 @@ function ProjectRow({
           )}
         </div>
       </div>
+
+      {/* Costs recorded against the book that no payment settles yet.
+          They cannot appear in the payment sub-rows below, because they
+          hang off no payment — and a cost that is recorded but invisible
+          is the reason the eight $0 payments were invented. */}
+      {loose.length > 0 && (
+        <div className="mt-2 pl-1">
+          {loose.map(po => (
+            <p key={po.id} className={adminType.small}>
+              {po.payee_name} · {po.kind} · {formatMoney(Number(po.amount) || 0)}
+              <span className="text-text-dim"> · not yet on a payment</span>
+            </p>
+          ))}
+        </div>
+      )}
 
       {/* Only projects that genuinely pay in instalments get the extra lines —
           a single-payment project would just repeat the row above. */}
@@ -392,9 +453,12 @@ export function PaymentsClient({
   cards,
   payments,
   economics,
+  unsettledPayouts,
 }: {
   cards: MoneyCard[];
   payments: PaymentRow[];
+  /** Costs recorded against a book that no payment settles yet. */
+  unsettledPayouts: LoosePayout[];
   /**
    * Per-card economics from `card_economics_for_session()`.
    *
@@ -446,6 +510,16 @@ export function PaymentsClient({
     [cards, rowsByCard, finishedRate],
   );
 
+  const looseByCard = useMemo(() => {
+    const m = new Map<string, LoosePayout[]>();
+    for (const po of unsettledPayouts) {
+      const list = m.get(po.card_id) ?? [];
+      list.push(po);
+      m.set(po.card_id, list);
+    }
+    return m;
+  }, [unsettledPayouts]);
+
   const projects = useMemo<Project[]>(() => {
     return cards
       .map(card => {
@@ -493,6 +567,10 @@ export function PaymentsClient({
           amount,
           editing,
           isEstimate: state === "paid" || state === "awaiting" ? false : !isCardExpectedActual(rows),
+          // Only asked when there is no figure, so a project that HAS one
+          // never carries a sentence explaining an absence that isn't there.
+          noFigureBecause: amount == null ? noIncomeReason(card, finishedRate) : null,
+          loose: looseByCard.get(card.id) ?? [],
         };
       })
       .sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0));
@@ -505,7 +583,7 @@ export function PaymentsClient({
     // uncostable and the page blamed the settings for it.
     // econById is in here because `expected` now reads from it. The /payments
     // outage was a memo that read a value its dependency array did not list.
-  }, [cards, rowsByCard, finishedRate, econById]);
+  }, [cards, rowsByCard, finishedRate, econById, looseByCard]);
 
   const grouped = useMemo(() => {
     const m = new Map<ProjectState, Project[]>();

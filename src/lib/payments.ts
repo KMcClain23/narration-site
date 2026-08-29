@@ -158,6 +158,26 @@ export function payoutBurden(payout: PayoutRow, card: MoneyCard): number {
 // The board_cards columns the money layer reads. A subset of BoardV2Card —
 // declared separately because this also needs production_company/type and
 // released_at, which the board itself has no use for.
+/**
+ * A cost recorded against a BOOK that no payment settles yet.
+ *
+ * payment_id is null by definition here. These never appear in the nested
+ * `payments -> payouts` read, because they hang off no payment — so they need
+ * their own fetch or they are written and never seen.
+ */
+export type LoosePayout = {
+  id: string;
+  card_id: string;
+  payment_id: string | null;
+  payee_name: string;
+  kind: string;
+  amount: number | string | null;
+  rate_pfh: number | string | null;
+  paid_on: string | null;
+  paid_via: string;
+  notes: string;
+};
+
 export type MoneyCard = {
   id: string;
   title: string;

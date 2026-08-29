@@ -643,13 +643,18 @@ export function PaymentFormModal({
     setPayouts(next);
   }
 
-  /** Payouts can only be written once the payment has an id to hang off. */
+  /**
+   * Payouts belong to the BOOK. The payment id is passed too, because a payout
+   * created here IS settled by this payment — but it is no longer what the
+   * payout hangs off, and the database refuses a payment for a different book.
+   */
   async function syncPayouts(paymentId: string) {
     for (const id of removedIds) {
       await fetch(`/api/payments/payouts?id=${id}`, { method: "DELETE" });
     }
     for (const p of payouts) {
       const body = {
+        card_id: cardId,
         payment_id: paymentId,
         payee_name: p.payee_name,
         kind: p.kind,

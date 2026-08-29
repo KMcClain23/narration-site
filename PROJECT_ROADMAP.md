@@ -1837,3 +1837,109 @@ a data migration breaks a page nobody was looking at.
    control: there is no `DATABASE_URL` and no Postgres driver in the project, so a
    client-side `BEGIN ... ROLLBACK` was not available. **If that function is ever edited,
    the `raise` is the rollback** - removing it commits a card to the live board.
+
+---
+
+## Editing costs belong to the book (2026-08-29)
+
+`payment_payouts.payment_id` was NOT NULL with no `card_id`, so recording an
+editor required inventing a payment first. That is where the eight $0 payments
+came from: Dean's workaround and the unreadable Money rows were one defect seen
+from two ends.
+
+### The remodelling
+
+`card_id` added, backfilled from each payout's payment, then set NOT NULL.
+`payment_id` keeps its foreign key but loses NOT NULL - it is now an OPTIONAL
+link to the payment that SETTLES the cost, not the payout's identity.
+
+A payout pointing at one book and at a payment for another is silent
+corruption, and this change is what makes it possible. A CHECK cannot see
+another table, so `check_payout_card_matches_payment()` enforces it as a
+trigger, shaped like the existing `check_card_*` validators.
+
+### What was verified, and what moved
+
+- **M1** `payout_summary_for_session` returns 12,071.28 / 4,680.00 / 9,731.28,
+  identical across all six fields. Lossless.
+- **M2** All 9 payouts map to the SAME card as before, per row, not just in
+  total. A total can match while two rows swap books.
+- **M4** The mismatch trigger refuses a payout linked to another book's payment,
+  naming both. A payout with NO payment link is accepted, and one with a
+  MATCHING link is accepted - both checked, because a trigger that refuses
+  everything would also have passed the first test.
+- **M5** Non-admin gets BOARD_ACCESS_NOT_ENABLED from both functions; anon has
+  no EXECUTE and no table grant; admin can INSERT against a book with no
+  payment, UPDATE a granted column and DELETE - and UPDATE on `card_id` is
+  REFUSED, so the column scope holds and the trigger's rule cannot be
+  sidestepped after the fact.
+- **M7** The nine `_for_session` functions are byte-identical to baseline.
+- **M8** The reconciliation check still passes on all 33 cards.
+
+### Three things in the brief that were not true
+
+1. **M1's fourth figure, 2,340.00, matches nothing.** Not a summary field, not a
+   subtotal, not the paid/unpaid split. The real figures are total 5,318, paid
+   638, unpaid 4,680 - and `committed_out` is the UNPAID total. Reported rather
+   than mapped onto the nearest real number.
+2. **M3's production figure is 13,431, not 12,700 - and the difference is not
+   this change.** Hexes & Heartbreakers now has BOTH a word count (91,605) and a
+   rate ($150); the brief said it needed a rate. Duet share 0.5 gives
+   91,605 / 9,400 x 150 x 0.5 = $731, and 12,700 + 731 = 13,431 exactly.
+   `Ready to invoice` is $7,262, matching the brief.
+3. **The L5 list of six was stale in two places.** Hexes has a rate now, so it
+   shows a figure rather than a dash; and `How an Angel Dies: Wrath` is
+   multicast and belongs on the list. Deriving the reason from the data, as the
+   brief required, produced the correct six where the hardcoded list would not
+   have.
+
+### The M7 audit caught a real regression
+
+`rs_plus_branch_probe` was created with `revoke all on function ... from public`
+and a single grant to `service_role`. The audit found **anon and authenticated
+still had EXECUTE**. Supabase's DEFAULT PRIVILEGES grant EXECUTE to those two
+roles EXPLICITLY on every new function in the schema, and an explicit grant is
+not a PUBLIC grant - so revoking PUBLIC left both untouched. Revoked by name.
+
+**The rule:** revoking PUBLIC is not enough on this database. Revoke `anon` and
+`authenticated` by name, then audit, or the grant is still there.
+
+### A cost that is recorded and invisible
+
+The first end-to-end run of "+ Editor" wrote the payout correctly - against the
+book, with no payment created, payments unchanged at 25 - and **nothing on the
+page showed it**. The Money screen reads payouts nested under payments
+(`payouts:payment_payouts(...)`), and a payout with no payment cannot arrive
+that way. The write was right and the row was invisible, which is the same
+failure shape as the dashes: it looked like nothing had happened.
+
+Fixed by fetching payouts with `payment_id is null` separately and rendering
+them on the row as `<payee> · <kind> · <amount> · not yet on a payment`.
+
+### STILL OPEN
+
+1. **`payouts_for_session` cannot return `card_id` without a DROP.** Proved, not
+   assumed: `CREATE OR REPLACE` with the column added is refused with
+   `42P13 cannot change return type of existing function`. Per the brief this
+   stopped rather than dropping - a DROP loses the ACL, re-grants EXECUTE to
+   PUBLIC and destroys the comments. This blocks the PHONE only; the web reads
+   `payment_payouts` directly through the service role and never calls that
+   function.
+2. **`card_economics_for_session` still attributes editing through payments.**
+   Its editing CTE joins `payment_payouts -> payments` and filters
+   `kind <> 'royalty'`. A cost recorded against a book with NO payment therefore
+   does not reach `editing_cost` or `invoice_total`. Nothing is wrong today -
+   all 9 existing payouts have a payment - but every payout the new button
+   creates will be outside the money figures until this is changed, and changing
+   it redefines a money figure, which is not something to do unasked. The
+   correct rewrite keys on `po.card_id` and admits a payout where
+   `payment_id is null OR its payment is non-royalty`, which preserves today's
+   numbers exactly.
+3. **M6, the phone end to end, is not done** - it needs Dean's hardware. The web
+   equivalent was run in full: added an editor to Hexes & Heartbreakers (a book
+   with no payment row), confirmed the payout appeared, confirmed payments
+   stayed at 25 and Hexes still had 0 payment rows, then deleted it and
+   confirmed it was gone.
+4. **The eight hollow payments are now vestigial.** Confirmed exactly eight,
+   each $0/$0/$0 carrying exactly one payout. Left untouched: deleting them
+   changes the Money screen's row set and is its own decision.
