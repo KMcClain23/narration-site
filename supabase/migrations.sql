@@ -1964,3 +1964,35 @@ $function$;
 -- Verified as an authenticated admin:
 --   expected_in 24142.56  committed_out 4680.00  net 19462.56
 --   unpaid 8  paid 1  books_without_word_count 0
+
+-- ============================================================
+-- Payout functions carry the board gate (28 August 2026)
+-- ============================================================
+--
+-- payouts_for_session and payout_summary_for_session now call
+-- assert_board_access() first, like the other seven read functions.
+--
+-- Not a live vulnerability: both are SECURITY INVOKER and payment_payouts has a
+-- "Role read" policy, so a non-admin already got zero rows. The gap was that
+-- every other read function refuses at the door while these two relied entirely
+-- on the policy behind it — one layer where the rest have two.
+--
+-- payouts_for_session moved from `language sql` to plpgsql to carry it. A SQL
+-- function has no statement to perform before its query.
+--
+-- CREATE OR REPLACE, never DROP, and the ACL compared before and after rather
+-- than assumed:
+--
+--   before  all nine: authenticated,postgres,service_role
+--   after   all nine: authenticated,postgres,service_role
+--
+-- The observable change, as an authenticated non-admin:
+--
+--   before  payouts_for_session -> 0 rows (RLS filtered, no error)
+--   after   payouts_for_session -> ERROR 42501 BOARD_ACCESS_NOT_ENABLED
+--
+-- The regression assertion is on committed_out, NOT expected_in or net.
+-- expected_in also reads the divisor from site_settings, which is admin-gated
+-- in its own right, so it returns 0 for a non-admin even if the payouts policy
+-- failed completely — it would pass for the wrong reason. Only committed_out
+-- depends solely on the payment_payouts join.
