@@ -1789,3 +1789,48 @@ $function$;
 -- referenced by six RLS policies, ALL scoped to {authenticated} — so revoking
 -- it from anon would not affect them. Not revoked here: a revoke is the most
 -- consequential command in this project and this one was not asked for.
+
+-- ============================================================
+-- Closing the callable helpers to PUBLIC and anon (28 August 2026)
+-- ============================================================
+--
+-- Seven functions the grant guard surfaced, all now authenticated/postgres/
+-- service_role only:
+--
+--   card_word_count_refusal(integer)
+--   check_card_share_percent(text, integer)
+--   check_card_word_count(integer)
+--   check_site_setting(text, text)
+--   current_app_role()
+--   site_setting_refusal(text, text)
+--   validate_site_setting()
+--
+-- THE ARGUMENT IS current_app_role. The only SECURITY DEFINER in the set, and a
+-- definer function reachable by an unauthenticated caller runs with the
+-- definer's privileges. It returns null for anon today because auth.uid() is
+-- null in its CURRENT BODY — a property of the body, not of the grant, and the
+-- grant should not depend on the body staying benign.
+--
+-- The other six are nuisance rather than risk. They go with it because leaving
+-- six open while closing one makes the guard's output permanently noisy, and a
+-- guard with expected noise is one people stop reading.
+--
+-- PRE-CHECKED, both halves, before revoking:
+--
+--   anon cannot reach any validation path. Every policy calling
+--   current_app_role is {authenticated}; anon holds SELECT only on board_cards
+--   and site_settings and nothing on payments or expenses, so no write fires as
+--   anon and no trigger calls these on its behalf.
+--
+--   authenticated holds an EXPLICIT grant on all seven, separate from PUBLIC.
+--   That is the half that mattered: had it held them only THROUGH PUBLIC,
+--   revoking PUBLIC would have taken the settings write path down with it —
+--   check_site_setting is called by the validate_site_setting trigger, which
+--   runs as the invoking user.
+--
+-- SEVEN, NOT SIX. The seventh, card_word_count_refusal, was in the guard's
+-- output from the first run and missing from the list acted on, because that
+-- list was read off a `tail` of the output rather than the whole of it. The
+-- guard was complete; the enumeration taken FROM the guard was truncated. A
+-- sampling error one layer above the tool that exists to prevent sampling
+-- errors — and it was the guard's own second run that caught it.
