@@ -141,11 +141,16 @@ function checkTypeScript(): void {
 }
 
 /**
- * Half two: the database, against rows that never commit.
+ * Half two: the database, touching no rows at all.
  *
- * card_payout_branch_probe() builds its own card AND its own card-level payout,
- * calls card_economics_for_session() in the same transaction so it sees them,
- * then unconditionally rolls both back from inside a plpgsql subtransaction.
+ * card_payout_branch_probe() passes synthetic SCALARS to public.card_economics()
+ * — the pure arithmetic that card_economics_for_session() also delegates to. The
+ * $200 reaches it as the p_editing scalar; in the live function that same figure
+ * arrives through editing_by_card's `po.payment_id is null` arm, so what the
+ * arithmetic sees is identical.
+ *
+ * It USED to build a card AND a payout inside a rolled-back subtransaction.
+ * Extracting the arithmetic removed the need.
  */
 async function checkSql(): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -186,9 +191,9 @@ async function checkSql(): Promise<void> {
     console.log("  FAIL the probe returned no row.");
     return;
   }
-  assertReal("SQL editing_cost", row.editing_cost == null ? null : Number(row.editing_cost), EXPECTED_EDITING);
-  assertReal("SQL income", row.income == null ? null : Number(row.income), EXPECTED_INCOME);
-  assertReal("SQL invoice_total", row.invoice_total == null ? null : Number(row.invoice_total), EXPECTED_INVOICE);
+  assertReal("SQL card_economics editing_cost", row.editing_cost == null ? null : Number(row.editing_cost), EXPECTED_EDITING);
+  assertReal("SQL card_economics income", row.income == null ? null : Number(row.income), EXPECTED_INCOME);
+  assertReal("SQL card_economics invoice_total", row.invoice_total == null ? null : Number(row.invoice_total), EXPECTED_INVOICE);
 }
 
 async function main(): Promise<number> {

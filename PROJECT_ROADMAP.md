@@ -2161,3 +2161,76 @@ the two agree on a real row end to end, which is what the eight edge cases in th
 reconciliation run do carry. That is a SMALLER claim and is not filed as
 equivalent. When a real `rs_plus` card or a real card-level payout exists, the
 reconciliation run covers it properly and the corresponding probe can go.
+
+---
+
+## The arithmetic, extracted (2026-08-29)
+
+Both CI probes were permanent functions whose bodies INSERTED into `board_cards`,
+each relying on an unconditional `RAISE` that an innocuous edit could remove. They
+were built that way because the formula only existed inside a query over three
+tables: the sole way to exercise a branch was to make rows exist.
+
+`public.card_economics()` now holds the arithmetic and nothing else. Ten scalars
+in, four figures out. No table reads, no writes, no `assert_board_access()` — it
+cannot leak anything because it is never given anything to leak. IMMUTABLE,
+PARALLEL SAFE. `card_economics_for_session()` supplies the columns, the payment
+aggregates and the studio divisor, and delegates.
+
+### The null semantics were preserved deliberately
+
+`when p_payment_type not in ('pfh', 'rs_plus') then null` looks like it wants
+tidying to `is distinct from`. It does not. When `payment_type` is NULL,
+`NULL not in (...)` evaluates to NULL, the branch is not taken, and evaluation
+falls through to the next test — which is what the original did. "Tidying" that
+would move money.
+
+### A one-minute outage, caused by the extraction
+
+The first delegating version failed function resolution: `count(*)` is `bigint`
+and `narrator_share_percent` is `smallint`, and **bigint to integer is an
+ASSIGNMENT cast, not an implicit one**, so no candidate matched. Between the two
+migrations `card_economics_for_session()` raised `42883` and `/payments` was
+broken in production for about a minute. Fixed with explicit casts at the call
+site rather than by widening the pure function's parameters, so the arithmetic
+keeps declaring the types it actually wants.
+
+Worth recording because the extraction was numerically inert and still caused an
+outage: **the risk in a refactor is not only in the arithmetic.**
+
+### Verified by the numbers
+
+- **Per-card, not just totals.** All 33 cards compared field by field across
+  `share`, `income`, `editing_cost`, `invoice_total`, `title`, `status` —
+  **198 comparisons, every one identical**, tolerance 1e-12, and nullness
+  compared separately from value so a null turning into 0 could not pass.
+- `payout_summary_for_session`: 12,071.281914893618 / 4,680 /
+  9,731.281914893618 / 8 / 1 / 0. Unchanged.
+- Web: In production **$13,431**, Ready to invoice **$7,262**. A fresh
+  before-reading was taken rather than trusting the figures in the brief.
+- Full ACL audit before and after: identical, with `card_economics` added as
+  anon false / authenticated true / service_role true / no PUBLIC.
+- All four checks green: reconciliation, rs_plus, card-payout, grant guard.
+
+### Mutation-tested in both directions, because the pure function is now the
+### single point where a one-sided change would hide
+
+| mutation | reconciliation | card-payout probe | rs_plus probe |
+|---|---|---|---|
+| SQL: share dropped from income in `card_economics` | RED, many cards | RED (income, invoice) | green — correctly |
+| TypeScript: share dropped from `estimatedEarnings` | RED, same cards | RED (income, invoice) | green — correctly |
+
+The rs_plus probe staying green in both is right, not a miss: its synthetic card
+has share 1, so dropping the share multiplication cannot change its figure. A
+probe that went red there would have been reporting something it does not test.
+
+### The probes are now pure
+
+Asserted in the migration itself, and re-checked independently against
+`pg_proc.prosrc`: neither body contains `INSERT`, `UPDATE`, `DELETE` or `RAISE`,
+and both are IMMUTABLE. That check is the point of the exercise — the bodies
+shrank to 401 and 495 characters, and there is no longer any code path in this
+schema, outside the application, that writes to `board_cards`.
+
+The residual claim is unchanged in kind: both probes prove each side against
+figures written down by hand, not that the two agree on a real row end to end.

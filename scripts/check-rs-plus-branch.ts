@@ -121,13 +121,16 @@ function checkTypeScript(): void {
 }
 
 /**
- * Half two: the database, against a row that never commits.
+ * Half two: the database, touching no rows at all.
  *
- * rs_plus_branch_probe() inserts an rs_plus card, calls
- * card_economics_for_session() in the same transaction so it sees the
- * uncommitted row, and then unconditionally rolls the insert back from inside a
- * plpgsql subtransaction. Nothing else ever sees the row, and the rollback does
- * not depend on the result, so a crash cannot leak it.
+ * rs_plus_branch_probe() passes synthetic SCALARS to public.card_economics() —
+ * the pure arithmetic that card_economics_for_session() also delegates to. It
+ * reads no table and writes nothing.
+ *
+ * It USED to insert an rs_plus card inside a rolled-back subtransaction, because
+ * the formula only existed inside a query over three tables and the only way to
+ * exercise a branch was to make rows exist. Extracting the arithmetic removed
+ * the need, and with it a permanent function whose body wrote to the live board.
  */
 async function checkSql(): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -165,7 +168,7 @@ async function checkSql(): Promise<void> {
     console.error(`rs_plus_branch_probe: ${error.message}`);
     process.exit(2);
   }
-  assertEarns("SQL card_economics_for_session", data == null ? null : Number(data));
+  assertEarns("SQL card_economics (via rs_plus_branch_probe)", data == null ? null : Number(data));
 }
 
 async function main(): Promise<number> {
