@@ -2696,3 +2696,120 @@ run wrote. Done that way, the real first screen is the clean sign-in screen.
   enrols Play App Signing, which is Dean's decision to accept.
 - `.apk` `D:\Developer\dmn-admin-android\app\build\outputs\apk\release\app-release.apk`
 - `.aab` `D:\Developer\dmn-admin-android\app\build\outputs\bundle\release\app-release.aab`
+
+---
+
+## E2 — the editor's write path: typed pickups and editing progress (2026-08-29)
+
+Android and database. The site's half is deferred; see the decisions at the end.
+
+### The shape of the thing
+
+`board_cards` gained `chapters_edited`, `chapters_total`, `editing_completed_at`
+and **no editing_status column**. The state is derived: completed_at set is done,
+chapters_edited above zero is in progress, neither is not started. A stored
+status and a count can disagree — "done" beside 4 of 12 is a row that cannot be
+true and would still render. There is one fact, so there is nothing to
+contradict.
+
+`pickups` is TYPED. `chapter` is first class rather than part of a location
+string, because two features read it: pickups batch per chapter, and E3 names the
+email subject from it. A value two features depend on is not a substring.
+`kind` is one of misread / noise / sentence / other, and a misread REQUIRES the
+said/should_be pair — enforced by a trigger, not by the form, because a typed
+form whose types are only enforced in the UI is an untyped table with a hopeful
+client. Status is a lifecycle: draft, sent, resolved, dismissed.
+
+Nothing is reserved for audio. E5 adds that when there is somewhere to put a
+file; an unused column is a promise the schema cannot keep.
+
+### Every write is an RLS bypass with a gate in front of it
+
+Nine SECURITY DEFINER functions, each naming its columns explicitly. `authenticated`
+has no grant at all on `pickups` and no UPDATE grant on the three new board_cards
+columns, so the functions are the only route — not the preferred one, the only one.
+
+`update_own_draft_pickup` and `delete_own_draft_pickup` check `created_by =
+auth.uid()` **and** `status = 'draft'`. Ownership because an editor changing
+someone else's pickup is a bug even while there is one editor — "there is only
+one" is a fact about today's data, not a property of the system. Draft because
+once sent, the email has gone and the record must stop moving, or it would
+disagree with what the narrator was actually asked to do.
+
+`send_chapter_pickups` performs the draft-to-sent transition **and nothing else**.
+No email is sent and none is queued. Doing the transition alone means E3 adds a
+side effect to a boundary that already exists and is already tested, rather than
+inventing both at once.
+
+`resolve_pickup` is admin-gated and only accepts a SENT pickup: resolving a draft
+would close something the narrator was never asked about.
+
+### What was verified
+
+- **X1** Whole-row diff as the editor: `set_editing_progress` changed
+  `chapters_edited`, `chapters_total` and `updated_at` — the last by the
+  pre-existing touch trigger, not by the column list. Title, status, pfh_rate,
+  word_count and every other column unchanged. A definer UPDATE is only as narrow
+  as its column list, and a whole-row diff is the only thing that catches a list
+  wider than intended.
+- **X2** Named attempts: direct UPDATE of `chapters_edited` refused outright;
+  direct SELECT/INSERT on `pickups` refused; a bogus `kind` refused; a pickup
+  with no chapter refused; every financial read refused.
+- **X3** `resolve_pickup` as the editor: `BOARD_ACCESS_NOT_ENABLED`.
+- **X4** `update_own_draft_pickup` against (a) Dean's draft and (b) her own SENT
+  pickup — both refused, as was deleting her own sent one.
+- **X5** `kind = 'misread'` without `said` and without `should_be` — both refused
+  AT THE DATABASE, each naming which half is missing. "Invalid misread" would be
+  true and useless.
+- **X6** `board_for_editor` after the DROP+CREATE: 33 rows, no `pfh_rate`,
+  `payment_type`, `narrator_share_percent` or `royalty_split_percent` KEY at all,
+  asserted on absence; `is_confidential` and the three new columns present.
+- **X7** Full ACL audit before and after. The only anon-executable functions are
+  the same seven inert trigger functions as the baseline; no new function is
+  reachable by anon.
+- **X8** Admin unchanged across every function, plus the new ones.
+- **X9** Every new definer function calls its gate before touching anything —
+  and the check was PROVED NON-VACUOUS against a probe whose gate comes last,
+  which it correctly reports as a failure.
+
+Money reconciles and the standing grant guard passes; the stage touched
+`board_cards`, so both were re-run.
+
+### One asymmetry worth knowing about
+
+A direct `update board_cards set pfh_rate` as the editor is not refused — it is
+RLS-filtered to zero rows. `authenticated` holds a column-scoped UPDATE grant
+covering `pfh_rate`, `payment_type`, `narrator_share_percent`,
+`royalty_split_percent`, `title` and `word_count`, for the ADMIN's writes from
+the phone, and RLS is what stops the editor.
+
+The three new columns are granted to nobody, which is why the same attempt on
+`chapters_edited` IS refused outright. For the financial columns the barrier is
+one layer, not two — which is exactly why E1's rule that no RLS policy may be
+added for editors matters as much as it does.
+
+### E2e — decisions taken here and NOT acted on
+
+Recorded because a decision taken and not written down gets made again,
+differently. This is the narration_format lesson.
+
+1. **The site's pickup UI is DEFERRED until after the web auth migration, not
+   dropped.** The database half is deliberately surface-neutral: no column, gate
+   or function assumes a phone, so the site needs no schema work when it comes.
+2. **`dmn_admin_key` will be RETIRED ENTIRELY at the end of that migration, not
+   kept as a fallback.** A shared secret that still works reads as `service_role`
+   regardless of role, so it bypasses every boundary E1 and E2 build. A fallback
+   that bypasses the thing it falls back from is not a fallback.
+3. **The text columns here are STAGED, not shortcuts.** E3 hangs the email on
+   `send_chapter_pickups`; E4 and E5 add OneDrive filing and audio; E6 turns
+   `assigned_to` into a real reference. `assigned_to` is text today because the
+   18 co-narrators exist as names and not as users, and a uuid referencing a
+   table with no rows for them is a migration later.
+
+### Not verified
+
+The Android UI compiles and its logic is unit-tested (305 tests, 0 failures), but
+**no part of it has been exercised on a device**. Sign-in needs a password that
+was deliberately not shared, so the editor's form, the narrator picker, the
+per-chapter Send and the admin's resolve have not been seen working against the
+real functions. The database side of every one of those is tested directly.
