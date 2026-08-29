@@ -2079,3 +2079,35 @@ $function$;
 --
 --   before  authors=27  board_cards=0   (empty, RLS filtering)
 --   after   authors=27  board_cards=ERROR permission denied
+
+-- ============================================================
+-- The decisions, written where SQL finds them (29 August 2026)
+-- ============================================================
+--
+-- COMMENT ON for five load-bearing decisions. The roadmap only works for
+-- someone who reads it first, and a person working in psql will not.
+--
+--   board_cards.narration_format        NULL is deliberate on four cards; the
+--                                       column renders publicly
+--   board_cards.narrator_share_percent  takes precedence in the share rule;
+--                                       the lever used instead
+--   payment_payouts (table)             admin-only, SELECT and only SELECT
+--   payout_summary_for_session          the payout/income share asymmetry
+--   card_economics_for_session          the single definition, and that the
+--                                       web has not migrated onto it
+--
+-- The two column comments narration_format and narrator_share_percent point at
+-- each other, so someone who finds either is led to the other. Both point at
+-- PROJECT_ROADMAP.md by section name for the full reasoning.
+--
+-- COMMENT ON is safe: no DROP, no ACL change, no behavioural effect. Verified
+-- afterwards anyway — the grant guard still reports clean.
+--
+-- Two comments already existed, on total_pages and current_page from 10A.
+-- Neither was on any of these five, so nothing was extended or overwritten;
+-- public now holds seven and both originals read back unchanged.
+--
+-- A THIRD REASON NOT TO DROP THESE FUNCTIONS. Comments are keyed to the object
+-- OID: CREATE OR REPLACE preserves them, DROP + CREATE destroys them silently.
+-- So a drop loses the ACL, re-grants EXECUTE to PUBLIC, and takes the
+-- documentation with it. Three failures, none of which announces itself.
