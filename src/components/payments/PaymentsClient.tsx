@@ -535,7 +535,8 @@ export function PaymentsClient({
         // the same as zero: the page then withholds the figure rather than
         // asserting a project is worth nothing.
         const expected = econById.get(card.id)?.invoice_total ?? null;
-        const editing = editingCost(rows);
+        const loose = looseByCard.get(card.id) ?? [];
+          const editing = editingCost(rows, loose);
 
         // cardExpected() excludes royalty rows on purpose — royalties are not
         // a forecast — so a project owed only royalties computed to $0 while
@@ -570,7 +571,7 @@ export function PaymentsClient({
           // Only asked when there is no figure, so a project that HAS one
           // never carries a sentence explaining an absence that isn't there.
           noFigureBecause: amount == null ? noIncomeReason(card, finishedRate) : null,
-          loose: looseByCard.get(card.id) ?? [],
+          loose,
         };
       })
       .sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0));

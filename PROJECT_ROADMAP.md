@@ -1943,3 +1943,118 @@ them on the row as `<payee> · <kind> · <amount> · not yet on a payment`.
 4. **The eight hollow payments are now vestigial.** Confirmed exactly eight,
    each $0/$0/$0 carrying exactly one payout. Left untouched: deleting them
    changes the Money screen's row set and is its own decision.
+
+---
+
+## Making the new payouts count (2026-08-29)
+
+The previous stage let a cost be recorded against a book. This one makes it
+reach the figures, on both sides at once.
+
+### N1 - a deliberate DROP, and the ACL restored by hand
+
+`payouts_for_session` had to return `card_id`: a payout created against a book
+has `payment_id` NULL, so without it the phone gets rows it cannot attribute.
+`CREATE OR REPLACE` refuses this with `42P13 cannot change return type of
+existing function`, proved rather than assumed.
+
+**The ACL captured before the drop, verbatim:**
+
+```
+postgres=X/postgres
+authenticated=X/postgres
+service_role=X/postgres
+```
+
+No PUBLIC entry, no anon, and **no COMMENT** - so there was none to preserve.
+One was added, since a drop is the moment you find out.
+
+Restored by name after the recreate, `anon` revoked by name, PUBLIC revoked as
+well, and every one of those asserted inside the same migration so a
+half-applied recreate fails loudly rather than shipping open. Verified with
+`has_function_privilege()`, not by reading the ACL string.
+
+### N2 - editing attributed through the book
+
+The old editing subquery lived inside `agg`, which is built
+`from payments group by card_id`. A card with NO payments produced no `agg` row
+at all, so its editing was 0 whatever the join said - and that is exactly the
+card the "+ Editor" button writes against. Fixing the join condition alone would
+not have been enough; editing needed its own CTE keyed on `po.card_id`.
+
+Both arms matter: `po.payment_id is null` (recorded against the book, nothing
+settles it yet) `or p2.kind <> 'royalty'` (settled by a real fee). A royalty
+statement has no fee to take production costs from.
+
+The TypeScript `editingCost` gained a **required** second parameter rather than
+a defaulted one. A default of `[]` would have let all three call sites keep
+compiling while silently under-counting, and a cost that is recorded but missing
+from the figure is worse than one that errors. Making it required meant the
+compiler named every caller - it found exactly three.
+
+### THE RECONCILIATION TEST WAS BLIND TO THIS
+
+Worth stating plainly, because the brief relied on the opposite: *"the
+reconciliation test goes red if only one lands."*
+
+**It does not, on today's data.** The TypeScript side was mutated to drop
+card-level payouts entirely, and the run reported **"All cards reconcile."**
+There are zero payouts with `payment_id is null`, so there is nothing for the
+two sides to disagree about, and the test cannot see a one-sided change.
+
+The mutation test was only meaningful once one such payout existed. With one
+present, both halves were mutation-tested independently and produced mirror
+images:
+
+| mutation | TypeScript | database |
+|---|---|---|
+| TS side drops card-level payouts | 0.0000 | 100.0000 |
+| SQL side drops the `payment_id is null` arm | 100.0000 | 0.0000 |
+
+Both reverted; the probe payout deleted; 9 payouts, 25 payments, 0 loose.
+
+**The standing consequence:** until a real card-level payout exists, this pairing
+is held by review and by the mutation test above, not by the reconciliation run.
+
+### What was verified
+
+- **P1** `payout_summary_for_session` returns 12,071.281914893618 / 4,680 /
+  9,731.281914893618 / 8 / 1 / 0 - identical before and after. Web: In
+  production **$13,431**, Ready to invoice **$7,262**, both unchanged. A fresh
+  before-reading was taken rather than trusting the brief's figures.
+- **P2** A payout with `payment_id` NULL against a duet card moved
+  `editing_cost` by **exactly the payout amount**. `invoice_total` moved by
+  **amount x (1 - share)** - $50 on a $100 payout at share 0.5, NOT the full
+  amount as the brief expected. That is the co-narrator's half being billed
+  back, and it is correct: on a solo card (share 1) `invoice_total` would not
+  move at all.
+- **P3** A $500 payout on a ROYALTY payment moved `editing_cost` by 0. Still
+  excluded. Note the rule keys on the PAYMENT's kind, not the card's: a payout
+  with no payment on a royalty-only book IS counted, which is the first arm
+  doing its job.
+- **P4** `payouts_for_session` returns `card_id`, populated on all 9 rows -
+  checked by calling it, after a first attempt via `information_schema.columns`
+  wrongly reported "NO" (that view does not describe set-returning functions).
+  `has_function_privilege('anon', ...)` false. Full audit across all ten
+  functions identical to baseline. The standing grant guard passes.
+- **P6** The L1 mismatch trigger still refuses a payout linked to another book's
+  payment, with a matching-link control accepted.
+
+### End to end, on the real page
+
+"+ Editor" on Hexes & Heartbreakers (duet, share 0.5), $321: the production total
+moved **$13,431 to $13,591**, exactly `321 x (1 - 0.5) = 160.50`. Before this
+stage it would have moved by nothing. Probe deleted, total back to $13,431.
+
+### N3 / N4
+
+`rs_plus_branch_probe` now carries a comment saying it is permanent schema that
+exists only for CI, that the unconditional RAISE **is** the rollback, that it is
+the only function in the schema whose body writes to `board_cards`, and that
+revoking PUBLIC alone was insufficient.
+
+`supabase/migrations.sql` records the rule beside the no-DROP rule: **PUBLIC and
+named grants are independent channels, in both directions.** Revoking PUBLIC does
+not remove an explicit `anon` grant that Supabase default privileges added; and a
+role may hold access ONLY via PUBLIC, so revoking PUBLIC can cut off a role you
+did not intend. Verify by privilege, never by reading the ACL string.

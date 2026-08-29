@@ -1790,6 +1790,52 @@ $function$;
 -- it from anon would not affect them. Not revoked here: a revoke is the most
 -- consequential command in this project and this one was not asked for.
 
+
+-- ============================================================
+-- PUBLIC AND NAMED GRANTS ARE INDEPENDENT CHANNELS (29 August 2026)
+-- ============================================================
+--
+-- Sits beside the no-DROP rule above, because it is the other half of it. That
+-- rule says a DROP resets the ACL and re-grants EXECUTE to PUBLIC. This one says
+-- what to do about it, and it is not what it looks like.
+--
+-- ON THIS DATABASE, `REVOKE ... FROM PUBLIC` IS NEVER SUFFICIENT.
+-- Supabase's DEFAULT PRIVILEGES grant EXECUTE to `anon` and `authenticated`
+-- EXPLICITLY on every function created in `public`. An explicit grant is NOT a
+-- PUBLIC grant: it survives a PUBLIC revoke untouched. Revoke BY NAME.
+--
+-- Found the hard way. `rs_plus_branch_probe()` was created with
+-- `revoke all on function ... from public` and one grant to service_role, which
+-- reads as locked down. The ACL audit found anon and authenticated still holding
+-- EXECUTE, because the default privileges had granted them directly and the
+-- PUBLIC revoke never touched those rows.
+--
+-- THE CONVERSE ALSO HOLDS, and has already nearly caused an outage here: a role
+-- may hold access ONLY through PUBLIC, so revoking PUBLIC can cut off a role you
+-- never intended to touch. Neither revoke implies the other, in either
+-- direction.
+--
+-- SO: revoke PUBLIC *and* revoke anon by name, then VERIFY BY PRIVILEGE rather
+-- than by reading the ACL string:
+--
+--   revoke all on function public.f() from anon;
+--   revoke all on function public.f() from public;
+--   grant execute on function public.f() to authenticated, service_role;
+--   -- then, and this is the part that actually proves it:
+--   select has_function_privilege('anon', 'public.f()', 'EXECUTE');  -- must be false
+--
+-- has_function_privilege() resolves BOTH channels and role inheritance at once.
+-- Reading pg_proc.proacl does not: PUBLIC is grantee OID 0 and matches no row in
+-- pg_roles, and a null acl means "defaults apply" rather than "nobody has it" —
+-- two different ways for the string to look clean while the privilege is held.
+--
+-- APPLIED HERE when payouts_for_session() was recreated to add card_id, which
+-- CREATE OR REPLACE refuses with 42P13 "cannot change return type of existing
+-- function". The ACL was captured before the drop, restored by name after it,
+-- anon revoked by name, PUBLIC revoked as well, the COMMENT re-attached — a drop
+-- destroys it in silence — and every one of those asserted in the same migration
+-- so a half-applied recreate fails loudly instead of shipping open.
+
 -- ============================================================
 -- Closing the callable helpers to PUBLIC and anon (28 August 2026)
 -- ============================================================

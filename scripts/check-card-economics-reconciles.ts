@@ -37,6 +37,7 @@ import { narratorShareOf } from "@/components/admin/board-card-utils";
 import {
   cardExpected,
   editingCost,
+  type LoosePayout,
   type MoneyCard,
   type PaymentRow,
 } from "@/lib/payments";
@@ -123,7 +124,7 @@ async function runComparison(db: SupabaseClient, divisor: number): Promise<numbe
 
   const { data: payouts, error: poErr } = await db
     .from("payment_payouts")
-    .select("id, payment_id, payee_name, kind, amount, paid_on");
+    .select("id, card_id, payment_id, payee_name, kind, amount, paid_on");
   if (poErr) {
     throw new Error(`payment_payouts: ${poErr.message}`);
   }
@@ -135,6 +136,15 @@ async function runComparison(db: SupabaseClient, divisor: number): Promise<numbe
     list.push(po);
     payoutsByPayment.set(po.payment_id as string, list);
   }
+  const looseByCard = new Map<string, LoosePayout[]>();
+  for (const po of payouts ?? []) {
+    if (po.payment_id != null) continue;
+    const cardId = po.card_id as string;
+    const list = looseByCard.get(cardId) ?? [];
+    list.push(po as unknown as LoosePayout);
+    looseByCard.set(cardId, list);
+  }
+
   const rowsByCard = new Map<string, PaymentRow[]>();
   for (const p of payments ?? []) {
     const row = { ...p, payouts: payoutsByPayment.get(p.id as string) ?? [] } as unknown as PaymentRow;
@@ -166,6 +176,7 @@ async function runComparison(db: SupabaseClient, divisor: number): Promise<numbe
       narrator_share_percent: number | null;
     };
     const rows = rowsByCard.get(card.id) ?? [];
+    const loose = looseByCard.get(card.id) ?? [];
     const dbRow = byId.get(card.id);
     if (!dbRow) {
       failures++;
@@ -186,11 +197,11 @@ async function runComparison(db: SupabaseClient, divisor: number): Promise<numbe
     if (rows.some(r => r.kind !== "royalty" && r.amount_expected != null)) {
       bucket("explicit amount_expected on a non-royalty row");
     }
-    if (editingCost(rows) > 0) bucket("editing cost present");
+    if (editingCost(rows, loose) > 0) bucket("editing cost present");
 
     const tsShare = narratorShareOf(card.narration_format, card.narrator_share_percent);
     const tsIncome = cardExpected(card, rows, divisor);
-    const tsEditing = editingCost(rows);
+    const tsEditing = editingCost(rows, loose);
     // COMPOSED from the three TypeScript primitives rather than called.
     // cardInvoiceTotal was deleted when /payments moved onto the function, so
     // there is no TS implementation of this figure left to call — which is the

@@ -170,7 +170,7 @@ export type LoosePayout = {
   card_id: string;
   payment_id: string | null;
   payee_name: string;
-  kind: string;
+  kind: PayoutKind;
   amount: number | string | null;
   rate_pfh: number | string | null;
   paid_on: string | null;
@@ -369,12 +369,33 @@ export type CardEconomics = {
   invoice_total: number | null;
 };
 
-export function editingCost(rows: PaymentRow[]): number {
-  return rows
+/**
+ * Production costs fronted on one book.
+ *
+ * MIRRORS the editing_by_card CTE in card_economics_for_session(), and the two
+ * are pinned to each other by `npm run check-card-economics`.
+ *
+ * `loose` is REQUIRED, not defaulted, and that is deliberate. An editing cost
+ * can now be recorded against a book with no payment at all — that is the whole
+ * point of the remodelling — and such a payout arrives in neither `rows` nor
+ * `rows[].payouts`, because it hangs off no payment. A default of `[]` would let
+ * every existing call site keep compiling while silently under-counting, and a
+ * cost that is recorded but absent from the figure is worse than one that
+ * errors. Making it required means the compiler names every caller.
+ */
+export function editingCost(rows: PaymentRow[], loose: LoosePayout[]): number {
+  const settled = rows
     .filter(r => r.kind !== "royalty")
     .flatMap(r => r.payouts ?? [])
     .filter(p => isOffTheTop(p.kind))
     .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  // The other arm of the condition: recorded against the book, nothing settles
+  // it yet. A royalty statement has no fee to take costs from, which is what the
+  // filter above is for; a payout with no payment has no kind to exclude it by.
+  const unsettled = loose
+    .filter(p => isOffTheTop(p.kind))
+    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  return settled + unsettled;
 }
 
 /**
