@@ -36,13 +36,43 @@ const categoryLabels: Record<BookCategory, string> = {
   "coming-soon": "Coming Soon to Audible",
 };
 
+/**
+ * co_narrator, whatever shape it arrives in.
+ *
+ * This used to WRAP a non-array in an array. Handed the string
+ * `'["Ann Dahlia"]'` that produced `['["Ann Dahlia"]']` — an array holding a
+ * JSON string — and saving the form then stored it. Three rows in `books`
+ * carried exactly that until 29 August 2026.
+ *
+ * It was unreachable only because GET /api/books happens to JSON.parse the
+ * column before returning it. AN INPUT-SHAPE ASSUMPTION IS NOT A GUARD: the
+ * route could change, another caller could appear, and nothing here would
+ * notice. So parse first, and wrap only when parsing cannot produce a list —
+ * which is the bare-text case, a real shape the column also held.
+ */
+function parseCoNarratorField(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter(Boolean) as string[];
+  if (typeof value !== "string" || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.filter(Boolean) as string[];
+    // Valid JSON that is not a list — a bare quoted name. One entry, not a
+    // wrapped blob.
+    if (typeof parsed === "string" && parsed.trim()) return [parsed];
+    return [];
+  } catch {
+    // Not JSON at all: a plain name such as `Ann Dahlia`.
+    return [value];
+  }
+}
+
 function formStateFromBook(book: Book): FormState {
   return {
     title: book.title,
     subtitle: book.subtitle || "",
     author: book.author,
     link: book.link,
-    co_narrator: Array.isArray(book.co_narrator) ? book.co_narrator : (book.co_narrator ? [book.co_narrator] : []),
+    co_narrator: parseCoNarratorField(book.co_narrator),
     description: book.description || "",
     tags: book.tags.join(", "),
     category: book.category,

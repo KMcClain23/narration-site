@@ -2183,3 +2183,43 @@ $function$;
 --   session_user was rejected for the branch because SET ROLE does not change
 --   it, so a harness impersonating service_role could never exercise that
 --   branch. Same untestability as auth.role(), opposite direction.
+
+-- ============================================================
+-- F: books cleanup, G: manuscript pages and words (29 August 2026)
+-- ============================================================
+--
+-- F. HYGIENE, NOT A PUBLIC FIX. `books` is WRITE-ONLY: GET /api/books reads
+-- board_cards, the public catalogue fetches that route, and the public book
+-- page reads board_cards directly. Verified with the page BEFORE any change —
+-- each duplicated title already appeared once, with zero bracket-quote
+-- sequences rendered. 24 -> 20 rows; the eight affected rows are preserved in
+-- books_pre_cleanup_20260829, because no foreign key protects this table and a
+-- comment cannot be restored from. Drop that table when satisfied.
+--
+-- Tease kept the OLDER row, against the stated rule: both were already
+-- 'completed', and the older one had the clean co_narrator AND a non-zero
+-- sort_order. So two values were normalised, not three — Tease's
+-- double-encoded row was deleted rather than repaired.
+--
+-- The two empty-string co_narrator values are left alone. `''` is not valid
+-- JSON, so a reader calling JSON.parse would throw on it — but nothing reads
+-- this table, so it is moot either way.
+--
+-- G. Pages and word counts from Dean's manuscript PDFs, trusted on two
+-- controls: three hand-entered page counts reproduced exactly, and every
+-- existing word count landed within 3%. Not applied: excerpts, samples, a
+-- duet-adapted script, an annotated narrator script, a broken extraction, and
+-- stale Word properties — each named in the migration.
+--
+-- ALL SIX new word counts are on cards with pfh_rate = 0.00, so
+-- estimatedEarnings returns null and NO money figure moves. Verified: web
+-- production 12699.77 and ready-to-invoice 7262.28 unchanged; phone
+-- 12071.28 / 4680.00 / 2340.00 / 9731.28 unchanged.
+--
+-- THE CAREER FIGURE DID MOVE, and it was not this change. Estimated went
+-- 23,444 -> 39,073 because A COWBOY'S RUNAWAY WAS UPDATED AT 06:45 TODAY,
+-- eleven hours before this migration ran at 17:50 — Dean recorded progress from
+-- page 132 to 220, and the trigger derived
+-- round(92000 * 0.5 * 220/259) = 39,073. That card is not in this migration.
+-- The prediction "career does not move" was made against a stale baseline, not
+-- broken by this work.
