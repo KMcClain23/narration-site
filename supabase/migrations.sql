@@ -1834,3 +1834,37 @@ $function$;
 -- guard was complete; the enumeration taken FROM the guard was truncated. A
 -- sampling error one layer above the tool that exists to prevent sampling
 -- errors — and it was the guard's own second run that caught it.
+
+-- ============================================================
+-- Stage 10D: career_totals_for_session() (28 August 2026)
+-- ============================================================
+--
+-- Words narrated across the career, in three categories, with the partition
+-- asserted inside the function.
+--
+-- A DEDICATED FUNCTION, not a widened list RPC. The total spans three
+-- populations and no list covers them: board_for_session filters to
+-- contracted/prepping/recording/editing so released books are absent, and
+-- released_for_session carries neither words_recorded nor word_count. Widening
+-- the latter would ship twelve rows so a client could sum one number, and would
+-- put the summing in a client where a second implementation could drift from
+-- this one.
+--
+-- NOT computeCareerTotals, which the web already has: that counts released
+-- only, uses word_count, zeroes multicast, and answers "hours of released audio
+-- at the current divisor". Different column, different population, different
+-- unit.
+--
+--   exact        released + editing carrying words_recorded — narrated in full
+--   estimated    recording, with pages, derived from page position
+--   not counted  everything else, WITH THE COUNT AND TITLES RETURNED
+--
+-- Today: 420,194 exact across 9 books, 23,444 estimated across 1, 23 not
+-- counted, 33 non-archived. Nine of the uncounted are released books with no
+-- word count.
+--
+-- THE PARTITION IS CHECKED AGAINST THE TABLE, not against the buckets. Summing
+-- the buckets and comparing to the sum of the buckets would agree with any
+-- bucketing at all, including one that dropped a category — the exact failure
+-- this exists to make impossible. Mutation-tested by removing the not_counted
+-- category: "Career categories account for 10 books but 33 are not archived."
