@@ -1350,3 +1350,282 @@ remains emulator-verified only. That is not a caveat weakening the result; it is
 scope one test earned.
 
 Stage 1 item 14, the offline sign-out, is unchanged and stays deliberately untested.
+
+---
+
+## Stage 10 and after — payouts, one definition, and a public field that nearly moved
+
+The record from the Stage 8 close-out (`48ee154`) to here. Android: `23774ee` card
+editor, `52ce1a8` the row merge, `e0863f5` page progress, `ba490f0` career total,
+`61dc5fd` app icon, `32413b1` payouts on Money. Web: `b1c81c1` grant guard, `1100a1f`
+page columns, `9294572` payment rows, `a6da9cc` payouts grant, `0ef828d` the pair,
+`7c8ad6d` settings store, `e3989d2` the gate, `5a78d07` retry and reset, `20fda86`
+one definition, `150cb72` the share correction.
+
+### The payouts grant — Stage 8's promise, collected
+
+Stage 8 closed `payment_payouts` to a hard deny and wrote that "any future Payouts
+screen starts with a grant and a reason." This is that grant. The reason: nine
+payments carry an editor payout — eight pending, one paid — and the Money screen was
+rendering all nine as $0.00 with nothing on the row to say why.
+
+`grant select` to `authenticated`, and a "Role read" policy using
+`((select current_app_role()) = 'admin')` — copied from `payments` and `expenses`
+character for character, **including the `(select ...)` wrapper**, which is the
+InitPlan-caching form evaluated once per statement rather than once per row. It looks
+like a redundant subquery and is not one.
+
+Four things deliberately NOT done, each a live temptation at the time:
+
+- **No `anon` or `PUBLIC` grant.** Nothing about a payout is public.
+- **SELECT only.** No insert, update or delete. The screen reads these; a write path
+  is a separate decision that would need its own verification.
+- **`payments_for_session` NOT flipped to `SECURITY DEFINER`.** It would have let one
+  function read payouts with no grant at all — convenient, and it would silently
+  change the security posture of everything else that function already returns.
+- **No `DROP` + `CREATE` on any existing function.** A drop resets the ACL and
+  re-grants `EXECUTE` to `PUBLIC`; `anon` inherits from `PUBLIC`. That regression has
+  already happened here once, on `board_for_session` and `card_detail`, in a migration
+  whose own comment claimed the opposite.
+
+### The share defect — the app shipped a number that was twice too big
+
+Recorded as a defect, not a footnote.
+
+The payouts spec defined Dean's expected income as `word_count / 9400 * pfh_rate` and
+omitted the narrator share factor entirely. `payout_summary_for_session` shipped to
+his phone showing **net $19,462.56** when the correct figure was roughly half.
+**Twenty-two of thirty-four cards are duet**, so the error applied to most of the
+catalogue rather than to an edge case.
+
+Corrected figures, verified against live data:
+
+| | |
+|---|---|
+| expected in | **$12,071.28** |
+| editing paid out | **$4,680.00** |
+| editing billed back | **$2,340.00** |
+| net to Dean | **$9,731.28** |
+
+The defect survived review on both sides because no single reader saw both: the web
+had the share, the app did not, and nothing compared them.
+
+### The asymmetry — why the defect was invisible
+
+This is the detail that made it hard to see, and it must survive any future tidy-up:
+
+    EDITOR PAYOUT  = word_count / divisor * rate_pfh           <- NO share
+    DEAN'S INCOME  = word_count / divisor * pfh_rate * SHARE   <- share applies
+
+The editor is paid for narrating **the whole book**; Dean earns his share of it. Two
+formulas that look like the same formula, differing by one factor that is correct to
+omit in one of them.
+
+**`PayoutTest.kt`'s no-share assertions are CORRECT.** It pins all nine stored payout
+amounts to `round(word_count / 9400 * rate_pfh)` — 638.30 stored as 638, 489.36 as
+489, and so on. Someone reading the share fix will want to "finish the job" by adding
+the share factor there too. That would be wrong, and it would silently halve what the
+editor is owed. The test is the guard against exactly that; do not edit it to agree
+with the income side.
+
+### `narration_format` is NULL on four cards ON PURPOSE
+
+**The single most likely entry in this document to be undone by someone tidying up.**
+
+Four unarchived cards carry a co-narrator with `narration_format` left `NULL`:
+
+| card | id |
+|---|---|
+| All the Ways I'd Die for You | `bbc26e88-95fb-4158-b94a-0cd0cb2edb50` |
+| To Dig Up The Past | `f4edd35d-a0ae-476b-a18b-1f3da6ab7211` |
+| Sparked Revolution | `b4479faa-b831-413f-8214-a626bd5a7ba1` |
+| All The Ways I'd Live For You | `62602ce3-bce0-42c9-a9d2-509a103f3512` |
+
+It looks like missing data. It is a decision.
+
+**`narration_format` renders publicly, in three places:** the format pill on
+`narrated-works/page.tsx`, the individual `[slug]` book page, and the `api/books`
+payload. The public catalogue filters
+`.in("status", ["contracted", "recording", "editing", "released"])` — and all four of
+these are `contracted`, not confidential, with two carrying live public slugs
+(`all-the-ways-id-live-for-you`, `to-dig-up-the-past`).
+
+Setting them to `duet` would have put a **DUET pill on four books on the public
+site**, announcing casting Dean has not announced. The financial fix would have
+shipped a content change nobody asked for.
+
+**The lever used instead:** `narratorShareOf` reads `narrator_share_percent` BEFORE
+`narration_format`, so `narrator_share_percent = 50` produces the same share of 0.5
+with the format left null. Same money, no public change.
+
+Verified with the pages rather than the schema — unauthenticated, after the write:
+zero format pills on the catalogue and on both live slugs (200 each), all four books
+still listed, `narrator_share_percent` absent from the public JSON. It appears in no
+public surface at all; all four routes that reference it are admin-gated.
+
+If you are here because the null looks untidy: **filling it in publishes casting
+information.** Leave it.
+
+### One definition — `card_economics_for_session`
+
+The formula existed twice: in the web's `estimatedEarnings` / `cardExpected` /
+`cardInvoiceTotal`, and again in the app's payout summary without the share. It now
+exists once, in the database.
+
+`SECURITY INVOKER`, `plpgsql`, `search_path=public`, `assert_board_access()` first,
+and the divisor read from `site_settings` rather than hardcoded so it moves with the
+studio setting instead of drifting from it.
+
+**The acceptance test that qualified it:** it reproduced the web's existing group
+totals **to the cent, against pre-fix data** — production $14,901.92,
+ready-to-invoice $7,262.28. Anything less than exact would have meant a different
+definition wearing the same name.
+
+**The standing risk, stated plainly: the web has NOT migrated.** There is one
+definition in the database and a TypeScript copy that agrees **by reconciliation, not
+by construction**. That agreement is a snapshot taken on 28 August 2026, not a
+property. Either copy can drift and only a re-run of the acceptance test would notice.
+The web migration is the next stage, and closing it is what makes "one definition"
+true rather than aspirational.
+
+"Editing billed back" is folded into `net` rather than returned as its own column.
+Adding a column changes the return type, which requires the `DROP` that resets the
+ACL. Dean chose to leave it folded rather than take that operation for a display
+convenience.
+
+### The gate convention — all ten read functions
+
+Every read function now calls `assert_board_access()` as its first statement.
+`payouts_for_session` and `payout_summary_for_session` were the last two without it,
+and `payouts_for_session` moved from `language sql` to `plpgsql` to carry it — a SQL
+function has no statement to perform before its query.
+
+**The resulting behaviour change is intended and worth knowing:** a non-admin now gets
+`BOARD_ACCESS_NOT_ENABLED` rather than an empty list, because the gate fires before
+RLS is reached. Not a live vulnerability before — both functions were `SECURITY
+INVOKER` and RLS returned zero rows — but every other read function refused at the
+door while these two relied entirely on the policy behind it. One layer where the rest
+had two.
+
+### The settings store — eight loading windows, not eight requests
+
+Eight components called `useStudioSettings()`, each with its own `useEffect` and its
+own fetch. **The request count was the visible cost; eight independent LOADING STATES
+were the defect.** The `/payments` outage of 26 August was a component reading a rate
+during its own loading window, a `useMemo` capturing it with the rate missing from its
+dependency array, and the memo freezing at the loading answer — every project reading
+"Cannot be worked out" for three days while the settings were perfectly readable.
+
+**A module store, not a context provider.** A provider must be mounted above every
+consumer and fails silently for one rendered outside it; that guarantee would rest on
+eight call sites sharing one tree, and they do not — `/board` is a client page, so the
+`AdminLayout` it shares with the others is bundled client-side there and cannot be the
+server boundary. Nor a server fetch: the only boundary above all eight is the ROOT
+layout, which wraps the public site, and `getStudioSettings()` reads with the
+service-role client. With a store the guarantee is structural and there is nothing to
+mount incorrectly.
+
+- `getServerSnapshot` returns the loading state, so SSR starts no fetch — the property
+  `check-first-render` exists to hold.
+- **One retry at 1.2s, with 401 exempt.** Consolidating eight fetches consolidates the
+  failure too: one 500 now takes all eight consumers. A 401 is not transient — the
+  session is gone, and retrying only delays telling the person to sign in again.
+- **`resetStudioSettingsCache` is wired into the save path and RE-READS**, not merely
+  clears. Nothing necessarily remounts after a save — the settings form stays on
+  screen — so a reset that only cleared would leave every consumer in `loading` until
+  the next navigation, which is worse than the staleness it fixes.
+
+Verified in a real browser: 1 request on a `/payments` load; under throttling the
+settings resolved at 17.7s and across 66 samples inside that window **zero**
+settings-derived figures rendered, 8 after it resolved, nothing frozen. Zero hydration
+warnings on a production build.
+
+### The app icon
+
+The art is inset to the 66dp safe zone **deliberately**. The mark's gold ring sits at
+the outer edge of the source, and at full bleed the adaptive mask clips it on every
+launcher shape. **Do not "fix" the margin by scaling the foreground up** — the empty
+band is what keeps the ring intact, and it is the first thing that looks like a
+mistake to someone who has not seen the clipped version.
+
+Two forms of the mark, by design: the monochrome layer is line art, the notification
+icon a filled silhouette, because line art mushes at 24dp. Both are alpha-only assets
+at five densities; the visual distinction is the design's, recorded here as intent
+rather than as something this record measured.
+
+`ic_stat_dmn` is landed and **deliberately unreferenced** — the app posts no
+notifications today. No `NotificationManager`, no `NotificationCompat`, no
+`setSmallIcon`, no `POST_NOTIFICATIONS`, and App info confirms "Notifications: Off".
+Wiring it up would mean inventing a notification to justify an asset.
+
+Verified with pixels rather than BUILD SUCCESSFUL: the APK's PNG byte sizes match the
+source at every density, and screenshots of the launcher drawer and App info both show
+the gold ring complete and unclipped.
+
+### The `anon` revoke on `board_cards`
+
+A vestigial `SELECT` grant that no policy admitted. Proven harmless before removal
+with a control — as `anon`, `authors` returned 27 and `board_cards` returned 0, so RLS
+was doing the work and the harness could demonstrably see data when data was visible.
+All 22 `board_cards` call sites verified to use `supabaseAdmin` first.
+
+**The consequence is deliberate: `anon` now gets "permission denied" rather than an
+empty result.** That is the intent, not a regression. An empty result meaning "you are
+denied" is indistinguishable from one meaning "there is nothing here", and this
+project has been bitten repeatedly by exactly that ambiguity. The loud failure is the
+better one — and nothing calls it, so it is unreachable by any client.
+
+### Verification practices that caught real defects
+
+Not process decoration — each of these found something in this stretch:
+
+1. **A harness that cannot fail for the reason it claims to test is not testing that
+   reason.** The RLS negative test first ran as `postgres`, which holds
+   `rolbypassrls`, and reported that a demoted session read all 9 payout rows. A
+   control against `payments` — identical policy, known-good — returned all 25 rows
+   too, which is what exposed the harness rather than the policy.
+2. **Same shape, different tool.** A Slow-3G throttle harsh enough to stop the page
+   loading returned all zeroes, which read as "no violations". The window has to be
+   wide enough for the thing to happen in.
+3. **Confirm a change moved a number by the PREDICTED amount, not merely that it
+   moved.** The share correction was predicted to drop production by $2,569.15; it
+   dropped by $2,202.15. The data was right and the prediction was wrong — the group
+   sums `invoice_total`, and the billed-back term `editing * (1 - share)` was dormant
+   at share 1 and switched on with the fix. "It changed" would have hidden that.
+4. **A check that informed an action must be re-run after the action.** The grant
+   guard's second run found a seventh function its first run had already reported,
+   missed because the output had been read through a `tail`.
+5. **Prove an enumerator can see what it claims to cover.** Granting `card_detail` to
+   `anon` inside a rolled-back transaction made it appear in the audit (0 rows to 1),
+   proving the sweep is whole-schema and not keyed on the `_for_session` naming
+   convention.
+6. **Every probe that writes runs inside a transaction that rolls back**, including
+   the quick ones. The quick ones are where it leaks.
+
+### Open items carried forward
+
+1. **Web migration onto `card_economics_for_session`.** The next stage. Until then the
+   two copies agree by reconciliation, not construction.
+2. **`supabaseBrowser` is defined and never imported.** Dead code that is also a trap:
+   it is the only anon-key client in the repo, so anyone reaching for a browser client
+   would find it and use it against tables that now deny `anon`. Delete it, or comment
+   what it is for.
+3. **`co_narrator` is stored in two shapes.** Across unarchived cards: **22 rows hold
+   a JSON array string** (`["Veronica Moore"]`, and several with multiple names) and
+   **9 hold bare text** (`Ann Dahlia`). This is not a four-row curiosity — it is most
+   of the catalogue, and anything keyed off that column must handle both. There is no
+   Postgres array operator that works against it as stored.
+4. **The share rule's fallback is still `else 1`.** After the four corrections no card
+   is in that state, so nothing is wrong today. But a NEW card with a co-narrator and
+   no format would be costed as solo — the same defect, re-entering through the front
+   door. Dean chose to fix the data rather than change the default, on the grounds
+   that the default is right for solo work and the co-narrator column is too
+   inconsistent to key off. Recorded as a known trap, not a bug.
+5. **DoD 2 — `word_count` from the phone, end to end.** Needs Dean's hardware; the
+   emulator will not land a save.
+6. **DoD 8 — setting a page on a book with no `total_pages`** should prompt for it
+   rather than fail. Real unbuilt scope.
+7. **Stage 1 item 14, offline sign-out — stays DELIBERATELY UNTESTED.** Refused twice
+   on the strength of the guard test, and the reason holds: the guard proves how many
+   places can call sign-out, not that the call works with no network. Those are
+   different claims and only one of them is tested.
