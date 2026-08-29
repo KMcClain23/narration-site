@@ -78,61 +78,6 @@ function compare(title: string, field: string, ts: number | null, db: number | n
   console.log(`         TypeScript ${show(ts)}   database ${show(db)}`);
 }
 
-/**
- * rs_plus is a live branch in BOTH implementations — board-card-utils.ts guards
- * `paymentType !== "pfh" && paymentType !== "rs_plus"`, the database guards
- * `payment_type not in ('pfh', 'rs_plus')` — and no card in Dean's data uses
- * it. A branch nothing reaches is a branch nothing checks: the two lists could
- * drift apart and every run would still say "All cards reconcile."
- *
- * The fixture has to be a REAL unarchived row, because the function reads
- * board_cards directly and filters `archived_at is null`. There is no hidden
- * corner to put it in. So it is created, compared, and deleted.
- *
- * STATED PLAINLY, because it is a real cost: for the few seconds a run takes, a
- * card that is not Dean's exists on the live board and inside the live totals.
- * A leftover from a killed run is swept at the start of the next one.
- */
-const FIXTURE_TITLE = "ZZZ reconciliation fixture — rs_plus (auto-deleted)";
-
-async function sweepFixture(db: SupabaseClient): Promise<void> {
-  const { error } = await db.from("board_cards").delete().eq("title", FIXTURE_TITLE);
-  // A sweep that cannot run means the delete at the end probably cannot either,
-  // and this must not leave a card behind quietly.
-  if (error) throw new Error(`could not sweep the rs_plus fixture: ${error.message}`);
-}
-
-async function createFixture(db: SupabaseClient): Promise<string> {
-  const { data, error } = await db
-    .from("board_cards")
-    .insert({
-      title: FIXTURE_TITLE,
-      status: "recording",
-      payment_type: "rs_plus",
-      // Round numbers, so a mismatch reads as a formula difference rather than
-      // as floating-point noise.
-      word_count: 100000,
-      pfh_rate: 250,
-    })
-    .select("id")
-    .single();
-  if (error) throw new Error(`could not create the rs_plus fixture: ${error.message}`);
-  return data.id as string;
-}
-
-async function removeFixture(db: SupabaseClient, id: string | null): Promise<void> {
-  if (!id) return;
-  const { error } = await db.from("board_cards").delete().eq("id", id);
-  if (error) {
-    // Loud, and by title, so it can be removed by hand.
-    console.error("");
-    console.error(`  COULD NOT DELETE THE FIXTURE (${error.message}).`);
-    console.error(
-      `  Delete the card titled "${FIXTURE_TITLE}" by hand — it is in the live totals until you do.`,
-    );
-  }
-}
-
 async function main() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -153,15 +98,7 @@ async function main() {
     process.exit(2);
   }
 
-  // The fixture exists for the whole comparison, so BOTH sides see it.
-  await sweepFixture(db);
-  let fixtureId: string | null = null;
-  try {
-    fixtureId = await createFixture(db);
-    return await runComparison(db, divisor);
-  } finally {
-    await removeFixture(db, fixtureId);
-  }
+  return await runComparison(db, divisor);
 }
 
 async function runComparison(db: SupabaseClient, divisor: number): Promise<number> {
@@ -262,20 +199,6 @@ async function runComparison(db: SupabaseClient, divisor: number): Promise<numbe
     const tsInvoice =
       tsIncome == null ? null : tsIncome + tsEditing * (1 - (tsShare ?? 1));
 
-    // The fixture reconciling is not enough. If BOTH sides returned null for
-    // rs_plus — which is exactly what a dropped rs_plus would look like on the
-    // side that dropped it — null equals null and the run passes having proved
-    // nothing. The fixture must produce a real figure on both sides.
-    if (card.title === FIXTURE_TITLE) {
-      if (tsIncome == null || dbRow.income == null) {
-        failures++;
-        console.log("  FAIL the rs_plus fixture earned nothing on one side:");
-        console.log(`         TypeScript ${show(tsIncome)}   database ${show(dbRow.income)}`);
-        console.log("       Both null reconciles and proves nothing — rs_plus has been");
-        console.log("       dropped from one of the two lists.");
-      }
-    }
-
     compare(card.title, "share", tsShare, dbRow.share);
     compare(card.title, "income", tsIncome, dbRow.income);
     compare(card.title, "editing_cost", tsEditing, dbRow.editing_cost);
@@ -297,14 +220,12 @@ async function runComparison(db: SupabaseClient, divisor: number): Promise<numbe
     const n = covered.get(name) ?? 0;
     console.log(`  ${n > 0 ? "covered " : "NO ROWS "} ${String(n).padStart(2)}  ${name}`);
   }
-  if (!(covered.get("payment_type rs_plus") ?? 0)) {
-    failures++;
-    console.log("");
-    console.log("  FAIL the rs_plus fixture was not compared. It is created before the");
-    console.log("       fetch and deleted after, so an empty bucket means it never reached");
-    console.log("       one of the two sides — and this run proves nothing about rs_plus.");
-  }
-
+  // rs_plus has no card in Dean's data and is NOT expected to. It is covered by
+  // scripts/check-rs-plus-branch.ts, which checks each side against one
+  // hand-derived figure without touching live data. That is a SMALLER claim
+  // than the cases here carry — those run both implementations over the same
+  // real card — so it is not filed as equivalent, and rs_plus still reports as
+  // uncovered below.
   const uncovered = EDGE_CASES.filter(e => !(covered.get(e) ?? 0));
   if (uncovered.length) {
     console.log(

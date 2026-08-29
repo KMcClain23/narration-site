@@ -10,8 +10,8 @@ import { useRouter, useSearchParams } from "next/navigation";
  * It used to be the old Manage Books screen, which had no way to sign in on
  * it: being bounced here meant looking at a books list, going back to the
  * public site, opening a menu, entering the key in a modal, and then
- * navigating a second time to wherever you were originally headed. The books
- * screen now lives at /admin/books, behind the gate like everything else.
+ * navigating a second time to wherever you were originally headed. That screen
+ * is gone — it edited a table nothing read.
  */
 
 /** Only same-site paths, so a crafted ?next= cannot bounce a signed-in admin off-site. */

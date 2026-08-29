@@ -1,6 +1,9 @@
 -- Run in Supabase SQL editor.
--- Step 1: Add co_narrator field to books table
-ALTER TABLE public.books ADD COLUMN IF NOT EXISTS co_narrator text NOT NULL DEFAULT '';
+-- Step 1: OBSOLETE, and left here only as a record of what this script did.
+-- public.books was dropped on 2026-08-29 — it was write-only, nothing ever
+-- selected from it, and board_cards carries co_narrator now. Re-running this
+-- line would error on a table that no longer exists.
+-- ALTER TABLE public.books ADD COLUMN IF NOT EXISTS co_narrator text NOT NULL DEFAULT '';
 
 -- Step 2: Create co_narrators table (mirrors authors table structure)
 CREATE TABLE IF NOT EXISTS public.co_narrators (

@@ -1645,8 +1645,13 @@ Not process decoration — each of these found something in this stretch:
    inconsistent to key off. Recorded as a known trap, not a bug.
 5. **DoD 2 — `word_count` from the phone, end to end.** Needs Dean's hardware; the
    emulator will not land a save.
-6. **DoD 8 — setting a page on a book with no `total_pages`** should prompt for it
-   rather than fail. Real unbuilt scope.
+6. **DoD 8 — setting a page on a book with no `total_pages`.** CLOSED 2026-08-29, and
+   this entry was WRONG about the starting point. It did not fail. The write was
+   accepted in full, the page was stored, `words_recorded` never moved, and nothing
+   said so — and `pageLine()` renders nothing without a total, so the screen looked
+   like it had saved. Silent acceptance with no derivation and nothing rendered, not a
+   failure. It now asks for the total, naming the book and the page. See the J1-J8
+   section at the end of this file.
 7. **Stage 1 item 14, offline sign-out — stays DELIBERATELY UNTESTED.** Refused twice
    on the strength of the guard test, and the reason holds: the guard proves how many
    places can call sign-out, not that the call works with no network. Those are
@@ -1692,8 +1697,20 @@ function whose output it is vouching for cannot detect a fault in that function.
   in-progress) and `link`, and all 20 links duplicate a link already on the card.
 
 An unlinked admin screen editing a table nothing reads, beside the same data's real
-source of truth. **Recommendation: delete the table and the screen.** Not acted on -
-Dean decides.
+source of truth. **Dean chose delete, and it is done.** Dropped: the table, the editor
+at `/admin/books`, the four write handlers on `/api/books`, and the login-page comment
+that pointed at it. **The GET handler was KEPT** - it reads `board_cards` and serves the
+public catalogue, and shares a route name with the writes and nothing else; deleting it
+would have taken the public site down.
+
+Backed up first as `books_full_backup_20260829` - all 20 rows, every column, verified
+row-for-row before the drop, which is refused if the backup is not 20 rows.
+
+Verified with the table already dropped and the old code still deployed, which is the
+strongest form of the check: `/api/books` returned **200 with 32 items** from
+`board_cards`, `/narrated-works` 200, and two real book pages 200. The one 404 in that
+run was a slug I guessed rather than took from the payload; re-run against two real
+slugs, both 200. Build clean after clearing a stale `.next` route-type cache.
 
 ### The backup table is PARTIAL, and was nearly recorded as if it were not
 
@@ -1713,14 +1730,29 @@ settled it.
 
 ### Two new verification rules
 
-1. **A fixture that reconciles as `null == null` proves nothing.** The `rs_plus` branch
-   had no card exercising it, so a fixture was added - but a fixture is only worth
-   something if it produces a REAL figure on both sides. Had `rs_plus` been dropped from
-   one list, that side would return null, null would equal null, and the run would have
-   reported "All cards reconcile." The check now asserts the fixture's income is
-   non-null on both sides, and that assertion was mutation-tested: removing `rs_plus`
-   from `board-card-utils.ts` produces three failures reporting `TypeScript null` against
-   `database 2659.5745`.
+1. **A fixture that reconciles as `null == null` proves nothing.** The `rs_plus`
+   branch had no card exercising it. The first fix created a real `rs_plus` card on the
+   live board, compared it and deleted it - and it had to be withdrawn, because two
+   concurrent CI runs would race: run B's opening sweep could delete run A's row
+   mid-comparison, a false FAILURE if it landed before A's read and a false PASS if
+   after, decided by timing nobody controls. A test that can corrupt live data is not
+   worth what it proves. It is replaced by `scripts/check-rs-plus-branch.ts`: a
+   TypeScript half with no database at all, and a SQL half whose row never commits.
+   Both assert against ONE hand-derived constant, so TS == EXPECTED and SQL == EXPECTED
+   gives TS == SQL transitively, and a wrong EXPECTED fails both halves loudly. The null
+   guard is kept, because that was the actual hole: a dropped `rs_plus` returns null on
+   its side, and null against null reconciles while proving nothing. Both halves were
+   mutation-tested independently - removing `rs_plus` from `board-card-utils.ts` reddens
+   only the TypeScript half, removing it from `card_economics_for_session()` reddens
+   only the SQL half.
+
+   **THE RESIDUAL GAP, stated because it is a smaller claim than the other eight
+   cases carry.** This proves each side handles `rs_plus` correctly against a figure
+   written down by hand. It does NOT prove the two agree on a real row end to end,
+   which is exactly what the other eight edge cases do prove. It should not be filed as
+   equivalent. If `rs_plus` ever gets a real card, delete that file and let the
+   reconciliation check cover it properly.
+
 2. **A pipeline that skips when its secrets are missing reports green.** The workflow
    fails when the credentials are absent rather than skipping, because a green tick that
    checked nothing is worse than no tick at all - and it is documented as a SIGNAL, not
@@ -1784,7 +1816,7 @@ a data migration breaks a page nobody was looking at.
 
 1. **Web migration onto `card_economics_for_session`.** Unchanged. `/payments` reads the
    function; six surfaces still compute in TypeScript, pinned by the reconciliation check.
-2. **The `books` table and `/admin/books`.** Recommendation above; awaiting Dean.
+2. **The `books` table and `/admin/books`.** CLOSED - deleted. See above.
 3. **The share rule's fallback is still `else 1`.** Unchanged, still a recorded trap.
 4. **DoD 2 - `word_count` from the phone, end to end.** Still needs Dean's hardware.
 5. **Stage 1 item 14, offline sign-out - stays DELIBERATELY UNTESTED.** Unchanged.
@@ -1792,9 +1824,16 @@ a data migration breaks a page nobody was looking at.
    needs `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as repository secrets.
    Until Dean adds them **it will fail on every push**, which is the intended behaviour and
    not a broken workflow.
-7. **The reconciliation fixture is visible while it runs.** `card_economics_for_session()`
-   filters `archived_at is null` and reads `board_cards` directly, so there is no hidden
-   place to put an `rs_plus` fixture. It is created, compared, and deleted - meaning for
-   the few seconds a run takes, a card that is not Dean's exists on the live board and
-   inside the live totals. A leftover from a killed run is swept at the start of the next.
-   Verified clean after both a passing and a deliberately failing run.
+7. **`rs_plus` is checked, but by a smaller claim than the other eight cases.** See
+   verification rule 1 above. The production fixture is gone; nothing the checks do can
+   now reach live data.
+8. **`public.rs_plus_branch_probe()` is the only function in the schema whose body
+   writes to `board_cards`.** Its rollback is an UNCONDITIONAL `raise` inside a plpgsql
+   subtransaction - not in an `if`, not below a check, the only exit from the inner
+   block - so the insert cannot survive, including when the select errors. plpgsql
+   variables are not transactional, which is what lets the figure survive while the row
+   does not. EXECUTE is revoked from PUBLIC and granted only to `service_role`. It
+   exists because CI reaches this database over PostgREST, which has no transaction
+   control: there is no `DATABASE_URL` and no Postgres driver in the project, so a
+   client-side `BEGIN ... ROLLBACK` was not available. **If that function is ever edited,
+   the `raise` is the rollback** - removing it commits a card to the live board.
