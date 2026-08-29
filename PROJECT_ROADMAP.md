@@ -1728,7 +1728,7 @@ a book from page 132 to page 220. The migration ran eleven hours later. A figure
 near a change is not a figure moving *because of* it, and the timestamps were what
 settled it.
 
-### Three new verification rules
+### Six verification rules
 
 1. **A fixture that reconciles as `null == null` proves nothing.** The `rs_plus`
    branch had no card exercising it. The first fix created a real `rs_plus` card on the
@@ -1789,6 +1789,51 @@ settled it.
    blindness. Mutating one side proves nothing if no row exercises the mutated
    branch — the first `editingCost` mutation passed cleanly. A mutation test must
    be shown to FAIL before its passing is worth anything.
+
+4. **An absent field is not "no value" — it is the CONSUMER'S DEFAULT.** Omitting
+   a column from a return type is only safe when the consumer's default for it is
+   the restrictive one. Ask what the reader does with the missing key before
+   deciding the omission is a protection.
+
+   `BoardCardDto` declares `is_confidential: Boolean = false`. The editor board
+   function was specified without that column, so an absent key would have
+   decoded as NOT confidential and rendered **both of today's confidential covers
+   as ordinary ones** — through the very function written to stop an editor
+   seeing too much. `canViewConfidentialCovers` is false for an editor precisely
+   so that cannot happen, and it reads the flag it was no longer being sent.
+
+   Omission is the right tool for `pfh_rate`, `payment_type` and
+   `narrator_share_percent`, because their default is null and null means "no
+   figure". It is the wrong tool for a boolean whose default is permissive. Same
+   technique, opposite outcome, decided entirely by the consumer.
+
+5. **`current_user` vs `auth.role()` depends on the function's security mode, and
+   the earlier preference for `current_user` was an artefact of the harness.**
+
+   Inside `SECURITY DEFINER`, `current_user` is the function's OWNER and can never
+   identify the caller — so a service-role escape written as
+   `current_user = 'service_role'` is dead code there, silently. `session_user`
+   does not rescue it either: PostgREST connects as `authenticator` and then SET
+   ROLEs, so it reads 'authenticator' whatever key was used. `auth.role()` reads a
+   JWT claim, which `SECURITY DEFINER` does not rebind.
+
+   The reason `current_user` was preferred in the first place is worth naming: the
+   SQL harness could set a role with `SET LOCAL ROLE` but was not setting JWT
+   claims, so `current_user` was the only thing that varied under test. **A
+   limitation of the test environment was promoted into a design rule** — and it
+   held for as long as every caller happened to be `SECURITY INVOKER`. The rule
+   was never about which is correct; it was about which the harness could see.
+
+6. **`notes` is excluded from every editor-facing function on purpose, and the
+   reason is measured rather than assumed.** Of the four populated `notes` on
+   `board_cards` today, **three carry financial content** — "No PFH rate recorded;
+   not missing data." on Restrict, Tease and Unbound. The fourth is "Live on TT
+   with Author".
+
+   It is free text, so it cannot be gated by column and cannot be trusted by
+   convention. If an editor needs card context, **add an `editor_notes` column**;
+   do not open this field. Anything that opens `notes` to an editor also opens
+   whatever Dean writes in it next.
 
 ### Open items 2, 3 and 6 above are now closed
 
@@ -2372,11 +2417,61 @@ lost the role it is acting as, which is the case bug 6 missed.
   a rule. `notes` is free text that has carried rate remarks before now — one
   card literally reads "No PFH rate recorded" — so it is left out until Dean
   decides an editor should see it.
-- **The detail screen is not yet routed by role.** `board_for_editor` is wired;
-  `card_detail_for_editor` exists and is verified but the Android detail read
-  still calls the admin path. That is the next increment.
-- **`SupabaseKeySpikeTest` fails, and it failed before this stage** — verified by
-  stashing. It asserts anon gets an EMPTY result from `board_cards`; since the
-  anon revoke, anon gets `permission denied` instead. The revoke is working and
-  the test encodes the old behaviour. Left alone: it is a claim about what anon
-  should do, and that is Dean's to re-state.
+- **The detail screen is not yet routed by role.** — DONE the same day, see the
+  section below. Both reads now route, with no fallback in either.
+- **`SupabaseKeySpikeTest` fails, and it failed before this stage** — RESTATED
+  the same day once Dean confirmed the new behaviour is the intended one. The
+  suite is green: 291 tests, 0 failures.
+
+---
+
+## T — the detail read routed, and a stale assertion restated (2026-08-29)
+
+### T1 — both reads now route, and two corrections came from the consumer
+
+`card_detail_for_editor` is wired for editor sessions, with the same
+hint-not-boundary treatment as the board: a stale ADMIN calls `card_detail()` and
+the SERVER refuses; a stale EDITOR gets the narrow card; UNKNOWN calls nothing.
+No fallback, and `BoardReadRoutingTest` now pins nine cases including both
+no-retry ones.
+
+Two problems surfaced by reading the CONSUMER rather than the function, and both
+needed a DROP to fix:
+
+- **`updated_at` was returned but `CardDetailDto` has no such field**, and
+  `card_detail()` does not return one either. Whether the decoder tolerates an
+  unknown key is not established anywhere in this project, and a key the DTO has
+  never seen is not the thing to find that out on. Removed; the editor shape is
+  now a strict SUBSET of the admin shape, asserted by comparing the two
+  functions' output columns — 23 columns, every one present in `card_detail`,
+  none financial.
+- **The parameter was `p_card_id` while `card_detail` takes `p_id`.** Renamed, so
+  the dispatch chooses a function NAME and nothing else. A dispatch that also has
+  to remember a different argument name per branch is a second thing to get
+  wrong, and a test now pins that they match.
+
+Both DROPs followed the discipline: ACL captured verbatim, restored by name, anon
+AND PUBLIC revoked by name, comment re-attached, all asserted in the migration.
+
+### T2 — the spike test restated rather than deleted
+
+It asserted an anonymous read returns an EMPTY LIST. Since the `board_cards`
+revoke it returns `42501 permission denied`, and **the new behaviour is the
+deliberate one**: a silent empty result meaning "you are denied" is
+indistinguishable from one meaning "there is nothing here", and this project has
+already paid for that ambiguity once — bug 6 was a demoted session receiving zero
+rows with HTTP 200 and rendering them as an ordinary empty board.
+
+The reason is now IN the test, with an explicit instruction not to change it
+back: restoring the old assertion would require re-granting `anon` SELECT on
+`board_cards`, so the test would be asserting that the database leaks rows to
+anonymous callers, dressed as a passing check.
+
+The spike's actual question still gets answered. A REJECTED key comes back 401
+before Postgres sees the request; an ACCEPTED one reaches Postgres, is authorised
+as `anon`, and is refused by grants. So `42501` is positive evidence for the key,
+and the test asserts both halves — permission denied, and NOT a 401 — rather than
+accepting any failure at all.
+
+**The Android suite is now 291 tests, 0 failures, 0 errors.** It was 285 of 286
+with this one red.
