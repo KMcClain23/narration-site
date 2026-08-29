@@ -1996,3 +1996,43 @@ $function$;
 -- in its own right, so it returns 0 for a non-admin even if the payouts policy
 -- failed completely — it would pass for the wrong reason. Only committed_out
 -- depends solely on the payment_payouts join.
+
+-- ============================================================
+-- E2/E3: one definition of card economics (29 August 2026)
+-- ============================================================
+--
+-- card_economics_for_session() is now the single place the formula lives:
+--
+--   share  = narrator_share_percent/100 if set
+--          ; null if multicast (figure hidden entirely)
+--          ; 0.5 for duet/dual ; else 1
+--   income = word_count / studio_words_per_finished_hour * pfh_rate * share
+--          ; null unless payment_type is 'pfh' or 'rs_plus'
+--          ; null if status = 'recast'
+--          ; explicit non-royalty amount_expected wins
+--   invoice_total = income + editing_cost * (1 - share)
+--
+-- Divisor from site_settings, not hardcoded.
+--
+-- THE ASYMMETRY, which is what made the original bug subtle and which this
+-- deliberately preserves:
+--   EDITOR PAYOUT   word_count / divisor * rate_pfh          NO share.
+--   DEAN'S INCOME   word_count / divisor * pfh_rate * SHARE  share applies.
+-- committed_out stays the sum of stored payout amounts. The nine-payout test
+-- pinning the share-free formula is CORRECT and was not touched.
+--
+-- ACCEPTANCE, against PRE-E1 data, to the cent:
+--   production        function 14901.92   web 14901.92   MATCH
+--   ready-to-invoice  function  7262.28   web  7262.28   MATCH
+--
+-- payout_summary_for_session now aggregates it and its local formula is
+-- DELETED, not left unused — an unused copy is how the divergence returns.
+-- Signature unchanged, so CREATE OR REPLACE is legal and no ACL was reset;
+-- "editing billed back" is therefore folded into net rather than added as a
+-- column, since a new column would have required the DROP that resets grants.
+--
+--   net = income - editing paid out + editing billed back
+--
+-- The web is deliberately NOT migrated to this function yet. Two
+-- implementations existing briefly is acceptable; changing both at once would
+-- give a mismatch two possible causes.
