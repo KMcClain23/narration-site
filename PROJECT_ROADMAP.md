@@ -2475,3 +2475,134 @@ accepting any failure at all.
 
 **The Android suite is now 291 tests, 0 failures, 0 errors.** It was 285 of 286
 with this one red.
+
+---
+
+## U — signed release builds and distribution (2026-08-29)
+
+The first release build ever made for this app. Before this, `assembleRelease`
+produced an unsigned artifact and there was no signingConfig at all.
+
+### U1 — signing, absent-not-fatal
+
+`signingConfigs.release` reads `KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`
+and `KEY_PASSWORD` from the git-ignored local.properties, the same file the
+Supabase keys already come from. Absent does NOT fail configuration, following
+the precedent already in that file: a fresh clone still configures, debug still
+builds, and `assembleRelease` still produces an artifact — an UNSIGNED one.
+
+The signingConfig is only CREATED when every part is present. A half-configured
+one fails at task execution with a message about a null password, which reads as
+a Gradle bug rather than as "you have not set up signing". `requireReleaseSigning`
+names exactly which properties are missing and says that unsigned local builds
+are deliberate and only publishing is blocked.
+
+### U2 — versionCode derived, and not trusted
+
+`git rev-list --count HEAD`, currently **42**, checked against a floor recorded
+in the checked-in `version.properties` (`lastPublishedVersionCode=0`). The
+publish tasks refuse unless the derived number strictly exceeds it, because Play
+rejects a duplicate or lower versionCode permanently and a burned number is
+burned for the life of the app.
+
+When git cannot answer, the build still works — floor plus one, so the artifact
+installs — but the publish tasks REFUSE, because a number that cannot be derived
+reproducibly cannot be checked for monotonicity either. The guard's message says
+explicitly not to raise the floor to make a failure pass.
+
+### U3 — the Gradle plugin does not work here, so the CLI does
+
+`com.google.firebase.appdistribution:5.1.1` FAILS TO APPLY on this project:
+`Extension of type 'AppExtension' does not exist`. It reaches for AGP's legacy
+variant API, which AGP 9 removed — and this build file already carries notes
+about AGP 9's other removals. Pinning AGP back to keep a distribution plugin
+happy would be the tail wagging the dog.
+
+`publishToFirebase` drives `firebase appdistribution:distribute` instead. Same
+one-command result, and it couples nothing: no plugin, no Firebase SDK, nothing
+in the binary. It resolves `firebase.cmd` on Windows, and when `FIREBASE_APP_ID`
+is missing it says so AND points at the signed .apk it already built, so the
+artifact is never lost to a configuration gap.
+
+### U4 — both artifacts
+
+`bundleForPlay` (signed .aab) and `assembleForFirebase` (signed .apk), each
+gated on both guards. App Distribution does not take an .aab, which is why both
+exist rather than one.
+
+### U5 / U9 — the guard, and the two ways it was wrong first
+
+`*.jks` and `*.keystore` were ALREADY in .gitignore; only `keystore.properties`
+was genuinely new. `ReleaseSecretsGuardTest` asks git what is TRACKED, which is
+the only question that matters — a .gitignore does not untrack anything already
+added, and `git add -f` walks past it.
+
+**The guard did not fail when it should have.** With a fake keystore and a
+`KEYSTORE_PASSWORD=hunter2` file both staged, the run reported 3 tests / 0
+failures. The test task was UP TO DATE: staging files changes nothing Gradle was
+watching, so the guard silently did not run — the identical failure this build
+file already documents for `CredentialDestructionGuardTest`. `--rerun-tasks`
+forced it and it correctly found both. Fixed by declaring `.git/index` as a test
+input, since that is what changes when something is staged. Re-verified WITHOUT
+`--rerun-tasks`: 2 failures with the fakes, 0 after reverting.
+
+**Then the guard caught its own documentation.** A comment reading "a
+KEYSTORE_PASSWORD= line was staged" matched, because the pattern allowed
+whitespace after the `=` and captured the next word. A real assignment has no
+space; the regex now requires none. Correct behaviour for the rule as first
+written, and the wrong rule.
+
+### U6 / U7 / U8 — what the release build actually did
+
+- **U8, signature conflict:** installing the signed release over the existing
+  debug install failed with `INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package
+  com.dmnarration.admin signatures do not match newer version`. Clear, and it
+  happens in BOTH directions — `installDebug` later failed the same way against
+  the release. Dean will hit this on his phone.
+- **U8, signing:** apksigner reports the .apk verified, one signer, APK Signature
+  Scheme v2. `jarsigner -verify` reports the .aab verified.
+- **U7:** `SUPABASE_URL` and `SUPABASE_ANON_KEY` are both present in the release
+  DEX, checked by extracting `classes*.dex` from the built .apk and searching for
+  the actual values — not by trusting that the release variant reads
+  local.properties the same way debug does.
+- **U6:** the signed release installs, launches, and renders the sign-in screen
+  with no crash, no `SerializationException`, no Hilt failure. A deliberately
+  wrong email and password produced the app's own classified message — **"That
+  email and password do not match an account."** — which means the HTTPS request
+  reached Supabase, the error response was deserialised, and the app classified
+  it, all in a release build.
+
+### A false result I reported to myself and had to withdraw
+
+Mid-verification I observed the release build apparently SIGNED IN and showing
+live figures — Payments, Expenses 21, real settings — after a clean install, and
+began investigating it as an `allowBackup` leak. It was not. `uiautomator dump`
+had silently failed on git-bash path mangling (`/sdcard/ui.xml` became
+`/Files/Git/sdcard/ui.xml`), and `adb pull` returned a **stale ui.xml left on the
+emulator from a session four days earlier**, when the debug build was signed in.
+
+The tell was that `allowBackup="false"` and the backup manager was disabled, so
+the story could not be true. Re-dumping via `adb exec-out` with
+`MSYS_NO_PATHCONV=1` showed the real first screen: "DMN Admin | Sign in to see
+the board." **A file read from a device is evidence only if this run wrote it.**
+
+### NOT DONE, and what each needs
+
+1. **A real device.** Everything above ran on an emulator. Dean's standing note
+   that the emulator will not land a save is about writes; these were reads and a
+   launch, but "installs and runs on the emulator" is not "installs and runs on
+   his phone".
+2. **A successful sign-in and a board load.** Needs Dean's password. The failed
+   sign-in proves the auth round trip and the deserialisation; it does not prove
+   the board renders.
+3. **An editor-role session reaching `board_for_editor`.** Needs the editor
+   account, which Dean creates himself.
+4. **The real upload key.** Signing was verified with a THROWAWAY keystore
+   generated outside the repo, used once, and deleted; local.properties was
+   restored and `requireReleaseSigning` fails again as it should. **Dean must
+   generate the real upload key himself and it must never leave his machine** —
+   whoever holds it controls every future update, and Play binds the app to it.
+5. **A Firebase project, app id and tester group.** `publishToFirebase` is wired
+   and refuses cleanly until `FIREBASE_APP_ID` exists.
+6. **`lastPublishedVersionCode` stays 0** until something is genuinely published.
+   Update it in the same commit as the release that went out.
