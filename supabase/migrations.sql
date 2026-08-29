@@ -2036,3 +2036,46 @@ $function$;
 -- The web is deliberately NOT migrated to this function yet. Two
 -- implementations existing briefly is acceptable; changing both at once would
 -- give a mismatch two possible causes.
+
+-- ============================================================
+-- F2/F4: the share correction, and anon's board_cards ceiling
+-- ============================================================
+--
+-- F2. Four cards had narration_format NULL with a co_narrator set, so both
+-- clients treated them as solo (share 1) on duet work. Corrected via
+-- narrator_share_percent = 50, NOT narration_format.
+--
+-- The share rule reads narrator_share_percent BEFORE narration_format, so 50
+-- gives share 0.5 with the format left null. That matters because
+-- narration_format RENDERS PUBLICLY — a format pill on /narrated-works, the
+-- individual book page, and the /api/books payload — and the public catalogue
+-- includes `contracted`, which all four are. Setting the format would have put
+-- a "DUET" pill on the public site. The NULL is now load-bearing and must not
+-- be "completed" as a tidy-up.
+--
+-- narrator_share_percent appears in NO public surface: zero references in
+-- api/books, either narrated-works page, or the co-narrator page, and all four
+-- referencing API routes are admin-gated.
+--
+-- Verified with the pages, not the schema: unauthenticated, zero format pills
+-- on the catalogue and on both live book slugs (200 each), all four books still
+-- listed, narrator_share_percent absent from the public JSON.
+--
+-- F4. anon held SELECT on board_cards that no policy admitted. Nothing was
+-- exposed — as anon the table returned 0 rows while `authors` returned 27 — but
+-- the ceiling was open, and one permissive policy later would have admitted
+-- anon because the grant was already there.
+--
+-- Checked before revoking: all 22 board_cards call sites use supabaseAdmin, and
+-- the anon browser client is DEFINED AND NEVER IMPORTED. Android signs in
+-- first, so its role is `authenticated`.
+--
+-- NOTE THE POST-CONDITION THAT CANNOT HOLD. The plan expected anon to still
+-- return 0 rather than an error. It cannot: removing the grant makes Postgres
+-- refuse at the PRIVILEGE layer before RLS is consulted, so the observable
+-- changes from an empty result to permission denied. That is precisely the
+-- conversion the pre-check existed to make safe, and nothing calls it, so the
+-- error is unreachable.
+--
+--   before  authors=27  board_cards=0   (empty, RLS filtering)
+--   after   authors=27  board_cards=ERROR permission denied
