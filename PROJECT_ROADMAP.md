@@ -2234,3 +2234,149 @@ schema, outside the application, that writes to `board_cards`.
 
 The residual claim is unchanged in kind: both probes prove each side against
 figures written down by hand, not that the two agree on a real row end to end.
+
+---
+
+## E1 — the editor read foundation (2026-08-29)
+
+A second role, made safe before anything is built on it.
+
+### The gate is separate, and assert_board_access was not touched
+
+`assert_editor_access()` admits admin OR editor and is used by exactly two
+functions. `assert_board_access()` still guards all ten of the others,
+unchanged — widening it would have opened every financial function at once.
+
+**One thing that had to be different, and it is load bearing.**
+`assert_board_access()` lets the service role through on `current_user =
+'service_role'`, which works because every function calling it is SECURITY
+INVOKER. The editor functions are SECURITY DEFINER, and inside a DEFINER function
+`current_user` is the function's OWNER, not the caller — so that test can never
+be true there. `session_user` is no help either: PostgREST connects as
+`authenticator` and then SET ROLEs, so it reads 'authenticator' whatever key was
+used. The new gate reads `auth.role()`, the JWT claim, which SECURITY DEFINER
+does not rebind and which the existing "Service role full access" RLS policies
+already use.
+
+### Why SECURITY DEFINER, written on the object so nobody "fixes" it
+
+Column-level control cannot come from RLS, which filters rows and not columns.
+It cannot come from column grants either, because the editor and the admin are
+the SAME Postgres role — both are `authenticated` — so a grant that hid a column
+from her would hide it from him. The only place the distinction can live is
+inside a function that runs as its owner and simply never selects those columns.
+
+`pfh_rate`, `payment_type` and `narrator_share_percent` are OMITTED FROM THE
+RETURN TYPE, not nulled. A column that does not exist cannot carry a value; a
+nulled one is one careless edit away from carrying it again.
+
+There is deliberately NO RLS policy on `board_cards` for editors. With one she
+could query the table directly through PostgREST and every stripped column would
+come straight back.
+
+### A deviation from the stated column list, because the list leaked
+
+E1b named sixteen columns and `is_confidential` was not among them. Omitting it
+LEAKS, in the exact direction this stage exists to close: `BoardCardDto` declares
+`is_confidential: Boolean = false`, so an ABSENT key decodes as NOT confidential
+and the editor's board would render every confidential cover as an ordinary one.
+`Capabilities.canViewConfidentialCovers` is false for an editor precisely so that
+cannot happen, and it reads this flag to do its job. **Two cards are confidential
+today**, and both would have been exposed.
+
+It is not a financial column, and the three that are remain absent. Adding it
+required a DROP (42P13 again), done with the full discipline: ACL captured
+(`postgres`, `authenticated`, `service_role`; no anon, no PUBLIC), restored by
+name, anon and PUBLIC both revoked by name, comment re-attached, every one of
+those asserted in the same migration.
+
+### The negative tests, each with a live control
+
+- **S1** As editor, `board_cards` returns **0 rows**, `payments` 0, and
+  `payment_payouts` 0 — while `board_for_editor()` returns **33 rows in the same
+  transaction**. The control matters: a role switch that silently broke the
+  session would return zero from everything and look like success.
+- **S2** Every admin function REFUSED with `BOARD_ACCESS_NOT_ENABLED`, named
+  individually: `payments_for_session`, `expenses_for_session`,
+  `card_economics_for_session`, `payout_summary_for_session`,
+  `payouts_for_session`, `career_totals_for_session`, `archived_for_session`, and
+  also `board_for_session` and `released_for_session`. Control: `board_for_editor`
+  still returned 33 in the same transaction.
+- **S3** 33 rows, and the response carries exactly seventeen keys with
+  **no `pfh_rate`, `payment_type` or `narrator_share_percent` key at all** —
+  asserted on key ABSENCE, both in SQL via `jsonb_object_keys` and against the
+  real PostgREST payload. Control: `word_count` present.
+- **S4** As admin, everything works exactly as before: payments 25, expenses 21,
+  economics 33, payout summary 1, payouts 9, career totals 1, archived 1, board
+  20, released 12, direct `board_cards` 34. All four standing checks green.
+- **S5** Full ACL audit before and after: every function `anon = false`,
+  `public_execute = 0`. The three new ones granted to authenticated and
+  service_role only.
+
+**One test of mine was vacuous and had to be redone.**
+`card_detail_for_editor` first returned 0 rows, which made "no forbidden keys"
+trivially true. The cause was the test, not the function: the subquery resolving
+the card id ran AS THE EDITOR, who reads 0 rows from `board_cards`, so the
+argument was NULL. Re-run with a literal id it returns 1 row, the right title,
+24 keys and none forbidden.
+
+### S6 — client-side filtering exists, and it is NOT the boundary
+
+The Android app has `Capabilities.canViewFinancials`, and the UI honours it:
+`BoardCardItem` drops the rate line, `CardDetailScreen` skips the whole Money
+field group. But `board_for_session()` returns `pfh_rate`, `payment_type` and
+`narrator_share_percent` in its payload regardless — the app hides fields it has
+already been given. That is presentation, not a boundary, and it is exactly why
+`board_for_editor()` exists.
+
+The WEB has no client-side financial filtering at all, and no role concept: it
+gates on a single shared admin cookie and reads everything through the
+service-role key. `canUseWebAdmin` is already false for editors for that reason.
+
+### E1e — routing, and the decision it reopens
+
+`BoardRepository` carried a deliberate note: *"There is deliberately no role
+dispatch left in the read path. Choosing the relation from a cached role is what
+produced the bug, so the client no longer chooses; the server refuses."*
+
+A second role brings dispatch back, because the two roles genuinely read
+different relations. What makes it safe is that the dispatch is a HINT and not
+the boundary, and the two directions are not symmetric:
+
+- a stale ADMIN calls `board_for_session()` and **the server refuses** — loud and
+  closed, exactly as before;
+- a stale EDITOR calls `board_for_editor()` and succeeds minus the money columns
+  — an admin loses columns, and nothing leaks.
+
+`UNKNOWN` calls nothing at all. There is **no fallback**: a refusal is not caught
+and retried against the editor relation, because that would turn a routing bug
+into a quietly narrower board — bug 6 wearing a new coat. `BoardReadRoutingTest`
+asserts all four cases, the no-retry one included.
+
+The role is PASSED IN rather than cached in the repository, so the choice is
+visible at the call site.
+
+Also corrected: a comment in `BoardViewModel` claiming *"only an admin gets rows
+out of board_for_session(), so a successful read is the server itself saying this
+session still is one."* A successful read no longer proves ADMIN — an editor
+succeeds against her own relation. What it still rules out is a session that has
+lost the role it is acting as, which is the case bug 6 missed.
+
+### Not done, and why
+
+- **Dean creates the editor account himself.** Every test above ran against a
+  synthetic editor inserted into `auth.users` and `profiles` inside a
+  transaction that was ROLLED BACK. No account was created and no password was
+  asked for.
+- **`card_detail_for_editor` omits `notes`,** and that is a judgement rather than
+  a rule. `notes` is free text that has carried rate remarks before now — one
+  card literally reads "No PFH rate recorded" — so it is left out until Dean
+  decides an editor should see it.
+- **The detail screen is not yet routed by role.** `board_for_editor` is wired;
+  `card_detail_for_editor` exists and is verified but the Android detail read
+  still calls the admin path. That is the next increment.
+- **`SupabaseKeySpikeTest` fails, and it failed before this stage** — verified by
+  stashing. It asserts anon gets an EMPTY result from `board_cards`; since the
+  anon revoke, anon gets `permission denied` instead. The revoke is working and
+  the test encodes the old behaviour. Left alone: it is a claim about what anon
+  should do, and that is Dean's to re-state.
