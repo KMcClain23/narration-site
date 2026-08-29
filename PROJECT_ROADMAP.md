@@ -1728,7 +1728,7 @@ a book from page 132 to page 220. The migration ran eleven hours later. A figure
 near a change is not a figure moving *because of* it, and the timestamps were what
 settled it.
 
-### Two new verification rules
+### Three new verification rules
 
 1. **A fixture that reconciles as `null == null` proves nothing.** The `rs_plus`
    branch had no card exercising it. The first fix created a real `rs_plus` card on the
@@ -1757,6 +1757,38 @@ settled it.
    fails when the credentials are absent rather than skipping, because a green tick that
    checked nothing is worse than no tick at all - and it is documented as a SIGNAL, not
    a gate, since Vercel deploys independently of Actions.
+
+3. **A differential test's coverage is a property of the test AND the data.** A
+   test that compares two implementations can only see a difference the data
+   makes visible. When no row exercises a branch, the two sides cannot disagree
+   about it, and the run reports agreement it has not earned. The test is not
+   wrong. It is correct and blind at the same time, which is why this keeps
+   getting missed - there is nothing to find by reading it.
+
+   **Three instances in this session alone:**
+
+   - **`rs_plus` returned null on both sides and the run reported agreement.**
+     No card used `rs_plus`, so both implementations returned null, null equalled
+     null, and "All cards reconcile" was printed.
+   - **W2/W3 passed before the change they were meant to gate.** They were
+     checking a table that nothing ever read, so they would have passed whatever
+     the change did.
+   - **The reconciliation run reported green across a one-sided change.**
+     `editingCost` was mutated to drop card-level payouts entirely and the run
+     still said "All cards reconcile", because no payout in the data has
+     `payment_id` NULL.
+
+   **What to do about it.** Ask of every differential test: *which rows make this
+   difference visible, and how many are there?* If the answer is none, the test
+   is not covering that branch no matter how correct it looks. Either construct
+   the row — a probe that builds its own data inside a rolled-back transaction,
+   as `rs_plus_branch_probe()` and `card_payout_branch_probe()` do — or report
+   the branch as UNTESTED. Do not let a green run stand in for either.
+
+   **And a corollary that bit twice here:** a mutation test inherits the same
+   blindness. Mutating one side proves nothing if no row exercises the mutated
+   branch — the first `editingCost` mutation passed cleanly. A mutation test must
+   be shown to FAIL before its passing is worth anything.
 
 ### Open items 2, 3 and 6 above are now closed
 
@@ -2016,6 +2048,11 @@ Both reverted; the probe payout deleted; 9 payouts, 25 payments, 0 loose.
 **The standing consequence:** until a real card-level payout exists, this pairing
 is held by review and by the mutation test above, not by the reconciliation run.
 
+**SUPERSEDED the same day.** The gap is closed by `card_payout_branch_probe()`
+and `scripts/check-card-payout-branch.ts`, which construct the missing row inside
+a rolled-back transaction rather than waiting for Dean to create one. See the
+section at the end of this file.
+
 ### What was verified
 
 - **P1** `payout_summary_for_session` returns 12,071.281914893618 / 4,680 /
@@ -2058,3 +2095,69 @@ named grants are independent channels, in both directions.** Revoking PUBLIC doe
 not remove an explicit `anon` grant that Supabase default privileges added; and a
 role may hold access ONLY via PUBLIC, so revoking PUBLIC can cut off a role you
 did not intend. Verify by privilege, never by reading the ACL string.
+
+---
+
+## Closing the card-level payout coverage gap (2026-08-29)
+
+The previous stage ended with a gap recorded rather than closed: the
+reconciliation run could not see a one-sided change to how editing is
+attributed, because no payout in the data has `payment_id` NULL. That made the
+coverage depend on Dean using the "+ Editor" button before the test could see
+the case it creates. Closed the same way `rs_plus` was.
+
+### The probe
+
+`card_payout_branch_probe()` builds its OWN card and its OWN card-level payout,
+so the figures depend on nothing in the catalogue:
+
+    duet (share 0.5), 100,000 words, $250/pfh, one $200 editor payout, no payment
+
+It calls `card_economics_for_session()` in the same transaction so the rows are
+visible, then rolls both back from an UNCONDITIONAL raise inside a plpgsql
+subtransaction — the same shape as `rs_plus_branch_probe()`, for the same reason:
+CI reaches this database over PostgREST, which has no transaction control.
+Locked to `postgres` and `service_role`, with `anon` AND `authenticated` revoked
+BY NAME, per the rule in migrations.sql.
+
+### One shared set of hand-derived figures
+
+    income:   100,000 / 9,400 = 10.638297872340425 finished hours
+              x $250 = $2,659.5744680851063
+              x share 0.5 (duet) = $1,329.7872340425532
+    editing:  one $200 editor payout, attributed to the BOOK = $200
+    invoice:  income + editing x (1 - share)
+              $1,329.7872340425532 + $100 = $1,429.7872340425532
+
+`scripts/check-card-payout-branch.ts` asserts all three on both sides, so
+TypeScript == EXPECTED and SQL == EXPECTED gives TypeScript == SQL transitively.
+
+**The hole here is 0 == 0, not null == null.** `editingCost` returns a number and
+never null, so a side that had dropped this branch returns 0 — and a comparison
+against a 0 expectation would agree while proving nothing. Every figure must be
+non-null AND non-zero.
+
+### Both halves mutation-tested, in mirror image
+
+| mutation | result |
+|---|---|
+| TypeScript drops card-level payouts | `TypeScript editingCost returned zero`, invoice 1329.7872 vs 1429.7872; SQL green |
+| SQL drops the `payment_id is null` arm | `SQL editing_cost returned zero`, invoice 1329.7872 vs 1429.7872; TypeScript green |
+
+Both reverted. Nothing committed: 9 payouts, 25 payments, 0 loose, 0 probe cards,
+and the `card_economics_for_session` comment intact after the replace cycle.
+
+### `set_books_updated_at` dropped
+
+Its table went on 2026-08-29, but dropping a table removes its triggers, not the
+functions they called — so the function survived, firing for nothing, referencing
+a table that no longer existed. Checked BEFORE dropping: zero triggers reference
+it, zero non-internal dependencies, `to_regclass('public.books')` is null.
+
+### The residual claim, unchanged in kind
+
+Both probes prove each side against figures written down by hand. Neither proves
+the two agree on a real row end to end, which is what the eight edge cases in the
+reconciliation run do carry. That is a SMALLER claim and is not filed as
+equivalent. When a real `rs_plus` card or a real card-level payout exists, the
+reconciliation run covers it properly and the corresponding probe can go.

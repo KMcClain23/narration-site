@@ -20,7 +20,9 @@
     "check-card-economics": "npx --yes tsx --env-file=.env.local scripts/check-card-economics-reconciles.ts",
     "check-card-economics:ci": "npx --yes tsx scripts/check-card-economics-reconciles.ts",
     "check-rs-plus": "npx --yes tsx --env-file=.env.local scripts/check-rs-plus-branch.ts",
-    "check-rs-plus:ci": "npx --yes tsx scripts/check-rs-plus-branch.ts"
+    "check-rs-plus:ci": "npx --yes tsx scripts/check-rs-plus-branch.ts",
+    "check-card-payout": "npx --yes tsx --env-file=.env.local scripts/check-card-payout-branch.ts",
+    "check-card-payout:ci": "npx --yes tsx scripts/check-card-payout-branch.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
