@@ -2152,3 +2152,34 @@ $function$;
 -- Android app calls it, as an authenticated admin, and the web does not. Left
 -- as-is rather than flipped to INVOKER, because changing a function's security
 -- mode is a posture change and was not asked for.
+
+-- ============================================================
+-- /payments onto card_economics_for_session (29 August 2026)
+-- ============================================================
+--
+-- PARTIAL, deliberately. /payments reads invoice_total from the function and
+-- cardInvoiceTotal is deleted; six surfaces still compute in TypeScript
+-- (analytics lib, BoardCardContent, CardEditModal, lib/payments' own totals,
+-- settle-payment, api/payments). narratorShareOf stays regardless —
+-- narrationPlan needs the share for SCHEDULING on books with no income figure.
+--
+-- THE RECONCILIATION TEST WAS BUILT FIRST, and that is what made the migration
+-- safe rather than merely checked: with both sides proven equal on all 33
+-- cards, moving a surface between them cannot change a number. All 34 figures
+-- on /payments were byte-identical before and after.
+--
+-- IT FOUND TWO LATENT DIVERGENCES BEFORE ANYTHING MOVED — see the
+-- editing_cost migration above. Both were invisible in current data, which is
+-- why the earlier acceptance test had passed on those dimensions.
+--
+-- ON THE GATE, recorded here because it is the same stage:
+--
+--   Inside a SECURITY DEFINER function current_user is the OWNER, not the
+--   caller, so the service_role branch of assert_board_access is UNREACHABLE
+--   in career_totals_for_session — the only definer in the family. Left as-is:
+--   only Android calls it, as an authenticated admin, and flipping it to
+--   invoker is a posture change nobody asked for.
+--
+--   session_user was rejected for the branch because SET ROLE does not change
+--   it, so a harness impersonating service_role could never exercise that
+--   branch. Same untestability as auth.role(), opposite direction.

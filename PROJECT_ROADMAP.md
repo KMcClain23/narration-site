@@ -1481,12 +1481,34 @@ totals **to the cent, against pre-fix data** — production $14,901.92,
 ready-to-invoice $7,262.28. Anything less than exact would have meant a different
 definition wearing the same name.
 
-**The standing risk, stated plainly: the web has NOT migrated.** There is one
-definition in the database and a TypeScript copy that agrees **by reconciliation, not
-by construction**. That agreement is a snapshot taken on 28 August 2026, not a
-property. Either copy can drift and only a re-run of the acceptance test would notice.
-The web migration is the next stage, and closing it is what makes "one definition"
-true rather than aspirational.
+**UPDATED 29 August 2026 — the migration is PARTIAL, and the precise shape matters.**
+
+`/payments` now calls the function; `cardInvoiceTotal` was deleted, since that page
+was its only caller. **Six surfaces still compute in TypeScript** — `tools/analytics/lib.ts`,
+`BoardCardContent.tsx`, `CardEditModal.tsx`, `lib/payments.ts`'s own totals,
+`settle-payment.ts` and `api/payments/route.ts` — via `estimatedEarnings` and
+`cardExpected`, which have roughly twenty call sites between them.
+
+`narratorShareOf` **cannot** be deleted at all: `narrationPlan` uses the share for
+SCHEDULING — hours at the mic, hours per day — on books with no income figure, feeding
+the agenda, the board, the edit modal and `capacity.ts`.
+
+**The two sides are pinned by a TEST, not by construction.**
+`npm run check-card-economics` compares them across every unarchived card on share,
+income, editing_cost and invoice_total. It needs service-role credentials and is NOT
+in CI, so it runs when someone remembers — treat it as an open item rather than a
+gate. Anyone editing either side must run it.
+
+Building that test first is what made the migration safe: with both sides proven equal
+on all 33 cards, moving one surface between them *cannot* change a number. All 34
+figures on /payments were byte-identical before and after.
+
+**It found two latent divergences before anything moved.** `editingCost` counts
+payouts of kind editor OR PROOFER, and only on NON-ROYALTY payment rows; the function
+counted only `editor` and ignored the row kind. Neither is reachable in today's data —
+all nine payouts are `editor` on `fee` rows — so the earlier "reconciles to the cent"
+had passed on those two dimensions *because nothing exercised them*. An edge case with
+no row is untested, not passing. `rs_plus` still has no card and remains untested.
 
 "Editing billed back" is folded into `net` rather than returned as its own column.
 Adding a column changes the return type, which requires the `DROP` that resets the

@@ -331,6 +331,24 @@ export function agreedFee(card: MoneyCard, wordsPerFinishedHour: number): number
 }
 
 /** Editing and proofing recorded against this project's fee rows. */
+/**
+ * One card's economics, as `card_economics_for_session()` returns them.
+ *
+ * The database is the definition; this is the shape it arrives in. /payments
+ * reads these directly. Six surfaces still compute the same figures in
+ * TypeScript — see the note on cardExpected — and `npm run check-card-economics`
+ * is what holds the two together.
+ */
+export type CardEconomics = {
+  card_id: string;
+  title: string;
+  status: string;
+  share: number | null;
+  income: number | null;
+  editing_cost: number | null;
+  invoice_total: number | null;
+};
+
 export function editingCost(rows: PaymentRow[]): number {
   return rows
     .filter(r => r.kind !== "royalty")
@@ -340,26 +358,19 @@ export function editingCost(rows: PaymentRow[]): number {
 }
 
 /**
- * What this project will actually be billed for.
+ * `cardInvoiceTotal` LIVED HERE and is now `card_economics_for_session()`.
  *
- * cardExpected() is the narrator's share *before* their own half of the
- * editing comes off — a figure that is neither what they invoice nor what they
- * keep, and so belongs on no screen by itself. On a duet with $980 of editing
- * it read $1,960 while the invoice came to $2,449.80 and the narrator's own
- * share was $1,469.80.
+ * It was income plus the co-narrator's half of editing — what goes on the
+ * invoice rather than what the narrator keeps. Its only caller was
+ * PaymentsClient, which now reads `invoice_total` from the database function,
+ * so keeping a second copy here would be a formula with no user and an
+ * invitation to reintroduce the divergence this stage exists to close.
  *
- * The invoice is that share net of their half, plus the whole editing fee they
- * front on the project's behalf: base − editing×share + editing.
+ * `cardExpected` and `estimatedEarnings` below are NOT deleted: six other
+ * surfaces still call them — the analytics lib, BoardCardContent,
+ * CardEditModal, this file's own totals, settle-payment and /api/payments —
+ * and moving those is its own stage.
  */
-export function cardInvoiceTotal(
-  card: MoneyCard,
-  rows: PaymentRow[],
-  wordsPerFinishedHour: number,
-): number | null {
-  const base = cardExpected(card, rows, wordsPerFinishedHour);
-  if (base == null) return null;
-  return base + editingCost(rows) * (1 - narratorShare(card));
-}
 
 /** Editing and proofing fronted on one payment row. */
 export function rowEditingCost(payment: PaymentRow): number {

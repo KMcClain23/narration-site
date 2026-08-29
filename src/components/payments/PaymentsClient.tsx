@@ -6,9 +6,9 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { adminType } from "@/lib/design-tokens";
 import { parseLocalDate } from "@/components/admin/board-card-utils";
+import type { CardEconomics } from "@/lib/payments";
 import {
   cardExpected,
-  cardInvoiceTotal,
   clientOf,
   editingCost,
   computeByClient,
@@ -388,7 +388,26 @@ function Group({
   );
 }
 
-export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; payments: PaymentRow[] }) {
+export function PaymentsClient({
+  cards,
+  payments,
+  economics,
+}: {
+  cards: MoneyCard[];
+  payments: PaymentRow[];
+  /**
+   * Per-card economics from `card_economics_for_session()`.
+   *
+   * NULL when the read failed, which is not the same as an empty list. An empty
+   * list would mean "no cards have economics"; null means "we could not ask",
+   * and the page withholds figures rather than showing zeroes for either.
+   */
+  economics: CardEconomics[] | null;
+}) {
+  const econById = useMemo(
+    () => new Map((economics ?? []).map(e => [e.card_id, e])),
+    [economics],
+  );
   const studioState = useStudioSettings();
   const studio = studioRates(studioState);
   // One rate, read once. Every money figure below is gated on it: the totals and
@@ -433,10 +452,15 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
         const rows = rowsByCard.get(card.id) ?? [];
         const state = projectState(card, rows, finishedRate);
         const received = rows.reduce((s, r) => s + (Number(r.amount_received) || 0), 0);
-        // What will be billed, not the narrator's pre-deduction share — see
-        // cardInvoiceTotal(). The row sits under "Ready to invoice", so the
-        // number on it has to be the one that goes on the invoice.
-        const expected = finishedRate == null ? null : cardInvoiceTotal(card, rows, finishedRate);
+        // What will be billed, not the narrator's pre-deduction share: income
+        // plus the co-narrator's half of editing. FROM THE DATABASE — this is
+        // the one figure on this page that is no longer computed here, and
+        // card_economics_for_session() is its single definition.
+        //
+        // Null when the economics could not be read, which is deliberately NOT
+        // the same as zero: the page then withholds the figure rather than
+        // asserting a project is worth nothing.
+        const expected = econById.get(card.id)?.invoice_total ?? null;
         const editing = editingCost(rows);
 
         // cardExpected() excludes royalty rows on purpose — royalties are not
@@ -479,7 +503,9 @@ export function PaymentsClient({ cards, payments }: { cards: MoneyCard[]; paymen
     // the answer it computed while the rate was still null — projectState reads
     // `wordsPerFinishedHour == null` as "unknown", so all 33 projects stayed
     // uncostable and the page blamed the settings for it.
-  }, [cards, rowsByCard, finishedRate]);
+    // econById is in here because `expected` now reads from it. The /payments
+    // outage was a memo that read a value its dependency array did not list.
+  }, [cards, rowsByCard, finishedRate, econById]);
 
   const grouped = useMemo(() => {
     const m = new Map<ProjectState, Project[]>();
