@@ -1937,3 +1937,30 @@ $function$;
 --
 -- Dean's profile was never committed as changed: the demotion ran inside a
 -- transaction that raises at the end. profiles still reads admin.
+
+-- ============================================================
+-- payout_summary_for_session() (28 August 2026)
+-- ============================================================
+--
+-- The payout position as a PAIR: expected in, committed out, net, returned
+-- together so a caller cannot render one without the others. "$4,680 owed"
+-- alone reads as a debt; it is a deduction from income already earned, because
+-- Dean pays the editor once the author pays him and the author pays on delivery.
+--
+-- A SEPARATE function, not a widened payouts_for_session. Widening would change
+-- the return type, which requires DROP + CREATE — and that resets the ACL and
+-- re-grants EXECUTE to PUBLIC, the regression this project has already had.
+-- payments_for_session carries the card join but was changed the same day and
+-- is deliberately left alone.
+--
+-- SCOPED TO UNPAID. A settled payout's book is no longer expected income, so
+-- including it would make `net` describe a position that does not exist.
+--
+-- expected_in uses the same formula the stored payout amounts round to:
+--   word_count / studio_words_per_finished_hour * pfh_rate
+-- The divisor is READ FROM site_settings rather than hardcoded, so it moves
+-- with the studio setting instead of drifting from it.
+--
+-- Verified as an authenticated admin:
+--   expected_in 24142.56  committed_out 4680.00  net 19462.56
+--   unpaid 8  paid 1  books_without_word_count 0
