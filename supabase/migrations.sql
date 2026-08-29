@@ -1868,3 +1868,27 @@ $function$;
 -- bucketing at all, including one that dropped a category — the exact failure
 -- this exists to make impossible. Mutation-tested by removing the not_counted
 -- category: "Career categories account for 10 books but 33 are not archived."
+
+-- ============================================================
+-- payments_for_session() carries the card title (28 August 2026)
+-- ============================================================
+--
+-- The function returned card_id and nothing else about the card, so a payment
+-- row had no way to say WHICH BOOK it belonged to. Every row fell back to its
+-- kind for a heading, and `label` is empty on 24 of 25 rows, so the list read
+-- "Fee / Fee ·" down the page. The repetition was the visible symptom; the
+-- missing identity was the defect.
+--
+-- Same reasoning as Stage 8's lean column list rather than an exception to it:
+-- cover what the row RENDERS. The row renders the book.
+--
+-- A JOIN, not a second query. Resolving titles client-side would put the
+-- association in a client, where two clients could resolve it differently.
+--
+-- LEFT join: a payment whose card was deleted still appears. A money row that
+-- vanishes because its book did is a total that stops matching what can be
+-- seen, which is what the breakdown work exists to prevent.
+--
+-- Drop-and-create, so the ACL reset and the revokes below are not optional.
+-- check-function-grants confirmed clean afterwards — the guard earning its
+-- keep on the first widening after it was built.
