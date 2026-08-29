@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import type {
   SettingIssue,
   StudioSettingField,
@@ -114,39 +114,113 @@ export function describeSettingsFailure(httpStatus: number | null): string {
  * wrong on precisely the day the stored value differs from the default, which
  * is the day this whole stage exists for.
  */
+/**
+ * ONE fetch, ONE loading state, shared by every caller.
+ *
+ * Eight components call this hook. Each used to run its own useEffect and its
+ * own fetch, which meant eight requests for the same small JSON and — the part
+ * that actually mattered — EIGHT INDEPENDENT LOADING WINDOWS.
+ *
+ * That is the shape behind the /payments outage of 26 August. A component read
+ * a rate during its own loading window, the value was captured by a useMemo
+ * whose dependency array omitted it, the memo froze at the loading answer, and
+ * every project rendered "Cannot be worked out — settings unreadable" for three
+ * days while the settings were perfectly readable. Collapsing eight windows
+ * into one removes seven chances for the next consumer to do the same.
+ *
+ * A MODULE STORE RATHER THAN A CONTEXT PROVIDER, deliberately. A provider has
+ * to be mounted above every consumer, and a consumer rendered outside it fails
+ * silently or throws — so the guarantee would depend on eight call sites all
+ * sitting under one tree. They do not: /board is a client page, so the admin
+ * layout it shares with the others is bundled client-side there and cannot be
+ * the server boundary. With a store, every caller reads the same state by
+ * construction and there is nothing to mount incorrectly.
+ *
+ * Not fetched server-side for the same reason, plus one more: the only server
+ * boundary above all of these is the ROOT layout, which wraps the public site
+ * too. getStudioSettings() reads with the service-role client, and putting its
+ * answer in the root layout would serialise studio rates into every public
+ * page's HTML.
+ */
+
+/** The one answer, shared. A stable reference, so useSyncExternalStore can compare it. */
+let snapshot: StudioSettingsState = { status: "loading" };
+
+/** The one request. Null until something asks; never re-entered while pending. */
+let inFlight: Promise<void> | null = null;
+
+const listeners = new Set<() => void>();
+
+function publish(next: StudioSettingsState) {
+  snapshot = next;
+  for (const l of listeners) l();
+}
+
+function subscribe(onChange: () => void): () => void {
+  listeners.add(onChange);
+  return () => {
+    listeners.delete(onChange);
+  };
+}
+
+const getSnapshot = () => snapshot;
+
+/**
+ * SSR has no window and must not start a fetch. It returns the loading state,
+ * which every surface already renders correctly — that property is what
+ * check-first-render exists to hold.
+ */
+const LOADING: StudioSettingsState = { status: "loading" };
+const getServerSnapshot = () => LOADING;
+
+function loadOnce(): void {
+  if (inFlight) return;
+  inFlight = fetch("/api/studio-settings")
+    .then(async r => {
+      if (!r.ok) throw new SettingsRequestError(r.status);
+      return r.json();
+    })
+    .then(data => {
+      const read = data?.settings;
+      if (!read?.settings) throw new Error("The studio settings response had no settings.");
+      publish({ status: "loaded", settings: read.settings, issues: read.issues ?? {} });
+    })
+    .catch((e: unknown) => {
+      // Was `.catch(() => {})`, which kept the defaults on screen forever and
+      // left no trace anywhere that the fetch had ever failed.
+      //
+      // A transport failure and a malformed body have no HTTP status, and are
+      // deliberately not described as if they did.
+      const httpStatus = e instanceof SettingsRequestError ? e.httpStatus : null;
+      publish({ status: "failed", httpStatus, reason: describeSettingsFailure(httpStatus) });
+    });
+}
+
+/**
+ * The studio numbers, for client components that do arithmetic with them.
+ *
+ * Starts at `loading` rather than at the defaults, so nothing renders a
+ * default-derived figure that then silently changes. The cost is a beat of
+ * blankness on first paint; the alternative is a money figure that is briefly
+ * wrong on precisely the day the stored value differs from the default, which
+ * is the day this whole thing exists for.
+ */
 export function useStudioSettings(): StudioSettingsState {
-  const [state, setState] = useState<StudioSettingsState>({ status: "loading" });
-
+  const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   useEffect(() => {
-    let live = true;
-    fetch("/api/studio-settings")
-      .then(async r => {
-        if (!r.ok) throw new SettingsRequestError(r.status);
-        return r.json();
-      })
-      .then(data => {
-        if (!live) return;
-        const read = data?.settings;
-        if (!read?.settings) throw new Error("The studio settings response had no settings.");
-        setState({ status: "loaded", settings: read.settings, issues: read.issues ?? {} });
-      })
-      .catch((e: unknown) => {
-        // Was `.catch(() => {})`, which kept the defaults on screen forever and
-        // left no trace anywhere that the fetch had ever failed.
-        if (!live) return;
-        // A transport failure and a malformed body have no HTTP status, and are
-        // deliberately not described as if they did.
-        const httpStatus = e instanceof SettingsRequestError ? e.httpStatus : null;
-        setState({
-          status: "failed",
-          httpStatus,
-          reason: describeSettingsFailure(httpStatus),
-        });
-      });
-    return () => {
-      live = false;
-    };
+    loadOnce();
   }, []);
-
   return state;
+}
+
+/**
+ * Drops the cached answer and the in-flight request.
+ *
+ * For tests and for a deliberate re-read after a settings SAVE — without it the
+ * store would hand back the pre-save numbers for the life of the page, which is
+ * the staleness a shared cache buys in exchange for the shared loading state.
+ */
+export function resetStudioSettingsCache(): void {
+  inFlight = null;
+  publish({ status: "loading" });
 }

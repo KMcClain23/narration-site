@@ -210,7 +210,6 @@ export default function ContractClient() {
       }
       return prev;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.authorName]);
 
   const set = useCallback(<K extends keyof ContractData>(k: K, v: ContractData[K]) => {
