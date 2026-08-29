@@ -2111,3 +2111,44 @@ $function$;
 -- OID: CREATE OR REPLACE preserves them, DROP + CREATE destroys them silently.
 -- So a drop loses the ACL, re-grants EXECUTE to PUBLIC, and takes the
 -- documentation with it. Three failures, none of which announces itself.
+
+-- ============================================================
+-- The board gate accepts service_role (29 August 2026)
+-- ============================================================
+--
+-- assert_board_access() now returns early for current_user = 'service_role'.
+--
+-- THE ARGUMENT, and the only one: service_role ALREADY READS EVERY ROW. It
+-- holds rolbypassrls, so it reads board_cards, payments and the rest regardless
+-- of any policy. Verified rather than assumed:
+--
+--   as service_role: rolbypassrls=t  current_app_role()=null  board_cards=34 rows
+--                    card_economics_for_session() -> ERROR 42501
+--
+-- A gate that refuses service_role while service_role reads the tables
+-- underneath it is an inconsistency, not a defence. This grants no new reach.
+--
+-- WHY current_user AND NOT auth.role(): auth.role() reads a JWT claim a direct
+-- psql connection does not set, so it returns null even under `set local role
+-- service_role`. A gate written against it is untestable in at least one
+-- environment — the property that made the rolbypassrls harness lie earlier.
+--
+-- WHY NOT session_user: `SET ROLE` changes current_user but not session_user,
+-- so a harness that impersonates service_role could never exercise it. Same
+-- untestability, opposite direction.
+--
+-- VERIFIED ACROSS ALL TEN READ FUNCTIONS, because this is the single shared
+-- gate and widening it widens all ten at once:
+--
+--   service_role          9 returned rows, 1 refused
+--   admin authenticated  10 returned rows, 0 refused
+--   editor authenticated  0 returned rows, 10 refused   <- the editor gate held
+--   anon/PUBLIC EXECUTE on read functions: 0
+--
+-- THE ONE REFUSAL IS career_totals_for_session, AND THE CAUSE IS WORTH KNOWING.
+-- It is the only SECURITY DEFINER in the family, and inside a definer function
+-- current_user is the function OWNER, not the caller — so the service_role
+-- branch cannot match there however the call arrived. Harmless today: only the
+-- Android app calls it, as an authenticated admin, and the web does not. Left
+-- as-is rather than flipped to INVOKER, because changing a function's security
+-- mode is a posture change and was not asked for.
