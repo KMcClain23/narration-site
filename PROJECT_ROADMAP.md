@@ -1623,6 +1623,20 @@ Not process decoration — each of these found something in this stretch:
    convention.
 6. **Every probe that writes runs inside a transaction that rolls back**, including
    the quick ones. The quick ones are where it leaks.
+7. **When two producers can set a value, a guard on one of them is a guard on
+   neither.** `profiles.role` has a column DEFAULT and a `handle_new_user` trigger
+   that names the role explicitly. The first version of the guard checked only the
+   default, and mutating it *passed the mutation test* — the guard went red exactly
+   as intended. The hole showed in the same run's other column: with the default set
+   back to `'editor'`, the simulated signup still came out `'pending'`, because the
+   trigger decided. A guard that can go red while the system is safe can also stay
+   green while it is not. Enumerate the producers, then guard each.
+8. **A default's meaning can change without the default changing.** `role` defaulted
+   to `'editor'` for months while `'editor'` meant nothing. E1 turned it into a real
+   grant over the whole board, and at that instant every account creation became an
+   access grant — with no diff, no migration and no review touching the line
+   responsible. The code that caused it was written long before the code that made it
+   dangerous, so only a test that re-asks the question every run can catch this class.
 
 ### Open items carried forward
 
@@ -3193,3 +3207,108 @@ to Dean and Marizete, and no chapters were orphaned.
 - `require-admin.ts` — `isAdminOrInternal` and `internalAuthHeaders`, the bearer.
 - `actions/resetStats.ts` — a server action that takes the secret as an argument.
   Not a cookie login and not reachable from the UI, so left alone and noted.
+
+---
+
+## T1–T4 — every new account was silently an editor (2026-08-30)
+
+`public.profiles.role` had `DEFAULT 'editor'`, and `handle_new_user` inserted only
+`id` and `display_name`. E1 had turned `'editor'` into a real grant covering the whole
+board — the card detail, the narrators, the pickups. So every account that came into
+existence was granted the board on creation.
+
+**Nothing changed to cause this.** The default was written when `'editor'` was an
+inert string. E1 gave the string meaning months later and never touched the line. That
+is the whole shape of it: no diff, no migration and no review went anywhere near the
+code that was responsible.
+
+### T1 — the default now names a role no gate admits
+
+Migration `new_accounts_default_to_no_access`:
+
+- `profiles_role_check` widened to `admin | editor | pending`.
+- `alter column role set default 'pending'`.
+- `handle_new_user` now names the role **explicitly** as `'pending'`, so the trigger is
+  correct even if the default is changed again. This is what made the guard's first
+  version insufficient — see below.
+
+`'pending'` over `'none'` because it says what the state *is*: an account waiting for
+Dean to assign it, not an account that was denied.
+
+### Verified by simulation, not by reading the default
+
+In a rolled-back transaction, an `auth.users` row was inserted and the profile the
+trigger produced was read back: `pending`. Then, as that user:
+
+| called | result |
+|---|---|
+| `board_for_editor` | REFUSED: BOARD_ACCESS_NOT_ENABLED |
+| `board_for_session` | REFUSED: BOARD_ACCESS_NOT_ENABLED |
+| `card_detail_for_editor` | REFUSED: BOARD_ACCESS_NOT_ENABLED |
+| `pickups_for_editor` | REFUSED: BOARD_ACCESS_NOT_ENABLED |
+| `narrators_for_editor` | REFUSED: BOARD_ACCESS_NOT_ENABLED |
+| `card_economics_for_session` | REFUSED: BOARD_ACCESS_NOT_ENABLED |
+| `set_editing_progress` | REFUSED: BOARD_ACCESS_NOT_ENABLED |
+| `create_pickup` | REFUSED: BOARD_ACCESS_NOT_ENABLED |
+| `select * from board_cards` | ACCEPTED, **0 rows** |
+
+The last line is the one to keep. RLS returns *nothing* rather than refusing, so a
+direct read looks like an empty board. That is why the gates raise instead of
+filtering, and why the refusals above are the actual evidence.
+
+### T2 — public signup is DISABLED
+
+`POST /auth/v1/signup` with the anon key returns `422 signup_disabled`, "Signups not
+allowed for this instance". Asked empirically rather than read off the config, because
+what matters is what the endpoint does.
+
+This bounds the damage: nobody could self-register into the grant. Every account had to
+be created by Dean. It does **not** make the bug theoretical — every account he *did*
+create, for any purpose, became an editor, and the fix is unchanged.
+
+### T3 — the guard, and the hole proving it exposed
+
+`public.role_default_audit()`, run by `npm run check-new-account-role` and as a step in
+`reconcile.yml`. The admitted set is **derived from the bodies** of
+`assert_board_access` and `assert_editor_access` rather than hardcoded, so a third gate
+that admits the default starts failing this without anyone remembering to update a list.
+
+The first version checked the column default alone. Setting the default back to
+`'editor'` in a rolled-back transaction made it go red — the mutation test passed. It
+was still wrong, and the same run said so: the simulated signup came out `'pending'`
+anyway, because `handle_new_user` now names the role and overrides the default. **A
+guard that can go red while the system is safe can also stay green while it is not.**
+
+Rewritten to check both producers, then mutated separately against each:
+
+| scenario | default check | trigger check |
+|---|---|---|
+| live state | ok `pending` | ok, names no admitted role |
+| default set back to `'editor'` | **FAIL** | ok |
+| trigger inserts `'editor'`, default left `'pending'` | ok | **FAIL** |
+
+Each mutation fires its own check and leaves the other green, so neither check is
+carrying the other. Both mutations were rolled back; `handle_new_user` was confirmed
+afterwards to be the real one and still attached to `auth.users`.
+
+The script additionally fails if the derived admitted set comes back **empty** — with
+no gates found, nothing can be "a role a gate admits" and every check below would pass
+vacuously — and if the audit stops reporting either producer.
+
+### T4 — the two existing accounts are unaffected
+
+Dean `admin`, Marizete `editor`. Neither relied on the default, and neither moved.
+
+### Residual gaps, stated
+
+1. **The script's own FAIL branch is proven through the audit, not end to end.** The
+   audit was mutated in a rolled-back transaction and returns `ok = false` for each
+   producer; the script's remaining logic is a count. Running the script itself against
+   a failing state would mean mutating production outside a transaction, which is not
+   worth it for a branch this thin.
+2. **`process.exit()` mangles the exit code on Windows.** After a `supabase-js` client
+   exists, exit triggers `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` and
+   the code becomes 127 regardless. This affects **every** check script here, not just
+   this one, and predates it. It fails safe — a pass also exits non-zero locally, so
+   the error is a false alarm, never a false pass — and CI runs ubuntu, where it does
+   not occur. Judge a local run by its output, not its exit code.

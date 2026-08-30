@@ -24,6 +24,8 @@
     "check-card-payout": "npx --yes tsx --env-file=.env.local scripts/check-card-payout-branch.ts",
     "check-card-payout:ci": "npx --yes tsx scripts/check-card-payout-branch.ts",
     "check-board-policies": "npx --yes tsx --env-file=.env.local scripts/check-board-policies.ts",
+    "check-new-account-role": "npx --yes tsx --env-file=.env.local scripts/check-new-account-role.ts",
+    "check-new-account-role:ci": "npx --yes tsx scripts/check-new-account-role.ts",
     "check-board-policies:ci": "npx --yes tsx scripts/check-board-policies.ts"
   },
   "dependencies": {

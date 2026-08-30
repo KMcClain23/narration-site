@@ -57,3 +57,13 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npm run check-board-policies:ci
+
+      # The role a new account gets, from BOTH producers: the column default and
+      # handle_new_user. profiles.role defaulted to 'editor' from before E1 gave
+      # that role meaning, so every account created was silently granted the
+      # whole board. Nothing changed; the meaning did.
+      - name: A new account must get a role no gate admits
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run check-new-account-role:ci
