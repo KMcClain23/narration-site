@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ADMIN_COOKIE_NAME, isValidAdminKey } from "@/lib/admin-auth";
+import { currentRole } from "@/lib/supabase/session";
 
 // Defense in depth for admin server components.
 //
@@ -17,10 +18,34 @@ import { ADMIN_COOKIE_NAME, isValidAdminKey } from "@/lib/admin-auth";
 // forged x-middleware-subrequest header). This app is on a patched Next, but
 // the structural point stands: a single bypass should not expose 20 pages.
 
-/** True when the current request carries a valid admin cookie. */
+/**
+ * True when the request is an admin, by EITHER of two independent paths.
+ *
+ * This one function backs assertAdmin, requireAdmin and isAdminOrInternal, so
+ * teaching it the second path teaches all three at once — which is why the
+ * Supabase check belongs here and not sprinkled through the call sites.
+ *
+ * THE TWO PATHS ARE INDEPENDENT AND BOTH COMPLETE. The shared-secret cookie is
+ * unchanged and is checked first because it is free — no network, no database.
+ * The Supabase session is checked on its own terms and grants admin on its own.
+ * Neither is a fallback for the other in the sense that matters: neither one
+ * being WRONG makes the other one right, and each is sufficient alone.
+ *
+ * WHAT THIS ORDER COSTS, named so it is not forgotten: while the cookie works, a
+ * broken Supabase path is invisible from a browser that has the cookie. That is
+ * unavoidable in an additive migration and is why the new path is proved on its
+ * own — signed in with an account and NO cookie — rather than by "the admin
+ * still loads".
+ */
 export async function isAdminRequest(): Promise<boolean> {
   const cookieStore = await cookies();
-  return isValidAdminKey(cookieStore.get(ADMIN_COOKIE_NAME)?.value);
+  if (isValidAdminKey(cookieStore.get(ADMIN_COOKIE_NAME)?.value)) return true;
+
+  // The role is read from public.profiles, because that is what
+  // current_app_role() reads and therefore the only answer that can agree with
+  // what the database itself will allow. An editor is deliberately NOT admin
+  // here: W1 gives her a session and nothing else on this surface.
+  return (await currentRole()) === "admin";
 }
 
 /**

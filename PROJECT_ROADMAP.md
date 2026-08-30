@@ -2991,3 +2991,81 @@ No new function is anon-executable; no anon grant exists on `narrators` or
    NOT demonstrated. That is the largest untested claim in this stage and should
    be run first once the function is deployed.
 4. **Nothing has been exercised on a device.**
+
+---
+
+## W1 — Supabase Auth on the website, alongside the shared secret (2026-08-30)
+
+Additive. `dmn_admin_key` is untouched and still carries every request; the
+Supabase session is new and grants admin on its own. **No database changes at
+all** — nothing was sent to `apply_migration`, which is what V7 asks for.
+
+### What was added
+
+`@supabase/ssr`, three clients (browser, server, and an edge-safe middleware
+refresher), and session helpers exposing: is there a user, what is their
+`profiles.role`, and a user-scoped client. Plus an email/password form on
+`/admin/login` beside the key form, with its own separate error state — one box
+saying "that did not work" for two independent mechanisms is exactly how a broken
+new path hides behind a working old one.
+
+### The gate that was NOT in the plan, and how it surfaced
+
+Signing in with an account landed on `/board`, and `/payments` then redirected.
+The tell was the redirect URL: **no `?next=` parameter**, which the middleware
+always sets — so it was not the middleware refusing. It was
+`require-admin.ts`, the server-component gate, which knew only the cookie.
+`/board` does not call it; `/payments` and `/settings` do.
+
+Had the new path been checked on one route it would have looked finished. It was
+fixed at `isAdminRequest()`, the single function backing `assertAdmin`,
+`requireAdmin` and `isAdminOrInternal` — so teaching it once taught all three.
+
+### Verified
+
+| | |
+|---|---|
+| **New path alone** (session cookies, no key) | `/board` `/payments` `/settings` `/released` `/expenses` all **200** |
+| **Old path alone** (key, no session) — V3 | `/board` `/payments` `/settings` all **200** |
+| **Neither** — V5 | **307** to `/admin/login?next=…`, as before |
+| **Editor session** — V2 | session real, `profiles.role` = `editor`, and **307** everywhere |
+| **Public** — V4 | catalogue and both book pages 200, `/api/books` **32 items**, no financial keys, no format pills |
+| **V7** | ACL unchanged, **0 migrations** |
+
+**V6, in its strong form.** A throwaway account was signed in, its role read
+`editor`, then `profiles` was changed to `admin` **without issuing a new token**
+— and the same live session immediately read `admin`. A JWT claim could not do
+that. This is why the role is read from `profiles` and never from a claim:
+`current_app_role()` is literally `select role from profiles where id =
+auth.uid()`, so profiles is the only source that can agree with what the database
+will actually allow. She also saw exactly one row in `profiles` — her own.
+
+Both throwaway accounts were deleted; only Dean and Marizete remain.
+
+### Two things I got wrong on the way
+
+1. **A silent no-op reported as success.** The login-form edit did not apply —
+   wrong indentation in the anchor — and the script printed a hardcoded success
+   line anyway. `tsc` passed because the file was still valid. Caught only when
+   the browser could not find the email input. Every replacement in the redo
+   asserts its anchor.
+2. **The previous stage left `tsc` broken.** The Deno Edge Function was being
+   typechecked by the project's TypeScript. I missed it because I grepped the
+   compiler output for a filename instead of reading it. `supabase/functions` is
+   now excluded, and `tsc` is clean.
+
+### NOT DONE
+
+**V1 and V2 with the real accounts.** Dean's and Marizete's passwords were not
+shared, so both were proved with throwaway accounts carrying the same roles. That
+tests the mechanism, not their specific credentials — signing in as himself once
+is the remaining check, and it is a minute's work.
+
+### The standing risk, named
+
+While both paths are live, a broken Supabase path is invisible to any browser
+holding the cookie. That is inherent to a migration nothing has to cut over for.
+It is why the new path was proved with **no cookie present at all**, and it is
+why `dmn_admin_key` is retired entirely at the end rather than kept as a
+fallback: a shared secret that still works reads as `service_role` regardless of
+role, and would bypass every boundary E1 and E2 built.
