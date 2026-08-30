@@ -22,7 +22,9 @@
     "check-rs-plus": "npx --yes tsx --env-file=.env.local scripts/check-rs-plus-branch.ts",
     "check-rs-plus:ci": "npx --yes tsx scripts/check-rs-plus-branch.ts",
     "check-card-payout": "npx --yes tsx --env-file=.env.local scripts/check-card-payout-branch.ts",
-    "check-card-payout:ci": "npx --yes tsx scripts/check-card-payout-branch.ts"
+    "check-card-payout:ci": "npx --yes tsx scripts/check-card-payout-branch.ts",
+    "check-board-policies": "npx --yes tsx --env-file=.env.local scripts/check-board-policies.ts",
+    "check-board-policies:ci": "npx --yes tsx scripts/check-board-policies.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

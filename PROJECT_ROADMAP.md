@@ -2813,3 +2813,71 @@ The Android UI compiles and its logic is unit-tested (305 tests, 0 failures), bu
 was deliberately not shared, so the editor's form, the narrator picker, the
 per-chapter Send and the admin's resolve have not been seen working against the
 real functions. The database side of every one of those is tested directly.
+
+---
+
+## Y — pinning the policy set and narrowing the financial grant (2026-08-29)
+
+E2 ended by reporting an asymmetry: a direct write to `pfh_rate` as the editor
+was not refused, it was RLS-filtered to zero rows. One layer, and a failure that
+looked like success. This closes it, on those four columns only.
+
+### Y1 — the policy set is pinned, and the guard was wrong first
+
+`board_cards_policy_audit()` returns every RLS policy on the table with a flag
+for any that admits a non-admin WRITE, and `npm run check-board-policies` pins
+the SET as well: a new policy fails the check even if the audit thinks it is
+safe, because a new write policy on this table is a decision somebody should have
+to state out loud.
+
+**The first version was broken, and how that was caught is the lesson.** It
+matched the policy expression's FORMATTING, and flagged the correct "Role update"
+policy — whose text carries an ` AS current_app_role)` that the planner inserts
+between the call and the comparison. The MUTATION TEST PASSED: the bad policy was
+flagged. Mutating alone would have shipped a guard that was permanently red on a
+correct database, which teaches whoever sees it to ignore it. **The baseline run
+is what caught it.** A guard must fire on the bad state AND stay quiet on the
+good one; checking only one of those is half a test.
+
+Rewritten to ask a semantic question — does the expression pin the app role to
+admin, and name no other role — it is quiet today and fires on both realistic
+widenings, each proved in a rolled-back transaction:
+
+| mutation | flagged |
+|---|---|
+| a permissive editor UPDATE policy added | `Editor update (UPDATE)` |
+| the existing `Role update` loosened to `true` | `Role update (UPDATE)` |
+
+### Y2 — the phone DID edit those four, so the revoke was not free
+
+Checked before changing anything, as asked. All four columns are declared as
+editable fields in `CardFields.kt` (Money group, behind `canViewFinancials`), and
+`save(column, raw)` builds a one-column patch straight to PostgREST. So the
+revoke needed a reroute, and got one.
+
+`set_card_financial(p_card_id, p_column, p_value)` is admin-gated and names the
+four columns in STATIC assignments — `p_column` selects between them and never
+becomes SQL. The UPDATE grant on those four is revoked from `authenticated`. The
+other 24 columns keep the direct path deliberately: this is two layers where one
+was not enough, not a refactor of every write in the app.
+
+**THE CHANGE IN FAILURE MODE IS THE VERIFICATION:**
+
+| attempt, as the editor | before | after |
+|---|---|---|
+| `update board_cards set pfh_rate` | `ACCEPTED, 0 rows` | `REFUSED [42501] permission denied` |
+| `update board_cards set title` | `ACCEPTED, 0 rows` | `ACCEPTED, 0 rows` — unchanged, by design |
+
+As the admin: all four write through the function, a non-financial column name is
+refused by name, and the direct path to `pfh_rate` is now refused for him too —
+which is exactly why the phone needed rerouting rather than just revoking.
+
+### Y3 — the controls, because this touches the table every figure reads
+
+Money reconciles across all 33 cards. rs_plus and card-payout branch checks
+green. The grant guard passes. The policy check passes. `authenticated` retains
+SELECT and 24 of 28 UPDATE columns — exactly the four removed and nothing else.
+The only anon-executable functions remain the inert trigger functions, now eight
+with `check_pickup_shape`.
+
+305 Android tests, 0 failures.
