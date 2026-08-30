@@ -3069,3 +3069,57 @@ It is why the new path was proved with **no cookie present at all**, and it is
 why `dmn_admin_key` is retired entirely at the end rather than kept as a
 fallback: a shared secret that still works reads as `service_role` regardless of
 role, and would bypass every boundary E1 and E2 built.
+
+---
+
+## R5 + R6 — the three-state login and the display name (2026-08-30)
+
+Done ahead of the shared-secret login removal, because neither depends on it and
+both reduce the risk of doing it.
+
+### R5 — three states, not two
+
+`/admin/login` is now a server component that reads the session BEFORE rendering:
+no session gives the form, a session with the wrong role gives a page naming the
+account and its role, and an admin is sent straight on to `?next=`.
+
+The middle state stopped being cosmetic the moment the shared secret stopped
+being a way in. An editor who signs in correctly and is bounced back to a login
+form has been told, as far as she can tell, that her password is wrong — the
+screen is identical either way.
+
+The sign-out control is not decoration: without it a wrong-role session has no
+exit, because the admin routes bounce her to this page, this page is not an admin
+route so it does not bounce her back, and re-entering correct credentials signs
+the same account in again. **Verified that it actually ends the session** — zero
+session cookies with a value remain afterwards, and the page returns to the form.
+
+### R6 — and the regression it caused
+
+`display_name` was `''` for Marizete; set to "Marizete", with
+`check (length(btrim(display_name)) > 0)` so NOT NULL stops meaning "not null but
+possibly meaningless".
+
+**That constraint immediately broke account creation.** `handle_new_user`
+inserted `(id)` alone and let `display_name` fall to its default of `''`, so every
+new signup failed with "Database error creating new user". Found by trying to
+create one; it would otherwise have surfaced the next time Dean added somebody.
+
+**That trigger is also how Marizete's row got a blank name.** It has always
+created profiles with no name and relied on something later filling it in, and on
+30 August nothing did. The trigger now seeds the name from the email's local part
+and the column default is dropped — a default that violates its own constraint is
+a trap for the next inserter. Fixing the trigger fixes the cause; the constraint
+only stopped the symptom being storable.
+
+### S7 — the audit found doors R1 alone would not close
+
+`isAdminRequest()` is not the only cookie check. Three route handlers compare the
+cookie themselves:
+
+- `src/app/api/inquiries/route.ts` — twice, `cookie !== ADMIN_SECRET_KEY`
+- `src/app/api/email-scan/route.ts` — `isValidAdminKey` on the cookie directly
+- `src/app/api/debug-env/route.ts` — reads the cookie
+
+Removing the check from `isAdminRequest()` would leave all three accepting the
+old credential. They are logged here so the removal covers them.
