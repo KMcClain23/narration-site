@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { isAdminRequest } from "@/lib/require-admin";
 import { redis, INQUIRY_KEY, ARCHIVE_KEY, parseInquiryList } from "@/lib/inquiries";
 
-const COOKIE_NAME = "dmn_admin_key";
 
 /**
  * GET: Protected - Admin views all inquiries
  */
 export async function GET() {
-  const cookieStore = await cookies();
-  if (cookieStore.get(COOKIE_NAME)?.value !== process.env.ADMIN_SECRET_KEY) {
+  // Was a direct comparison of the dmn_admin_key cookie against
+  // ADMIN_SECRET_KEY, which would have kept accepting that credential after it
+  // was retired everywhere else. Same question as every other admin surface now.
+  if (!(await isAdminRequest())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -28,8 +29,10 @@ export async function PATCH(req: Request) {
   // nothing else, so an unauthenticated caller could move a client's enquiry out
   // of the inbox — the message survives in the archive, but it stops being seen,
   // which for an enquiry is most of the damage.
-  const cookieStore = await cookies();
-  if (cookieStore.get(COOKIE_NAME)?.value !== process.env.ADMIN_SECRET_KEY) {
+  // Was a direct comparison of the dmn_admin_key cookie against
+  // ADMIN_SECRET_KEY, which would have kept accepting that credential after it
+  // was retired everywhere else. Same question as every other admin surface now.
+  if (!(await isAdminRequest())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -1,21 +1,23 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { isAdminRequest } from "@/lib/require-admin";
 
-// Admin-only diagnostic endpoint — checks env vars are present without exposing values
+// Admin-only diagnostic: are the environment variables PRESENT. It deliberately
+// does not report their values.
+//
+// Its gate was a direct comparison of the dmn_admin_key cookie, which would have
+// left this route standing on a credential nothing issues any more. It now asks
+// the same question every other admin surface asks.
 export async function GET() {
-  const cookieStore = await cookies();
-  const adminCookie = cookieStore.get("dmn_admin_key")?.value;
-  const adminSecret = process.env.ADMIN_SECRET_KEY;
-
-  // Require admin auth
-  if (!adminCookie || adminCookie !== adminSecret) {
+  if (!(await isAdminRequest())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // The key's length and first ten characters used to be returned here, which
+  // contradicted this route's own description. A prefix is not a whole key, but
+  // it is not nothing either, and "is it set" is the question actually being
+  // asked. Presence only.
   const vars = {
     ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY,
-    ANTHROPIC_API_KEY_length: process.env.ANTHROPIC_API_KEY?.length ?? 0,
-    ANTHROPIC_API_KEY_prefix: process.env.ANTHROPIC_API_KEY?.slice(0, 10) ?? "(not set)",
     SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
     ADMIN_SECRET_KEY: !!process.env.ADMIN_SECRET_KEY,

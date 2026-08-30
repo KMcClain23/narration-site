@@ -1,8 +1,6 @@
 import "server-only";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ADMIN_COOKIE_NAME, isValidAdminKey } from "@/lib/admin-auth";
 import { currentRole } from "@/lib/supabase/session";
 
 // Defense in depth for admin server components.
@@ -19,37 +17,23 @@ import { currentRole } from "@/lib/supabase/session";
 // the structural point stands: a single bypass should not expose 20 pages.
 
 /**
- * True when the request is an admin, by EITHER of two independent paths.
+ * True when a signed-in Supabase user has the admin role.
  *
- * This one function backs assertAdmin, requireAdmin and isAdminOrInternal, so
- * teaching it the second path teaches all three at once — which is why the
- * Supabase check belongs here and not sprinkled through the call sites.
+ * THE SHARED SECRET IS NO LONGER A WAY IN. It used to be checked here first and
+ * that check is gone: email and password is the only browser path now. The
+ * secret itself REMAINS, because it is also the internal service-to-server
+ * bearer — see isAdminOrInternal below, and do not remove the env var.
  *
- * THE TWO PATHS ARE INDEPENDENT AND BOTH COMPLETE. The shared-secret cookie is
- * unchanged and is checked first because it is free — no network, no database.
- * The Supabase session is checked on its own terms and grants admin on its own.
- * Neither is a fallback for the other in the sense that matters: neither one
- * being WRONG makes the other one right, and each is sufficient alone.
- *
- * WHAT THIS ORDER COSTS, named so it is not forgotten: while the cookie works, a
- * broken Supabase path is invisible from a browser that has the cookie. That is
- * unavoidable in an additive migration and is why the new path is proved on its
- * own — signed in with an account and NO cookie — rather than by "the admin
- * still loads".
+ * The role comes from public.profiles, not from a token claim, because
+ * current_app_role() is literally a select against profiles — so profiles is the
+ * only source that can agree with what the database will actually allow.
  */
 export async function isAdminRequest(): Promise<boolean> {
-  const cookieStore = await cookies();
-  if (isValidAdminKey(cookieStore.get(ADMIN_COOKIE_NAME)?.value)) return true;
-
-  // The role is read from public.profiles, because that is what
-  // current_app_role() reads and therefore the only answer that can agree with
-  // what the database itself will allow. An editor is deliberately NOT admin
-  // here: W1 gives her a session and nothing else on this surface.
   return (await currentRole()) === "admin";
 }
 
 /**
- * Admin cookie, or the app calling itself.
+ * A signed-in admin, or the app calling itself.
  *
  * The parse chain is a sequence of server-to-server requests: uploading a
  * manuscript triggers /process, which triggers /extract, which chains through
@@ -59,10 +43,12 @@ export async function isAdminRequest(): Promise<boolean> {
  * after that sat at "processing" forever with no chapters and no error, which
  * looked exactly like a very slow parse.
  *
- * The shared secret is the same one the cookie is checked against, sent as a
- * bearer between two routes of the same deployment over HTTPS. It is not a
- * second credential to manage, and it cannot be forged without already having
- * the admin key.
+ * ADMIN_SECRET_KEY IS NO LONGER A LOGIN CREDENTIAL. It is ONLY this: a bearer
+ * sent between two routes of the same deployment over HTTPS. The browser path
+ * is email and password, and nothing accepts this secret from a cookie any more.
+ *
+ * DO NOT FINISH THE JOB BY DELETING THE ENV VAR — that is the failure described
+ * directly above, and it has already happened here once.
  */
 export async function isAdminOrInternal(req: Request): Promise<boolean> {
   if (await isAdminRequest()) return true;
@@ -73,7 +59,11 @@ export async function isAdminOrInternal(req: Request): Promise<boolean> {
   return header === `Bearer ${secret}`;
 }
 
-/** Header for one route of this app to call another with. */
+/**
+ * Header for one route of this app to call another with.
+ *
+ * The remaining legitimate use of ADMIN_SECRET_KEY. Not a login.
+ */
 export function internalAuthHeaders(): Record<string, string> {
   const secret = process.env.ADMIN_SECRET_KEY;
   return secret ? { authorization: `Bearer ${secret}` } : {};

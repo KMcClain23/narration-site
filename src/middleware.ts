@@ -1,23 +1,18 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ADMIN_COOKIE_NAME, isValidAdminKey } from "@/lib/admin-auth";
+import { ADMIN_COOKIE_NAME } from "@/lib/admin-auth";
 import { refreshSession } from "@/lib/supabase/middleware-session";
 
 /**
- * TWO AUTHENTICATION PATHS, DELIBERATELY BOTH LIVE.
+ * ONE AUTHENTICATION PATH: a Supabase session whose profiles.role is admin.
  *
- * The shared-secret cookie is unchanged and still carries every request. The
- * Supabase session is new, additive, and grants admin access on its own. Neither
- * depends on the other and neither is consulted only when the other fails to
- * throw — they are two complete answers to the same question, and either one
- * being true is enough.
+ * The shared-secret cookie is no longer accepted anywhere, and any stale one is
+ * DELETED on the way past — a cookie that still exists but no longer works is
+ * indistinguishable, from the browser, from a login that has broken.
  *
- * THE RISK THIS CREATES, NAMED SO IT IS NOT FORGOTTEN: while both are live, a
- * BROKEN Supabase path is invisible from the browser, because the cookie keeps
- * working. That is the price of a migration nothing has to cut over for, and it
- * is why the new path is proved in isolation rather than by "the admin still
- * loads". When the cookie is retired, this file loses its first check and the
- * session becomes the only answer.
+ * ADMIN_SECRET_KEY itself is deliberately still in the environment. It is the
+ * internal service-to-server bearer that /process uses to call /extract, and
+ * removing it breaks the manuscript parse chain silently. See require-admin.ts.
  */
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -43,37 +38,55 @@ export async function middleware(req: NextRequest) {
     pathname === "/released";
 
   if (isAdminRoute || isBoardRoute || isNewAdminRoute) {
-    // Compares the cookie against ADMIN_SECRET_KEY. This previously only
-    // checked the cookie was non-empty, which meant
-    // `document.cookie = "dmn_admin_key=x"` reached every admin page.
-    // The OLD path, byte-for-byte what it was.
-    const byAdminKey = isValidAdminKey(req.cookies.get(ADMIN_COOKIE_NAME)?.value);
-    // The NEW path, independent of it. Editor is deliberately NOT enough: these
-    // routes are the admin, and W1 gives an editor nothing new on the website.
-    const bySupabaseAdmin = role === "admin";
-
-    if (!byAdminKey && !bySupabaseAdmin) {
+    // Editor is deliberately NOT enough: these routes are the admin, and an
+    // editor who reaches them is sent to the login page, which now tells her she
+    // is signed in and simply has no access here — rather than showing her a
+    // form that reads as "your password was wrong".
+    if (role !== "admin") {
       const url = req.nextUrl.clone();
       url.pathname = "/admin/login";
       // Carry where they were going, so signing in finishes the journey
       // instead of dropping everyone on the board to navigate again.
       url.search = "";
       url.searchParams.set("next", pathname);
-      return NextResponse.redirect(url);
+      // The redirect is a DIFFERENT response object, so the clear at the bottom
+      // of this function never touches it — and a redirect is exactly when a
+      // stale cookie holder arrives. Found by looking for the Set-Cookie header
+      // rather than trusting that calling the helper once was enough.
+      const redirected = NextResponse.redirect(url);
+      clearStaleAdminKey(req, redirected);
+      return redirected;
     }
 
     // /admin root has no page — redirect authenticated users straight to /board
     if (pathname === "/admin") {
       const url = req.nextUrl.clone();
       url.pathname = "/board";
-      return NextResponse.redirect(url);
+      const redirected = NextResponse.redirect(url);
+      clearStaleAdminKey(req, redirected);
+      return redirected;
     }
   }
 
   // The refreshed response, so any rotated auth cookie is actually written.
   // Returning NextResponse.next() here instead would drop the refresh silently
   // and sessions would expire early for no visible reason.
+  clearStaleAdminKey(req, res);
   return res;
+}
+
+/**
+ * Delete a leftover dmn_admin_key.
+ *
+ * It grants nothing now, but leaving it in the browser means a stale credential
+ * sitting there looking like a login — and the next person to find it in
+ * devtools has to work out whether it matters. Removing it on the next visit
+ * makes the answer visible instead of archaeological.
+ */
+function clearStaleAdminKey(req: NextRequest, res: NextResponse): void {
+  if (req.cookies.get(ADMIN_COOKIE_NAME)) {
+    res.cookies.set({ name: ADMIN_COOKIE_NAME, value: "", maxAge: 0, path: "/" });
+  }
 }
 
 export const config = {

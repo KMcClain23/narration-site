@@ -7,23 +7,14 @@ import { NextResponse } from "next/server";
 import { graphToken } from "@/lib/microsoft-graph";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import Anthropic from "@anthropic-ai/sdk";
-import { ADMIN_COOKIE_NAME, isValidAdminKey } from "@/lib/admin-auth";
+import { isAdminRequest } from "@/lib/require-admin";
 
-// ─── admin auth (same cookie pattern as other board routes) ───────────────────
-
-// Was: "a cookie named dmn_admin_key exists and is non-empty", which any
-// visitor could satisfy with document.cookie. Now compares against
-// ADMIN_SECRET_KEY via the shared helper.
-function isAdmin(req: Request): boolean {
-  const header = req.headers.get("cookie") ?? "";
-  for (const part of header.split(";")) {
-    const [name, ...rest] = part.trim().split("=");
-    if (name.trim() === ADMIN_COOKIE_NAME) {
-      return isValidAdminKey(rest.join("="));
-    }
-  }
-  return false;
-}
+// ─── admin auth ──────────────────────────────────────────────────────────────
+//
+// This route used to compare the dmn_admin_key cookie itself, which meant it
+// would have kept accepting that credential after it was removed from
+// isAdminRequest(). It now asks the same question every other admin surface
+// asks: is there a signed-in user whose profiles.role is admin.
 
 // ─── token management ─────────────────────────────────────────────────────────
 
@@ -33,7 +24,7 @@ const getValidAccessToken = graphToken;
 // ─── GET — connection status ───────────────────────────────────────────────────
 
 export async function GET(req: Request) {
-  if (!isAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!await isAdminRequest()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data } = await supabaseAdmin
     .from("admin_integrations")
@@ -66,7 +57,7 @@ type Suggestion = {
 };
 
 export async function POST(req: Request) {
-  if (!isAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!await isAdminRequest()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   // 1. Validate Microsoft connection
   const accessToken = await getValidAccessToken();

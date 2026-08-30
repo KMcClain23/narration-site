@@ -3123,3 +3123,73 @@ cookie themselves:
 
 Removing the check from `isAdminRequest()` would leave all three accepting the
 old credential. They are logged here so the removal covers them.
+
+---
+
+## R1–R4 — the shared-secret LOGIN retired (2026-08-30)
+
+Email and password is now the only way into a browser. **ADMIN_SECRET_KEY
+remains** and is still required: it is the internal service-to-server bearer, and
+removing it breaks the manuscript parse chain silently.
+
+Done only after Dean confirmed the prerequisite — signed in incognito with no
+`dmn_admin_key` cookie and reached /payments. Until that was confirmed the
+removal was held, because while the cookie works it masks a broken session path,
+and the failure mode of getting this wrong is Dean locked out of his own admin.
+
+### S7 found three doors that R1 alone would have left open
+
+`isAdminRequest()` was not the only cookie check. `api/inquiries` compared the
+cookie itself, twice; `api/email-scan` had its own copy of the comparison; and
+`api/debug-env` read the cookie directly. Removing the check from one function
+would have left all three accepting a credential nothing else honoured. All now
+ask the same question every admin surface asks.
+
+`api/debug-env` also returned the Anthropic key's length and first ten
+characters, directly contradicting its own comment — "checks env vars are present
+without exposing values". Presence only now.
+
+### Four things the verification caught that the plan did not
+
+1. **The new constraint broke account creation.** `handle_new_user` inserted
+   `(id)` alone and let `display_name` fall to its default of `''`, so every new
+   signup failed with "Database error creating new user". That trigger is also
+   how Marizete's row got blank in the first place. It now seeds the name from
+   the email's local part, and the column default is dropped — a default that
+   violates its own constraint is a trap for whoever inserts next.
+2. **The stale-cookie clear never ran on a redirect.** `NextResponse.redirect()`
+   builds a DIFFERENT response object, so the clear at the end of the middleware
+   never touched it — and a redirect is exactly when a stale-cookie holder
+   arrives. Found by looking for the `Set-Cookie` header rather than trusting
+   that calling the helper once was enough.
+3. **The admin UI's sign-out only cleared the cookie.** `useLogout` POSTed to
+   `/admin/logout` and nothing else. Left alone it would have kept clearing a
+   cookie nothing reads while the session that actually grants access survived —
+   a button that looked like it worked. It signs out of Supabase now.
+4. **`isValidAdminKey` was deleted, not left dead.** While it existed, adding a
+   cookie check back was one import away.
+
+### Verified
+
+| | |
+|---|---|
+| **S1** admin session | `/board` `/payments` `/settings` `/released` `/expenses` `/api/inquiries` `/api/debug-env` all **200** |
+| **S2** valid key, no session | all **307**; the API routes **401**; `/api/admin/login` **404**; `Set-Cookie: dmn_admin_key=; Max-Age=0` |
+| **S3** parse chain | uploaded a manuscript end to end; log shows `/process` parsed and `/extract` completed, status `ready`, chapter row created |
+| **S4** editor | no-access page naming her and her role, sign-out present, and **zero session cookies remain** afterwards |
+| **S5** constraint | empty, whitespace and blank-insert all refused; a real name accepted |
+| **S6** public | catalogue and both book pages 200, 32 items, no financial keys, no format pills |
+
+S3 was run against **localhost**, not production. `baseUrl` falls back to
+`https://www.dmnarration.com` when `NEXT_PUBLIC_SITE_URL` is empty — which it is
+locally — so a naive local test would have fired the parse chain at the live
+site. The variable was pointed at localhost for the test and restored after.
+
+The probe manuscript and every throwaway account were deleted; profiles are back
+to Dean and Marizete, and no chapters were orphaned.
+
+### Still on ADMIN_SECRET_KEY, and correctly
+
+- `require-admin.ts` — `isAdminOrInternal` and `internalAuthHeaders`, the bearer.
+- `actions/resetStats.ts` — a server action that takes the secret as an argument.
+  Not a cookie login and not reachable from the UI, so left alone and noted.
