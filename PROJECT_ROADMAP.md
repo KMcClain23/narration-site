@@ -2881,3 +2881,113 @@ The only anon-executable functions remain the inert trigger functions, now eight
 with `check_pickup_shape`.
 
 305 Android tests, 0 failures.
+
+---
+
+## E3 + E4 — narrators, the pickup email, and filing to OneDrive (2026-08-30)
+
+### E3a — narrators, seeded and counted independently
+
+19 rows: the 18 distinct co-narrator names on unarchived cards, plus Dean. Z1
+compared the seeded set against the source set in BOTH directions rather than
+trusting the parse to agree with itself — nothing in the source is missing, and
+the only extra is Dean. **No email address was invented**; every one is null
+until Dean fills them in. No `profile_id` is set: that is the column E6 fills.
+
+The parser handles both storage shapes, though worth recording: **all 31 rows are
+JSON arrays today and none is bare text**, because J7 normalised them. The bare-
+text branch is now defensive rather than exercised.
+
+The TABLE is admin-only. An editor reads it through `narrators_for_editor()`,
+which returns id, name and active and **omits email and notes from the return
+type** — the same boundary shape as `board_for_editor()`.
+
+### E3b — assigned_to became a real reference
+
+**Row count before converting: 0.** Reported first, as asked, and that is what
+made this free — in E6 it would have been a data migration.
+
+### E3c/E3d/E4 — the sender
+
+A Supabase Edge Function, not a Next.js route: the phone can call it today with
+the user's JWT and the site will call the same function after the auth migration.
+
+The order is the point, and it is written in that order — verify, gather, email,
+THEN transition, then file. Two guarantees that fail in OPPOSITE directions:
+
+- a failed EMAIL leaves everything DRAFT (nothing was delivered, so nothing is
+  marked delivered);
+- a failed MANIFEST leaves everything SENT with `manifest_path` null (the email
+  is the delivery, the manifest is the record, and null is visible and
+  retryable).
+
+`send_chapter_pickups` gained an optional narrator filter, and it was REQUIRED
+rather than convenient: a narrator with no email is skipped and reported, and
+moving their pickups anyway would mark them sent with nobody told — the original
+failure one level down.
+
+### E4a/E4b — what Graph actually does, observed rather than assumed
+
+Probed against the live API before the filer was written around either belief:
+
+1. **Graph DOES create missing intermediate folders on upload** — a PUT three
+   levels deep with no parents returned 201 and created them. So nothing
+   pre-creates the tree.
+2. **An unsanitised colon fails**, with
+   `400 BadRequest "Resource not found for the segment 'root:'"` — an error that
+   reads like a bad path rather than a bad character, which is exactly how an
+   afternoon disappears.
+3. App-only auth reaches the drive at `/users/Dean@DMNarration.com/drive`.
+
+**Z6, for real:** `Heaven's Gate: Greed` filed to
+`Pickups/Heaven's Gate- Greed/Veronica Moore/3 - pickups.txt`, then read back —
+the file's CONTENTS carry the original title, colon intact; only the path segment
+is sanitised. The mapping is fixed (forbidden characters to hyphen, collapse
+whitespace, trim, strip trailing periods) and the result is RECORDED in
+`board_cards.pickups_folder` on first use, because both inputs can move: the
+sanitiser could be changed and the title itself can be edited, and either would
+silently produce a second folder holding half the manifests.
+
+### Its own token function
+
+The filer does NOT reuse `graphToken()` in `src/lib/microsoft-graph.ts`. That one
+is delegated auth — a stored refresh token, scope `Mail.Read offline_access`,
+calling `/me/` — with no drive scope, and reusing it fails in a way that looks
+like a bad path rather than a wrong credential. The filer is app-only
+client_credentials, and app-only has no "me".
+
+### Z8 — the environment is isolated
+
+The only variables the new code reads are `PICKUPS_*` and the `SUPABASE_*` pair
+Supabase injects. `RESEND_API_KEY`, `RESEND_FROM_EMAIL` and `MICROSOFT_*` appear
+nowhere in it except in the comment saying they must not. `AZURE_*` is avoided by
+name for the stated reason, and **`@azure/identity ^4.13.1` is confirmed to be a
+real dependency**, so that hazard is not hypothetical.
+
+`notify-payment.ts` is byte-identical — unchanged since an earlier commit — and
+still compiles. **I did not RUN it**: `notifyPaymentReceived` sends a real
+"Payment received — $X" email to Dean, and fabricating one in his inbox to prove
+a module loads is not a trade worth making. Its rendering functions and its env
+reads are intact and the build compiles it.
+
+### Z9 — the guards
+
+Money reconciles across all 33 cards. The grant guard passes. The policy guard
+passes on a clean tree AND still fires on a widened policy — both halves, again.
+No new function is anon-executable; no anon grant exists on `narrators` or
+`pickups`; the four financial columns remain narrowed.
+
+### NOT DONE — and precisely why
+
+1. **The Edge Function is written but NOT DEPLOYED.** There is no
+   `SUPABASE_ACCESS_TOKEN` and the CLI is not logged in, and logging in is
+   interactive and Dean's to do.
+2. **`PICKUPS_RESEND_API_KEY` and `PICKUPS_FROM_ADDRESS` are not set anywhere.**
+   The three `PICKUPS_GRAPH_*` are; these two are not.
+3. **So Z3, Z4, Z5 and Z7 could not be run.** They all need the deployed function,
+   and Z3/Z5 additionally need a working Resend key to produce a successful send
+   to fail *after*. Z4 in particular — the ordering guarantee, and the one Dean
+   called most worth proving — is currently argued from the code's structure and
+   NOT demonstrated. That is the largest untested claim in this stage and should
+   be run first once the function is deployed.
+4. **Nothing has been exercised on a device.**

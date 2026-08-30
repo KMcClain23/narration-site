@@ -1,0 +1,18 @@
+# Supabase CLI configuration.
+#
+# Only what this project actually uses. The Edge Function's settings are the
+# point of this file: verify_jwt is what makes Z7 true.
+
+project_id = "rtosqtzrwdbexvttbziv"
+
+[functions.send-pickups]
+# JWT VERIFICATION IS THE ANONYMOUS BOUNDARY, and it is on deliberately.
+#
+# With this true, Supabase rejects a request carrying no valid JWT before the
+# function runs at all — anon cannot invoke it, full stop. The role check inside
+# (assert_editor_access) is a SECOND question: it decides whether a valid,
+# signed-in caller may send, and it cannot be reached without passing this one.
+#
+# Turning this off would put the whole boundary on the function body, which is
+# one edit away from being wrong. Two gates, and the outer one is the platform's.
+verify_jwt = true

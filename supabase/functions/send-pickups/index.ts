@@ -1,0 +1,457 @@
+/**
+ * Send a chapter's pickups to their narrators, and file the manifest.
+ *
+ * A SUPABASE EDGE FUNCTION AND NOT A NEXT.JS ROUTE, deliberately. The Android
+ * app can call this today with the user's existing JWT; the website will call
+ * the same function after the auth migration with no change. A Next.js route
+ * would need site auth that does not exist yet, and building it twice is how the
+ * two ends drift.
+ *
+ * ── THE ORDER IS THE WHOLE POINT ────────────────────────────────────────────
+ *
+ *   1. verify the caller is admin or editor
+ *   2. gather the chapter's DRAFT pickups, grouped by narrator
+ *   3. send one email per narrator
+ *   4. ONLY on acceptance, move those narrators' pickups to SENT
+ *   5. file the manifest — and a failure here does NOT undo step 4
+ *
+ * If the transition ran first and the send failed, pickups would read as SENT
+ * with nobody told: invisible, and the exact failure shape this project keeps
+ * finding. Steps 4 and 5 fail in OPPOSITE directions on purpose — a failed email
+ * must leave everything DRAFT, and a failed manifest must leave everything SENT.
+ *
+ * ── ENVIRONMENT ─────────────────────────────────────────────────────────────
+ *
+ * PICKUPS_RESEND_API_KEY, PICKUPS_FROM_ADDRESS
+ * PICKUPS_GRAPH_TENANT_ID, PICKUPS_GRAPH_CLIENT_ID, PICKUPS_GRAPH_CLIENT_SECRET
+ *
+ * NOTHING HERE READS RESEND_API_KEY, RESEND_FROM_EMAIL OR MICROSOFT_*. Those
+ * belong to notify-payment.ts and the mailbox OAuth, and sharing them would mean
+ * one rotation silently breaking an unrelated feature.
+ *
+ * AZURE_TENANT_ID / AZURE_CLIENT_ID / AZURE_CLIENT_SECRET ARE AVOIDED BY NAME.
+ * @azure/identity is a dependency of the site, and its EnvironmentCredential —
+ * first in DefaultAzureCredential's chain — reads exactly those three
+ * automatically. Nothing imports it today; one import would make it live,
+ * silently, as the wrong application.
+ */
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+
+/** App-only Graph has no "me". The drive is addressed by user principal name. */
+const DRIVE_USER = "Dean@DMNarration.com";
+
+// ── path sanitisation ───────────────────────────────────────────────────────
+
+/**
+ * OneDrive/SharePoint forbid  " * : < > ? / \ |  in a name, plus leading and
+ * trailing spaces and trailing periods.
+ *
+ * THE MAPPING IS FIXED AND MUST NOT DRIFT: every forbidden character becomes a
+ * hyphen, runs of whitespace collapse to one space, then trim, then strip
+ * trailing periods. A mapping that changes produces a SECOND folder for the same
+ * book, with half the manifests in each — which is why the result is also
+ * recorded on the card in `pickups_folder` and reused rather than recomputed.
+ *
+ * Two of Dean's titles contain a colon. Observed against the live API: an
+ * unsanitised colon fails with
+ *   400 BadRequest "Resource not found for the segment 'root:'"
+ * which reads like a bad path rather than a bad character, and is exactly the
+ * kind of error someone loses an afternoon to.
+ */
+export function sanitiseSegment(raw: string): string {
+  const cleaned = (raw ?? "")
+    .replace(/["*:<>?/\\|]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\.+$/, "")
+    .trim();
+  // Never an empty segment: an empty path component silently reparents the file
+  // to the level above, which is worse than an obviously wrong name.
+  return cleaned.length > 0 ? cleaned : "Untitled";
+}
+
+// ── the message ─────────────────────────────────────────────────────────────
+
+type Pickup = {
+  id: string;
+  chapter: string;
+  timestamp_at: string;
+  kind: string;
+  said: string;
+  should_be: string;
+  note: string;
+};
+
+/** One pickup as a person reads it. Shared by the email and the manifest, so
+ *  the two cannot disagree about what was asked for. */
+function describe(p: Pickup): string {
+  const when = p.timestamp_at?.trim() ? p.timestamp_at.trim() : "no timestamp";
+  const detail = p.kind === "misread"
+    ? `said "${p.said}" — should be "${p.should_be}"`
+    : (p.note?.trim() || "(no note)");
+  const extra = p.kind === "misread" && p.note?.trim() ? ` (${p.note.trim()})` : "";
+  return `${when} · ${p.kind} · ${detail}${extra}`;
+}
+
+function plainBody(book: string, chapter: string, narrator: string, rows: Pickup[]): string {
+  return [
+    `${book} — chapter ${chapter}`,
+    `Pickups for ${narrator}`,
+    "",
+    ...rows.map((p, i) => `${i + 1}. ${describe(p)}`),
+    "",
+    `${rows.length} pickup${rows.length === 1 ? "" : "s"}.`,
+    "Reply to this email if anything is unclear.",
+  ].join("\n");
+}
+
+function htmlBody(book: string, chapter: string, narrator: string, rows: Pickup[]): string {
+  const esc = (s: string) =>
+    (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const items = rows.map(p => `<li>${esc(describe(p))}</li>`).join("");
+  return [
+    `<p><strong>${esc(book)}</strong> — chapter ${esc(chapter)}</p>`,
+    `<p>Pickups for ${esc(narrator)}</p>`,
+    `<ol>${items}</ol>`,
+    `<p>${rows.length} pickup${rows.length === 1 ? "" : "s"}. Reply to this email if anything is unclear.</p>`,
+  ].join("");
+}
+
+/**
+ * The manifest, written at SEND time and not at resolve.
+ *
+ * It is the narrator's work order: it should exist when the email arrives and
+ * say the same thing. Plain text because this runs on Deno and the site's PDF
+ * libraries are Node-only; PDF becomes an option once the web migration provides
+ * a Node route. E5 puts their audio beside it.
+ */
+function manifestText(
+  book: string,
+  chapter: string,
+  narrator: string,
+  sentAt: string,
+  rows: Pickup[],
+): string {
+  return [
+    `Book:     ${book}`,
+    `Chapter:  ${chapter}`,
+    `Narrator: ${narrator}`,
+    `Sent:     ${sentAt}`,
+    "",
+    ...rows.map((p, i) => `${i + 1}. ${describe(p)}`),
+    "",
+    `${rows.length} pickup${rows.length === 1 ? "" : "s"}.`,
+  ].join("\n");
+}
+
+// ── Microsoft Graph, app-only ───────────────────────────────────────────────
+
+/**
+ * DO NOT REUSE graphToken() from src/lib/microsoft-graph.ts.
+ *
+ * That one is DELEGATED: a stored refresh token, scope "Mail.Read
+ * offline_access", calling /me/. It has no file permission and no drive scope,
+ * and reusing it fails with an error that looks like a bad path rather than a
+ * wrong credential — the same disguise the colon wears.
+ *
+ * This is APP-ONLY: client_credentials, scope .default, and no "me".
+ */
+async function graphAppToken(): Promise<string> {
+  const tenant = Deno.env.get("PICKUPS_GRAPH_TENANT_ID");
+  const client = Deno.env.get("PICKUPS_GRAPH_CLIENT_ID");
+  const secret = Deno.env.get("PICKUPS_GRAPH_CLIENT_SECRET");
+  if (!tenant || !client || !secret) throw new Error("PICKUPS_GRAPH_* not configured");
+
+  const res = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: client,
+      client_secret: secret,
+      scope: "https://graph.microsoft.com/.default",
+      grant_type: "client_credentials",
+    }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(`Graph token ${res.status}: ${json.error_description ?? json.error ?? ""}`);
+  return json.access_token as string;
+}
+
+/**
+ * Upload the manifest.
+ *
+ * VERIFIED AGAINST THE LIVE API rather than assumed: a PUT to a path whose
+ * parent folders do not exist returns 201 and CREATES them. So nothing here
+ * pre-creates the tree — if that behaviour ever changes, this is the line that
+ * would need it, and the observation is recorded so the next person knows which
+ * way it was.
+ */
+async function uploadManifest(
+  token: string,
+  bookSegment: string,
+  narratorSegment: string,
+  fileName: string,
+  body: string,
+): Promise<string> {
+  const path = `Pickups/${bookSegment}/${narratorSegment}/${fileName}`;
+  const url =
+    `https://graph.microsoft.com/v1.0/users/${DRIVE_USER}/drive/root:/${encodeURI(path)}:/content`;
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "text/plain" },
+    body,
+  });
+  if (!res.ok) {
+    throw new Error(`Graph upload ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+  return path;
+}
+
+// ── the handler ─────────────────────────────────────────────────────────────
+
+Deno.serve(async (req: Request) => {
+  if (req.method !== "POST") {
+    return json({ error: "POST only" }, 405);
+  }
+
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return json({ error: "Missing bearer token" }, 401);
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  // Two clients, on purpose.
+  //
+  // userClient carries the CALLER's JWT: it is what the gate is checked against,
+  // and what performs the draft-to-sent transition — send_chapter_pickups scopes
+  // to auth.uid(), so doing it as the service role would match nothing.
+  //
+  // adminClient reads narrator EMAIL, which the editor is deliberately not
+  // allowed to see, and writes manifest_path.
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false },
+  });
+  const adminClient = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+  let cardId: string, chapter: string;
+  try {
+    const body = await req.json();
+    cardId = String(body.cardId ?? "");
+    chapter = String(body.chapter ?? "").trim();
+    if (!cardId || !chapter) return json({ error: "cardId and chapter are required" }, 400);
+  } catch {
+    return json({ error: "Body must be JSON" }, 400);
+  }
+
+  // ---- 1. the caller is admin or editor -----------------------------------
+  //
+  // Asked of the DATABASE rather than decided here: assert_editor_access is the
+  // same gate every other editor path uses, so there is one answer to "may she"
+  // and not two that can drift.
+  const { error: gateError } = await userClient.rpc("assert_editor_access");
+  if (gateError) {
+    return json({ error: "Not permitted", detail: gateError.message }, 403);
+  }
+  const { data: userData } = await userClient.auth.getUser();
+  const callerId = userData?.user?.id;
+  if (!callerId) return json({ error: "No user on that token" }, 401);
+
+  // ---- 2. gather --------------------------------------------------------
+  const { data: card, error: cardError } = await adminClient
+    .from("board_cards")
+    .select("id, title, pickups_folder")
+    .eq("id", cardId)
+    .single();
+  if (cardError || !card) return json({ error: "No such book" }, 404);
+
+  const { data: drafts, error: draftError } = await adminClient
+    .from("pickups")
+    .select("id, chapter, timestamp_at, kind, said, should_be, note, assigned_narrator_id")
+    .eq("card_id", cardId)
+    .eq("chapter", chapter)
+    .eq("status", "draft")
+    .eq("created_by", callerId)
+    .order("created_at");
+  if (draftError) return json({ error: draftError.message }, 500);
+  if (!drafts || drafts.length === 0) {
+    return json({ error: "There are no drafts of yours to send for that chapter." }, 400);
+  }
+
+  const narratorIds = [...new Set(drafts.map(d => d.assigned_narrator_id).filter(Boolean))];
+  const { data: narrators } = await adminClient
+    .from("narrators")
+    .select("id, display_name, email")
+    .in("id", narratorIds.length > 0 ? narratorIds : ["00000000-0000-0000-0000-000000000000"]);
+  const byId = new Map((narrators ?? []).map(n => [n.id, n]));
+
+  // Grouped by narrator. Anything with no narrator at all is its own report
+  // line: unassigned is not the same as unreachable, and neither is silent.
+  const groups = new Map<string, Pickup[]>();
+  const unassigned: Pickup[] = [];
+  for (const d of drafts) {
+    if (!d.assigned_narrator_id) unassigned.push(d as Pickup);
+    else {
+      const list = groups.get(d.assigned_narrator_id) ?? [];
+      list.push(d as Pickup);
+      groups.set(d.assigned_narrator_id, list);
+    }
+  }
+
+  const emailed: Array<{ narrator: string; count: number }> = [];
+  const skipped: Array<{ narrator: string; count: number; reason: string }> = [];
+  const failed: Array<{ narrator: string; count: number; reason: string }> = [];
+  const sentNarratorIds: string[] = [];
+
+  if (unassigned.length > 0) {
+    skipped.push({
+      narrator: "(nobody assigned)",
+      count: unassigned.length,
+      reason: "no narrator assigned",
+    });
+  }
+
+  const resendKey = Deno.env.get("PICKUPS_RESEND_API_KEY");
+  const fromAddress = Deno.env.get("PICKUPS_FROM_ADDRESS");
+  if (!resendKey || !fromAddress) {
+    return json({ error: "PICKUPS_RESEND_API_KEY and PICKUPS_FROM_ADDRESS are not configured" }, 500);
+  }
+
+  // ---- 3. send ----------------------------------------------------------
+  for (const [narratorId, rows] of groups) {
+    const narrator = byId.get(narratorId);
+    const name = narrator?.display_name ?? "(unknown narrator)";
+
+    // SKIP AND REPORT, never silently drop. No address on file is a fact about
+    // the narrator record, and the only useful response is to say so.
+    if (!narrator?.email) {
+      skipped.push({ narrator: name, count: rows.length, reason: "no email address on file" });
+      continue;
+    }
+
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${resendKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: fromAddress,
+          to: [narrator.email],
+          // Reply-to is the pickups address, which Dean has confirmed reaches him.
+          reply_to: fromAddress,
+          subject: `${card.title} — chapter ${chapter} pickups`,
+          // BOTH parts. These are read on phones in booths, where a text part is
+          // not a fallback so much as the thing that actually renders.
+          text: plainBody(card.title, chapter, name, rows),
+          html: htmlBody(card.title, chapter, name, rows),
+        }),
+      });
+      if (!res.ok) {
+        failed.push({
+          narrator: name,
+          count: rows.length,
+          reason: `Resend ${res.status}: ${(await res.text()).slice(0, 200)}`,
+        });
+        continue;
+      }
+      emailed.push({ narrator: name, count: rows.length });
+      sentNarratorIds.push(narratorId);
+    } catch (e) {
+      failed.push({ narrator: name, count: rows.length, reason: String(e).slice(0, 200) });
+    }
+  }
+
+  // ---- 4. ONLY NOW, move to sent ----------------------------------------
+  //
+  // Scoped to the narrators actually emailed. A skipped narrator's pickups stay
+  // DRAFT — marking them sent would be the original failure one level down.
+  let moved = 0;
+  if (sentNarratorIds.length > 0) {
+    const { data: n, error: sendError } = await userClient.rpc("send_chapter_pickups", {
+      p_card_id: cardId,
+      p_chapter: chapter,
+      p_narrator_ids: sentNarratorIds,
+    });
+    if (sendError) {
+      // The emails ARE out. Say so loudly rather than pretending nothing
+      // happened: the narrators have been told and the records disagree.
+      return json({
+        error: "Emails were sent but the pickups could not be marked sent.",
+        detail: sendError.message,
+        emailed, skipped, failed,
+        warning: "These pickups are still DRAFT and re-sending would email twice.",
+      }, 500);
+    }
+    moved = (n as number) ?? 0;
+  }
+
+  // ---- 5. file the manifest ---------------------------------------------
+  //
+  // A FAILURE HERE MUST NOT UNDO THE SEND. The email is the delivery; the
+  // manifest is the record. manifest_path stays null, which is visible and
+  // retryable rather than a silent gap.
+  const manifests: Array<{ narrator: string; path?: string; error?: string }> = [];
+  if (emailed.length > 0) {
+    const bookSegment = card.pickups_folder ?? sanitiseSegment(card.title);
+    // Recorded on first use so the same book always resolves to the same folder,
+    // even if the title is edited later.
+    if (!card.pickups_folder) {
+      await adminClient.from("board_cards").update({ pickups_folder: bookSegment }).eq("id", cardId);
+    }
+
+    let token: string | null = null;
+    try {
+      token = await graphAppToken();
+    } catch (e) {
+      manifests.push({ narrator: "(all)", error: `token: ${String(e).slice(0, 200)}` });
+    }
+
+    if (token) {
+      const sentAt = new Date().toISOString();
+      for (const narratorId of sentNarratorIds) {
+        const narrator = byId.get(narratorId);
+        const name = narrator?.display_name ?? "unknown";
+        const rows = groups.get(narratorId) ?? [];
+        try {
+          const path = await uploadManifest(
+            token,
+            bookSegment,
+            sanitiseSegment(name),
+            sanitiseSegment(`${chapter} - pickups`) + ".txt",
+            manifestText(card.title, chapter, name, sentAt, rows),
+          );
+          await adminClient
+            .from("pickups")
+            .update({ manifest_path: path })
+            .in("id", rows.map(r => r.id));
+          manifests.push({ narrator: name, path });
+        } catch (e) {
+          manifests.push({ narrator: name, error: String(e).slice(0, 200) });
+        }
+      }
+    }
+  }
+
+  return json({
+    book: card.title,
+    chapter,
+    moved,
+    emailed,
+    skipped,
+    failed,
+    manifests,
+  }, failed.length > 0 ? 207 : 200);
+});
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
