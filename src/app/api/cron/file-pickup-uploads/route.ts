@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   QUARANTINE_ROOT,
-  deleteByPath,
+  childrenById,
+  deleteInsideQuarantine,
   graphAppToken,
   itemByPath,
-  listChildren,
   moveItem,
+  quarantineFolder,
 } from "@/lib/pickup-graph";
 
 /**
@@ -129,34 +130,44 @@ export async function GET(req: Request) {
 
   // ── orphans: sessions started and never completed ────────────────────────
   //
-  // Debris lives in a VISIBLY NAMED folder rather than invisibly, which is the
-  // point — but it should not accumulate. Anything in _incoming with no live row
-  // behind it, and old enough not to be an upload still in flight, goes.
+  // WALKED BY ITEM ID, NOT BY PATH, and every delete re-checks the item's own
+  // parentReference against the quarantine root. Containment is a property of
+  // the query now rather than of how carefully a path was assembled — after two
+  // manifests went missing with no proven cause, "the path looked right" stopped
+  // being an acceptable guarantee.
+  //
+  // Debris still lives in a VISIBLY NAMED folder rather than invisibly; it just
+  // must not accumulate.
   let swept = 0;
   const sweepErrors: string[] = [];
   try {
-    const { data: livePaths } = await supabaseAdmin.rpc("live_quarantine_paths");
-    const live = new Set(((livePaths ?? []) as { quarantine_path: string }[]).map(r => r.quarantine_path));
-    const cutoff = Date.now() - ORPHAN_AGE_MS;
+    const root = await quarantineFolder(graph);
+    if (root) {
+      const { data: livePaths } = await supabaseAdmin.rpc("live_quarantine_paths");
+      const live = new Set(
+        ((livePaths ?? []) as { quarantine_path: string }[]).map(r => r.quarantine_path),
+      );
+      const cutoff = Date.now() - ORPHAN_AGE_MS;
 
-    for (const folder of await listChildren(graph, QUARANTINE_ROOT)) {
-      const dir = `${QUARANTINE_ROOT}/${folder.name}`;
-      const children = await listChildren(graph, dir);
-      for (const child of children) {
-        const path = `${dir}/${child.name}`;
-        if (live.has(path)) continue;
-        if (new Date(child.createdDateTime).getTime() > cutoff) continue;
-        await deleteByPath(graph, path);
-        swept++;
-      }
-      // An empty link folder is debris too, once its contents have gone.
-      if ((await listChildren(graph, dir)).length === 0 &&
-          new Date(folder.createdDateTime).getTime() < cutoff) {
-        await deleteByPath(graph, dir);
+      for (const folder of await childrenById(graph, root.id)) {
+        if (!folder.folder) continue;
+        const children = await childrenById(graph, folder.id);
+        for (const child of children) {
+          const path = `${QUARANTINE_ROOT}/${folder.name}/${child.name}`;
+          if (live.has(path)) continue;
+          if (new Date(child.createdDateTime).getTime() > cutoff) continue;
+          await deleteInsideQuarantine(graph, child);
+          swept++;
+        }
+        const remaining = await childrenById(graph, folder.id);
+        if (remaining.length === 0 && new Date(folder.createdDateTime).getTime() < cutoff) {
+          await deleteInsideQuarantine(graph, folder);
+        }
       }
     }
   } catch (e) {
-    // A failed sweep must not fail the filing that already succeeded.
+    // A failed sweep must not fail the filing that already succeeded — and a
+    // REFUSED delete lands here, loudly, rather than being skipped in silence.
     sweepErrors.push((e as Error).message.slice(0, 200));
   }
 

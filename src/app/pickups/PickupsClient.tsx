@@ -171,6 +171,28 @@ export function PickupsClient({
   const forceClose = (id: string) =>
     call(id, () => supabase.rpc("resolve_pickup", { p_id: id, p_status: "dismissed" }));
 
+  /**
+   * DELETE IS NOT DISMISS, and the UI has to keep them apart.
+   *
+   * Dismiss closes something real and leaves it in the history, so the record of
+   * what a chapter needed stays true. Delete is for rows that should never have
+   * existed — a mis-tap, a duplicate, a line raised against the wrong book.
+   *
+   * It is irreversible and there is no undo, so it asks first and names what it
+   * is about to remove. Kept as the quietest affordance on the row: the common
+   * action is Close, and a destructive control should not sit where a habitual
+   * click lands.
+   */
+  const removePickup = (p: AdminPickup) => {
+    const what = `${chapterHeading(p.chapter)} at ${p.timestampAt || "no timestamp"}`;
+    if (!window.confirm(`Delete ${what}? This cannot be undone.
+
+To close it instead and keep the record, use Close.`)) {
+      return;
+    }
+    void call(p.id, () => supabase.rpc("delete_pickup", { p_id: p.id }));
+  };
+
   const { needsYou, books, closedCount } = useMemo(() => {
     const isMine = (p: AdminPickup) =>
       ownerNarratorId !== null && p.assignedNarratorId === ownerNarratorId;
@@ -341,6 +363,15 @@ export function PickupsClient({
                 Close
               </button>
             )}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => removePickup(p)}
+              title="Permanently remove this pickup"
+              className="text-xs text-text-dim/70 underline-offset-2 transition-colors hover:text-alert-red hover:underline disabled:opacity-40"
+            >
+              Delete
+            </button>
           </div>
         </div>
       </li>

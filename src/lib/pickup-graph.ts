@@ -173,3 +173,74 @@ export async function listChildren(
   if (!res.ok) throw new Error(`list ${res.status}`);
   return (await res.json()).value ?? [];
 }
+
+
+/**
+ * ── THE SWEEP'S CONTAINMENT, ENFORCED BY THE QUERY ─────────────────────────
+ *
+ * Two manifests went missing from a book folder and the cause was never proved.
+ * The sweep was read and found correctly scoped, and the drive-wide delta showed
+ * the files nowhere — but "I read it and it looked right" is exactly the evidence
+ * that was available before, and it was not enough.
+ *
+ * So containment stops depending on how a path string is built. These helpers
+ * resolve `Pickups/_incoming` to an ITEM ID once, walk by id, and refuse to
+ * delete anything whose own parentReference does not sit inside that folder. A
+ * malformed path can no longer address a sibling of the quarantine root, because
+ * paths are not used to address anything.
+ */
+
+export type DriveItem = {
+  id: string;
+  name: string;
+  size: number;
+  folder?: unknown;
+  createdDateTime: string;
+  parentReference?: { id?: string; path?: string };
+};
+
+const GRAPH_ROOT = `https://graph.microsoft.com/v1.0/users/${DRIVE_USER}/drive`;
+
+/** The quarantine folder itself, or null when it does not exist yet. */
+export async function quarantineFolder(token: string): Promise<DriveItem | null> {
+  const res = await fetch(`${GRAPH_ROOT}/root:/${encodeURI(QUARANTINE_ROOT)}:`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`quarantine stat ${res.status}`);
+  return (await res.json()) as DriveItem;
+}
+
+export async function childrenById(token: string, id: string): Promise<DriveItem[]> {
+  const res = await fetch(`${GRAPH_ROOT}/items/${id}/children`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`children ${res.status}`);
+  return ((await res.json()).value ?? []) as DriveItem[];
+}
+
+/**
+ * Delete by ID, and ONLY inside quarantine.
+ *
+ * The parent check is not belt-and-braces over the id lookup — it is the thing
+ * that makes this safe to call at all. An item is deleted only when its own
+ * `parentReference.path` is the quarantine root or a folder beneath it, as
+ * reported by Graph rather than as assembled here. Anything else throws, loudly,
+ * rather than being skipped quietly.
+ */
+export async function deleteInsideQuarantine(token: string, item: DriveItem): Promise<void> {
+  const parent = item.parentReference?.path ?? "";
+  const root = `/drive/root:/${QUARANTINE_ROOT}`;
+  if (parent !== root && !parent.startsWith(`${root}/`)) {
+    throw new Error(
+      `REFUSED to delete ${item.name}: its parent is ${parent || "(unknown)"}, ` +
+        `which is outside ${QUARANTINE_ROOT}`,
+    );
+  }
+  const res = await fetch(`${GRAPH_ROOT}/items/${item.id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok && res.status !== 404) throw new Error(`delete ${res.status}`);
+}
