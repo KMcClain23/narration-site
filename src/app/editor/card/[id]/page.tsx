@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { currentSession } from "@/lib/supabase/session";
-import { editorBoard, editorCardDetail, editorPickups, editorCardCast } from "@/lib/editor-data";
+import {
+  editorBoard, editorCardDetail, editorPickups, editorCardCast, editorUploads,
+} from "@/lib/editor-data";
 import { EditorCardClient } from "./EditorCardClient";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +26,7 @@ export default async function EditorCardPage({
 }) {
   const { id } = await params;
 
-  const [session, card, board, allPickups, cast] = await Promise.all([
+  const [session, card, board, allPickups, cast, uploads] = await Promise.all([
     currentSession(),
     editorCardDetail(id),
     // THE EDITING COLUMNS COME FROM THE BOARD FUNCTION, not the detail one.
@@ -39,6 +41,7 @@ export default async function EditorCardPage({
     // short list, so a book whose co_narrator has drifted fails loudly here
     // instead of quietly offering the wrong people.
     editorCardCast(id),
+    editorUploads(),
   ]);
   const progress = board.find(c => c.id === id) ?? null;
 
@@ -63,6 +66,7 @@ export default async function EditorCardPage({
         editingCompletedAt={progress?.editing_completed_at ?? null}
         pickups={allPickups.filter(p => p.card_id === card.id)}
         cast={cast}
+        uploads={uploads.filter(u => u.card_id === id)}
         userId={session?.userId ?? null}
       />
     </>

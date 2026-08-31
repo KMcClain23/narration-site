@@ -178,10 +178,17 @@ export async function listChildren(
 /**
  * ── THE SWEEP'S CONTAINMENT, ENFORCED BY THE QUERY ─────────────────────────
  *
- * Two manifests went missing from a book folder and the cause was never proved.
- * The sweep was read and found correctly scoped, and the drive-wide delta showed
- * the files nowhere — but "I read it and it looked right" is exactly the evidence
- * that was available before, and it was not enough.
+ * THE SWEEP WAS EXONERATED. Do not read the existence of this code as evidence
+ * that it once misbehaved. Two manifests went missing from a book folder, the
+ * sweep was the leading suspect, and the recycle bin settled it: both were
+ * "Deleted by: Dean Miller" — his own account, from a synced client — while
+ * every row the app touched is attributed to "SharePoint App". The sweep never
+ * reached them, and could not have.
+ *
+ * This stayed anyway, because it is correct on its own terms: containment that
+ * depends on how carefully a path string was assembled is one typo from being
+ * wrong, and "I read it and it looked right" was exactly the evidence available
+ * during the investigation — which was not enough to settle anything.
  *
  * So containment stops depending on how a path string is built. These helpers
  * resolve `Pickups/_incoming` to an ITEM ID once, walk by id, and refuse to

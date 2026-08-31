@@ -3,7 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
-import type { EditorCardDetail, EditorPickup, CastMember } from "@/lib/editor-data";
+import type {
+  EditorCardDetail, EditorPickup, CastMember, UploadCount,
+} from "@/lib/editor-data";
 import { ChapterField, chapterOptions, defaultChapter } from "./ChapterField";
 
 /**
@@ -215,6 +217,7 @@ export function EditorCardClient({
   editingCompletedAt,
   pickups,
   cast,
+  uploads,
   userId,
 }: {
   card: EditorCardDetail;
@@ -225,6 +228,8 @@ export function EditorCardClient({
   pickups: EditorPickup[];
   /** THIS book's cast, from card_cast — never the 19-name roster. */
   cast: CastMember[];
+  /** Narrator audio for this card, per chapter. Filed and pending kept apart. */
+  uploads: UploadCount[];
   userId: string | null;
 }) {
   const router = useRouter();
@@ -701,8 +706,32 @@ export function EditorCardClient({
           const sendableCount = list.filter(p => isEditableBy(p, userId)).length;
           return (
             <div key={chapter} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold">Chapter {chapter || "—"}</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-bold">
+                  Chapter {chapter || "—"}
+                  {/* AGAINST THE CHAPTER IT BELONGS TO. Filed means it is in the
+                      book's folder and she can play it; pending means it is
+                      still in quarantine under a uuid name, so it is said
+                      differently rather than counted together. */}
+                  {(() => {
+                    const u = uploads.find(x => x.chapter === chapter);
+                    if (!u) return null;
+                    return (
+                      <>
+                        {u.filed > 0 && (
+                          <span className="ml-2 rounded-full border border-emerald-400/40 px-2 py-0.5 text-[11px] font-normal text-emerald-300">
+                            {u.filed} audio file{u.filed === 1 ? "" : "s"}
+                          </span>
+                        )}
+                        {u.pending > 0 && (
+                          <span className="ml-2 rounded-full border border-white/15 px-2 py-0.5 text-[11px] font-normal text-white/40">
+                            {u.pending} still filing
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
+                </h3>
                 {sendableCount > 0 && (
                   <button
                     type="button"

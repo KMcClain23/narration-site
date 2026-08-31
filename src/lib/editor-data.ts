@@ -195,3 +195,19 @@ export const EDITING_LABEL: Record<EditingState, string> = {
   in_progress: "In progress",
   done: "Done",
 };
+
+/**
+ * Narrator audio, per (card, chapter).
+ *
+ * FILED and PENDING are kept apart on purpose. Filed is in the book's folder and
+ * can be played; pending is still in quarantine under a uuid name and cannot be
+ * found yet. One combined number would tell her audio is ready when it is not —
+ * the same reason the "filed" email fires on filed_at rather than on upload.
+ */
+export type UploadCount = { card_id: string; chapter: string; filed: number; pending: number };
+
+export async function editorUploads(): Promise<UploadCount[]> {
+  const db = await userScopedClient();
+  const { data, error } = await db.rpc("uploads_for_editor");
+  return unwrap<UploadCount[]>(data as UploadCount[], error, "uploads_for_editor");
+}

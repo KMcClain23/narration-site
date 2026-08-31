@@ -4516,3 +4516,81 @@ free-text input.
 (the probe's own seeded pickup) and then 20 (a real draft), where I had hardcoded 6 both
 times. The expectation is now derived from the live rows: a default that depends on data
 cannot be asserted against a number written down in advance.
+
+---
+
+## The manifests: exonerated. And notifying on filed audio (2026-08-31)
+
+### The investigation closed
+
+The recycle bin named the actor: both manifests were **"Deleted by: Dean Miller"** — his
+own account, from a synced client — while every row this app touched shows as
+**"SharePoint App"**. The sweep never reached them. **The cron is re-enabled** and the
+kill switch removed.
+
+**The decoys, which had two possible explanations.** The recycle bin also showed
+`DECOY at book level.txt` and `DECOY - do not delete.txt` deleted by SharePoint App, three
+hours ago, after a report saying both survived. They did survive; the deletion was the
+test's own cleanup. The run's numbers settle it:
+
+```
+sweep: {"filed":0,"failed":0,"swept":1,…}
+ok  DECOY SURVIVES: Ann Dahlia/DECOY - do not delete.txt
+ok  DECOY SURVIVES: A Cowboy's Runaway/DECOY at book level.txt
+ok  the real orphan inside quarantine WAS swept
+decoys removed
+```
+
+`swept: 1` — the orphan alone. Had the sweep taken the decoys it would read 3 and the two
+survival assertions, which run **after** the sweep, would have failed. The cleanup then
+deleted them with a raw `DELETE /items/{id}` on the same app token: same identity in the
+audit log, different code path.
+
+**The containment stays, and the comment now says why.** It was not the fix for a bug —
+the code comment records the exoneration explicitly, so the next reader does not infer
+misbehaviour from the fix's existence.
+
+### The filed notification
+
+**The gap is narrow:** P4 already emails when Ann presses confirm. What produced nothing
+was Ann uploading and never confirming — attaching marks nothing, so she could send audio,
+close the tab, and Marizete would learn of it only by opening the folder.
+
+**Fires on `filed_at`, not on upload.** Until the sweep moves a file out of `_incoming` it
+sits under a uuid name; telling her audio is ready when she cannot find it is worse than
+silence. **One email per batch per sweep run** — five files produce one naming five.
+
+**Two emails, each saying what the other does not.** The confirm email now says the audio
+is *being filed* with a second email to follow, rather than implying it is listenable. The
+filed email carries the folder — taken from a filed row rather than rebuilt, since the
+sweep suffixes on a name clash — and states plainly when the pickups are **still sent**,
+i.e. the narrator never confirmed but the audio arrived anyway. Never a zero-file email.
+
+**Ordering is state-first, and this is the THIRD place these two orderings sit side by side
+for different reasons** — recorded at the call site: send-pickups emails first because
+there the email *is* the delivery; confirm flips state first because the re-record
+happened; here the file is already moved, and un-filing it to keep a message tidy would
+delete a fact about the drive to preserve a notification.
+
+### The in-app count, shipped first
+
+Per (card, chapter) via `uploads_for_editor()`, with **filed and pending kept apart** —
+filed is in the book's folder and playable, pending is still in quarantine. The card page
+shows it against the chapter it belongs to; the hub shows a book-level total. Rejected
+uploads are excluded entirely.
+
+### Verified
+
+Uploads + confirm → `filed_count 2`, `returned 2 / sent 0`, folder read from the filed row.
+Uploads + no confirm → `returned 0 / sent 2`, so the email can say the pickups are still
+sent. Confirm + no uploads → `filed_count 0`, so no filed email exists to send. **Five real
+files through a real sweep → `filed=5`, `notified=1`.** And with a deliberately invalid
+Resend key, the send failed `Resend 401` while **every row kept `filed_at` and its
+`onedrive_path`** — the asymmetry holding under a genuine failure rather than a stubbed one.
+
+The first coalescing attempt proved nothing: it created rows without files, so every move
+failed, nothing filed, and no email fired. Correct behaviour, empty test. Redone with five
+real wavs.
+
+**Also found:** a real filed upload — "Closing Credits", chapter 6 — from actual use, left
+untouched by the cleanup.

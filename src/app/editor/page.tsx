@@ -3,6 +3,7 @@ import Image from "next/image";
 import {
   editorBoard,
   editorPickups,
+  editorUploads,
   editingStateOf,
   EDITING_LABEL,
   type EditorCard,
@@ -66,7 +67,11 @@ function Cover({ url, size }: { url: string | null; size: "lg" | "sm" }) {
 }
 
 /** The full tile: her queue, where progress and pickups matter. */
-function QueueTile({ card, openPickups, returned }: { card: EditorCard; openPickups: number; returned: number }) {
+function QueueTile({
+  card, openPickups, returned, filedAudio,
+}: {
+  card: EditorCard; openPickups: number; returned: number; filedAudio: number;
+}) {
   const state = editingStateOf(card.chapters_edited, card.editing_completed_at);
   const total = card.chapters_total ?? 0;
   const done = card.chapters_edited ?? 0;
@@ -89,6 +94,11 @@ function QueueTile({ card, openPickups, returned }: { card: EditorCard; openPick
           {returned > 0 && (
             <span className="rounded-full bg-[#D4AF37] px-2 py-0.5 text-[11px] font-bold text-black">
               {returned} to check
+            </span>
+          )}
+          {filedAudio > 0 && (
+            <span className="rounded-full border border-emerald-400/40 px-2 py-0.5 text-[11px] text-emerald-300">
+              {filedAudio} audio file{filedAudio === 1 ? "" : "s"}
             </span>
           )}
           {openPickups > 0 && (
@@ -169,7 +179,19 @@ function Section({
 }
 
 export default async function EditorBoardPage() {
-  const [cards, pickups] = await Promise.all([editorBoard(), editorPickups()]);
+  const [cards, pickups, uploads] = await Promise.all([
+    editorBoard(),
+    editorPickups(),
+    editorUploads(),
+  ]);
+
+  // Audio waiting per book. FILED only — a pending upload is still in quarantine
+  // under a uuid name, and pointing her at a folder where she cannot find it is
+  // worse than saying nothing.
+  const filedByCard = new Map<string, number>();
+  for (const u of uploads) {
+    if (u.filed > 0) filedByCard.set(u.card_id, (filedByCard.get(u.card_id) ?? 0) + u.filed);
+  }
 
   const openByCard = new Map<string, number>();
   const returnedByCard = new Map<string, number>();
@@ -259,6 +281,7 @@ export default async function EditorBoardPage() {
               card={c}
               openPickups={openByCard.get(c.id) ?? 0}
               returned={returnedByCard.get(c.id) ?? 0}
+              filedAudio={filedByCard.get(c.id) ?? 0}
             />
           ))}
         </div>

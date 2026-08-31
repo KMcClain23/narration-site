@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { notifyEditorsOfFiling } from "@/lib/notify-filed";
 import {
   QUARANTINE_ROOT,
   childrenById,
@@ -42,18 +43,19 @@ function sanitiseSegment(raw: string): string {
 const ORPHAN_AGE_MS = 3 * 60 * 60 * 1000;
 
 /**
- * ── DISABLED 2026-08-31, PENDING AN INVESTIGATION ──────────────────────────
+ * ── RE-ENABLED 2026-08-31, AFTER THE INVESTIGATION CLEARED IT ──────────────
  *
- * Two manifests disappeared from Pickups/A Cowboy's Runaway/Ann Dahlia/ and the
- * cause is not yet established. This endpoint is the only thing in the system
- * that deletes from Dean's drive on a schedule, so it is off until the cause is
- * known — both halves, because the filing move writes to OneDrive too.
+ * This was disabled while two manifests were missing from a book folder and the
+ * cause was open. The recycle bin settled it: both were "Deleted by: Dean
+ * Miller" — his own account — while every row this app touched is attributed to
+ * "SharePoint App". The sweep never touched them.
  *
- * It stays off unless PICKUP_SWEEP_ENABLED=1 is set deliberately. Re-enable only
- * with the decoy test in place (a manifest planted in a real book folder, the
- * sweep run, the manifest still there).
+ * The containment work done during the investigation stays (see
+ * deleteInsideQuarantine): it was not the fix for a bug, it is a bound worth
+ * having. The decoy test is what backs it — a file planted in a real book folder
+ * survives a run, while a genuine orphan inside _incoming is still deleted, so
+ * the sweep is contained rather than merely inert.
  */
-const SWEEP_ENABLED = process.env.PICKUP_SWEEP_ENABLED === "1";
 
 export async function GET(req: Request) {
   const auth = req.headers.get("authorization") ?? "";
@@ -62,19 +64,6 @@ export async function GET(req: Request) {
     !!process.env.ADMIN_SECRET_KEY && auth === `Bearer ${process.env.ADMIN_SECRET_KEY}`;
   if (!isCron && !isInternal) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Nothing touches the drive while the cause of the missing manifests is open.
-  if (!SWEEP_ENABLED) {
-    return NextResponse.json(
-      {
-        disabled: true,
-        reason:
-          "Filing and the orphan sweep are disabled pending the investigation into " +
-          "two manifests deleted from a book folder. Set PICKUP_SWEEP_ENABLED=1 to re-enable.",
-      },
-      { status: 503 },
-    );
   }
 
   let graph: string;
@@ -101,10 +90,13 @@ export async function GET(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const rows = (pending ?? []) as {
-    id: string; quarantine_path: string; original_name: string; content_type: string;
-    book_title: string; pickups_folder: string | null; chapter: string;
-    narrator_name: string; attempts: number;
+    id: string; link_id: string; quarantine_path: string; original_name: string;
+    content_type: string; book_title: string; pickups_folder: string | null;
+    chapter: string; narrator_name: string; attempts: number;
   }[];
+
+  /** Filed count per batch this run, so five files produce ONE email naming five. */
+  const filedPerLink = new Map<string, number>();
 
   const filed: string[] = [];
   const failed: { id: string; error: string }[] = [];
@@ -121,6 +113,7 @@ export async function GET(req: Request) {
       const actual = await moveItem(graph, row.quarantine_path, folder, name);
       await supabaseAdmin.rpc("mark_upload_filed", { p_id: row.id, p_path: actual });
       filed.push(actual);
+      filedPerLink.set(row.link_id, (filedPerLink.get(row.link_id) ?? 0) + 1);
     } catch (e) {
       const message = (e as Error).message;
       await supabaseAdmin.rpc("mark_upload_failed", { p_id: row.id, p_error: message });
@@ -187,10 +180,36 @@ export async function GET(req: Request) {
     }
   }
 
+  // ── STATE FIRST, THEN EMAIL — the THIRD place these two orderings sit side
+  //    by side, and the third different reason. ────────────────────────────
+  //
+  //   send-pickups  emails FIRST and flips to `sent` only on acceptance, so a
+  //                 pickup can never claim an email that did not go. There, the
+  //                 email IS the delivery.
+  //   confirm       flips to `returned` FIRST, then emails: Ann's re-record
+  //                 actually happened and must be recorded either way.
+  //   HERE          the file is already MOVED. It is sitting in the book's
+  //                 folder. Nothing about a failed email makes that untrue, and
+  //                 "un-filing" it to keep a message tidy would delete a fact
+  //                 about the drive to preserve a notification. So: log, keep
+  //                 the file where it is, and leave filed_at/onedrive_path
+  //                 exactly as they are.
+  //
+  // One call per BATCH, not per file.
+  const notified: { linkId: string; outcome: string }[] = [];
+  for (const [linkId, count] of filedPerLink) {
+    const outcome = await notifyEditorsOfFiling(linkId, count);
+    if ("failed" in outcome) {
+      console.error(`filed notification failed for ${linkId} (${count} file(s)):`, outcome.failed);
+    }
+    notified.push({ linkId, outcome: JSON.stringify(outcome) });
+  }
+
   return NextResponse.json({
     filed: filed.length,
     failed: failed.length,
     swept,
+    notified,
     paths: filed,
     errors: failed,
     sweepErrors,

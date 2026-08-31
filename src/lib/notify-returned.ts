@@ -40,10 +40,19 @@ function chapterLabel(chapter: string): string {
 function bodies(s: Summary, origin: string) {
   const link = `${origin}/editor/card/${s.card_id}`;
   const n = s.returned_count;
+  /*
+    SAY WHAT IS TRUE OF THE AUDIO RIGHT NOW, which is "arriving", not "ready".
+    
+    At this moment the files are in `Pickups/_incoming/` under uuid names; the
+    sweep has not moved them yet. Implying they are listenable would send her to
+    a folder where nothing is findable. A SECOND email follows once they are
+    actually filed, and that one carries the location — see notify-filed.ts.
+  */
   const audio =
     s.upload_count > 0
-      ? `${s.upload_count} audio file${s.upload_count === 1 ? "" : "s"} attached`
-      : "no audio attached — they may have sent it another way";
+      ? `${s.upload_count} audio file${s.upload_count === 1 ? "" : "s"} uploaded — being filed now, ` +
+        "you will get a second email when they are in the book's folder"
+      : "no audio uploaded — they may have sent it another way";
 
   const text = [
     `${s.narrator_name} has re-recorded ${n} pickup${n === 1 ? "" : "s"}.`,
