@@ -6,29 +6,38 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
 
 /**
- * Resolve and dismiss — THROUGH resolve_pickup(), never a direct table write.
+ * Every write here is a FUNCTION CALL — resolve_pickup and mark_pickup_returned,
+ * with Dean's own session. Never a direct table write.
  *
- * This is a client component for exactly that reason. It calls the function with
- * Dean's own session, so `assert_board_access` actually evaluates a caller
- * instead of taking the service_role early return, and every rule the function
- * owns — only 'sent' pickups resolve, only into two statuses, `resolved_by` is
- * whoever pressed the button — is enforced once, in the place that owns it.
+ * The rules those functions own — resolved only from returned, dismissed from
+ * sent or returned, resolved_by is whoever pressed the button — are enforced
+ * once, in the place that owns them. If an `.update("pickups")` ever appears in
+ * this file, the site has acquired a second write path and the guarantee is gone.
  *
- * IF AN `.update("pickups")` EVER APPEARS IN THIS FILE, the site has acquired a
- * second write path and the guarantee is gone.
+ * ── GROUPED BY WHOSE COURT THE BALL IS IN ──────────────────────────────────
  *
- * ON THE LAYOUT. A pickup is an instruction to go back into a session and fix
- * something, so the correction is the row's centre of gravity and the timestamp
- * is a coordinate — it gets scrubbed to, which is why it is monospace and
- * weighted rather than grey filler. The first version of this page put all of
- * that in truncated 11px grey: the only content that told him what to do was the
- * smallest thing on screen, and a long correction was cut off mid-word.
+ * Every sent row used to show Resolve and Dismiss regardless of assignee, so
+ * Dean was handed buttons for Ann Dahlia's work — and, since the state machine
+ * landed, a Resolve that would have been refused anyway because the narrator has
+ * not sent it back. The list now says who is holding each item:
+ *
+ *   Yours to re-record   his own, sent      → he acts: "Re-recorded"
+ *   With the narrator    someone else, sent → read-only; nothing for him to do
+ *   Waiting on Marizete  returned           → read-only; verification is hers
+ *   Closed               resolved/dismissed → collapsed
+ *
+ * He keeps a force-close everywhere, as a quiet secondary action rather than a
+ * primary button, because "this one is never happening" is a real outcome.
+ *
+ * EMPTY GROUPS RENDER NOTHING. Two of the four are usually empty, and a heading
+ * over an empty list reads as something failing to load.
  */
 
 export type AdminPickup = {
   id: string;
   cardId: string;
   cardTitle: string;
+  assignedNarratorId: string | null;
   chapter: string;
   timestampAt: string;
   kind: string;
@@ -42,7 +51,7 @@ export type AdminPickup = {
   resolvedAt: string | null;
 };
 
-const OPEN = new Set(["draft", "sent"]);
+const CLOSED = new Set(["resolved", "dismissed"]);
 
 const KIND_LABEL: Record<string, string> = {
   misread: "Misread",
@@ -54,16 +63,14 @@ const KIND_LABEL: Record<string, string> = {
 const STATUS_STYLE: Record<string, string> = {
   draft: "border-text-dim text-text-muted",
   sent: "border-accent-amber-dim text-accent-amber",
+  returned: "border-status-prepping text-status-prepping",
   resolved: "border-capacity-light/50 text-capacity-light",
   dismissed: "border-surface-border text-text-dim",
 };
 
 /**
- * Chapters sort NUMERICALLY where they can.
- *
- * They are free text — "12", "Chapter 12", "12a" are all legal — so a plain
- * string sort puts 10 before 2 and scatters a book's chapters. Leading digits
- * decide, and anything without them falls to the end alphabetically.
+ * Chapters sort NUMERICALLY where they can. They are free text — "12",
+ * "Chapter 12", "12a" are all legal — so a plain string sort puts 10 before 2.
  */
 function chapterKey(chapter: string): [number, string] {
   const m = /(\d+)/.exec(chapter ?? "");
@@ -77,12 +84,9 @@ function compareChapters(a: string, b: string): number {
 }
 
 /**
- * CHAPTER IS FREE TEXT, so the heading cannot just prefix "Chapter".
- *
- * She types "12", but "Chapter 7" and "Prologue" are equally legal and both
- * appeared the moment this was tested with realistic values — the first version
- * rendered "Chapter Chapter 7". A leading digit is the signal that the label is
- * a bare number wanting the word; anything else already reads as a name.
+ * CHAPTER IS FREE TEXT, so the heading cannot just prefix "Chapter". A leading
+ * digit means a bare number wanting the word; anything else already reads as a
+ * name ("Prologue"), and "Chapter 7" would otherwise render doubled.
  */
 function chapterHeading(chapter: string): string {
   const c = (chapter ?? "").trim();
@@ -95,7 +99,15 @@ function shortDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export function PickupsClient({ pickups }: { pickups: AdminPickup[] }) {
+export function PickupsClient({
+  pickups,
+  ownerNarratorId,
+}: {
+  pickups: AdminPickup[];
+  /** Which assignee is Dean, from narrators.profile_id. Null means unknown, and
+   *  then nothing lands in "Yours" rather than everything doing so. */
+  ownerNarratorId: string | null;
+}) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const supabase = createClient();
@@ -104,44 +116,43 @@ export function PickupsClient({ pickups }: { pickups: AdminPickup[] }) {
   const [error, setError] = useState("");
   const [showClosed, setShowClosed] = useState(false);
 
-  const { open, closed, closedLabel } = useMemo(() => {
-    const open = pickups.filter(p => OPEN.has(p.status));
-    const closed = pickups.filter(p => !OPEN.has(p.status));
-    // Say what it IS. "1 closed" beside a Hide button reads as something being
-    // withheld; "1 resolved" is the same fact and needs no interpreting.
+  const groups = useMemo(() => {
+    const sorted = [...pickups].sort(
+      (a, b) =>
+        a.cardTitle.localeCompare(b.cardTitle) ||
+        compareChapters(a.chapter, b.chapter) ||
+        a.timestampAt.localeCompare(b.timestampAt),
+    );
+    const isMine = (p: AdminPickup) =>
+      ownerNarratorId !== null && p.assignedNarratorId === ownerNarratorId;
+
+    const closed = sorted.filter(p => CLOSED.has(p.status));
     const resolved = closed.filter(p => p.status === "resolved").length;
     const dismissed = closed.length - resolved;
     const parts = [];
     if (resolved) parts.push(`${resolved} resolved`);
     if (dismissed) parts.push(`${dismissed} dismissed`);
-    return { open, closed, closedLabel: parts.join(" · ") };
-  }, [pickups]);
 
-  /** Open work, grouped by book and then in chapter order — he works a book at a time. */
-  const byBook = useMemo(() => {
-    const m = new Map<string, { title: string; cardId: string; rows: AdminPickup[] }>();
-    for (const p of open) {
-      const g = m.get(p.cardId) ?? { title: p.cardTitle, cardId: p.cardId, rows: [] };
-      g.rows.push(p);
-      m.set(p.cardId, g);
-    }
-    for (const g of m.values()) {
-      g.rows.sort((a, b) => compareChapters(a.chapter, b.chapter) ||
-        a.timestampAt.localeCompare(b.timestampAt));
-    }
-    return [...m.values()].sort((a, b) => a.title.localeCompare(b.title));
-  }, [open]);
+    return {
+      mine: sorted.filter(p => p.status === "sent" && isMine(p)),
+      withNarrator: sorted.filter(p => p.status === "sent" && !isMine(p)),
+      returned: sorted.filter(p => p.status === "returned"),
+      drafts: sorted.filter(p => p.status === "draft"),
+      closed,
+      closedLabel: parts.join(" · "),
+    };
+  }, [pickups, ownerNarratorId]);
 
-  async function resolve(id: string, status: "resolved" | "dismissed") {
+  async function call(id: string, fn: () => PromiseLike<{ error: { message: string } | null }>) {
     if (busyId) return;
     setBusyId(id);
     setError("");
     try {
-      // THE ONLY WRITE ON THIS PAGE, and it is a function call.
-      const { error: e } = await supabase.rpc("resolve_pickup", { p_id: id, p_status: status });
+      const { error: e } = await fn();
       if (e) {
-        // Surfaced, not swallowed. "Not sent yet" is a real answer from the
-        // function and he needs to see it rather than watch nothing happen.
+        // Surfaced, not swallowed. "The narrator has not sent it back" is a real
+        // answer from the function and he needs to read it, not watch nothing
+        // happen.
         setError(e.message);
         return;
       }
@@ -150,6 +161,11 @@ export function PickupsClient({ pickups }: { pickups: AdminPickup[] }) {
       setBusyId(null);
     }
   }
+
+  const markReturned = (id: string) =>
+    call(id, () => supabase.rpc("mark_pickup_returned", { p_id: id }));
+  const close = (id: string, status: "resolved" | "dismissed") =>
+    call(id, () => supabase.rpc("resolve_pickup", { p_id: id, p_status: status }));
 
   /** The correction itself, at full size and never truncated. */
   function Correction({ p }: { p: AdminPickup }) {
@@ -184,7 +200,8 @@ export function PickupsClient({ pickups }: { pickups: AdminPickup[] }) {
     );
   }
 
-  function Row({ p }: { p: AdminPickup }) {
+  function Row({ p, actions }: { p: AdminPickup; actions: "mine" | "none" }) {
+    const busy = busyId === p.id;
     return (
       <li className="rounded-xl border border-surface-border bg-surface px-4 py-3.5">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -217,43 +234,91 @@ export function PickupsClient({ pickups }: { pickups: AdminPickup[] }) {
             </p>
           </div>
 
-          {p.status === "sent" ? (
-            <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 items-center gap-3">
+            {actions === "mine" && (
               <button
                 type="button"
-                disabled={busyId === p.id}
-                onClick={() => void resolve(p.id, "resolved")}
+                disabled={busy}
+                onClick={() => void markReturned(p.id)}
                 className="rounded-lg bg-accent-amber px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-accent-amber-bright disabled:opacity-40"
               >
-                {busyId === p.id ? "…" : "Resolve"}
+                {busy ? "…" : "Re-recorded"}
               </button>
+            )}
+            {/* FORCE-CLOSE, everywhere and quietly. Secondary on purpose: it is
+                the exception, not the flow. */}
+            {!CLOSED.has(p.status) && (
               <button
                 type="button"
-                disabled={busyId === p.id}
-                onClick={() => void resolve(p.id, "dismissed")}
-                className="rounded-lg border border-surface-border px-4 py-2 text-sm font-medium text-text-muted transition-colors hover:border-text-dim hover:text-text-body disabled:opacity-40"
+                disabled={busy}
+                onClick={() => void close(p.id, "dismissed")}
+                className="text-xs text-text-dim underline-offset-2 transition-colors hover:text-text-muted hover:underline disabled:opacity-40"
               >
-                Dismiss
+                Close
               </button>
-            </div>
-          ) : (
-            // A draft is hers and not yet sent. Saying so beats an inert row he
-            // might read as broken.
-            p.status === "draft" && (
-              <span className="shrink-0 text-xs text-text-dim">not sent yet</span>
-            )
-          )}
+            )}
+          </div>
         </div>
       </li>
     );
   }
+
+  /** A heading over nothing reads as a fault, so an empty group renders nothing. */
+  function Group({
+    title,
+    hint,
+    rows,
+    actions,
+  }: {
+    title: string;
+    hint: string;
+    rows: AdminPickup[];
+    actions: "mine" | "none";
+  }) {
+    if (rows.length === 0) return null;
+    return (
+      <section>
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2 border-b border-divider pb-2">
+          <h2 className="text-lg font-bold text-text-primary">{title}</h2>
+          <span className="text-xs text-text-dim">
+            {rows.length} · {hint}
+          </span>
+        </div>
+        <ul className="space-y-2">
+          {rows.map(p => (
+            <BookRow key={p.id} p={p} actions={actions} />
+          ))}
+        </ul>
+      </section>
+    );
+  }
+
+  /** Rows span books inside a group, so each one names its own. */
+  function BookRow({ p, actions }: { p: AdminPickup; actions: "mine" | "none" }) {
+    return (
+      <div>
+        <Link
+          href={`/board/card/${p.cardId}`}
+          className="mb-1 block text-xs text-text-muted hover:text-accent-amber"
+        >
+          {p.cardTitle}
+        </Link>
+        <ul>
+          <Row p={p} actions={actions} />
+        </ul>
+      </div>
+    );
+  }
+
+  const openCount =
+    groups.mine.length + groups.withNarrator.length + groups.returned.length + groups.drafts.length;
 
   return (
     <div className="mx-auto max-w-3xl">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="text-xl font-bold text-text-primary">Pickups</h1>
         <p className="text-sm text-text-muted">
-          {open.length} open{closedLabel ? ` · ${closedLabel}` : ""}
+          {openCount} open{groups.closedLabel ? ` · ${groups.closedLabel}` : ""}
         </p>
       </div>
 
@@ -263,51 +328,57 @@ export function PickupsClient({ pickups }: { pickups: AdminPickup[] }) {
         </p>
       )}
 
-      {open.length === 0 ? (
+      {openCount === 0 ? (
         <p className="mt-6 rounded-xl border border-surface-border bg-surface p-6 text-sm text-text-muted">
           Nothing open.
         </p>
       ) : (
         <div className="mt-6 space-y-8">
-          {byBook.map(group => (
-            <section key={group.cardId}>
-              <div className="mb-3 flex items-baseline justify-between gap-3 border-b border-divider pb-2">
-                <Link
-                  href={`/board/card/${group.cardId}`}
-                  className="text-lg font-bold text-text-primary hover:text-accent-amber"
-                >
-                  {group.title}
-                </Link>
-                <span className="shrink-0 text-xs text-text-dim">
-                  {group.rows.length} open
-                </span>
-              </div>
-              <ul className="space-y-2">
-                {group.rows.map(p => (
-                  <Row key={p.id} p={p} />
-                ))}
-              </ul>
-            </section>
-          ))}
+          <Group
+            title="Yours to re-record"
+            hint="waiting on you"
+            rows={groups.mine}
+            actions="mine"
+          />
+          <Group
+            title="With the narrator"
+            hint="waiting on them"
+            rows={groups.withNarrator}
+            actions="none"
+          />
+          <Group
+            title="Waiting on Marizete"
+            hint="re-recorded, not yet verified"
+            rows={groups.returned}
+            actions="none"
+          />
+          {/* Drafts are hers and not yet sent. Shown so an unsent pile is
+              visible rather than absent, but there is nothing here for him. */}
+          <Group
+            title="Not sent yet"
+            hint="still drafts"
+            rows={groups.drafts}
+            actions="none"
+          />
         </div>
       )}
 
-      {closed.length > 0 && (
+      {groups.closed.length > 0 && (
         <>
           <button
             type="button"
             onClick={() => setShowClosed(v => !v)}
             className="mt-10 text-xs text-text-muted transition-colors hover:text-text-body"
           >
-            {showClosed ? "Hide" : "Show"} {closedLabel}
+            {showClosed ? "Hide" : "Show"} {groups.closedLabel}
           </button>
           {showClosed && (
             <ul className="mt-3 space-y-2">
-              {closed
+              {groups.closed
                 .slice()
                 .sort((a, b) => (b.resolvedAt ?? "").localeCompare(a.resolvedAt ?? ""))
                 .map(p => (
-                  <Row key={p.id} p={p} />
+                  <Row key={p.id} p={p} actions="none" />
                 ))}
             </ul>
           )}

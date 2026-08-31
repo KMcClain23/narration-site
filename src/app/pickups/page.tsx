@@ -24,6 +24,16 @@ export const dynamic = "force-dynamic";
 export default async function PickupsPage() {
   await assertAdmin();
 
+  // WHO IS DEAN, asked of the data rather than hardcoded. The page groups by
+  // whose court the ball is in, so it needs to know which assignee is the owner
+  // — and narrators.profile_id is now the thing that says so.
+  const { data: ownerRow } = await supabaseAdmin
+    .from("narrators")
+    .select("id")
+    .not("profile_id", "is", null)
+    .maybeSingle();
+  const ownerNarratorId = ownerRow?.id ?? null;
+
   // Titles come from a join because a pickup that says only "chapter 12" is not
   // actionable — he needs to know which book before anything else.
   const { data, error } = await supabaseAdmin
@@ -71,6 +81,7 @@ export default async function PickupsPage() {
     id: r.id,
     cardId: r.card_id,
     cardTitle: one(r.board_cards)?.title ?? "Unknown book",
+    assignedNarratorId: r.assigned_narrator_id,
     chapter: r.chapter,
     timestampAt: r.timestamp_at,
     kind: r.kind,
@@ -89,7 +100,7 @@ export default async function PickupsPage() {
   // inside the first is how a page ends up scrolling twice.
   return (
     <AdminLayout>
-      <PickupsClient pickups={pickups} />
+      <PickupsClient pickups={pickups} ownerNarratorId={ownerNarratorId} />
     </AdminLayout>
   );
 }

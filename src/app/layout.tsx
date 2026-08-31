@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { SiteAnalytics } from "@/app/components/SiteAnalytics";
-import Header from "./components/Header";
-import CartDrawer from "./components/CartDrawer";
-import { CartProvider } from "@/context/CartContext";
+import { PublicChrome } from "./components/PublicChrome";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -131,7 +129,22 @@ export default function RootLayout({
         />
       </head>
 
-      <body className="min-h-screen bg-[#06082E] text-white antialiased pt-14 sm:pt-16 overflow-x-hidden">
+      {/*
+        NO pt-14 sm:pt-16 HERE ANY MORE, and it was never doing anything.
+        globals.css carries `body { padding: 0 !important; }`, so the computed
+        padding-top has been 0px on every page — public and private alike —
+        since long before this change. Measured before touching it: on /pickups
+        the body padding computed to 0px and .admin-root sat at top 0; on /,
+        /merch and /narrated-works the same 0px, with a fixed 64px header and
+        content starting at 0.
+
+        So the public pages already clear the header their own way, and MOVING
+        this class into PublicChrome would not have preserved behaviour — it
+        would have switched on 64px of padding that has never applied and pushed
+        every public page down. Removing the dead class is the change that keeps
+        both sides rendering exactly as they do now.
+      */}
+      <body className="min-h-screen bg-[#06082E] text-white antialiased overflow-x-hidden">
         {/* Audit Fix: Integrated your unique GA4 Measurement ID
             Place GA as early as possible in the body so it reliably fires */}
         <GoogleAnalytics gaId="G-WN5GMY7ZN7" />
@@ -140,11 +153,7 @@ export default function RootLayout({
           Skip to content
         </a>
 
-        <CartProvider>
-          <Header />
-          {children}
-          <CartDrawer />
-        </CartProvider>
+        <PublicChrome>{children}</PublicChrome>
         <SiteAnalytics />
       </body>
     </html>

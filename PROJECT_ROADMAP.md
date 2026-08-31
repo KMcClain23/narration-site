@@ -3872,3 +3872,100 @@ Recorded in the migration and on the column itself so it is not re-proposed. RLS
 `current_app_role() = 'admin'` — an editor updating status gets **0 rows** — and the grant
 is load-bearing for `BoardViewModel.kt:297`. Revoking closes nothing and breaks the phone
 until a release ships.
+
+---
+
+## The pickup state machine, and public chrome off private pages (2026-08-31)
+
+### A1 — `returned` exists
+
+`draft → sent → returned → resolved`, with `dismissed` reachable from `sent` or
+`returned`. The record used to jump from "asked" straight to "done", so there was no state
+meaning *re-recorded, not yet checked* — which is the state the work is in for most of its
+life. `mark_pickup_returned(p_id)` is admin-only and exists so the state is reachable now;
+P2's token flow calls that same function rather than inventing a second way in.
+
+### A2/A3 — `resolve_pickup` admits the editor, and the two outcomes have different sources
+
+It gated on `assert_board_access` — admin only — which locked out the one person
+verification belongs to. Now `assert_editor_access`. `CREATE OR REPLACE`, not DROP: the
+signature is unchanged, so the ACL and comment survive (confirmed after:
+`anon=false, authenticated=true, service_role=true`, comment intact).
+
+`resolved` only from `returned`; `dismissed` from `sent` or `returned`. Distinct messages,
+because "she has not sent it back yet" and "that is already closed" send someone looking
+in different places.
+
+**Every transition run against the live rows, in a rolled-back transaction.** The baseline
+was captured first and is the evidence the rule took effect:
+
+| | before | after |
+|---|---|---|
+| admin resolve from `sent` | **SUCCEEDED** | **REFUSED** — "the narrator has not sent it back" |
+
+| scenario | result |
+|---|---|
+| editor resolve from `returned` (the intended path) | SUCCEEDED |
+| editor resolves the same row again | REFUSED — "already closed (resolved)" |
+| editor resolve from `sent` | REFUSED — "has not sent it back" |
+| editor dismiss from `sent` | SUCCEEDED |
+| admin dismiss from `sent` | SUCCEEDED |
+| admin marks `sent` → `returned` | SUCCEEDED |
+| ...and again | REFUSED — "not out with a narrator" |
+| editor marks returned | REFUSED — admin-only |
+| unknown role, anything | REFUSED — BOARD_ACCESS_NOT_ENABLED |
+
+Production unchanged afterwards: 1 resolved, 3 sent.
+
+### A4 — grouped by whose court the ball is in
+
+Four groups; empty ones render nothing. His own sent rows get the primary action, and it
+is **"Re-recorded"** (`mark_pickup_returned`) — not Resolve, which the state machine would
+now refuse from `sent` anyway. Force-close is a quiet secondary on every open row.
+
+Seeded one row in **each** state to prove the groups render — a page tested with only
+`sent` rows cannot show that the other three exist. All four rendered; exactly one
+"Re-recorded" button, on his row only.
+
+### B — public chrome, and a padding class that was already dead
+
+`PublicChrome` calls `usePathname` + `isPrivateRoute` — the same predicate Header uses,
+imported, not restated — and mounts `CartProvider`, `Header` and `CartDrawer` only on
+public routes. Header moved inside it because it calls `useCart()` above its own early
+return, so it depended on the provider everywhere; that is what made the provider
+removable at all.
+
+**B2 audit:** `useCart` consumers are CartDrawer, Header and three `/merch` components.
+None is reachable from an admin or editor route once Header is inside PublicChrome.
+
+**B3 — and the padding was NOT visible, so it was not "moved".** Measured before touching
+anything: on `/pickups` the body's computed `padding-top` was **0px** and `.admin-root`
+sat at **top 0**, despite `pt-14 sm:pt-16` on `<body>`. The cause is
+`globals.css` → `body { padding: 0 !important; }`, which has killed that utility on
+**every** page since long before this change. Public pages measured the same — 0px padding,
+a fixed 64px header, content starting at 0 — so they already clear the header their own way.
+
+Moving the class into `PublicChrome`, as planned, would therefore have **switched on 64px
+that has never applied** and pushed every public page down. The dead class was removed
+instead, which is the change that leaves both sides rendering exactly as they do now.
+
+### Verified
+
+Private: `/pickups`, `/board`, `/editor` — no "Your Cart", no cart drawer node, no
+marketing header, each with a control that the page rendered. Admin content still starts
+at 0.
+
+Public: `/`, `/narrated-works`, `/merch` all 200 with the marketing header; the cart button
+opens the drawer and it reports its empty state; no uncaught page errors.
+
+**NOT EXERCISED, and stated rather than glossed:** add-to-cart and checkout. The store has
+**zero products** today — `/merch` renders "More Coming Soon" — so there is nothing to add.
+The drawer opening is what proves the provider still works; a passing add-to-cart assertion
+here would have been passing on absence.
+
+### Recommended, not done: route groups
+
+`(public)` and `(private)` with separate layouts is the real answer, and would keep the
+cart out of private **bundles** rather than rendering nothing at runtime. This change stops
+it executing; it does not stop it shipping. That is a move of every route directory and
+belongs in its own change.
