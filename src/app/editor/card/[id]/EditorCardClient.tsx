@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import type { EditorCardDetail, EditorPickup, CastMember } from "@/lib/editor-data";
+import { ChapterField, chapterOptions, defaultChapter } from "./ChapterField";
 
 /**
  * Her writes — ALL of them through the gated functions, with her JWT.
@@ -69,9 +70,33 @@ function defaultAssignee(cast: CastMember[]): string {
   return "";
 }
 
-function emptyDraft(cast: CastMember[]): Draft {
+/**
+ * mm:ss(.d), typed as digits.
+ *
+ * It is a coordinate off her DAW — there is nothing to pick — so the keyboard
+ * stays. What goes is the FORMAT being her problem: she types 432 and gets
+ * 04:32. Live rows were inconsistently padded (4:32 beside 04:32), which makes
+ * ordering within a chapter unreliable because the sort is on the string; the
+ * two existing rows were normalised in the same change.
+ */
+export function maskTimestamp(raw: string): string {
+  const d = (raw ?? "").replace(/[^0-9]/g, "").slice(0, 5);
+  if (d.length === 0) return "";
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, d.length - 2).padStart(2, "0")}:${d.slice(-2)}`;
+  return `${d.slice(0, 2)}:${d.slice(2, 4)}.${d.slice(4)}`;
+}
+
+/** What is stored: padded, so string ordering is time ordering. */
+export function normaliseTimestamp(v: string): string {
+  const m = /^(\d{1,2}):(\d{2})(?:\.(\d))?$/.exec((v ?? "").trim());
+  if (!m) return (v ?? "").trim();
+  return `${m[1].padStart(2, "0")}:${m[2]}${m[3] ? `.${m[3]}` : ""}`;
+}
+
+function emptyDraft(cast: CastMember[], chapter = ""): Draft {
   return {
-    chapter: "",
+    chapter,
     timestamp_at: "",
     kind: "misread",
     said: "",
@@ -212,7 +237,19 @@ export function EditorCardClient({
   const [notice, setNotice] = useState("");
   const [edited, setEdited] = useState(String(chaptersEdited ?? ""));
   const [total, setTotal] = useState(String(chaptersTotal ?? ""));
-  const [draft, setDraft] = useState<Draft>(() => emptyDraft(cast));
+  const [formOpen, setFormOpen] = useState(false);
+  const [draft, setDraft] = useState<Draft>(() =>
+    emptyDraft(
+      cast,
+      defaultChapter(
+        chapterOptions(card.chapters, chaptersTotal),
+        chaptersEdited,
+        [...pickups]
+          .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""))
+          .pop()?.chapter ?? null,
+      ),
+    ),
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
 
   /**
@@ -248,6 +285,19 @@ export function EditorCardClient({
       }),
     );
 
+  /** +1, saved immediately. The number field is for corrections, not for counting. */
+  async function bumpEdited(by: number) {
+    const next = Math.max(0, (Number(edited) || 0) + by);
+    setEdited(String(next));
+    await run("Saving progress", () =>
+      supabase.rpc("set_editing_progress", {
+        p_card_id: card.id,
+        p_chapters_edited: next,
+        p_chapters_total: total === "" ? null : Number(total),
+      }),
+    );
+  }
+
   const setComplete = (complete: boolean) =>
     run(complete ? "Marking complete" : "Reopening", () =>
       supabase.rpc("set_editing_complete", { p_card_id: card.id, p_complete: complete }),
@@ -256,7 +306,7 @@ export function EditorCardClient({
   async function submitPickup() {
     const payload = {
       p_chapter: draft.chapter.trim(),
-      p_timestamp_at: draft.timestamp_at.trim(),
+      p_timestamp_at: normaliseTimestamp(draft.timestamp_at),
       p_kind: draft.kind,
       p_said: needsSaidPair(draft.kind) ? draft.said.trim() : "",
       p_should_be: needsSaidPair(draft.kind) ? draft.should_be.trim() : "",
@@ -271,7 +321,14 @@ export function EditorCardClient({
           supabase.rpc("create_pickup", { p_card_id: card.id, ...payload }),
         );
     if (okDone) {
-      setDraft(emptyDraft(cast));
+      // KEEP CHAPTER, KIND AND NARRATOR. Consecutive pickups are nearly always
+      // the same book, chapter and narrator — a different line. Clearing them
+      // would make her re-answer three questions she has already answered.
+      setDraft(d => ({
+        ...emptyDraft(cast, d.chapter),
+        kind: d.kind,
+        assigned_narrator_id: d.assigned_narrator_id,
+      }));
       setEditingId(null);
     }
   }
@@ -448,74 +505,136 @@ export function EditorCardClient({
         </section>
       )}
 
-      {/* ---------------------------------------------------------- progress */}
+      {/* ── progress, as a stepper ────────────────────────────────────────
+          THE COMMON ACTION IS "I finished another chapter" — one more than
+          before. It was two number fields and a Save button, so the most
+          frequent thing on the page cost a tap, a keyboard, a correction and a
+          second tap. +1 saves on the spot; the number stays editable for
+          corrections; total is demoted because it is set once, and it is what
+          gives the hub a progress bar at all. */}
       <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <h2 className="text-sm font-bold">Editing progress</h2>
-        <div className="mt-3 flex flex-wrap items-end gap-3">
+
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void bumpEdited(1)}
+            className="rounded-xl bg-[#D4AF37] px-6 py-3 text-base font-bold text-black transition-colors hover:bg-[#E0C15A] disabled:opacity-40"
+          >
+            +1 chapter
+          </button>
+
           <label className="text-xs text-white/50">
-            Chapters edited
+            Edited
             <input
               inputMode="numeric"
               value={edited}
               onChange={e => setEdited(e.target.value.replace(/[^0-9]/g, ""))}
-              className={`${field} mt-1 w-28`}
+              onBlur={() => void saveProgress()}
+              className={`${field} mt-1 w-20 text-center text-base font-semibold`}
             />
           </label>
-          <label className="text-xs text-white/50">
-            Chapters total
+
+          <span className="pt-4 text-sm text-white/40">
+            {total ? `of ${total}` : "of —"}
+          </span>
+
+          {editingCompletedAt && (
+            <span className="pt-4 text-xs text-emerald-300">complete</span>
+          )}
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <label className="text-[11px] text-white/40">
+            Chapters in the book
             <input
               inputMode="numeric"
               value={total}
               onChange={e => setTotal(e.target.value.replace(/[^0-9]/g, ""))}
-              className={`${field} mt-1 w-28`}
+              onBlur={() => void saveProgress()}
+              placeholder="—"
+              className={`${field} mt-1 w-20 text-center`}
             />
           </label>
           <button
             type="button"
             disabled={busy}
-            onClick={() => void saveProgress()}
-            className="rounded-xl bg-[#D4AF37] px-4 py-2 text-sm font-bold text-black transition-colors hover:bg-[#E0C15A] disabled:opacity-40"
-          >
-            Save
-          </button>
-          <button
-            type="button"
-            disabled={busy}
             onClick={() => void setComplete(!editingCompletedAt)}
-            className="rounded-xl border border-white/20 px-4 py-2 text-sm font-bold text-white/80 transition-colors hover:bg-white/5 disabled:opacity-40"
+            className="mt-4 rounded-lg border border-white/20 px-3 py-1.5 text-xs text-white/70 transition-colors hover:bg-white/5 disabled:opacity-40"
           >
             {editingCompletedAt ? "Reopen" : "Mark complete"}
           </button>
         </div>
       </section>
 
-      {/* ----------------------------------------------------------- new/edit */}
+      {/* ── raise a pickup, COLLAPSED WHEN UNUSED ─────────────────────────
+          It filled half the viewport and pushed her chapters below the fold, so
+          the page opened on a form rather than on her work. */}
+      {!formOpen && !editingId ? (
+        <button
+          type="button"
+          onClick={() => setFormOpen(true)}
+          className="w-full rounded-2xl border border-dashed border-white/20 py-3 text-sm text-white/60 transition-colors hover:border-[#D4AF37]/50 hover:text-white/85"
+        >
+          + Raise a pickup
+        </button>
+      ) : (
       <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-        <h2 className="text-sm font-bold">{editingId ? "Edit pickup" : "Raise a pickup"}</h2>
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-sm font-bold">{editingId ? "Edit pickup" : "Raise a pickup"}</h2>
+          {!editingId && (
+            <button
+              type="button"
+              onClick={() => setFormOpen(false)}
+              className="text-xs text-white/40 hover:text-white/70"
+            >
+              Close
+            </button>
+          )}
+        </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <input
-            placeholder="Chapter"
+          <ChapterField
+            chapters={card.chapters}
+            chaptersTotal={chaptersTotal}
             value={draft.chapter}
-            onChange={e => setDraft({ ...draft, chapter: e.target.value })}
-            className={field}
+            onChange={v => setDraft({ ...draft, chapter: v })}
           />
           <input
-            placeholder="Timestamp (04:32.1)"
+            placeholder="Timestamp 04:32"
             value={draft.timestamp_at}
-            onChange={e => setDraft({ ...draft, timestamp_at: e.target.value })}
+            inputMode="numeric"
+            onChange={e => setDraft({ ...draft, timestamp_at: maskTimestamp(e.target.value) })}
             className={field}
+            aria-label="Timestamp"
           />
-          <select
-            value={draft.kind}
-            onChange={e => setDraft({ ...draft, kind: e.target.value })}
-            className={field}
-          >
-            {KINDS.map(k => (
-              <option key={k.value} value={k.value} className="bg-[#0A0D3A]">
-                {k.label}
-              </option>
-            ))}
-          </select>
+
+          {/* FOUR BUTTONS, NOT A SELECT. A native select opens a scroll wheel on
+              her phone to choose between four things. And the kind drives the
+              form below it. */}
+          <div className="sm:col-span-2">
+            <p className="mb-2 text-xs uppercase tracking-wide text-white/40">What kind?</p>
+            <div className="grid grid-cols-4 gap-2">
+              {KINDS.map(k => {
+                const on = draft.kind === k.value;
+                return (
+                  <button
+                    key={k.value}
+                    type="button"
+                    onClick={() => setDraft({ ...draft, kind: k.value })}
+                    className={[
+                      "rounded-xl border px-2 py-2.5 text-sm transition-colors",
+                      on
+                        ? "border-[#D4AF37] bg-[#D4AF37]/15 font-semibold text-white"
+                        : "border-white/15 bg-white/5 text-white/70 hover:border-white/30",
+                    ].join(" ")}
+                  >
+                    {k.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="sm:col-span-2">
             <NarratorPicker
               cast={cast}
@@ -564,7 +683,7 @@ export function EditorCardClient({
               type="button"
               disabled={busy}
               onClick={() => {
-                setDraft(emptyDraft(cast));
+                setDraft(emptyDraft(cast, draft.chapter));
                 setEditingId(null);
               }}
               className="rounded-xl border border-white/20 px-4 py-2 text-sm text-white/70 transition-colors hover:bg-white/5"
@@ -574,6 +693,7 @@ export function EditorCardClient({
           )}
         </div>
       </section>
+      )}
 
       {/* ------------------------------------------------------------ pickups */}
       <section className="space-y-4">
@@ -639,7 +759,7 @@ export function EditorCardClient({
                               setEditingId(p.id);
                               setDraft({
                                 chapter: p.chapter,
-                                timestamp_at: p.timestamp_at,
+                                timestamp_at: maskTimestamp(p.timestamp_at),
                                 kind: p.kind,
                                 said: p.said ?? "",
                                 should_be: p.should_be ?? "",

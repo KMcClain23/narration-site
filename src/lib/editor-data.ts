@@ -44,6 +44,22 @@ export type EditorCard = {
   created_at: string | null;
 };
 
+/**
+ * One entry in a card's chapters array.
+ *
+ * `number` IS NULLABLE and that is not an edge case: front matter — Prologue,
+ * Dedication, Trigger Warnings, Epilogue, Acknowledgements — carries a title and
+ * no number, and eleven such titles exist across the live cards. A picker that
+ * assumes a number silently drops them.
+ */
+export type ChapterEntry = {
+  title: string | null;
+  number: number | null;
+  pages?: number | null;
+  status?: string | null;
+  wordCount?: number | null;
+};
+
 export type EditorCardDetail = {
   id: string;
   title: string;
@@ -63,7 +79,7 @@ export type EditorCardDetail = {
   description: string | null;
   tags: string[] | null;
   trigger_warnings: string[] | null;
-  chapters: unknown;
+  chapters: ChapterEntry[] | null;
   released_at: string | null;
   created_at: string | null;
   total_pages: number | null;

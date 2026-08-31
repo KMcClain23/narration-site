@@ -4455,3 +4455,64 @@ wrong book. Keeping those as history makes the history wrong.
 Verified: a `pending` account and an **editor** are both refused (`BOARD_ACCESS_NOT_ENABLED`)
 and the row survives; an admin deletes a draft and a `sent` pickup; deleting the same row
 again **raises** rather than reporting a silent success.
+
+---
+
+## Marizete's two screens (2026-08-31)
+
+### A — /editor, the hub
+
+Was 33 cards in one flat grid: 12 released and 9 contracted-but-unrecorded, so two
+thirds was work she cannot touch and her 8 were scattered among them.
+
+**Waiting on you** (returned pickups — overdue by definition) · **Editing now** (8, by
+deadline, overdue and due-soon marked) · **Coming next** (recording + prepping, quieter,
+no progress bar) · **Not yet** (contracted + recast, collapsed) · **Released** moved to
+`/editor/released` behind a link with its count. Empty sections render nothing.
+
+**Recast lives in "Not yet", labelled.** It is neither upcoming nor finished — the book is
+being re-recorded by someone else. It cannot sit in "Coming next", which promises work
+arriving soon, and dropping it would hide a book; so it sits with the other things she
+cannot act on, with `recast` on the tile so it is never silently filed as contracted.
+
+**Honest progress.** Only one of the eight has `chapters_total`, so seven have no
+percentage. No bar and no 0% — the count stands alone until B1's stepper fills the totals
+in.
+
+**A5's auth claim was confirmed, not assumed:** `isEditorRoute` matches
+`startsWith("/editor/")` so the new route inherits `isPrivateRoute`, and `requiresAdmin`
+calls only `matches()`, which does not include `/editor`.
+
+### B — /editor/card/[id], the workbench
+
+**B1** progress is a stepper: a prominent **+1 chapter** that saves on the spot, the number
+editable for corrections saving on blur, `chapters_total` demoted. **B2** the chapter field
+has three branches because the data has three: an array (10 cards), `chapters_total` only
+(1), free text (22 — the majority, unchanged). **B3** four kind buttons instead of a
+select. **B4** the timestamp is masked to `mm:ss(.d)` with `inputMode="numeric"`, and
+normalised on save. **B5** the form starts collapsed. **B6** the Whose-read pair, the
+returned section and the attach rules are untouched. After a submit, chapter, kind and
+narrator survive; only the text clears.
+
+**Already right, so left alone:** Said/Should-be were already misread-only from W2. The
+empty strings on noise pickups come from the payload (`p_said: needsSaidPair ? … : ""`),
+not from the form showing fields it shouldn't.
+
+**Timestamp backfill: DONE.** Two live rows, `4:32` and `6:46`, normalised to `04:32` and
+`06:46`. Two rows and no risk; leaving them inconsistent to avoid a migration would be the
+worse trade, since ordering within a chapter is a string sort.
+
+### Verified
+
+The deadline sort was tested by **contradicting** it — Unmasked Hearts pushed to 2026-12-31
+and Underworld Vows pulled to 2026-01-05 — and the render followed. "Waiting on you" was
+confirmed **absent** first, then appeared when a pickup was returned. All three chapter
+cases: Unmasked Hearts renders 43 options with front matter keeping its bare title
+("Dedication", "Epilogue"), A Cowboy's Runaway offers 1…23, Where My Demons Hide keeps the
+free-text input.
+
+**Two failed assertions that were the code being right.** The chapter default is
+"chapters_edited + 1 or the last pickup's chapter, whichever is further on" — it returned 9
+(the probe's own seeded pickup) and then 20 (a real draft), where I had hardcoded 6 both
+times. The expectation is now derived from the live rows: a default that depends on data
+cannot be asserted against a number written down in advance.
