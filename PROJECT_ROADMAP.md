@@ -3482,3 +3482,111 @@ documents are not present and `--apply` was not run. Its auth was verified direc
 does not gate it; only `assertAdmin` in the page does. Not an exposure — the page gate
 holds, and it returned 307 under the wrong-secret mutation — but it is one layer of
 defence in depth rather than two, and unlike every sibling route.
+
+---
+
+## W2 — Marizete on the website (2026-08-30)
+
+Additive. The existing admin routes were NOT converted to user-scoped reads — they
+work, Dean is their only user, and changing 22 call sites delivers her nothing. W1c
+built a user-scoped client and role helpers that nothing consumed; this consumes them.
+
+### W2a — the rule everything else follows from
+
+Every editor page calls the database with HER JWT, through `userScopedClient()`, never
+`supabaseAdmin`. All of it is in `src/lib/editor-data.ts` so there is one place to check.
+
+This is not stylistic. `assert_board_access` has a literal `service_role` early return,
+so a page reading as service_role and filtering in React would enforce **nothing** while
+looking identical on screen — and the first sign of it would be a financial figure in a
+payload. The gates only see a caller when a caller is passed.
+
+### What was built
+
+| | |
+|---|---|
+| `/editor` | her board — `board_for_editor` |
+| `/editor/card/[id]` | detail — `card_detail_for_editor`, plus her writes |
+| `/pickups` | Dean's view — reads service_role, resolves through `resolve_pickup()` |
+| `src/lib/route-access.ts` | who may enter which surface, one definition |
+| `src/components/auth/NoAccessPanel.tsx` | R5's state 2, now shared rather than copied |
+
+Her writes are the SAME functions the phone calls — `set_editing_progress`,
+`set_editing_complete`, `create_pickup`, `update_own_draft_pickup`,
+`delete_own_draft_pickup`, `send_chapter_pickups`. No web-only variants.
+
+**No client-side financial filtering, deliberately.** `board_for_editor` does not select
+those columns, so there is nothing to strip; stripping in React would turn a broken
+boundary into a cosmetic one and delete the only evidence.
+
+### Two things the build surfaced
+
+**`card_detail_for_editor` does not return the editing columns.** No `chapters_edited`,
+`chapters_total` or `editing_completed_at` — `board_for_editor` has them. Widening it
+would mean DROP+CREATE (42P13 refuses adding a column to RETURNS TABLE), resetting its
+ACL and comment, and the phone shares that definition. The page makes a second gated read
+instead.
+
+**The login page's state 3 had to stop meaning `role === "admin"`.** "Right role" is now
+relative to the destination: Marizete heading for `/editor` is admitted, the same account
+heading for `/payments` is not. Left alone, she would have signed in perfectly and landed
+on "no access here yet" — the exact failure R5 was built to end, reintroduced by a page
+that still looked correct. `LoginForm` also stopped defaulting to `/board`, which she
+cannot open.
+
+### Verified
+
+Throwaway accounts throughout, created and deleted in each run; Marizete's password is
+not known to this process and was not needed. The admin one is transient and exists only
+because Y3 requires driving the site as an admin — it is not a standing machine account.
+
+**Y1** — 33 cards to an editor, matching the 33 unarchived rows. No `pfh_rate`,
+`payment_type`, `narrator_share_percent` or `royalty_split_percent` in the RPC payload or
+in **any** of the 34 responses the browser received. Two controls: service_role sees
+`pfh_rate` on the same table, and a real book title IS present in those bodies — without
+the second, "no financial keys" would also be true of an empty string.
+
+**Y2** — raised, edited while draft, sent; each landed. Then refused: *"That pickup is
+not yours, or it has already been sent."* — and the row did not move. Delete refused too.
+
+**Y3** — `resolve_pickup` refuses an editor (`BOARD_ACCESS_NOT_ENABLED`); the pickup
+stayed `sent`. Dean resolved it from `/pickups` and `resolved_by` was set to him **by the
+function**. Then the function was deliberately broken and the site's resolve **failed
+too**, with the error shown rather than swallowed — so the page has no write path of its
+own. Restored, and the restore was verified rather than assumed.
+
+**Y4** — a `pending` account: every editor RPC refused, and in the browser it gets the
+refusal panel with "nothing wrong with your password", not a login form, and zero cards.
+
+**Y5** — `/board`, `/payments`, `/settings`, `/released`, `/expenses` all 200.
+
+THE FIGURES MOVED, AND NOT BECAUSE OF THIS STAGE. In production is now **$12,134**
+(was $13,431) and ready to invoice **$8,559** (was $7,262). Both differ by exactly
+**$1,297**, in opposite directions, and the totals sum identically to $20,693 either way —
+one card ("A Cowboy's Runaway", ~$1,297) moved between buckets. No money was created or
+destroyed, and W2 touches no payments, economics, settings or invoicing file. The
+reconciliation guard is green.
+
+The first attempt to check this grepped the SSR body and found neither figure — and its
+control also failed, which said the grep was reading the wrong thing: `/payments` is a
+client component whose figures arrive after the settings do. Read from a rendered browser
+instead.
+
+**Y6** — `/narrated-works` 200 with no session; no financial key in any public payload.
+
+**Y7** — `check-board-policies`, `check-new-account-role`, `check-function-grants` and
+`check-card-economics` all green.
+
+### Also
+
+`/pickups` is in the sidebar — a page with no way to reach it is not delivered — and in
+`check-first-render`, which now covers 9 routes.
+
+### The harness bug worth recording
+
+The first page-level run reported seven failures and the app was fine. `signIn` waited for
+`networkidle`, which returns before the client-side `router.replace` lands, so every
+assertion read the login page. **The control caught it**: "a real book title is in the
+payload" failed, which meant the four "no financial keys" passes were vacuous — nothing
+had rendered. Without that control the run would have reported four clean passes on an
+empty page.

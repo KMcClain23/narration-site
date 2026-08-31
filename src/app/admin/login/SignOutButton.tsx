@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/browser";
  * perfectly correct credentials just signs the same account in again. The only
  * escape is clearing cookies by hand, which nobody should have to know to do.
  */
-export function SignOutButton() {
+export function SignOutButton({ returnTo = "/admin/login" }: { returnTo?: string } = {}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -28,7 +28,7 @@ export function SignOutButton() {
         // refresh() as well as replace(): the server component that decides
         // which of the three states to render has to re-run, or the page would
         // still be showing the signed-in one.
-        router.replace("/admin/login");
+        router.replace(returnTo);
         router.refresh();
       }}
       className="mt-4 w-full rounded-xl border border-white/20 py-2 text-sm font-bold text-white/80 transition-colors hover:bg-white/5 disabled:opacity-40"

@@ -22,9 +22,17 @@ import { createClient } from "@/lib/supabase/browser";
  * someone whose password was correct tells them it was not.
  */
 
-/** Only same-site paths, so a crafted ?next= cannot bounce a signed-in admin off-site. */
-function safeNext(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/board";
+/**
+ * Only same-site paths, so a crafted ?next= cannot bounce a signed-in user off-site.
+ *
+ * Null when there is no destination — and the caller then goes back to
+ * /admin/login rather than guessing. It used to default to "/board", which an
+ * EDITOR cannot open: she would have signed in correctly, been sent to a page
+ * her role is refused, and bounced to "no access here yet". The server page
+ * knows her role and picks her home; this one does not, so it does not choose.
+ */
+function safeNext(raw: string | null): string | null {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return null;
   return raw;
 }
 
@@ -55,8 +63,9 @@ function Form() {
       }
       // replace, not push: the back button should not land on a login page you
       // are already past. refresh() so the server component re-reads the session
-      // and decides which of the three states to show.
-      router.replace(next);
+      // and decides which of the three states to show — and, with no explicit
+      // destination, which home this role belongs on.
+      router.replace(next ?? "/admin/login");
       router.refresh();
     } catch {
       setError("Could not sign in. Try again.");
@@ -70,7 +79,7 @@ function Form() {
       <div className="w-full max-w-sm rounded-2xl border border-[#1A2070] bg-[#0A0D3A] p-6 shadow-2xl">
         <h1 className="text-base font-bold text-white">Admin Access</h1>
         <p className="mt-1 text-sm text-white/50">
-          {next === "/board" ? "Sign in to continue." : `Sign in to continue to ${next}.`}
+          {next ? `Sign in to continue to ${next}.` : "Sign in to continue."}
         </p>
 
         <input

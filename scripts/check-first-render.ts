@@ -36,6 +36,7 @@ const ROUTES = [
   "/schedule",
   "/settings",
   "/released",
+  "/pickups",
   "/tools/analytics",
   "/tools/contract-builder",
 ];

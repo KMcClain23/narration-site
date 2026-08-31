@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentSession } from "@/lib/supabase/session";
+import { roleAdmits, surfaceForPath } from "@/lib/route-access";
+import { NoAccessPanel } from "@/components/auth/NoAccessPanel";
 import { LoginForm } from "./LoginForm";
-import { SignOutButton } from "./SignOutButton";
 
 /**
  * THREE STATES, NOT TWO.
@@ -20,12 +20,22 @@ import { SignOutButton } from "./SignOutButton";
  * A page cannot show what it cannot distinguish, which is why this is a server
  * component: it reads the session and the role before rendering anything, rather
  * than rendering a form and finding out afterwards.
+ *
+ * W2 CHANGED WHAT "RIGHT ROLE" MEANS, and it is the trap this page had to avoid.
+ * "Right" is now relative to WHERE THEY WERE GOING. Marizete signing in on her
+ * way to /editor is admitted; the same account on its way to /payments is not.
+ * Had state 3 stayed `role === "admin"`, she would have signed in perfectly and
+ * landed on "no access here yet" — the exact failure this page was built to end,
+ * reintroduced by a page that still looked correct.
  */
 
-/** Only same-site paths, so a crafted ?next= cannot bounce a signed-in admin off-site. */
-function safeNext(raw: string | undefined): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/board";
-  return raw;
+/** Only same-site paths, so a crafted ?next= cannot bounce a signed-in user off-site. */
+function safeNext(raw: string | undefined, role: string | null): string | null {
+  if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
+  if (!role) return null;
+  // No destination given: send each role to its own home rather than to /board,
+  // which an editor cannot open.
+  return role === "editor" ? "/editor" : "/board";
 }
 
 export default async function AdminLoginPage({
@@ -34,42 +44,19 @@ export default async function AdminLoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next: rawNext } = await searchParams;
-  const next = safeNext(rawNext);
   const session = await currentSession();
+  const next = safeNext(rawNext, session?.role ?? null);
 
-  // STATE 3 — already an admin. Nothing to do here; finish the journey.
-  if (session?.role === "admin") {
+  // STATE 3 — signed in with a role that admits the destination. Finish the journey.
+  if (session && next && roleAdmits(session.role, surfaceForPath(next))) {
     redirect(next);
   }
 
-  // STATE 2 — signed in, and it is not enough. Say so in those words: who they
-  // are signed in AS, what role they have, and that the account is fine but this
-  // surface is not open to it yet.
+  // STATE 2 — signed in, and it is not enough for where they were going.
   if (session) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[#06082E] px-6">
-        <div className="w-full max-w-sm rounded-2xl border border-[#1A2070] bg-[#0A0D3A] p-6 shadow-2xl">
-          <h1 className="text-base font-bold text-white">Signed in — no access here yet</h1>
-          <p className="mt-3 text-sm text-white/60">
-            You are signed in as{" "}
-            <span className="text-white">{session.email ?? "this account"}</span>.
-          </p>
-          <p className="mt-1 text-sm text-white/60">
-            Role: <span className="text-white">{session.role ?? "none recorded"}</span>.
-          </p>
-          <p className="mt-3 text-sm text-white/50">
-            The admin pages are not open to this account. Your sign-in worked — there is
-            nothing wrong with your password.
-          </p>
-
-          <SignOutButton />
-
-          <Link href="/" className="mt-4 block text-center text-xs text-white/40 hover:text-white/70">
-            Back to the site
-          </Link>
-        </div>
-      </main>
-    );
+    const surface =
+      next && surfaceForPath(next) === "editor" ? "The editing pages" : "The admin pages";
+    return <NoAccessPanel session={session} surface={surface} />;
   }
 
   // STATE 1 — nobody is signed in.

@@ -1,0 +1,155 @@
+import "server-only";
+
+import { userScopedClient } from "@/lib/supabase/session";
+
+/**
+ * Every read the editor surface makes, in one place, and all of them through
+ * HER JWT.
+ *
+ * W2a IS THE WHOLE POINT: these call `userScopedClient()`, never `supabaseAdmin`.
+ * The gates are what enforce the boundary and a gate only sees a caller when a
+ * caller is passed — `assert_board_access` literally returns early for
+ * service_role. A page that read as service_role and filtered in React would
+ * enforce nothing while looking identical on screen, and the first sign of it
+ * would be a financial figure in a payload.
+ *
+ * THERE IS NO FINANCIAL FILTERING HERE, deliberately. `board_for_editor` does not
+ * return pfh_rate, payment_type or narrator_share_percent at all, so there is
+ * nothing to strip. If one ever appears in a payload the FUNCTION is wrong;
+ * hiding it here would turn a broken boundary into a cosmetic one and delete the
+ * only evidence.
+ */
+
+/** Exactly the columns board_for_editor returns. No money, by construction. */
+export type EditorCard = {
+  id: string;
+  title: string;
+  author: string | null;
+  co_narrator: string | null;
+  cover_url: string | null;
+  status: string;
+  deadline: string | null;
+  first15_due: string | null;
+  first_15_complete: boolean | null;
+  is_confidential: boolean | null;
+  narration_format: string | null;
+  recording_dates: unknown;
+  words_recorded: number | null;
+  word_count: number | null;
+  total_pages: number | null;
+  current_page: number | null;
+  chapters_edited: number | null;
+  chapters_total: number | null;
+  editing_completed_at: string | null;
+  created_at: string | null;
+};
+
+export type EditorCardDetail = {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  author: string | null;
+  co_narrator: string | null;
+  cover_url: string | null;
+  status: string;
+  deadline: string | null;
+  first15_due: string | null;
+  first_15_complete: boolean | null;
+  word_count: number | null;
+  words_recorded: number | null;
+  narration_format: string | null;
+  is_confidential: boolean | null;
+  recording_dates: unknown;
+  description: string | null;
+  tags: string[] | null;
+  trigger_warnings: string[] | null;
+  chapters: unknown;
+  released_at: string | null;
+  created_at: string | null;
+  total_pages: number | null;
+  current_page: number | null;
+};
+
+export type EditorPickup = {
+  id: string;
+  card_id: string;
+  chapter: string;
+  timestamp_at: string;
+  kind: string;
+  said: string | null;
+  should_be: string | null;
+  note: string | null;
+  assigned_narrator_id: string | null;
+  assigned_narrator_name: string | null;
+  status: string;
+  manifest_path: string | null;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  sent_at: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+};
+
+export type EditorNarrator = { id: string; display_name: string; active: boolean };
+
+/**
+ * A refusal must reach the caller as a refusal.
+ *
+ * The gates raise 42501 with a marker rather than returning zero rows, precisely
+ * so "you are not allowed" cannot be read as "there is nothing here". Throwing
+ * here keeps that distinction all the way to the page instead of rendering an
+ * empty board to someone who was refused.
+ */
+function unwrap<T>(data: T | null, error: { message: string } | null, what: string): T {
+  if (error) throw new Error(`${what}: ${error.message}`);
+  return (data ?? []) as T;
+}
+
+export async function editorBoard(): Promise<EditorCard[]> {
+  const db = await userScopedClient();
+  const { data, error } = await db.rpc("board_for_editor");
+  return unwrap<EditorCard[]>(data as EditorCard[], error, "board_for_editor");
+}
+
+export async function editorCardDetail(id: string): Promise<EditorCardDetail | null> {
+  const db = await userScopedClient();
+  const { data, error } = await db.rpc("card_detail_for_editor", { p_id: id });
+  const rows = unwrap<EditorCardDetail[]>(data as EditorCardDetail[], error, "card_detail_for_editor");
+  return rows[0] ?? null;
+}
+
+export async function editorPickups(): Promise<EditorPickup[]> {
+  const db = await userScopedClient();
+  const { data, error } = await db.rpc("pickups_for_editor");
+  return unwrap<EditorPickup[]>(data as EditorPickup[], error, "pickups_for_editor");
+}
+
+export async function editorNarrators(): Promise<EditorNarrator[]> {
+  const db = await userScopedClient();
+  const { data, error } = await db.rpc("narrators_for_editor");
+  return unwrap<EditorNarrator[]>(data as EditorNarrator[], error, "narrators_for_editor");
+}
+
+/**
+ * Editing state, DERIVED and never stored — the same rule the phone follows.
+ *
+ * There is no editing_status column on purpose: a stored status and a chapter
+ * count can disagree, and "done" beside 4 of 12 is a row that cannot be true and
+ * would still render. One fact, so there is nothing to contradict.
+ */
+export type EditingState = "not_started" | "in_progress" | "done";
+
+export function editingStateOf(
+  chaptersEdited: number | null,
+  editingCompletedAt: string | null,
+): EditingState {
+  if (editingCompletedAt) return "done";
+  return (chaptersEdited ?? 0) > 0 ? "in_progress" : "not_started";
+}
+
+export const EDITING_LABEL: Record<EditingState, string> = {
+  not_started: "Not started",
+  in_progress: "In progress",
+  done: "Done",
+};

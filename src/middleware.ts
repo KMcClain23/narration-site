@@ -36,6 +36,7 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/tools") ||
     pathname === "/settings" ||
     pathname === "/payments" ||
+    pathname === "/pickups" ||
     pathname === "/released";
 
   // The internal bearer gets through, so check-first-render can fetch these
@@ -101,6 +102,11 @@ export const config = {
   matcher: [
     "/admin/:path*", "/board", "/board/archive", "/board/card/:path*",
     "/schedule", "/contacts", "/contacts/:path*",
-    "/inquiries", "/tools", "/tools/:path*", "/settings", "/payments", "/expenses", "/released",
+    "/inquiries", "/tools", "/tools/:path*", "/settings", "/payments", "/pickups", "/expenses", "/released",
+    // The editor pages are matched for SESSION REFRESH ONLY. They are gated in
+    // their own layout, against a different admitted set (editor or admin) —
+    // adding them to the admin predicates above would bounce Marizete off her
+    // own board.
+    "/editor", "/editor/:path*",
   ],
 };

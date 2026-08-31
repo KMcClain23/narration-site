@@ -7,7 +7,7 @@ import { useState } from "react";
 import { BUSINESS, PROFILE_PHOTO_URL, ROLE_LABEL } from "@/lib/business-identity";
 import {
   LayoutGrid, Calendar, CheckCircle2, Users, Mail, Wrench, DollarSign, Settings as SettingsIcon,
-  ChevronLeft, ChevronRight, LogOut, Receipt,
+  ChevronLeft, ChevronRight, LogOut, Receipt, Mic2,
 } from "lucide-react";
 import { SidebarSection, type NavItem } from "./SidebarSection";
 import { useUnreadInquiries } from "./useUnreadInquiries";
@@ -30,6 +30,9 @@ const NAV_GROUPS: NavItem[][] = [
     // shipped title. It was reachable only by the board's drop zone, which meant
     // a released book could not be found again once it had left the board.
     { label: "Released", href: "/released", icon: CheckCircle2 },
+    // W2f. A page with no way to reach it is not delivered — Dean asked for
+    // pickups "where he works", and this is what makes that true.
+    { label: "Pickups", href: "/pickups", icon: Mic2 },
     { label: "Schedule", href: "/schedule", icon: Calendar },
   ],
   [
