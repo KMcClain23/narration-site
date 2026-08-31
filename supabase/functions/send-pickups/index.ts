@@ -41,6 +41,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 /** App-only Graph has no "me". The drive is addressed by user principal name. */
 const DRIVE_USER = "Dean@DMNarration.com";
 
+/** Where the narrator's tokenised page lives. */
+const SITE_ORIGIN = Deno.env.get("PICKUPS_SITE_ORIGIN") ?? "https://www.dmnarration.com";
+
 // ── path sanitisation ───────────────────────────────────────────────────────
 
 /**
@@ -94,7 +97,9 @@ function describe(p: Pickup): string {
   return `${when} · ${p.kind} · ${detail}${extra}`;
 }
 
-function plainBody(book: string, chapter: string, narrator: string, rows: Pickup[]): string {
+function plainBody(
+  book: string, chapter: string, narrator: string, rows: Pickup[], link: string,
+): string {
   return [
     `${book} — chapter ${chapter}`,
     `Pickups for ${narrator}`,
@@ -102,17 +107,24 @@ function plainBody(book: string, chapter: string, narrator: string, rows: Pickup
     ...rows.map((p, i) => `${i + 1}. ${describe(p)}`),
     "",
     `${rows.length} pickup${rows.length === 1 ? "" : "s"}.`,
+    "",
+    "Open this to see them and mark them re-recorded when the audio is done:",
+    link,
+    "",
     "Reply to this email if anything is unclear.",
   ].join("\n");
 }
 
-function htmlBody(book: string, chapter: string, narrator: string, rows: Pickup[]): string {
+function htmlBody(
+  book: string, chapter: string, narrator: string, rows: Pickup[], link: string,
+): string {
   const esc = (s: string) =>
     (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const items = rows.map(p => `<li>${esc(describe(p))}</li>`).join("");
   return [
     `<p><strong>${esc(book)}</strong> — chapter ${esc(chapter)}</p>`,
     `<p>Pickups for ${esc(narrator)}</p>`,
+    `<p><a href="${esc(link)}">Open your pickups and mark them re-recorded</a></p>`,
     `<ol>${items}</ol>`,
     `<p>${rows.length} pickup${rows.length === 1 ? "" : "s"}. Reply to this email if anything is unclear.</p>`,
   ].join("");
@@ -357,6 +369,33 @@ Deno.serve(async (req: Request) => {
       continue;
     }
 
+    // ONE LINK PER BATCH, minted just before the email that carries it.
+    //
+    // issue_pickup_link revokes any live link for the same batch first, so a
+    // re-send kills the previous email's URL instead of leaving two live doors.
+    // The raw token exists ONLY in this variable and in the email body: it is
+    // never logged, never put in this function's JSON response, and never in an
+    // error message. A failure here skips the narrator rather than sending an
+    // email with no way to act on it.
+    let link: string;
+    try {
+      const { data: token, error: linkError } = await adminClient.rpc("issue_pickup_link", {
+        p_card_id: cardId,
+        p_chapter: chapter,
+        p_narrator_id: narratorId,
+      });
+      if (linkError || !token) throw new Error(linkError?.message ?? "no token returned");
+      link = `${SITE_ORIGIN}/p/${token}`;
+    } catch (e) {
+      failed.push({
+        narrator: name,
+        count: rows.length,
+        // The MESSAGE, never the token.
+        reason: `could not issue a link: ${String(e).slice(0, 150)}`,
+      });
+      continue;
+    }
+
     try {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -372,8 +411,8 @@ Deno.serve(async (req: Request) => {
           subject: `${card.title} — chapter ${chapter} pickups`,
           // BOTH parts. These are read on phones in booths, where a text part is
           // not a fallback so much as the thing that actually renders.
-          text: plainBody(card.title, chapter, name, rows),
-          html: htmlBody(card.title, chapter, name, rows),
+          text: plainBody(card.title, chapter, name, rows, link),
+          html: htmlBody(card.title, chapter, name, rows, link),
         }),
       });
       if (!res.ok) {

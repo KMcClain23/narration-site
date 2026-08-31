@@ -280,6 +280,19 @@ export function EditorCardClient({
     run("Deleting pickup", () => supabase.rpc("delete_own_draft_pickup", { p_id: id }));
 
   /**
+   * VERIFICATION, and it is hers.
+   *
+   * P1 gave her resolve_pickup and no way to use it; without this control
+   * `returned` is a dead end — the narrator says "re-recorded" and the row sits
+   * there forever. The database already refuses `resolved` from anything but
+   * `returned`, so this button only appears where the server would accept it.
+   */
+  const closePickup = (id: string, status: "resolved" | "dismissed") =>
+    run(status === "resolved" ? "Closing pickup" : "Dismissing pickup", () =>
+      supabase.rpc("resolve_pickup", { p_id: id, p_status: status }),
+    );
+
+  /**
    * SEND GOES THROUGH THE EDGE FUNCTION, and only through it.
    *
    * This used to call send_chapter_pickups directly, which skipped the sender
@@ -543,6 +556,26 @@ export function EditorCardClient({
                           {p.assigned_narrator_name ? ` · ${p.assigned_narrator_name}` : ""}
                         </p>
                       </div>
+                      {p.status === "returned" && (
+                        <div className="flex shrink-0 items-center gap-3">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void closePickup(p.id, "resolved")}
+                            className="rounded-lg bg-[#D4AF37] px-3 py-1.5 text-xs font-bold text-black transition-colors hover:bg-[#E0C15A] disabled:opacity-40"
+                          >
+                            Verify &amp; close
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void closePickup(p.id, "dismissed")}
+                            className="text-xs text-white/50 underline-offset-2 hover:text-white/80 hover:underline"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      )}
                       {editable && (
                         <div className="flex shrink-0 gap-2">
                           <button

@@ -46,6 +46,17 @@ const PREFIXES = ["/admin", "/board/card", "/contacts", "/tools"];
 /** The editor surface: private, but not admin-only. */
 const EDITOR_PREFIX = "/editor";
 
+/**
+ * The narrator's tokenised pages: private, and NOT AUTHENTICATED AT ALL.
+ *
+ * The second case that proves these two predicates had to be separate. Ann has
+ * no account; her link is the credential. `/p` must be private — she should not
+ * get "Narrated Works · Demos · Merch" across the top of a work order — and it
+ * must NOT require admin, or the gate would bounce the one person it is for to a
+ * login she can never pass.
+ */
+const NARRATOR_PREFIX = "/p";
+
 function matches(pathname: string): boolean {
   if (EXACT.has(pathname)) return true;
   return PREFIXES.some(p => pathname === p || pathname.startsWith(`${p}/`));
@@ -53,6 +64,10 @@ function matches(pathname: string): boolean {
 
 function isEditorRoute(pathname: string): boolean {
   return pathname === EDITOR_PREFIX || pathname.startsWith(`${EDITOR_PREFIX}/`);
+}
+
+function isNarratorRoute(pathname: string): boolean {
+  return pathname === NARRATOR_PREFIX || pathname.startsWith(`${NARRATOR_PREFIX}/`);
 }
 
 /**
@@ -67,11 +82,12 @@ export function requiresAdmin(pathname: string): boolean {
 }
 
 /**
- * A private surface — no marketing chrome. Admin routes plus the editor's.
+ * A private surface — no marketing chrome. Admin routes, the editor's, and the
+ * narrator's tokenised pages.
  *
  * Includes `/admin/login`: it is not admin-gated, and it is still no place for
- * the site navigation.
+ * the site navigation. Includes `/p`, which is not authenticated at all.
  */
 export function isPrivateRoute(pathname: string): boolean {
-  return matches(pathname) || isEditorRoute(pathname);
+  return matches(pathname) || isEditorRoute(pathname) || isNarratorRoute(pathname);
 }

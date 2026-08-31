@@ -3969,3 +3969,95 @@ here would have been passing on absence.
 cart out of private **bundles** rather than rendering nothing at runtime. This change stops
 it executing; it does not stop it shipping. That is a move of every route directory and
 belongs in its own change.
+
+---
+
+## P2 — the narrator's page: a tokenised link, no login (2026-08-31)
+
+Ann has no account and is not getting one. The email already goes per
+(card, chapter, narrator); the link is scoped to that same batch. She opens it, sees only
+her pickups for that chapter of that book, and marks them re-recorded. Marizete then
+verifies and closes. **No upload — that is P3.**
+
+### The decision everything else rests on: anon gets nothing
+
+`anon` holds EXECUTE on **none** of the three functions, and no privilege on
+`pickup_links`. The token goes to a Next.js route handler holding the service key, and
+only a shaped payload comes back. Granting anon a function that reads pickups would be a
+permanent widening of the public role for one feature's convenience, and it would outlive
+the feature. Confirmed by `check-function-grants`, not by reading the migration.
+
+| | anon | authenticated | service_role |
+|---|---|---|---|
+| `issue_pickup_link` | false | false | true |
+| `pickup_batch_by_token` | false | false | true |
+| `mark_returned_by_token` | false | false | true |
+| `pickup_links` (SELECT) | false | false | true |
+
+`pickup_links` has RLS on with **zero policies** — deny-all except service_role, which is
+exactly the reachability it should have.
+
+### The token is never stored
+
+Only its SHA-256. A database read — a backup, a support query, a leaked dump — must not
+yield working links. `pgcrypto` lives in `extensions`, so every call is qualified
+(`extensions.gen_random_bytes`, `extensions.digest`); unqualified, they resolve to nothing
+under `search_path TO 'public'`.
+
+Expiry is `NOT NULL` with a 90-day default and an explicit refusal on null — "we forgot to
+set one" must not be able to produce a permanent unauthenticated door.
+
+### Verified — and two of these are the ones that matter
+
+| | result |
+|---|---|
+| token shape | 64 hex chars (32 bytes) |
+| raw token in the table | no — only the hash |
+| a valid token | exactly that batch, that chapter |
+| another chapter's pickup, **through the HTTP route** | `moved: 0`, row still `sent` |
+| another narrator's pickup, same batch | `moved: 0`, row still `sent` |
+| a re-send | revokes the previous link; the old URL reads 0 rows |
+| an expired token | 0 rows, and cannot write either |
+| unknown / revoked / expired | **the same page, byte for byte** |
+
+The cross-batch test goes through the **route**, not the client. A client-side filter would
+pass this by never sending the id; this sends it and the database refuses it, which is the
+only version of the test worth having.
+
+"Unknown" and "revoked" were compared as normalised strings and are identical — the page
+cannot confirm that a token is real.
+
+### The page
+
+`/p/[token]`, `robots: noindex, nofollow, nocache`. Added to `isPrivateRoute` (no
+marketing chrome) and **not** to `requiresAdmin` — the second case those two predicates
+were split for, and the one a merged predicate would break by bouncing Ann to a login she
+can never pass. Confirmed both: no header, no cart, and a signed-in **admin** and
+**editor** both reach it without a redirect.
+
+Rate-limited per IP — 30 reads/min, 10 confirms/min — and fails **open** on a Redis
+outage, because the token is still required and taking the narrator's page down over a
+cache is the worse failure.
+
+### The email carries the link (deployed v5)
+
+`issue_pickup_link` is called per narrator just before the email. Proven against the
+deployed function with a throwaway narrator: 0 links before, 1 after, and the response
+body contains **no `/p/`, no hash and no 64-hex string at all**. The two `console.error`
+calls in `pickup-link.ts` print `error.message` only.
+
+### Marizete's verify control
+
+`returned` was a dead end: she had `resolve_pickup` since P1 and no way to use it. A
+returned pickup on her card page now shows **Verify & close** plus Dismiss. Verified:
+exactly one button, on the returned row only; it resolved, `resolved_by` was set to **her**
+by the function, and the `sent` row beside it was untouched.
+
+### Housekeeping
+
+The deployed-function test filed a real manifest into OneDrive. It was removed via Graph
+afterwards — `Pickups/A Cowboy's Runaway/` now contains only `Ann Dahlia`.
+
+### Not built, deliberately
+
+The audio upload. P3, and it needs its own decisions.
