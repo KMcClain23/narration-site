@@ -4061,3 +4061,94 @@ afterwards — `Pickups/A Cowboy's Runaway/` now contains only `Ann Dahlia`.
 ### Not built, deliberately
 
 The audio upload. P3, and it needs its own decisions.
+
+---
+
+## P3 — the narrator's upload (2026-08-31)
+
+Built, tested, and **inert**: it refuses to issue a single upload URL until a private
+bucket exists. That is the correct state, not an unfinished one.
+
+### THE BLOCKER, found by checking rather than assuming
+
+The instruction said to verify the R2 credentials before building on them. They work —
+and every bucket they can reach is **public**.
+
+| | result |
+|---|---|
+| credentials / `HeadBucket dmn-site-media` | reachable |
+| signed GET | 200 |
+| **GET with NO signature, via the public base URL** | **200 — world-readable** |
+| `CreateBucket dmn-pickup-audio` | **AccessDenied** |
+| buckets the token can reach | `dmn-site-media`, `narration-demos` — both public |
+
+Unreleased audiobook audio, some of it on confidential books, cannot sit somewhere anyone
+with the URL can download it. And the token cannot create a private bucket, so this could
+not be solved from here.
+
+**So the bucket is guarded, and the guard is the feature's off switch.**
+`pickupsBucket()` refuses when `R2_PICKUPS_BUCKET_NAME` is unset **and** when it names a
+known-public bucket — the second check being the one that matters, since "set it to the
+media bucket" is exactly the shortcut a future reader would take. All three endpoints
+return 503 today.
+
+**What Dean needs to do:** create a private R2 bucket, add an API token scoped to it, set
+`R2_PICKUPS_BUCKET_NAME`. Nothing else changes. If R2 is the wrong home, Supabase Storage
+would also work and its private buckets are creatable with the service key already here —
+but that is a design change and was not made unilaterally.
+
+### The shape
+
+browser → **R2** → OneDrive, never browser → OneDrive. A presigned Graph URL in a browser
+is write access to Dean's drive; a presigned R2 PUT is one object in a bucket he controls.
+
+- **The server names the file, always.** `pickups/{link_id}/{uuid}.{ext}`, extension from a
+  content-type allowlist, never from the filename. There is no sanitisation to get wrong
+  because no user input reaches the key.
+- **Signing a content-type does not enforce the bytes.** The file is read back after upload
+  and its magic bytes sniffed; a mismatch is **deleted from R2 and never recorded**, so the
+  sweep can only ever see files that were checked.
+- **Filing is out of band**, on a 10-minute cron. Ann's upload landing in R2 is the
+  delivery. This is the same asymmetry as send-pickups steps 4 and 5: a failed file move
+  leaves the upload recorded and retryable, never rolled back, because telling her it
+  failed would make her send it twice.
+- **Never overwrite.** `@microsoft.graph.conflictBehavior=rename`, and the name Graph
+  actually used is what gets recorded — the requested path would be a lie after a rename.
+- **Uploads attach to the batch**, not to individual pickups.
+
+### Verified
+
+**The rules** (pure, in their own module precisely so they are testable): wav/flac/mp3/m4a
+sniff correctly; a zip and an exe sniff as nothing; **a zip signed as `audio/wav` is
+rejected**, and so is a flac signed as wav — a mismatch, not merely an unknown. Traversal,
+backslash traversal, a colon, a dot-run, an empty name and a 300-character name all reduce
+to something inert, and the R2 key contains nothing from any of them.
+
+**The signing endpoint refuses, server-side**: a 6th file (400), a non-audio type (400),
+over 200 MB (400), a **revoked** token (403), an unknown token (403) — with a valid request
+signing successfully as the control. A `../../../etc/passwd.wav` filename still produces a
+plain `pickups/{uuid}/{uuid}.wav` key.
+
+**anon holds nothing**: all six new functions refused, `pickup_uploads` unreadable, RLS on
+with zero policies — with service_role succeeding as the control.
+
+**The cron records failure rather than dropping the row**: forced to fail, the row still
+exists, `attempts` went 0 → 1, `last_error` is populated and `filed_at` is still null.
+
+### NOT VERIFIED, and it is the happy path
+
+Blocked on the private bucket, so no object could be written:
+
+1. a valid wav end to end into OneDrive
+2. the sniff rejecting a **real** uploaded file (the function is proven on real container
+   bytes; the upload → read-back → delete path is not)
+3. the no-overwrite suffix, verified by fetching both takes
+4. the cron's **success** branch — only its failure branch has been exercised
+
+A filing path only ever exercised on the failure side has no evidence it succeeds, and I am
+not going to imply otherwise. These run the day the bucket exists.
+
+### Not built, deliberately
+
+Antivirus and content moderation. Out of scope, and a half-built version is worse than an
+honest absence.

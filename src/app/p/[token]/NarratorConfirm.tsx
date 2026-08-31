@@ -29,6 +29,20 @@ export function NarratorConfirm({
   const [error, setError] = useState("");
   const [checked, setChecked] = useState<Set<string>>(() => new Set());
 
+  /**
+   * ATTACHING IS OPTIONAL AND NEVER MARKS ANYTHING.
+   *
+   * She may have sent the audio another way entirely — WeTransfer, a shared
+   * folder, email. Blocking the confirm on an upload would make this page refuse
+   * work that is already done. And uploading must not itself move a pickup to
+   * returned: that stays her deliberate action, because "the file arrived" and
+   * "I am finished with these" are different claims and only she can make the
+   * second one.
+   */
+  const [attached, setAttached] = useState<{ name: string; bytes: number }[]>([]);
+  const [uploading, setUploading] = useState("");
+  const [uploadError, setUploadError] = useState("");
+
   const toggle = (id: string) =>
     setChecked(prev => {
       const next = new Set(prev);
@@ -121,6 +135,76 @@ export function NarratorConfirm({
     );
   }
 
+  async function attach(list: FileList | null) {
+    if (!list || list.length === 0 || uploading) return;
+    const files = [...list];
+    setUploadError("");
+    try {
+      setUploading(`Preparing ${files.length} file${files.length === 1 ? "" : "s"}…`);
+      const signRes = await fetch("/api/pickup-link/sign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          files: files.map(f => ({ name: f.name, contentType: f.type, bytes: f.size })),
+        }),
+      });
+      const signed = await signRes.json().catch(() => ({}));
+      if (!signRes.ok) {
+        setUploadError(signed.error ?? "Those files could not be accepted.");
+        return;
+      }
+
+      for (let i = 0; i < signed.files.length; i++) {
+        const target = signed.files[i];
+        setUploading(`Sending ${i + 1} of ${signed.files.length}: ${files[i].name}`);
+        const put = await fetch(target.url, {
+          method: "PUT",
+          headers: { "Content-Type": files[i].type },
+          body: files[i],
+        });
+        if (!put.ok) {
+          setUploadError(`${files[i].name} did not upload. Try again.`);
+          return;
+        }
+      }
+
+      setUploading("Checking the files…");
+      const doneRes = await fetch("/api/pickup-link/uploaded", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          files: signed.files.map((t: { key: string }, i: number) => ({
+            key: t.key, name: files[i].name, contentType: files[i].type,
+          })),
+        }),
+      });
+      // NOT named `done`: that is a prop on this component, holding the
+      // already-returned pickups. Shadowing it with a different type here is a
+      // trap for whoever edits this next.
+      const checkResult = await doneRes.json().catch(() => ({}));
+      if (!doneRes.ok) {
+        setUploadError(checkResult.error ?? "The files could not be checked.");
+        return;
+      }
+      setAttached(prev => [...prev, ...(checkResult.accepted ?? [])]);
+      if ((checkResult.rejected ?? []).length > 0) {
+        setUploadError(
+          (checkResult.rejected as { name: string; reason: string }[])
+            .map(r => `${r.name}: ${r.reason}`)
+            .join("; "),
+        );
+      }
+    } catch {
+      setUploadError("Something went wrong sending those files.");
+    } finally {
+      setUploading("");
+    }
+  }
+
+  const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
+
   return (
     <div className="mt-8">
       {error && (
@@ -166,6 +250,43 @@ export function NarratorConfirm({
           Everything here has been marked re-recorded. Nothing else is needed from you.
         </p>
       )}
+
+      {/* ── attaching audio, entirely optional ────────────────────────── */}
+      <section className="mt-10 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <h2 className="text-sm font-bold">Attach the re-recorded audio</h2>
+        <p className="mt-1 text-xs text-white/50">
+          Optional — if you have already sent the files another way, skip this. Up to 5
+          files, 200 MB each. WAV, FLAC, MP3 or M4A.
+        </p>
+
+        <input
+          type="file"
+          multiple
+          accept=".wav,.flac,.mp3,.m4a,audio/*"
+          disabled={!!uploading}
+          onChange={e => void attach(e.target.files)}
+          className="mt-4 block w-full text-sm text-white/70 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-white/15 disabled:opacity-40"
+        />
+
+        {uploading && <p className="mt-3 text-sm text-[#D4AF37]">{uploading}</p>}
+        {uploadError && (
+          <p className="mt-3 rounded-lg border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+            {uploadError}
+          </p>
+        )}
+
+        {attached.length > 0 && (
+          <ul className="mt-4 space-y-1.5">
+            {attached.map((a, i) => (
+              <li key={`${a.name}-${i}`} className="flex items-center gap-2 text-sm text-white/80">
+                <span className="text-emerald-400">received</span>
+                <span className="truncate">{a.name}</span>
+                <span className="text-xs text-white/40">{mb(a.bytes)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {done.length > 0 && (
         <>
