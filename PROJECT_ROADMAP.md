@@ -3778,3 +3778,97 @@ amber notice.
 
 **For Dean:** filling in `narrators.email` is what makes the send work. Nothing else is
 outstanding on this path.
+
+---
+
+## Closing the narrator data split (2026-08-31)
+
+Two tables both meant "narrator". `co_narrators` backs Contacts and carries the emails;
+`narrators` is what `pickups.assigned_narrator_id` points at. Nothing joined them but
+`co_narrators.name = narrators.display_name` — a string match that worked on all 18
+overlapping rows and had already failed twice: Rylee Kuberra exists only in Contacts,
+Dean only in narrators.
+
+### 1 — empty strings are not missing values
+
+Four rows held `email = ''` (Ash Beverly, Bailey Turpin, E. Montoya, Meg Sylvan).
+Contacts renders `''` and NULL identically as an em dash, so four narrators who could not
+be emailed at all looked exactly like four whose address was simply not shown. That is why
+the roster read as complete. Normalised to NULL, with
+`CHECK (email IS NULL OR btrim(email) <> '')` on **both** tables.
+
+**The writers shipped first, in their own commit (980a538).** Both paths submitted `''`
+for a cleared field — the POST default and the PUT trim loop — so applying the constraint
+first would have rejected every save that clears an email and broken the Contacts form on
+what looks like a data fix. Only `email` is treated this way; nothing distinguishes absent
+from blank for a bio.
+
+Verified against LIVE PROD, which is also what proved the deploy had landed: a PUT
+clearing the email returned **200** and stored **NULL**, and — the control — a direct `''`
+write was **refused** by the constraint. Without that second line, "it saved" would also
+be true of a constraint doing nothing.
+
+### 2 — the join has a real key
+
+`narrators.co_narrator_id` → `co_narrators(id)`, backfilled from the name match while it
+still worked: **18 of 19**, Dean the only one unlinked, which is correct. `display_name`
+stays — `card_cast` still resolves co-narrators by name and the phone renders it.
+
+The email backfill now runs **through the FK**, via an AFTER UPDATE OF email trigger, and
+the current state was re-derived through that mechanism rather than left as the output of
+the one being retired. A rename in Contacts can no longer strand a narrator with a stale
+address.
+
+### 3 — `is_self` became `is_owner`, anchored on identity
+
+`narrators.profile_id` is now set for Dean, and `card_cast` finds the owner by that id
+instead of `display_name = 'Dean'`. A rename no longer changes who the owner is; unlinking
+the profile still RAISES.
+
+**And the flag was misnamed.** `card_cast` never reads `auth.uid()` — it cannot know who
+is calling — so "is_self" invited the UI to render it in the second person, and the picker
+did: **Marizete was shown "you" beside Dean's name.** Now `is_owner`, rendered as
+"primary narrator" / "co-narrator", which is true for every viewer. It is deliberately NOT
+viewer-aware.
+
+Changing a `RETURNS TABLE` column forces DROP + CREATE, which discards the ACL and
+re-grants EXECUTE to PUBLIC. Grants captured before and compared after —
+`anon=false, authenticated=true, service_role=true, public=false`, identical `proacl`,
+comment restored — and `check-function-grants` re-run rather than assuming.
+
+### 4 — a guard, mutated until it fired
+
+`narrator_sync_audit()` + `check-narrator-sync.ts`, in `reconcile.yml`. Dean and Rylee
+Kuberra are reported as `known` rather than filtered out: a guard that quietly drops the
+two rows it finds hardest will be equally quiet about the third.
+
+| mutation | result |
+|---|---|
+| baseline | PASS — both known exceptions named |
+| a second `narrators` row for a cast name | **could not be created** — `narrators_display_name_key` |
+| a new one-sided Contacts record | **exit 1** — "the one-sided records changed" |
+| a cast narrator's `co_narrator_id` set to NULL | **exit 1** — "is cast on a live book but has no co_narrators link" |
+| the two tables' addresses made to disagree | **exit 1** — "email disagrees with the Contacts record" |
+| restored | PASS, and the restore was verified rather than assumed |
+
+The first mutation attempt failing is worth keeping: it proved nothing, and had it been
+the only one, the FAIL branches would have shipped unexercised.
+
+### Final state
+
+19 / 19 rows, 18 overlapping, 18 linked by FK, 14 with addresses, 0 empty strings, 0
+disagreements, 1 narrator linked to the owner profile, 0 guard failures.
+
+### Noted, not changed
+
+`CartDrawer` is mounted in the ROOT layout, so "Your Cart" is in the DOM of every admin
+and editor page. Pre-existing and harmless, but it is why a whole-page pronoun sweep found
+"your" on the editor card page; the check is scoped to the picker's own copy.
+
+### The status grant stays
+
+Recorded in the migration and on the column itself so it is not re-proposed. RLS
+"Role update" already restricts every write on `board_cards` to
+`current_app_role() = 'admin'` — an editor updating status gets **0 rows** — and the grant
+is load-bearing for `BoardViewModel.kt:297`. Revoking closes nothing and breaks the phone
+until a release ships.

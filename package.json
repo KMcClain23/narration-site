@@ -25,6 +25,8 @@
     "check-card-payout:ci": "npx --yes tsx scripts/check-card-payout-branch.ts",
     "check-board-policies": "npx --yes tsx --env-file=.env.local scripts/check-board-policies.ts",
     "check-new-account-role": "npx --yes tsx --env-file=.env.local scripts/check-new-account-role.ts",
+    "check-narrator-sync": "npx --yes tsx --env-file=.env.local scripts/check-narrator-sync.ts",
+    "check-narrator-sync:ci": "npx --yes tsx scripts/check-narrator-sync.ts",
     "check-new-account-role:ci": "npx --yes tsx scripts/check-new-account-role.ts",
     "check-board-policies:ci": "npx --yes tsx scripts/check-board-policies.ts"
   },

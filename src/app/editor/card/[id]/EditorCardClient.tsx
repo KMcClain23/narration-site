@@ -65,7 +65,7 @@ type Draft = {
  */
 function defaultAssignee(cast: CastMember[]): string {
   if (cast.length === 1) return cast[0].narrator_id;
-  if (cast.length === 2) return (cast.find(c => !c.is_self) ?? cast[0]).narrator_id;
+  if (cast.length === 2) return (cast.find(c => !c.is_owner) ?? cast[0]).narrator_id;
   return "";
 }
 
@@ -110,6 +110,9 @@ function NarratorPicker({
     return <p className="text-sm text-red-300">No cast for this book.</p>;
   }
 
+  // NO SECOND PERSON ANYWHERE IN HERE. `is_owner` marks whose book it is, and
+  // this page is read by Marizete as often as by Dean — "you" beside his name
+  // told her she was him. "primary narrator" is true for every viewer.
   if (cast.length === 1) {
     return (
       <p className="text-sm text-white/60">
@@ -140,7 +143,7 @@ function NarratorPicker({
               >
                 <span className="block text-sm font-semibold">{c.display_name}</span>
                 <span className="block text-[11px] text-white/40">
-                  {c.is_self ? "you" : "co-narrator"}
+                  {c.is_owner ? "primary narrator" : "co-narrator"}
                 </span>
               </button>
             );
@@ -169,7 +172,9 @@ function NarratorPicker({
               ].join(" ")}
             >
               {c.display_name}
-              {c.is_self && <span className="ml-1.5 text-[11px] text-white/40">you</span>}
+              {c.is_owner && (
+                <span className="ml-1.5 text-[11px] text-white/40">primary</span>
+              )}
             </button>
           );
         })}

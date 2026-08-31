@@ -67,3 +67,12 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npm run check-new-account-role:ci
+
+      # co_narrators and narrators both mean "narrator" and were joined by a
+      # string match. They now share a key; this notices when they come apart
+      # anyway, which neither screen shows.
+      - name: The two narrator tables must agree
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run check-narrator-sync:ci

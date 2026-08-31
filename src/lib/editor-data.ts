@@ -98,7 +98,18 @@ export type EditorPickup = {
  * that as the assignee list for a two-hander is how a pickup reaches someone who
  * never read the chapter.
  */
-export type CastMember = { narrator_id: string; display_name: string; is_self: boolean };
+export type CastMember = {
+  narrator_id: string;
+  display_name: string;
+  /**
+   * The narrator whose book it is — NOT the viewer.
+   *
+   * card_cast never reads auth.uid(), so this cannot mean "you". It was called
+   * is_self and the picker duly rendered "you" beside Dean's name to Marizete.
+   * Do not render it in the second person.
+   */
+  is_owner: boolean;
+};
 
 /**
  * A refusal must reach the caller as a refusal.
