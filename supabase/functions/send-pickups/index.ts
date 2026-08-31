@@ -210,7 +210,31 @@ async function uploadManifest(
 
 // ── the handler ─────────────────────────────────────────────────────────────
 
+/**
+ * CORS, because the WEBSITE now calls this and a browser asks first.
+ *
+ * The Android app never needed it — native HTTP sends no preflight — so this
+ * function answered OPTIONS with 405 and the browser refused to make the real
+ * request at all. From the page that looks like "Failed to send a request to the
+ * Edge Function", which names the symptom and not the cause; the function itself
+ * was healthy the whole time and answered Node calls correctly.
+ *
+ * `*` is right here and is not a weakening: this endpoint authenticates with an
+ * Authorization header, never a cookie, so a hostile page gains nothing by being
+ * allowed to ask — it still has no token to send. CORS is not the boundary;
+ * verify_jwt and assert_editor_access are.
+ */
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
+};
+
 Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS });
+  }
   if (req.method !== "POST") {
     return json({ error: "POST only" }, 405);
   }
@@ -450,8 +474,12 @@ Deno.serve(async (req: Request) => {
 });
 
 function json(body: unknown, status = 200): Response {
+  // CORS on EVERY response, not just the happy one. Without it the browser can
+  // see that a request failed but not why, and the reason is the useful part —
+  // it is how the missing PICKUPS_RESEND_API_KEY reaches the screen as a
+  // sentence instead of as "non-2xx status code".
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { ...CORS, "Content-Type": "application/json" },
   });
 }

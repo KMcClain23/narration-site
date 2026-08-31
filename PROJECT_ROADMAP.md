@@ -3668,3 +3668,113 @@ warning against adding one. The service_role `from("pickups")` is the read W2f p
 - `/` and `/narrated-works` — 200, marketing header present.
 - `check-first-render` green on all 9 routes, so the internal bearer still passes the
   rewritten middleware.
+
+---
+
+## The cast picker, the sender, and a revoke that was NOT done (2026-08-31)
+
+### 1 — status stays in the grant. THE AUDIT SAID DON'T.
+
+The instruction was to revoke `board_cards.status` from the 24-column UPDATE grant to
+`authenticated`, **after** confirming every writer goes through service_role or an
+admin-gated function. It does not, so it was not revoked.
+
+| writer | client | breaks on revoke? |
+|---|---|---|
+| `/api/board` PATCH (Dean's web board) | `supabaseAdmin` | no — service_role ignores column grants |
+| `/api/books`, ratings cron, prepper, settle-payment | `supabaseAdmin` | no |
+| web browser client | *never touches board_cards* | no |
+| **Android `BoardViewModel.moveTo` → `updateCard`** | **`authenticated`, direct table write** | **YES** |
+
+`BoardViewModel.kt:297` builds `put("status", card.status)` and sends it straight at the
+table. Revoking would break moving a card on Dean's phone, and the installed build would
+stay broken until a new release reached it.
+
+**And the exposure it would close is already closed.** Measured, not read off the policy:
+
+| | result |
+|---|---|
+| editor updating `status` | **0 rows** — RLS `Role update` requires `current_app_role() = 'admin'` |
+| admin updating `status` | 1 row — the grant is load-bearing for the phone |
+| admin updating `pfh_rate` (control, not granted) | `permission denied for table board_cards` |
+
+Note the shape of the editor result: **no error, zero rows**. The silent RLS refusal this
+project keeps meeting — which is why the control matters, and why the third line is there
+to prove the probe can see a refusal at all.
+
+So the trade is: break the phone today to remove a permission RLS already denies. Per the
+instruction's own condition, it was not taken. **To do it safely:** add an admin-gated
+`set_card_status`, ship an Android release that calls it, confirm the fleet has it, then
+revoke. That is Dean's call and needs a release, not a migration.
+
+### 2 — `card_cast(p_card_id)`
+
+DEFINER, `assert_editor_access`, returns `narrator_id, display_name, is_self` — Dean
+first, then `co_narrator` in stored order. `co_narrator` is text holding JSON: 31 arrays
+and 2 empty strings today, and nothing else.
+
+**Every failure raises.** A cast quietly short by one is how a pickup reaches a narrator
+who never read the chapter, and nothing on screen says anybody is missing.
+
+| scenario | result |
+|---|---|
+| `No One to Hold Me` | 1 row — `Dean (self)` |
+| `A Cowboy's Runaway` | 2 rows — `Dean (self), Ann Dahlia` |
+| `How an Angel Dies: Wrath` | 7 rows |
+| not JSON | RAISED |
+| JSON object, not an array | RAISED |
+| a name with no `narrators` row | RAISED |
+| a blank name | RAISED |
+| a duplicate name | RAISED |
+| no such card | RAISED |
+| CONTROL: restored to the real value | 2 rows |
+
+`is_self` is anchored on the narrators row named `'Dean'` because `profile_id` is null on
+all 19 rows. If that row is renamed the function RAISES rather than returning a cast with
+no owner — the rename becomes visible instead of silent.
+
+### 3 — the picker, by count and not by format
+
+`narration_format` says how a book was produced; the cast says who is on it. Rendered by
+cast size: **1** no control at all, just who it is in text; **2** two large named buttons
+(27 of 33 books) with the **co-narrator preselected**, since a pickup is usually about the
+other person's read; **3+** chips for that card's cast. Never the 19-name roster —
+verified that a narrator who is not on the book does not appear.
+
+### 4 — Send goes through the Edge Function, and two things that found
+
+`supabase.functions.invoke("send-pickups", { cardId, chapter })`, with no fallback to the
+RPC. The function calls `send_chapter_pickups` itself *after* Resend accepts; calling it
+from the client skipped the sender entirely and marked pickups sent with nobody told.
+Verified by watching the network: the edge function is called and
+`/rest/v1/rpc/send_chapter_pickups` is not. No `.rpc("send_chapter_pickups")` remains in
+`src/`.
+
+**a. The function had no CORS, so the browser could never reach it.** It answered the
+preflight with **405**, which surfaces as "Failed to send a request to the Edge Function"
+— a symptom that names nothing. The function was healthy throughout and answered Node
+calls correctly; only browsers were blocked, and only the website is a browser. Added
+OPTIONS handling and CORS on **every** response (deployed v4, `verify_jwt` still true).
+`*` is not a weakening here: this endpoint authenticates by Authorization header and never
+by cookie, so being allowed to ask gains a hostile page nothing.
+
+**b. THE PREDICTED CAUSE WAS NOT THE CAUSE.** The send was expected to fail on a missing
+`PICKUPS_RESEND_API_KEY`. It does not: the function gets past that check, so **both
+secrets are configured**. It returns **HTTP 200** with
+
+```
+{"moved":0,"emailed":[],"skipped":[{"narrator":"Ann Dahlia","reason":"no email address on file"}]}
+```
+
+**No narrator has an email address — 0 of 19.** That is the real blocker, and it is data,
+not configuration.
+
+That 200 also exposed a bug in this change: a correct, successful, empty send rendered as
+silence. She would press Send, see nothing, and believe the narrator had been told — the
+failure the function's own ordering exists to prevent, moved up a layer into the UI. The
+client now reads `emailed`/`skipped`/`failed`: nothing emailed is an error
+("Nothing was sent. Ann Dahlia — no email address on file"), and a partial send is its own
+amber notice.
+
+**For Dean:** filling in `narrators.email` is what makes the send work. Nothing else is
+outstanding on this path.

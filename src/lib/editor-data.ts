@@ -91,7 +91,14 @@ export type EditorPickup = {
   resolved_by: string | null;
 };
 
-export type EditorNarrator = { id: string; display_name: string; active: boolean };
+/**
+ * One narrator ON A GIVEN BOOK. Not the roster — the cast.
+ *
+ * `narrators_for_editor` returns all 19 people, which is a directory. Offering
+ * that as the assignee list for a two-hander is how a pickup reaches someone who
+ * never read the chapter.
+ */
+export type CastMember = { narrator_id: string; display_name: string; is_self: boolean };
 
 /**
  * A refusal must reach the caller as a refusal.
@@ -125,10 +132,18 @@ export async function editorPickups(): Promise<EditorPickup[]> {
   return unwrap<EditorPickup[]>(data as EditorPickup[], error, "pickups_for_editor");
 }
 
-export async function editorNarrators(): Promise<EditorNarrator[]> {
+/**
+ * The cast of one book: Dean first, then this card's co-narrators.
+ *
+ * `card_cast` RAISES rather than returning a short list — an unparseable
+ * co_narrator or a name with no narrators row stops the page. `unwrap` turns
+ * that into a thrown error here, deliberately: a cast quietly missing somebody
+ * looks exactly like a book they are not on.
+ */
+export async function editorCardCast(cardId: string): Promise<CastMember[]> {
   const db = await userScopedClient();
-  const { data, error } = await db.rpc("narrators_for_editor");
-  return unwrap<EditorNarrator[]>(data as EditorNarrator[], error, "narrators_for_editor");
+  const { data, error } = await db.rpc("card_cast", { p_card_id: cardId });
+  return unwrap<CastMember[]>(data as CastMember[], error, "card_cast");
 }
 
 /**

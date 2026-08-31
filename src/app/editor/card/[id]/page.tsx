@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { currentSession } from "@/lib/supabase/session";
-import { editorBoard, editorCardDetail, editorPickups, editorNarrators } from "@/lib/editor-data";
+import { editorBoard, editorCardDetail, editorPickups, editorCardCast } from "@/lib/editor-data";
 import { EditorCardClient } from "./EditorCardClient";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export default async function EditorCardPage({
 }) {
   const { id } = await params;
 
-  const [session, card, board, allPickups, narrators] = await Promise.all([
+  const [session, card, board, allPickups, cast] = await Promise.all([
     currentSession(),
     editorCardDetail(id),
     // THE EDITING COLUMNS COME FROM THE BOARD FUNCTION, not the detail one.
@@ -35,7 +35,10 @@ export default async function EditorCardPage({
     // second gated read is the cheaper correctness.
     editorBoard(),
     editorPickups(),
-    editorNarrators(),
+    // THIS CARD'S cast, not the roster. card_cast raises rather than returning a
+    // short list, so a book whose co_narrator has drifted fails loudly here
+    // instead of quietly offering the wrong people.
+    editorCardCast(id),
   ]);
   const progress = board.find(c => c.id === id) ?? null;
 
@@ -59,7 +62,7 @@ export default async function EditorCardPage({
         chaptersTotal={progress?.chapters_total ?? null}
         editingCompletedAt={progress?.editing_completed_at ?? null}
         pickups={allPickups.filter(p => p.card_id === card.id)}
-        narrators={narrators}
+        cast={cast}
         userId={session?.userId ?? null}
       />
     </>

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
-import type { EditorCardDetail, EditorPickup, EditorNarrator } from "@/lib/editor-data";
+import type { EditorCardDetail, EditorPickup, CastMember } from "@/lib/editor-data";
 
 /**
  * Her writes — ALL of them through the gated functions, with her JWT.
@@ -54,15 +54,129 @@ type Draft = {
   assigned_narrator_id: string;
 };
 
-const EMPTY: Draft = {
-  chapter: "",
-  timestamp_at: "",
-  kind: "misread",
-  said: "",
-  should_be: "",
-  note: "",
-  assigned_narrator_id: "",
-};
+/**
+ * Who a new pickup is for, before she touches anything.
+ *
+ * A solo book has exactly one possible answer, so it is filled in and no control
+ * is drawn. A two-hander defaults to the CO-NARRATOR: a pickup is usually about
+ * the other person's read, and on the rare occasion it is not, correcting it is
+ * one tap. Three or more and there is no defensible guess, so it stays empty and
+ * she chooses.
+ */
+function defaultAssignee(cast: CastMember[]): string {
+  if (cast.length === 1) return cast[0].narrator_id;
+  if (cast.length === 2) return (cast.find(c => !c.is_self) ?? cast[0]).narrator_id;
+  return "";
+}
+
+function emptyDraft(cast: CastMember[]): Draft {
+  return {
+    chapter: "",
+    timestamp_at: "",
+    kind: "misread",
+    said: "",
+    should_be: "",
+    note: "",
+    assigned_narrator_id: defaultAssignee(cast),
+  };
+}
+
+/**
+ * Who the pickup is for — SIZED TO THE BOOK, not to the roster.
+ *
+ * Rendered by how many people are actually on this card, because that is what
+ * changes the question being asked. It is deliberately NOT keyed on
+ * narration_format: the format says how a book was produced, the cast says who
+ * is on it, and they are not the same fact.
+ *
+ *   1  a solo book has no question. Say whose it is and draw no control — a
+ *      select with one option is a decision she has to make that has one answer.
+ *   2  27 of 33 books. Two large named buttons: answering a question, not
+ *      filling in a field.
+ *   3+ chips, for THIS card's cast only.
+ */
+function NarratorPicker({
+  cast,
+  value,
+  onChange,
+}: {
+  cast: CastMember[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  if (cast.length === 0) {
+    // card_cast always returns at least Dean, so this is unreachable unless the
+    // function changed. Say so rather than rendering an empty row.
+    return <p className="text-sm text-red-300">No cast for this book.</p>;
+  }
+
+  if (cast.length === 1) {
+    return (
+      <p className="text-sm text-white/60">
+        This pickup is for <span className="font-semibold text-white">{cast[0].display_name}</span>
+        <span className="text-white/40"> — the only narrator on this book.</span>
+      </p>
+    );
+  }
+
+  if (cast.length === 2) {
+    return (
+      <div>
+        <p className="mb-2 text-xs uppercase tracking-wide text-white/40">Whose read?</p>
+        <div className="grid grid-cols-2 gap-3">
+          {cast.map(c => {
+            const on = value === c.narrator_id;
+            return (
+              <button
+                key={c.narrator_id}
+                type="button"
+                onClick={() => onChange(c.narrator_id)}
+                className={[
+                  "rounded-xl border px-4 py-3 text-left transition-colors",
+                  on
+                    ? "border-[#D4AF37] bg-[#D4AF37]/15 text-white"
+                    : "border-white/15 bg-white/5 text-white/70 hover:border-white/30",
+                ].join(" ")}
+              >
+                <span className="block text-sm font-semibold">{c.display_name}</span>
+                <span className="block text-[11px] text-white/40">
+                  {c.is_self ? "you" : "co-narrator"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <p className="mb-2 text-xs uppercase tracking-wide text-white/40">Whose read?</p>
+      <div className="flex flex-wrap gap-2">
+        {cast.map(c => {
+          const on = value === c.narrator_id;
+          return (
+            <button
+              key={c.narrator_id}
+              type="button"
+              onClick={() => onChange(c.narrator_id)}
+              className={[
+                "rounded-full border px-3.5 py-1.5 text-sm transition-colors",
+                on
+                  ? "border-[#D4AF37] bg-[#D4AF37]/15 font-semibold text-white"
+                  : "border-white/15 bg-white/5 text-white/70 hover:border-white/30",
+              ].join(" ")}
+            >
+              {c.display_name}
+              {c.is_self && <span className="ml-1.5 text-[11px] text-white/40">you</span>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function EditorCardClient({
   card,
@@ -70,7 +184,7 @@ export function EditorCardClient({
   chaptersTotal,
   editingCompletedAt,
   pickups,
-  narrators,
+  cast,
   userId,
 }: {
   card: EditorCardDetail;
@@ -79,7 +193,8 @@ export function EditorCardClient({
   chaptersTotal: number | null;
   editingCompletedAt: string | null;
   pickups: EditorPickup[];
-  narrators: EditorNarrator[];
+  /** THIS book's cast, from card_cast — never the 19-name roster. */
+  cast: CastMember[];
   userId: string | null;
 }) {
   const router = useRouter();
@@ -88,9 +203,11 @@ export function EditorCardClient({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  /** A send that partly worked: some emailed, some not. Neither an error nor a success. */
+  const [notice, setNotice] = useState("");
   const [edited, setEdited] = useState(String(chaptersEdited ?? ""));
   const [total, setTotal] = useState(String(chaptersTotal ?? ""));
-  const [draft, setDraft] = useState<Draft>(EMPTY);
+  const [draft, setDraft] = useState<Draft>(() => emptyDraft(cast));
   const [editingId, setEditingId] = useState<string | null>(null);
 
   /**
@@ -149,7 +266,7 @@ export function EditorCardClient({
           supabase.rpc("create_pickup", { p_card_id: card.id, ...payload }),
         );
     if (okDone) {
-      setDraft(EMPTY);
+      setDraft(emptyDraft(cast));
       setEditingId(null);
     }
   }
@@ -157,10 +274,83 @@ export function EditorCardClient({
   const removePickup = (id: string) =>
     run("Deleting pickup", () => supabase.rpc("delete_own_draft_pickup", { p_id: id }));
 
-  const sendChapter = (chapter: string) =>
-    run("Sending chapter", () =>
-      supabase.rpc("send_chapter_pickups", { p_card_id: card.id, p_chapter: chapter }),
-    );
+  /**
+   * SEND GOES THROUGH THE EDGE FUNCTION, and only through it.
+   *
+   * This used to call send_chapter_pickups directly, which skipped the sender
+   * entirely: the rows went to 'sent' and no narrator was ever emailed. The
+   * function calls that same RPC itself, AFTER Resend has accepted the mail —
+   * that ordering is the whole guarantee that "sent" means an email went, and
+   * calling the RPC from here destroys it while looking like it worked.
+   *
+   * There is deliberately no fallback to the RPC. A fallback would restore the
+   * exact failure this replaces, on the days the function is unavailable, and
+   * those are precisely the days nobody would notice.
+   */
+  async function sendChapter(chapter: string) {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const { data, error: e } = await supabase.functions.invoke("send-pickups", {
+        body: { cardId: card.id, chapter },
+      });
+      if (e) {
+        // invoke() reports a non-2xx as a bare "non-2xx status code". The reason
+        // is in the function's own body, and the reason is the useful part.
+        let detail = e.message;
+        const ctx = (e as { context?: Response }).context;
+        if (ctx && typeof ctx.json === "function") {
+          try {
+            const body = await ctx.json();
+            if (body?.error) detail = String(body.error);
+          } catch {
+            /* a body that will not parse leaves the original message standing */
+          }
+        }
+        setError(`Sending chapter: ${detail}`);
+        return;
+      }
+
+      // A 2xx IS NOT "IT WENT".
+      //
+      // The function answers 200 when it did the right thing with a chapter it
+      // could not deliver — every narrator skipped for having no address on file
+      // is a successful, correct, empty send. Treating that as success is the
+      // exact failure the function's own ordering exists to prevent, moved up one
+      // layer into the UI: she would press Send, see nothing, and believe the
+      // narrator had been told.
+      const r = (data ?? {}) as {
+        emailed?: { narrator: string; count: number }[];
+        skipped?: { narrator: string; reason: string }[];
+        failed?: { narrator: string; reason: string }[];
+      };
+      const emailed = r.emailed ?? [];
+      const skipped = r.skipped ?? [];
+      const failed = r.failed ?? [];
+      const problems = [...skipped, ...failed]
+        .map(x => `${x.narrator} — ${x.reason}`)
+        .join("; ");
+
+      if (emailed.length === 0) {
+        setError(
+          problems
+            ? `Nothing was sent. ${problems}`
+            : "Nothing was sent, and the sender gave no reason.",
+        );
+        return;
+      }
+      if (problems) {
+        setNotice(
+          `Sent to ${emailed.map(x => x.narrator).join(", ")}. Not sent: ${problems}`,
+        );
+      }
+      startTransition(() => router.refresh());
+    } finally {
+      setBusy(false);
+    }
+  }
 
   // Grouped by chapter, because that is the unit that gets sent.
   const byChapter = new Map<string, EditorPickup[]>();
@@ -178,6 +368,11 @@ export function EditorCardClient({
       {error && (
         <p className="rounded-xl border border-rose-400/40 bg-rose-500/10 px-4 py-2.5 text-sm text-rose-200">
           {error}
+        </p>
+      )}
+      {notice && (
+        <p className="rounded-xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-4 py-2.5 text-sm text-[#E0C15A]">
+          {notice}
         </p>
       )}
 
@@ -249,20 +444,13 @@ export function EditorCardClient({
               </option>
             ))}
           </select>
-          <select
-            value={draft.assigned_narrator_id}
-            onChange={e => setDraft({ ...draft, assigned_narrator_id: e.target.value })}
-            className={field}
-          >
-            <option value="" className="bg-[#0A0D3A]">
-              Unassigned
-            </option>
-            {narrators.map(n => (
-              <option key={n.id} value={n.id} className="bg-[#0A0D3A]">
-                {n.display_name}
-              </option>
-            ))}
-          </select>
+          <div className="sm:col-span-2">
+            <NarratorPicker
+              cast={cast}
+              value={draft.assigned_narrator_id}
+              onChange={id => setDraft({ ...draft, assigned_narrator_id: id })}
+            />
+          </div>
 
           {/* The pair the database refuses one half of, so the form asks for both. */}
           {needsSaidPair(draft.kind) && (
@@ -304,7 +492,7 @@ export function EditorCardClient({
               type="button"
               disabled={busy}
               onClick={() => {
-                setDraft(EMPTY);
+                setDraft(emptyDraft(cast));
                 setEditingId(null);
               }}
               className="rounded-xl border border-white/20 px-4 py-2 text-sm text-white/70 transition-colors hover:bg-white/5"
