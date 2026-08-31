@@ -42,6 +42,37 @@ export type EditorCard = {
   chapters_total: number | null;
   editing_completed_at: string | null;
   created_at: string | null;
+
+  /**
+   * WHOSE BOOK IT IS, or null for unclaimed — and it is null far more often than
+   * not. `status = editing` was standing in for this and meant something else
+   * entirely: eight books were in editing, she had ever worked on two, and the
+   * hub billed all eight as hers with overdue alarms on six deadlines that were
+   * never her commitment.
+   *
+   * ── NOT A COLUMN OF board_for_editor, AND THAT COST A ROUND TRIP TO LEARN ──
+   *
+   * It was added to that function's return type first, which is the obvious
+   * place for it. The Android app calls the same function, decodes it through
+   * KotlinXSerializer()'s default Json, and that has ignoreUnknownKeys = false —
+   * so an extra key does not widen the phone's board, it throws and EMPTIES it.
+   * versionCode 49 is on Play and cannot be corrected after the fact, and the
+   * editor's only screen in that app is the board.
+   *
+   * So it comes from `editor_assignments()`, a second function the website alone
+   * calls, and `editorBoard` merges the two. A NEW FUNCTION IS ADDITIVE TO EVERY
+   * CLIENT THAT DOES NOT CALL IT; a new column is not.
+   */
+  editor_id: string | null;
+  /** Display name of the holder, for "claimed by X". Null when unclaimed. */
+  editor_name: string | null;
+};
+
+/** One row of editor_assignments(). Only CLAIMED cards appear. */
+export type EditorAssignment = {
+  card_id: string;
+  editor_id: string;
+  editor_name: string;
 };
 
 /**
@@ -140,10 +171,39 @@ function unwrap<T>(data: T | null, error: { message: string } | null, what: stri
   return (data ?? []) as T;
 }
 
+/**
+ * The board, with the assignment merged in.
+ *
+ * Two calls, because the phone shares the first one and cannot survive a new
+ * column in it — see the note on EditorCard.editor_id. They are issued together;
+ * the second is tiny (only claimed cards come back) and this is one render.
+ *
+ * A CARD WITH NO ASSIGNMENT ROW IS UNCLAIMED, explicitly. `editor_assignments`
+ * returns nothing for unclaimed books rather than a row of nulls, so absence is
+ * the representation and `?? null` below is where it is turned into a value.
+ */
 export async function editorBoard(): Promise<EditorCard[]> {
   const db = await userScopedClient();
-  const { data, error } = await db.rpc("board_for_editor");
-  return unwrap<EditorCard[]>(data as EditorCard[], error, "board_for_editor");
+  const [board, assigned] = await Promise.all([
+    db.rpc("board_for_editor"),
+    db.rpc("editor_assignments"),
+  ]);
+  const cards = unwrap<Omit<EditorCard, "editor_id" | "editor_name">[]>(
+    board.data as Omit<EditorCard, "editor_id" | "editor_name">[],
+    board.error,
+    "board_for_editor",
+  );
+  const rows = unwrap<EditorAssignment[]>(
+    assigned.data as EditorAssignment[],
+    assigned.error,
+    "editor_assignments",
+  );
+  const by = new Map(rows.map(r => [r.card_id, r]));
+  return cards.map(c => ({
+    ...c,
+    editor_id: by.get(c.id)?.editor_id ?? null,
+    editor_name: by.get(c.id)?.editor_name ?? null,
+  }));
 }
 
 export async function editorCardDetail(id: string): Promise<EditorCardDetail | null> {

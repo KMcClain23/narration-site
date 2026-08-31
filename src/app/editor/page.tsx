@@ -8,53 +8,69 @@ import {
   EDITING_LABEL,
   type EditorCard,
 } from "@/lib/editor-data";
+import { currentSession } from "@/lib/supabase/session";
+import { ClaimButton } from "./ClaimButton";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Marizete's hub, and the question it answers is "what do I work on".
  *
- * It used to render all 33 cards in one flat grid. Twelve were released and nine
- * more contracted-but-unrecorded, so two thirds of the page was work she cannot
- * touch and the eight she is actually editing were scattered among them. The
- * page is now ordered by what she can act on:
+ * ── WHAT WAS WRONG, BECAUSE THE FIX ONLY MAKES SENSE AGAINST IT ────────────
  *
- *   Waiting on you   returned pickups — overdue BY DEFINITION, the narrator is done
- *   Editing now      status = editing, by deadline. Her real queue.
- *   Coming next      recording and prepping. Soon, but not hers yet.
- *   Not yet          contracted and recast, collapsed.
- *   Released         gone to its own page; a third of the list and none of it work.
+ * It grouped by `status = editing` and called the result "Your books". Eight
+ * books are in editing; she has ever worked on two. So six books she has never
+ * opened were presented as her queue, several carrying red "overdue" badges
+ * against deadlines that were never hers to miss.
  *
- * EMPTY SECTIONS RENDER NOTHING. Several are empty on an ordinary day, and a
- * heading over nothing reads as something failing to load.
+ * The schema had no answer to "whose book is this" at all, so `status` was
+ * standing in for ownership and it does not mean that. `board_cards.editor_id`
+ * now does, and the sections below group by it:
+ *
+ *   Waiting on you     returned pickups — the narrator is done, this is on her
+ *   Your books         editor_id = her. The only section that is a queue.
+ *   Unclaimed          in editing, nobody holds it. Claimable, not assigned.
+ *   With someone else  held by another editor. Empty today; it will not be.
+ *   Coming next        recording and prepping — soon, but not hers yet
+ *   Not yet            contracted and recast, collapsed
+ *
+ * EMPTY SECTIONS RENDER NOTHING. Most days several are empty, and a heading
+ * over nothing reads as something failing to load.
  */
 
 const DAY = 24 * 60 * 60 * 1000;
 
-function dueState(deadline: string | null): "overdue" | "soon" | "later" | "none" {
-  if (!deadline) return "none";
-  const days = (new Date(`${deadline}T00:00:00`).getTime() - Date.now()) / DAY;
-  if (days < 0) return "overdue";
-  if (days <= 7) return "soon";
-  return "later";
-}
-
-const DUE_STYLE: Record<string, string> = {
-  overdue: "border-rose-400/50 bg-rose-500/15 text-rose-200",
-  soon: "border-[#D4AF37]/50 bg-[#D4AF37]/15 text-[#E0C15A]",
-  later: "border-white/15 text-white/50",
-  none: "border-white/15 text-white/40",
-};
-
-function dueLabel(deadline: string | null): string {
-  if (!deadline) return "no deadline";
+/**
+ * ── THE DEADLINE IS NOT HERS ───────────────────────────────────────────────
+ *
+ * `board_cards.deadline` is the delivery date Dean owes the publisher. It is not
+ * an editing due date and there is no such column. Rendering it as a rose
+ * "12d overdue" badge on her hub told her she was late on books she had never
+ * been given — an alarm that was real-looking, urgent, and about somebody
+ * else's commitment.
+ *
+ * So it is stated as a fact about the BOOK: the word "delivery", the date, and
+ * "late" in muted amber once the date has passed. Not red, not bold, and never a
+ * countdown addressed to her. The information stays — a book shipping in three
+ * days is worth knowing while choosing what to edit — but as context rather than
+ * an accusation.
+ */
+function deliveryLabel(deadline: string | null): string {
+  if (!deadline) return "no delivery date";
   const d = new Date(`${deadline}T00:00:00`);
   const days = Math.round((d.getTime() - Date.now()) / DAY);
   const when = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  if (days < 0) return `${when} · ${Math.abs(days)}d overdue`;
-  if (days === 0) return `${when} · today`;
-  if (days <= 7) return `${when} · ${days}d`;
-  return when;
+  if (days < 0) return `delivery ${when} · late`;
+  if (days === 0) return `delivery ${when} · today`;
+  if (days <= 7) return `delivery ${when} · ${days}d`;
+  return `delivery ${when}`;
+}
+
+function deliveryStyle(deadline: string | null): string {
+  if (!deadline) return "border-white/15 text-white/40";
+  const days = (new Date(`${deadline}T00:00:00`).getTime() - Date.now()) / DAY;
+  // Amber, and only amber. The rose alarm is gone deliberately — see above.
+  return days < 7 ? "border-amber-400/30 text-amber-200/80" : "border-white/15 text-white/50";
 }
 
 function Cover({ url, size }: { url: string | null; size: "lg" | "sm" }) {
@@ -66,7 +82,7 @@ function Cover({ url, size }: { url: string | null; size: "lg" | "sm" }) {
   );
 }
 
-/** The full tile: her queue, where progress and pickups matter. */
+/** The full tile: a book she holds, where progress and pickups matter. */
 function QueueTile({
   card, openPickups, returned, filedAudio,
 }: {
@@ -75,7 +91,6 @@ function QueueTile({
   const state = editingStateOf(card.chapters_edited, card.editing_completed_at);
   const total = card.chapters_total ?? 0;
   const done = card.chapters_edited ?? 0;
-  const due = dueState(card.deadline);
 
   return (
     <Link
@@ -88,8 +103,8 @@ function QueueTile({
         <p className="truncate text-xs text-white/50">{card.author ?? "—"}</p>
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className={`rounded-full border px-2 py-0.5 text-[11px] ${DUE_STYLE[due]}`}>
-            {dueLabel(card.deadline)}
+          <span className={`rounded-full border px-2 py-0.5 text-[11px] ${deliveryStyle(card.deadline)}`}>
+            {deliveryLabel(card.deadline)}
           </span>
           {returned > 0 && (
             <span className="rounded-full bg-[#D4AF37] px-2 py-0.5 text-[11px] font-bold text-black">
@@ -109,11 +124,11 @@ function QueueTile({
         </div>
 
         {/*
-          HONEST PROGRESS. Only one card has chapters_total, so seven of the
-          eight editing tiles have no percentage to show. A bar at 0% would read
-          as "nothing done" and a bar with an invented denominator would be a
-          lie — so with no total, the count stands alone and the bar is absent.
-          Part B's stepper fills the totals in over time.
+          HONEST PROGRESS. Only one card has chapters_total, so the others have
+          no percentage to show. A bar at 0% would read as "nothing done" and a
+          bar with an invented denominator would be a lie — so with no total, the
+          count stands alone and the bar is absent. The stepper fills totals in
+          over time.
         */}
         <div className="mt-2 flex items-center gap-2 text-[11px] text-white/40">
           <span>{EDITING_LABEL[state]}</span>
@@ -131,13 +146,21 @@ function QueueTile({
             />
           </div>
         )}
+
+        <div className="mt-3">
+          <ClaimButton cardId={card.id} mine />
+        </div>
       </div>
     </Link>
   );
 }
 
-/** The quiet tile: things she cannot start. No progress, smaller. */
-function QuietTile({ card, note }: { card: EditorCard; note?: string }) {
+/** The quiet tile: things she is not working. No progress, smaller. */
+function QuietTile({
+  card, note, claimable,
+}: {
+  card: EditorCard; note?: string; claimable?: boolean;
+}) {
   return (
     <Link
       href={`/editor/card/${card.id}`}
@@ -148,23 +171,18 @@ function QuietTile({ card, note }: { card: EditorCard; note?: string }) {
         <p className="truncate text-sm text-white/80">{card.title}</p>
         <p className="truncate text-[11px] text-white/40">
           {note ?? card.status}
-          {card.deadline ? ` · ${dueLabel(card.deadline)}` : ""}
+          {card.deadline ? ` · ${deliveryLabel(card.deadline)}` : ""}
         </p>
       </div>
+      {claimable && <ClaimButton cardId={card.id} mine={false} />}
     </Link>
   );
 }
 
 function Section({
-  title,
-  hint,
-  children,
-  count,
+  title, hint, children, count,
 }: {
-  title: string;
-  hint?: string;
-  count: number;
-  children: React.ReactNode;
+  title: string; hint?: string; count: number; children: React.ReactNode;
 }) {
   if (count === 0) return null;
   return (
@@ -179,11 +197,13 @@ function Section({
 }
 
 export default async function EditorBoardPage() {
-  const [cards, pickups, uploads] = await Promise.all([
+  const [cards, pickups, uploads, session] = await Promise.all([
     editorBoard(),
     editorPickups(),
     editorUploads(),
+    currentSession(),
   ]);
+  const me = session?.userId ?? null;
 
   // Audio waiting per book. FILED only — a pending upload is still in quarantine
   // under a uuid name, and pointing her at a folder where she cannot find it is
@@ -204,21 +224,36 @@ export default async function EditorBoardPage() {
   }
 
   const byId = new Map(cards.map(c => [c.id, c]));
+
+  /*
+    WAITING ON YOU IS NOT FILTERED BY OWNERSHIP, and that is deliberate.
+
+    A returned pickup means a narrator re-recorded something and is waiting. That
+    is on whoever raised it, claimed or not — and pickups only exist where she
+    has already been working. Dropping one because the book was never claimed
+    would lose the most time-sensitive thing on the page to a bookkeeping detail.
+  */
   const waiting = [...returnedByCard.entries()]
     .map(([id, n]) => ({ card: byId.get(id), n }))
     .filter((x): x is { card: EditorCard; n: number } => !!x.card)
     .sort((a, b) => b.n - a.n);
 
-  // Her queue, by deadline. All eight have one, so this is the real answer to
-  // "what's next" rather than an ordering invented here. Nulls sort last so a
-  // card without a deadline never displaces one with a date.
-  const editing = cards
-    .filter(c => c.status === "editing")
-    .sort((a, b) => (a.deadline ?? "9999-12-31").localeCompare(b.deadline ?? "9999-12-31"));
+  const inEditing = cards.filter(c => c.status === "editing");
+  const byDelivery = (a: EditorCard, b: EditorCard) =>
+    (a.deadline ?? "9999-12-31").localeCompare(b.deadline ?? "9999-12-31");
+
+  // Hers, by delivery date. Sorting on the book's date is still the right order
+  // to work in: that is reading the date as information, which it is, rather
+  // than as a verdict on her, which it is not.
+  const mine = inEditing.filter(c => me !== null && c.editor_id === me).sort(byDelivery);
+  const unclaimed = inEditing.filter(c => c.editor_id === null).sort(byDelivery);
+  const others = inEditing
+    .filter(c => c.editor_id !== null && c.editor_id !== me)
+    .sort((a, b) => a.title.localeCompare(b.title));
 
   const comingNext = cards
     .filter(c => c.status === "recording" || c.status === "prepping")
-    .sort((a, b) => (a.deadline ?? "9999-12-31").localeCompare(b.deadline ?? "9999-12-31"));
+    .sort(byDelivery);
 
   /*
     RECAST LIVES HERE, and it is labelled rather than absorbed.
@@ -240,7 +275,7 @@ export default async function EditorBoardPage() {
   return (
     <>
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-lg font-bold">Your books</h1>
+        <h1 className="text-lg font-bold">Editing</h1>
         {released.length > 0 && (
           <Link href="/editor/released" className="text-xs text-white/40 hover:text-white/70">
             {released.length} released →
@@ -248,7 +283,7 @@ export default async function EditorBoardPage() {
         )}
       </div>
 
-      {/* Overdue by definition: the narrator has done their part. */}
+      {/* The narrator has done their part; this is the one thing genuinely on her. */}
       <Section
         title="Waiting on you"
         count={waiting.length}
@@ -273,9 +308,9 @@ export default async function EditorBoardPage() {
         </div>
       </Section>
 
-      <Section title="Editing now" count={editing.length} hint={`${editing.length} in your queue`}>
+      <Section title="Your books" count={mine.length} hint={`${mine.length} claimed by you`}>
         <div className="grid gap-3 sm:grid-cols-2">
-          {editing.map(c => (
+          {mine.map(c => (
             <QueueTile
               key={c.id}
               card={c}
@@ -283,6 +318,28 @@ export default async function EditorBoardPage() {
               returned={returnedByCard.get(c.id) ?? 0}
               filedAudio={filedByCard.get(c.id) ?? 0}
             />
+          ))}
+        </div>
+      </Section>
+
+      {/*
+        NOT "YOUR BOOKS TOO". These are in editing and nobody holds them; whether
+        any of them is hers to pick up is a conversation with Dean, not something
+        the board knows. So they are offered, with a button, and nothing here
+        implies she is behind on them.
+      */}
+      <Section title="Unclaimed" count={unclaimed.length} hint="in editing · nobody assigned">
+        <div className="grid gap-2 sm:grid-cols-2">
+          {unclaimed.map(c => (
+            <QuietTile key={c.id} card={c} note="unclaimed" claimable />
+          ))}
+        </div>
+      </Section>
+
+      <Section title="With someone else" count={others.length} hint="claimed">
+        <div className="grid gap-2 sm:grid-cols-2">
+          {others.map(c => (
+            <QuietTile key={c.id} card={c} note={c.editor_name ? `claimed by ${c.editor_name}` : "claimed"} />
           ))}
         </div>
       </Section>
