@@ -4152,3 +4152,46 @@ not going to imply otherwise. These run the day the bucket exists.
 
 Antivirus and content moderation. Out of scope, and a half-built version is worse than an
 honest absence.
+
+---
+
+## /pickups as a book → chapter tree (2026-08-31)
+
+Supersedes P1's A4 four-group layout. **The guarantee is kept** — exactly one primary
+action, on Dean's own sent rows, everything else read-only with a quiet force-close. What
+went is the structure around it: `/pickups` is in `requiresAdmin` so Marizete never opens
+it, which left three of the four headings existing only to say "not you".
+
+- **"Needs you"** pinned flat at the top, never behind a disclosure, keeping P1's
+  **"Re-recorded"** primary (`mark_pickup_returned` — Resolve would be refused from `sent`).
+  Those rows come out of the tree entirely, so the counts below cannot double-count them.
+- **The tree**: book → chapter → rows. Books with open work first, then most recent
+  activity. Chapters reuse the existing numeric-first helper.
+- **Closed rows live in their own chapter**, visually demoted, behind one global toggle.
+  With it off, a chapter of only history does not render and neither does a book of only
+  such chapters.
+- **Expansion** is a TRI-STATE in localStorage, not a set of collapsed ids. A set can only
+  record "collapse this", so a book that defaults to shut — nothing but closed history —
+  could never be opened: removing it from the set returns it to the default, which is shut.
+  Every storage access is wrapped; a private window must not take the page down.
+
+### The fixture bug, again, and caught by the test
+
+The first run reported the chapter sort broken. It was not. I had named the seeded chapters
+`TREE-1788198774604-2` and `TREE-1788198774604-10`, so **every chapter shared a leading
+number** — the numeric key collided and everything fell to the alphabetical tiebreak,
+putting `-10` before `-2` and `Prologue` first. The same mistake as the earlier chapter
+sort, in a prompt that warned about exactly it.
+
+Re-seeded with realistic labels — `2`, `10`, `Prologue` — and the tag moved to the note:
+renders `Chapter 2 | Chapter 10 | Prologue`. A timestamp in a fixture value is not neutral
+when the thing under test parses that value.
+
+### Verified
+
+Two books, a `Prologue` beside numbered chapters, a book of nothing but closed pickups, a
+chapter holding both open and closed rows, one row for Dean and one for Ann: "Needs you"
+renders with **exactly one** "Re-recorded" button and no Resolve anywhere; numeric before
+non-numeric; the closed-only book and the closed-only chapter both vanish with the toggle
+off and appear with it on, still folded; a closed-by-default book opens on click and stays
+open across a refresh. Seeds removed, table back to its four live rows.
