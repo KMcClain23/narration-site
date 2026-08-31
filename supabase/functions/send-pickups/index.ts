@@ -86,17 +86,67 @@ type Pickup = {
   note: string;
 };
 
-/** One pickup as a person reads it. Shared by the email and the manifest, so
- *  the two cannot disagree about what was asked for. */
-function describe(p: Pickup): string {
-  const when = p.timestamp_at?.trim() ? p.timestamp_at.trim() : "no timestamp";
-  const detail = p.kind === "misread"
-    ? `said "${p.said}" — should be "${p.should_be}"`
-    : (p.note?.trim() || "(no note)");
-  const extra = p.kind === "misread" && p.note?.trim() ? ` (${p.note.trim()})` : "";
-  return `${when} · ${p.kind} · ${detail}${extra}`;
+/**
+ * ONE PICKUP, BROKEN INTO ITS PARTS — the single source for all three renderings.
+ *
+ * THE MANIFEST AND THE EMAIL ARE MEANT TO AGREE. The manifest is the narrator's
+ * work order and the email is the same instruction in her inbox; if the two can
+ * disagree about what was asked for, one of them is lying and nothing on either
+ * says which. So a change to what a pickup SAYS is made here, once, and the
+ * plain text, the HTML and the manifest all compose from it.
+ *
+ * A richer HTML layout must NEVER fork this into a second description.
+ */
+function pickupParts(p: Pickup): { when: string; kind: string; detail: string; extra: string } {
+  return {
+    when: p.timestamp_at?.trim() ? p.timestamp_at.trim() : "no timestamp",
+    kind: p.kind,
+    detail: p.kind === "misread"
+      ? `said "${p.said}" \u2014 should be "${p.should_be}"`
+      : (p.note?.trim() || "(no note)"),
+    extra: p.kind === "misread" && p.note?.trim() ? p.note.trim() : "",
+  };
 }
 
+/** The one-line form, used by the plain text AND the manifest. */
+function describe(p: Pickup): string {
+  const { when, kind, detail, extra } = pickupParts(p);
+  return `${when} \u00b7 ${kind} \u00b7 ${detail}${extra ? ` (${extra})` : ""}`;
+}
+
+const esc = (t: string) =>
+  (t ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+/** Brand, matching the site and the page this link lands on. */
+const NAVY = "#06082E";
+const PANEL = "#0A0D3A";
+const GOLD = "#D4AF37";
+
+/**
+ * The logo, as an absolute hosted URL.
+ *
+ * The site already serves this publicly at /logo-mark.png and it is the same
+ * asset LOGO_URL points at for the contract PDF, so it is reused rather than
+ * copied into R2: a second copy is a second thing to keep in step, and a logo
+ * that disagrees with the site is worse than one served from it. (Putting brand
+ * assets in the world-readable media bucket would also be fine — that bucket
+ * being public is correct for a logo and is not in tension with the R2 finding
+ * on pickup_uploads, which is about unreleased AUDIO.)
+ */
+const LOGO = "https://www.dmnarration.com/logo-mark.png";
+
+/**
+ * THE PLAIN-TEXT ALTERNATIVE, and it stays accurate.
+ *
+ * Several spam filters read this rather than the HTML, and it is what anyone
+ * reading in plain text actually gets. If the HTML ever gains information this
+ * lacks, THIS IS NOW WRONG — they are two renderings of one message, not a real
+ * version and a courtesy copy.
+ */
 function plainBody(
   book: string, chapter: string, narrator: string, rows: Pickup[], link: string,
 ): string {
@@ -115,19 +165,106 @@ function plainBody(
   ].join("\n");
 }
 
+/**
+ * TABLES AND INLINE STYLES ONLY.
+ *
+ * Email is a hostile rendering target: Gmail strips much of a <style> block and
+ * Outlook on Windows renders through Word, which has neither flexbox nor grid.
+ * A naive modern layout here looks WORSE than the plain version, not better. So
+ * nested tables, 600px, inline styles, and background colours on CELLS rather
+ * than on <body>, which several clients drop entirely.
+ *
+ * THE BUTTON IS TEXT, NOT AN IMAGE: a padded <a> on a coloured table cell. An
+ * image-only button disappears for anyone with images blocked — the default in
+ * several clients — and that button is the only thing in this email that
+ * matters. Outlook VML for its background was considered and left out: every
+ * current narrator address is Gmail or a small business domain, and the
+ * fallback there is a perfectly usable gold cell with a dark label.
+ */
 function htmlBody(
   book: string, chapter: string, narrator: string, rows: Pickup[], link: string,
 ): string {
-  const esc = (s: string) =>
-    (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const items = rows.map(p => `<li>${esc(describe(p))}</li>`).join("");
-  return [
-    `<p><strong>${esc(book)}</strong> — chapter ${esc(chapter)}</p>`,
-    `<p>Pickups for ${esc(narrator)}</p>`,
-    `<p><a href="${esc(link)}">Open your pickups and mark them re-recorded</a></p>`,
-    `<ol>${items}</ol>`,
-    `<p>${rows.length} pickup${rows.length === 1 ? "" : "s"}. Reply to this email if anything is unclear.</p>`,
-  ].join("");
+  const n = rows.length;
+
+  // Gmail shows this beside the subject. Left alone it repeats the book title,
+  // which the subject already carried — so it says something useful instead.
+  const preheader =
+    `${n} pickup${n === 1 ? "" : "s"} to re-record \u2014 open to see the timestamps.`;
+
+  const items = rows
+    .map(p => {
+      const { when, kind, detail, extra } = pickupParts(p);
+      return `
+      <tr>
+        <td style="padding:12px 0;border-bottom:1px solid #1A2070;">
+          <span style="display:inline-block;font-family:Consolas,Menlo,monospace;font-size:14px;font-weight:bold;color:${GOLD};background-color:#141A4A;padding:3px 8px;border-radius:4px;">${esc(when)}</span>
+          <span style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8b93a7;padding-left:8px;text-transform:uppercase;letter-spacing:1px;">${esc(kind)}</span>
+          <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#e8ebf2;padding-top:8px;">${esc(detail)}</div>
+          ${extra ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#8b93a7;padding-top:4px;">${esc(extra)}</div>` : ""}
+        </td>
+      </tr>`;
+    })
+    .join("");
+
+  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"><head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${esc(book)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:${NAVY};">
+<span style="display:none !important;font-size:1px;color:${NAVY};line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${esc(preheader)}</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${NAVY};">
+  <tr>
+    <td align="center" style="background-color:${NAVY};padding:24px 12px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
+
+        <tr>
+          <td align="center" style="padding:4px 0 20px 0;">
+            <img src="${LOGO}" width="56" height="56" alt="Dean Miller Narration" style="display:block;border:0;outline:none;text-decoration:none;width:56px;height:56px;" />
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background-color:${PANEL};border:1px solid #1A2070;border-radius:12px;padding:24px;">
+            <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:${GOLD};">Pickups for ${esc(narrator)}</p>
+            <h1 style="margin:8px 0 0 0;font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:30px;color:#ffffff;font-weight:normal;">${esc(book)}</h1>
+            <p style="margin:6px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:22px;color:#c4c9d6;">Chapter ${esc(chapter)}</p>
+
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
+              ${items}
+            </table>
+
+            <p style="margin:16px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#c4c9d6;">
+              ${n} pickup${n === 1 ? "" : "s"} in total.
+            </p>
+
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:24px auto 0 auto;">
+              <tr>
+                <td align="center" bgcolor="${GOLD}" style="background-color:${GOLD};border-radius:8px;">
+                  <a href="${esc(link)}" style="display:inline-block;padding:14px 30px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#06082E;text-decoration:none;border-radius:8px;">Open your pickups</a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:20px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#8b93a7;">
+              Or paste this into your browser:<br />
+              <span style="color:#c4c9d6;word-break:break-all;">${esc(link)}</span>
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:18px 8px 0 8px;">
+            <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#5f6478;">Reply to this email if anything is unclear.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body></html>`;
 }
 
 /**

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { BatchRow } from "@/lib/pickup-link";
 
@@ -42,6 +42,15 @@ export function NarratorConfirm({
   const [attached, setAttached] = useState<{ name: string; bytes: number }[]>([]);
   const [uploading, setUploading] = useState("");
   const [uploadError, setUploadError] = useState("");
+  /**
+   * The native file input keeps showing the chosen filename after the upload has
+   * finished, so the control said "Chapter 12.wav" while the receipt below it
+   * said "received" — which reads as a file still waiting to be sent. Clearing
+   * it in `finally` covers BOTH directions: a stale filename beside a FAILED
+   * upload is the same lie the other way round.
+   */
+  const fileInput = useRef<HTMLInputElement | null>(null);
+  const [attachOpen, setAttachOpen] = useState(false);
 
   const toggle = (id: string) =>
     setChecked(prev => {
@@ -206,6 +215,7 @@ export function NarratorConfirm({
       setUploadError("Something went wrong sending those files.");
     } finally {
       setUploading("");
+      if (fileInput.current) fileInput.current.value = "";
     }
   }
 
@@ -257,7 +267,21 @@ export function NarratorConfirm({
         </p>
       )}
 
-      {/* ── attaching audio, entirely optional ────────────────────────── */}
+      {/* ── attaching audio, entirely optional ──────────────────────────
+          DEMOTED, NOT REMOVED, once nothing is outstanding. A full-size upload
+          panel under "nothing else is needed from you" contradicts the sentence
+          above it — but hiding it outright would send her back to email the
+          moment she remembers a file, so it collapses to one quiet line she can
+          open again. Attaching still marks nothing, in either state. */}
+      {outstanding.length === 0 && !attachOpen ? (
+        <button
+          type="button"
+          onClick={() => setAttachOpen(true)}
+          className="mt-10 block text-sm text-white/50 underline-offset-2 transition-colors hover:text-white/80 hover:underline"
+        >
+          Sent another take? Attach it
+        </button>
+      ) : (
       <section className="mt-10 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
         <h2 className="text-sm font-bold">Attach the re-recorded audio</h2>
         <p className="mt-1 text-xs text-white/50">
@@ -266,6 +290,7 @@ export function NarratorConfirm({
         </p>
 
         <input
+          ref={fileInput}
           type="file"
           multiple
           accept=".wav,.flac,.mp3,.m4a,audio/*"
@@ -293,6 +318,7 @@ export function NarratorConfirm({
           </ul>
         )}
       </section>
+      )}
 
       {done.length > 0 && (
         <>
