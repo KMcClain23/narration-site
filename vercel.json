@@ -7,10 +7,6 @@
     {
       "path": "/api/cron/refresh-amazon-rating",
       "schedule": "0 4,12,20 * * *"
-    },
-    {
-      "path": "/api/cron/file-pickup-uploads",
-      "schedule": "*/10 * * * *"
     }
   ]
 }

@@ -40,6 +40,20 @@ function sanitiseSegment(raw: string): string {
 /** Abandoned quarantine items older than this are debris, not work in progress. */
 const ORPHAN_AGE_MS = 3 * 60 * 60 * 1000;
 
+/**
+ * ── DISABLED 2026-08-31, PENDING AN INVESTIGATION ──────────────────────────
+ *
+ * Two manifests disappeared from Pickups/A Cowboy's Runaway/Ann Dahlia/ and the
+ * cause is not yet established. This endpoint is the only thing in the system
+ * that deletes from Dean's drive on a schedule, so it is off until the cause is
+ * known — both halves, because the filing move writes to OneDrive too.
+ *
+ * It stays off unless PICKUP_SWEEP_ENABLED=1 is set deliberately. Re-enable only
+ * with the decoy test in place (a manifest planted in a real book folder, the
+ * sweep run, the manifest still there).
+ */
+const SWEEP_ENABLED = process.env.PICKUP_SWEEP_ENABLED === "1";
+
 export async function GET(req: Request) {
   const auth = req.headers.get("authorization") ?? "";
   const isCron = !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`;
@@ -47,6 +61,19 @@ export async function GET(req: Request) {
     !!process.env.ADMIN_SECRET_KEY && auth === `Bearer ${process.env.ADMIN_SECRET_KEY}`;
   if (!isCron && !isInternal) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Nothing touches the drive while the cause of the missing manifests is open.
+  if (!SWEEP_ENABLED) {
+    return NextResponse.json(
+      {
+        disabled: true,
+        reason:
+          "Filing and the orphan sweep are disabled pending the investigation into " +
+          "two manifests deleted from a book folder. Set PICKUP_SWEEP_ENABLED=1 to re-enable.",
+      },
+      { status: 503 },
+    );
   }
 
   let graph: string;
