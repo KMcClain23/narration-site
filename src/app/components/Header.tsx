@@ -3,10 +3,10 @@
 import Image from "next/image";
 import { BUSINESS, PROFILE_PHOTO_URL, ROLE_LABEL } from "@/lib/business-identity";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FaTiktok, FaInstagram, FaDiscord } from "react-icons/fa";
 import { HiMenu, HiX } from "react-icons/hi";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { isAdminRoute } from "@/lib/admin-routes";
 import { SiteSearch } from "./SiteSearch";
 import { useCart } from "@/context/CartContext";
@@ -24,15 +24,7 @@ export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const { count: cartCount, openCart } = useCart();
   const [isScrolled, setIsScrolled] = useState(false);
-  const [showAdminModal, setShowAdminModal] = useState(false);
-  const [adminKey, setAdminKey] = useState("");
-  const [adminError, setAdminError] = useState("");
   const pathname = usePathname();
-  const router = useRouter();
-
-  // Secret admin trigger: 5 rapid clicks on the brand/profile area
-  const secretClicks = useRef(0);
-  const lastSecretClickAt = useRef(0);
 
   const toggleMenu = () => setIsOpen((v) => !v);
   const closeMenu = () => setIsOpen(false);
@@ -93,64 +85,21 @@ export default function Header() {
     ? "bg-[#06082E]/55 backdrop-blur-xl border-b border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
     : "bg-[#06082E]/60 backdrop-blur-md border-b border-white/5";
 
-  const handleSecretAdminTrigger = (e: React.MouseEvent) => {
-    // Let normal navigation still happen
-    // Just count rapid clicks in the background
-    const now = Date.now();
-
-    // If the gap between clicks is too long, reset the sequence
-    if (now - lastSecretClickAt.current > 1500) {
-      secretClicks.current = 0;
-    }
-
-    secretClicks.current += 1;
-    lastSecretClickAt.current = now;
-
-    if (secretClicks.current >= 5) {
-      secretClicks.current = 0;
-      e.preventDefault();
-
-      setAdminKey("");
-      setAdminError("");
-      setShowAdminModal(true);
-    }
-  };
-
-  const submitAdminKey = async () => {
-    if (!adminKey) return;
-    setAdminError("");
-    try {
-      const r = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: adminKey }),
-      });
-      const data = await r.json();
-      if (data.success) {
-        setShowAdminModal(false);
-        router.push("/board");
-      } else {
-        setAdminError("Invalid key.");
-        setAdminKey("");
-      }
-    } catch {
-      setAdminError("Login failed. Try again.");
-    }
-  };
-
   if (isAdminWorldRoute(pathname)) return null;
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 h-12 sm:h-16 transition-all duration-200 ${headerClass}`}>
       <div className="max-w-7xl mx-auto px-5 sm:px-6 h-12 sm:h-16 flex items-center justify-between">
-        {/* Brand */}
+        {/* Brand — an ordinary link, and it stays one.
+            Five rapid clicks here used to open a shared-secret admin modal that
+            POSTed to /api/admin/login. That route is gone and the browser signs
+            in with email and password at /admin/login. R1's sweep missed this
+            because it searched for ADMIN_SECRET_KEY and ADMIN_COOKIE_NAME, and
+            this file named neither — it knew only the URL. */}
         <Link
           href="/"
           className="flex items-center gap-3 group"
-          onClick={(e) => {
-            handleSecretAdminTrigger(e);
-            closeMenu();
-          }}
+          onClick={closeMenu}
         >
           <div className="h-9 w-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center overflow-hidden transition group-hover:border-[#D4AF37]/50 group-hover:bg-[#D4AF37]/10">
             <Image
@@ -307,35 +256,6 @@ export default function Header() {
         </div>
       ) : null}
 
-      {/* Admin key modal */}
-      {showAdminModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onKeyDown={e => { if (e.key === "Escape") setShowAdminModal(false); }}>
-          <div className="bg-[#0A0D3A] border border-[#1A2070] rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
-            <h2 className="text-white font-bold text-base mb-4">Admin Access</h2>
-            <input
-              type="password"
-              autoFocus
-              placeholder="Enter admin key"
-              value={adminKey}
-              onChange={e => { setAdminKey(e.target.value); setAdminError(""); }}
-              onKeyDown={e => { if (e.key === "Enter") submitAdminKey(); }}
-              className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
-            />
-            {adminError && <p className="text-red-400 text-xs mt-2">{adminError}</p>}
-            <div className="flex gap-3 mt-4">
-              <button onClick={submitAdminKey}
-                className="flex-1 bg-[#D4AF37] text-black text-sm font-bold py-2 rounded-xl hover:bg-[#E0C15A] transition-colors">
-                Login
-              </button>
-              <button onClick={() => setShowAdminModal(false)}
-                className="flex-1 border border-white/15 text-white/60 text-sm py-2 rounded-xl hover:text-white hover:border-white/30 transition-colors">
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
 }
