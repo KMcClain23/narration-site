@@ -3312,3 +3312,85 @@ Dean `admin`, Marizete `editor`. Neither relied on the default, and neither move
    this one, and predates it. It fails safe — a pass also exits non-zero locally, so
    the error is a false alarm, never a false pass — and CI runs ubuntu, where it does
    not occur. Judge a local run by its output, not its exit code.
+
+---
+
+## U1–U3 — the header still had the shared-secret login (2026-08-30)
+
+Five rapid clicks on the brand opened a modal that POSTed the shared secret to
+`/api/admin/login`. The route was deleted in R1, so it was dead — the fetch 404s and
+no cookie is set — but Dean hit it trying to sign in, which is cost enough.
+
+### Why S7 missed it
+
+S7 grepped for `ADMIN_SECRET_KEY`, `ADMIN_COOKIE_NAME` and `isValidAdminKey`.
+`Header.tsx` contains none of them. It was a **client that knew only the address**:
+the string `"/api/admin/login"`.
+
+**A search for a mechanism's identifiers does not find the callers that know only its
+URL.** Identifiers find the implementation and everything that imports it. Callers that
+address a route by string literal are invisible to that search, and they are exactly the
+things left behind when a route is deleted — because deleting the route is what makes
+them harmless enough to stop erroring loudly.
+
+### U1 — removed
+
+State, refs, `handleSecretAdminTrigger`, `submitAdminKey`, the `onClick` on the brand
+and the modal. `useRef` and `useRouter` became unused and went with them; the brand is
+an ordinary `<Link href="/">` again. 89 lines out, 9 in (the replacement is a comment
+saying why it must not come back).
+
+### U2 — kept
+
+`HomeClient.tsx:964`, the invisible link to `/admin/login`. That addresses the login
+**page**, which is now email and password. A hidden way to reach the sign-in form is
+not part of the old mechanism.
+
+### U3 — S7 re-run, by ROUTE PATH as well as identifier
+
+| searched | live hits | purpose |
+|---|---|---|
+| `/api/admin/login` | none in code | route deleted in R1; the last caller was this header |
+| `isValidAdminKey` | none | deleted in R1 |
+| `/admin/login` | `middleware.ts` ×2, `require-admin.ts`, `useLogout.ts`, `SignOutButton.tsx`, `HomeClient.tsx` | all point at the **new** page — redirect targets and entry points |
+| `ADMIN_COOKIE_NAME` | `admin-auth.ts` (def), `middleware.ts` ×3 | only to **clear** a stale cookie |
+| `dmn_admin_key` | `admin/logout/route.ts`, four comments | clearing a pre-migration cookie, and history |
+| `ADMIN_SECRET_KEY` | `require-admin.ts` ×2, `resetStats.ts`, `debug-env` | the internal bearer, correctly retained |
+
+### What the corrected sweep FOUND — three broken callers
+
+`check-first-render.ts`, `check-payments-costed.ts` and `import-payments.ts` all
+authenticate by sending `cookie: dmn_admin_key=$ADMIN_SECRET_KEY`. **That credential is
+accepted by nothing.** The four routes they call — `/api/studio-settings`, `/api/board`,
+`/api/payments/parse-document`, `/api/payments/bulk` — gate on `requireAdmin` /
+`isAdminRequest`, which are session-only since R1; `isAdminOrInternal`'s bearer is a
+header, not a cookie, and these routes do not use it anyway.
+
+They fail LOUDLY (both checks `process.exit(1)` on a non-200), so nothing has been
+silently passing. But two standing guards cannot currently run. Fixing them needs a real
+Supabase session, which means a service account and a decision about its credentials —
+**not made here.** Neither is in `reconcile.yml`, so CI is unaffected.
+
+### Verified on the live site
+
+Deploy confirmed by scanning the shipped chunks for `"Enter admin key"` — **with a
+control**, because "not found" is also what a scan that reached the wrong file returns.
+The first attempt reported 0 hits across 1 chunk and was worthless: `dmnarration.com`
+redirects to `www.`, and it had scanned a 15-byte redirect body. Following the redirect
+found 14 chunks, the control string `"Narrated Works"` in the header chunk, and the
+modal string beside it — pre-deploy. Post-deploy: control still 1, modal 0.
+
+Then Playwright against production:
+
+- Five rapid clicks on the brand: no modal, no password input, **no request to
+  `/api/admin/login`**, still on the public site. Screenshot taken.
+- Control for that check: the clicks provably landed (the brand is a link and the main
+  frame navigated). Without it, "nothing happened" is indistinguishable from "the clicks
+  missed".
+- `/admin/login` serves 200 with an email input, a password input and Sign in, and does
+  **not** carry the old `Enter admin key` placeholder.
+- Public site otherwise unchanged: all five nav links present, `/narrated-works`,
+  `/demos`, `/merch` all 200, no uncaught page errors.
+
+Dean signing in with his own credentials was confirmed by him earlier and is unchanged
+by this — nothing here touches the login page.
