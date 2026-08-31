@@ -7,18 +7,23 @@ import { useEffect, useMemo, useState } from "react";
 import { FaTiktok, FaInstagram, FaDiscord } from "react-icons/fa";
 import { HiMenu, HiX } from "react-icons/hi";
 import { usePathname } from "next/navigation";
-import { isAdminRoute } from "@/lib/admin-routes";
+import { isPrivateRoute } from "@/lib/admin-routes";
 import { SiteSearch } from "./SiteSearch";
 import { useCart } from "@/context/CartContext";
 
 const BOOKINGS_URL =
   "https://outlook.office.com/book/DeanMillerNarration1@deanmillernarrator.com/s/-Gzrs2xlgUy8MfSGaPUf1A2?ismsaljsauthenabled";
 
-// Admin is its own world with no public chrome. Shared with middleware.ts
-// rather than kept as a second copy: the copy that lived here fell a page
-// behind the moment /expenses was added, and put the marketing navigation
-// across the top of a private page.
-const isAdminWorldRoute = isAdminRoute;
+// A private surface has no public chrome. Shared with middleware.ts rather than
+// kept as a second copy: the copy that lived here fell a page behind the moment
+// /expenses was added, and put the marketing navigation across the top of a
+// private page.
+//
+// isPrivateRoute, NOT requiresAdmin — /editor is Marizete's and requires only
+// the editor role, but it is no more a place for "Narrated Works · Demos ·
+// Merch" than /payments is. Asking the admin question here would put the
+// marketing header on her board.
+const isPrivateSurface = isPrivateRoute;
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
@@ -85,7 +90,7 @@ export default function Header() {
     ? "bg-[#06082E]/55 backdrop-blur-xl border-b border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
     : "bg-[#06082E]/60 backdrop-blur-md border-b border-white/5";
 
-  if (isAdminWorldRoute(pathname)) return null;
+  if (isPrivateSurface(pathname)) return null;
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 h-12 sm:h-16 transition-all duration-200 ${headerClass}`}>

@@ -3590,3 +3590,81 @@ assertion read the login page. **The control caught it**: "a real book title is 
 payload" failed, which meant the four "no financial keys" passes were vacuous — nothing
 had rendered. Without that control the run would have reported four clean passes on an
 empty page.
+
+---
+
+## /pickups in the admin shell, and the route list re-unified (2026-08-31)
+
+### A — one list, two questions
+
+`admin-routes.ts` was written to end a drift and middleware then drifted from it anyway,
+by keeping a local `isNewAdminRoute` beside it. `/expenses` was in this file AND in
+middleware's matcher, but missing from that local copy — so **middleware never gated
+`/expenses`**, and the only thing in front of it was `assertAdmin` in the page. One layer
+where every sibling had two.
+
+It was provable from the redirect alone, and was measured before changing anything:
+middleware sends `?next=`, `redirect("/admin/login")` in `assertAdmin` does not.
+
+| | before | after |
+|---|---|---|
+| `/expenses` | `→ /admin/login` | `→ /admin/login?next=%2Fexpenses` |
+| every other admin route | `?next=` | `?next=` |
+
+The file now exports **two** predicates, because the Header and middleware were never
+asking the same question:
+
+- `isPrivateRoute` — admin routes **plus `/editor`**. Used by the Header to hide the
+  marketing chrome.
+- `requiresAdmin` — admin routes only, `/admin/login` excluded so the gate cannot
+  redirect to itself.
+
+`/editor` is what separates them: private, but gated in its own layout against
+`roleAdmits`, which admits editor OR admin. Collapsing these into one predicate either
+puts "Narrated Works · Demos · Merch" across Marizete's board or bounces her off it,
+depending which way it collapses. Middleware's three local predicates are **deleted**,
+not corrected — a second list that agrees today is still a second list, and this file is
+the proof of that.
+
+### B/C — the page
+
+Wrapped in `AdminLayout`, with no `min-h-screen` or padding of its own (`AdminShell`
+already supplies `flex-1 min-w-0 p-8`; a second one nested inside the first is how a page
+ends up scrolling twice). Hardcoded `bg-[#06082E]` / `text-white/60` replaced with the
+admin tokens.
+
+The row was a truncated one-liner in 11px grey — the content telling him what to *do* was
+the smallest thing on screen, and a long correction was cut mid-word. Now: chapter as a
+real heading, the timestamp monospace and weighted because it is a coordinate he scrubs
+to, and the correction as the centre of gravity — `said` struck through and muted,
+`should be` full strength, wrapping and never truncated. Resolve is a filled primary
+button; Dismiss is secondary. Open pickups group by book then chapter order. The closed
+toggle says what it is — "2 resolved" — rather than "2 closed", which read as withholding.
+
+### D — the write path is untouched
+
+`resolve_pickup()` via his own session remains the only write. Verified by grep: **zero**
+`update`/`insert`/`upsert`/`delete` calls in the route; the single match is the comment
+warning against adding one. The service_role `from("pickups")` is the read W2f permits.
+
+### Two bugs the verification caught, both from testing with realistic values
+
+1. **Chapter ordering was untestable in my first run.** I seeded chapters as
+   `PXTEST-<timestamp>-12`, so every value shared a leading number, fell through to the
+   alphabetical tiebreak, and rendered 10, 12, 2 — which looked like a sort bug and was a
+   *fixture* bug. Re-seeded with `12, 2, 10, "Chapter 7", 1a`: renders 1a, 2, 7, 10, 12.
+2. **`Chapter Chapter 7`.** Chapter is free text. The heading prefixed "Chapter"
+   unconditionally, so a chapter stored as "Chapter 7" doubled up. Now a leading digit is
+   the signal that the label wants the word; anything else ("Prologue") reads as a name
+   already.
+
+### Verified
+
+- `/pickups` — sidebar present, `.admin-root` present, no marketing header.
+- `/editor` — an editor reaches it, no marketing header, **and her own header IS there**
+  (the control: "no header" must not be "nothing rendered"). Cards present.
+- `/expenses` — an editor lands on the login page at `?next=%2Fexpenses`, so the refusal
+  now comes from middleware, and she is told she is signed in rather than shown a form.
+- `/` and `/narrated-works` — 200, marketing header present.
+- `check-first-render` green on all 9 routes, so the internal bearer still passes the
+  rewritten middleware.

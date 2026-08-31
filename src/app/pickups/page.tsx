@@ -1,4 +1,5 @@
 import { assertAdmin } from "@/lib/require-admin";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PickupsClient, type AdminPickup } from "./PickupsClient";
 
@@ -38,11 +39,11 @@ export default async function PickupsPage() {
   // same lie as an empty board meaning "denied".
   if (error) {
     return (
-      <main className="min-h-screen bg-[#06082E] px-6 py-10 text-white">
-        <p className="mx-auto max-w-3xl rounded-xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+      <AdminLayout>
+        <p className="mx-auto max-w-3xl rounded-xl border border-alert-red/50 bg-alert-red/10 px-4 py-3 text-sm text-alert-red">
           Could not read pickups: {error.message}
         </p>
-      </main>
+      </AdminLayout>
     );
   }
 
@@ -83,5 +84,12 @@ export default async function PickupsPage() {
     resolvedAt: r.resolved_at,
   }));
 
-  return <PickupsClient pickups={pickups} />;
+  // AdminShell already provides <main className="flex-1 min-w-0 p-8">, so the
+  // page brings no min-h-screen and no padding of its own — a second one nested
+  // inside the first is how a page ends up scrolling twice.
+  return (
+    <AdminLayout>
+      <PickupsClient pickups={pickups} />
+    </AdminLayout>
+  );
 }

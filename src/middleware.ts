@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { ADMIN_COOKIE_NAME } from "@/lib/admin-auth";
 import { refreshSession } from "@/lib/supabase/middleware-session";
 import { matchesInternalBearer } from "@/lib/internal-bearer";
+import { requiresAdmin } from "@/lib/admin-routes";
 
 /**
  * ONE AUTHENTICATION PATH: a Supabase session whose profiles.role is admin.
@@ -22,22 +23,22 @@ export async function middleware(req: NextRequest) {
   // expire mid-visit. This is a side effect and decides nothing.
   const { res, role } = await refreshSession(req);
 
-  // Protect /admin/* (except login) and /board/*
-  const isAdminRoute = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login");
-  const isBoardRoute = pathname === "/board" || pathname === "/board/archive" || pathname.startsWith("/board/card");
-
-  // New admin redesign routes (Stage 1+) — same cookie gate as everything else above.
-  // /board itself is covered by isBoardRoute above, not here — it's now the
-  // same page that used to live at /board-v2 (renamed Stage 7.6).
-  const isNewAdminRoute =
-    pathname === "/schedule" ||
-    pathname.startsWith("/contacts") ||
-    pathname === "/inquiries" ||
-    pathname.startsWith("/tools") ||
-    pathname === "/settings" ||
-    pathname === "/payments" ||
-    pathname === "/pickups" ||
-    pathname === "/released";
+  // WHICH PATHS NEED ADMIN comes from admin-routes.ts, and from nowhere else.
+  //
+  // There used to be three local predicates here, and one of them had already
+  // drifted: /expenses was in admin-routes.ts and in the matcher below, but
+  // missing from the local list, so middleware never gated it. The only thing in
+  // front of it was assertAdmin in the page — one layer where every sibling had
+  // two. Visible in the redirect, had anyone looked: this layer sends ?next=,
+  // assertAdmin does not, and /expenses was the one admin route redirecting
+  // without it.
+  //
+  // The local copies are DELETED rather than corrected. A second list that
+  // agrees today is still a second list, and this file is the proof.
+  //
+  // requiresAdmin, NOT isPrivateRoute: /editor is private but admits the editor
+  // role, and it is gated in its own layout. Asking the private question here
+  // would bounce Marizete off her own board.
 
   // The internal bearer gets through, so check-first-render can fetch these
   // pages and prove they RENDER. It has to be here as well as in the page gate:
@@ -46,7 +47,7 @@ export async function middleware(req: NextRequest) {
   // browser attaches it by itself. See internal-bearer.ts.
   const isInternal = matchesInternalBearer(req.headers.get("authorization"));
 
-  if ((isAdminRoute || isBoardRoute || isNewAdminRoute) && !isInternal) {
+  if (requiresAdmin(pathname) && !isInternal) {
     // Editor is deliberately NOT enough: these routes are the admin, and an
     // editor who reaches them is sent to the login page, which now tells her she
     // is signed in and simply has no access here — rather than showing her a
