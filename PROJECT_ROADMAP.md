@@ -4262,3 +4262,60 @@ dropped — `attempts` incremented, rejection recorded, `filed_at` still null.
 Not inferred from delete status codes: `Pickups/A Cowboy's Runaway/Ann Dahlia/` held 2
 items before the run (`14 - pickups.txt`, `18 - pickups.txt`) and holds exactly those 2
 after. `_incoming` ends with 0 folders and 0 files.
+
+---
+
+## Telling Marizete a chapter came back (2026-08-31)
+
+Two signals: an email, and a count on the pages she opens anyway.
+
+### 1 — one email per BATCH
+
+Fired from a successful `mark_returned_by_token`, which is already the per-batch
+boundary — not reconstructed from rows afterwards. Three pickups returning produce one
+email naming three.
+
+### 2 — the recipient is derived from the role
+
+`editor_notification_recipients()` joins every `profiles` row with role `editor` to
+`auth.users` for the address. A literal address would mean a second editor silently gets
+nothing and a departed one keeps receiving. Zero recipients is a **logged skip** — not a
+crash, and not a silent success.
+
+### 3 — state first, then email, which is the OPPOSITE of the send path
+
+`send-pickups` emails first and flips to `sent` only on acceptance, so `sent` can never
+claim an email that did not go. Here it is reversed on purpose: **Ann's re-record actually
+happened**, and the state must record it whether or not the notification lands. Emailing
+first would risk telling Marizete to check something that is not marked, and a failed send
+would mean discarding a fact about the world to keep a message tidy.
+
+The two orderings look inconsistent and someone will eventually "fix" one to match the
+other, so the reasoning is in a comment **at the call site**: there the email IS the
+delivery; here the state is, and the email is a convenience on top.
+
+### 5 — the count that survives a missed email
+
+`/editor` carries a banner — "5 re-recorded pickups waiting for you to check" — and each
+card tile a filled **"N to check"** badge, deliberately louder than the open-pickup count
+because this is work waiting on *her*. The card page surfaces those pickups **above
+everything else**, with Verify & close on each.
+
+### Verified
+
+| | result |
+|---|---|
+| a three-pickup batch | one call, `moved: 3`, summary says 3 and names book/chapter/narrator |
+| the count before it | 0 returned — so the 3 is a change, not a coincidence |
+| a **second** editor added | picked up automatically, 1 → 2, address present |
+| that editor **demoted** | drops back to 1 — the departed-editor case |
+| **Resend made to fail for real** | confirm still 200, `moved: 2`, both rows **returned**, failure logged, nothing leaked to Ann |
+| `/editor`, mailbox untouched | banner names 5, tile badge present |
+| the card page | "re-recorded, waiting on you" renders **above** the forms |
+
+The Resend failure was forced with a deliberately invalid `PICKUPS_RESEND_API_KEY` rather
+than stubbed, so no test mail could reach a real editor and the asymmetry was exercised
+against a genuine failure. A happy-path-only run cannot show that the rows survive.
+
+The first run put the waiting section below "Raise a pickup" — above the chapter list, but
+not above the rest. Moved, and the order is now asserted in the source as well as on screen.

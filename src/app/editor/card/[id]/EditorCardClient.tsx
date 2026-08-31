@@ -394,6 +394,60 @@ export function EditorCardClient({
         </p>
       )}
 
+      {/* ── WAITING ON HER, ABOVE EVERYTHING ELSE ─────────────────────────
+          Returned means the narrator has re-recorded and it is her turn. This
+          sits above the chapter list because it is the only part of this page
+          that is actionable right now, and because the email announcing it will
+          often have been missed — the page she opens anyway has to carry the
+          signal on its own. */}
+      {pickups.some(p => p.status === "returned") && (
+        <section className="rounded-2xl border border-[#D4AF37]/50 bg-[#D4AF37]/[0.08] p-4">
+          <h2 className="text-sm font-bold text-[#E0C15A]">
+            {pickups.filter(p => p.status === "returned").length} re-recorded, waiting on you
+          </h2>
+          <p className="mt-0.5 text-xs text-white/50">
+            Listen, then close each one.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {pickups
+              .filter(p => p.status === "returned")
+              .map(p => (
+                <li
+                  key={p.id}
+                  className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-white/15 bg-white/[0.04] px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[11px] text-white/50">
+                      {/^\d/.test(p.chapter.trim()) ? `Chapter ${p.chapter}` : p.chapter} ·{" "}
+                      {p.timestamp_at}
+                      {p.assigned_narrator_name ? ` · ${p.assigned_narrator_name}` : ""}
+                    </p>
+                    <p className="mt-0.5 break-words text-sm text-white/90">{summary(p)}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void closePickup(p.id, "resolved")}
+                      className="rounded-lg bg-[#D4AF37] px-3 py-1.5 text-xs font-bold text-black transition-colors hover:bg-[#E0C15A] disabled:opacity-40"
+                    >
+                      Verify &amp; close
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void closePickup(p.id, "dismissed")}
+                      className="text-xs text-white/50 underline-offset-2 hover:text-white/80 hover:underline"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
+
       {/* ---------------------------------------------------------- progress */}
       <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <h2 className="text-sm font-bold">Editing progress</h2>

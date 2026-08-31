@@ -24,7 +24,15 @@ const STATE_STYLE: Record<string, string> = {
   done: "border-emerald-400/40 text-emerald-300",
 };
 
-function CardTile({ card, openPickups }: { card: EditorCard; openPickups: number }) {
+function CardTile({
+  card,
+  openPickups,
+  returnedPickups,
+}: {
+  card: EditorCard;
+  openPickups: number;
+  returnedPickups: number;
+}) {
   const state = editingStateOf(card.chapters_edited, card.editing_completed_at);
   const total = card.chapters_total ?? 0;
   const done = card.chapters_edited ?? 0;
@@ -54,6 +62,15 @@ function CardTile({ card, openPickups }: { card: EditorCard; openPickups: number
               {done} of {total} chapters
             </span>
           )}
+          {/* THE SIGNAL THAT SURVIVES A MISSED EMAIL. Email gets buried; a
+              number on the page she opens anyway does not. Deliberately louder
+              than the open-pickup count, because this is work waiting on HER
+              rather than work waiting on somebody else. */}
+          {returnedPickups > 0 && (
+            <span className="rounded-full bg-[#D4AF37] px-2 py-0.5 text-[11px] font-bold text-black">
+              {returnedPickups} to check
+            </span>
+          )}
           {openPickups > 0 && (
             <span className="rounded-full border border-rose-400/40 px-2 py-0.5 text-[11px] text-rose-300">
               {openPickups} pickup{openPickups === 1 ? "" : "s"}
@@ -77,19 +94,33 @@ export default async function EditorBoardPage() {
   // Open = raised and not yet resolved or dismissed. Counted here so a card
   // shows the badge without the tile needing its own query.
   const openByCard = new Map<string, number>();
+  const returnedByCard = new Map<string, number>();
   for (const p of pickups) {
     if (p.status === "resolved" || p.status === "dismissed") continue;
     openByCard.set(p.card_id, (openByCard.get(p.card_id) ?? 0) + 1);
+    // Returned = the narrator has re-recorded and it is waiting on her to
+    // listen and close. This is the count the whole notification exists for.
+    if (p.status === "returned") {
+      returnedByCard.set(p.card_id, (returnedByCard.get(p.card_id) ?? 0) + 1);
+    }
   }
+  const waiting = [...returnedByCard.values()].reduce((a, b) => a + b, 0);
 
   return (
     <>
-      <div className="mb-5 flex items-baseline justify-between">
+      <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-lg font-bold">Books</h1>
         <p className="text-xs text-white/40">
           {cards.length} book{cards.length === 1 ? "" : "s"}
         </p>
       </div>
+
+      {waiting > 0 && (
+        <p className="mb-5 rounded-xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-4 py-2.5 text-sm text-[#E0C15A]">
+          <span className="font-bold">{waiting}</span> re-recorded pickup
+          {waiting === 1 ? "" : "s"} waiting for you to check.
+        </p>
+      )}
 
       {cards.length === 0 ? (
         <p className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm text-white/50">
@@ -98,7 +129,12 @@ export default async function EditorBoardPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {cards.map(c => (
-            <CardTile key={c.id} card={c} openPickups={openByCard.get(c.id) ?? 0} />
+            <CardTile
+              key={c.id}
+              card={c}
+              openPickups={openByCard.get(c.id) ?? 0}
+              returnedPickups={returnedByCard.get(c.id) ?? 0}
+            />
           ))}
         </div>
       )}
