@@ -157,14 +157,20 @@ export function NarratorConfirm({
 
       for (let i = 0; i < signed.files.length; i++) {
         const target = signed.files[i];
-        setUploading(`Sending ${i + 1} of ${signed.files.length}: ${files[i].name}`);
+        const file = files[i];
+        setUploading(`Sending ${i + 1} of ${signed.files.length}: ${file.name}`);
+        // A OneDrive upload session wants Content-Range even for a single PUT,
+        // and answers 200/201 on the final chunk. The URL is bound to one
+        // destination path and expires; it is not a general drive credential.
         const put = await fetch(target.url, {
           method: "PUT",
-          headers: { "Content-Type": files[i].type },
-          body: files[i],
+          headers: {
+            "Content-Range": `bytes 0-${file.size - 1}/${file.size}`,
+          },
+          body: file,
         });
         if (!put.ok) {
-          setUploadError(`${files[i].name} did not upload. Try again.`);
+          setUploadError(`${file.name} did not upload. Try again.`);
           return;
         }
       }
@@ -175,8 +181,8 @@ export function NarratorConfirm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token,
-          files: signed.files.map((t: { key: string }, i: number) => ({
-            key: t.key, name: files[i].name, contentType: files[i].type,
+          files: signed.files.map((t: { path: string }, i: number) => ({
+            path: t.path, name: files[i].name, contentType: files[i].type,
           })),
         }),
       });

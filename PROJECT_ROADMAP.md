@@ -4195,3 +4195,70 @@ renders with **exactly one** "Re-recorded" button and no Resolve anywhere; numer
 non-numeric; the closed-only book and the closed-only chapter both vanish with the toggle
 off and appear with it on, still folded; a closed-by-default book opens on click and stays
 open across a refresh. Seeds removed, table back to its four live rows.
+
+---
+
+## P3 revised — direct to OneDrive, with a quarantine (2026-08-31)
+
+Dean chose direct-to-OneDrive. The R2 path is **deleted**, not left inert: dead code behind
+a clever guard invites someone to satisfy the guard.
+
+### The correction, accepted
+
+The original objection — a browser-held Graph URL is write access to the drive — was
+overstated. `createUploadSession` returns a URL bound to ONE destination path, short-lived
+and write-only: the same shape as a presigned PUT. The one property genuinely lost is that
+the magic-byte check no longer precedes arrival, and `Pickups/_incoming/` is what pays for
+it.
+
+### THE R2 FINDING, RECORDED WHERE IT WILL BE READ
+
+On the `pickup_uploads` table comment, because "why not just use R2, we already have it" is
+the obvious future question and the answer must not be re-derived by experiment:
+
+> Both buckets the site's token can reach (`dmn-site-media`, `narration-demos`) answer an
+> **unsigned GET with 200** — they are world-readable — and that token **cannot create a
+> private one** (AccessDenied on CreateBucket). Unreleased audiobook audio, some of it on
+> confidential titles, must not be publicly downloadable.
+
+### Two phases, both inside the drive
+
+1. **Quarantine.** The session's destination is `Pickups/_incoming/{link_id}/{uuid}.{ext}`,
+   server-chosen always. The filename never influences the path; it survives as
+   `original_name`, sanitised.
+2. **Verify, then move.** The first bytes are range-read back through Graph and sniffed. On
+   a pass the item is **moved** — a Graph PATCH on `parentReference` and `name`, not a
+   download-and-reupload. On a fail the quarantine item is deleted and the row records why.
+
+A sniff failure is terminal and has its own `rejected_at`/`rejected_reason` rather than
+being faked by exhausting `attempts` — "this is not audio" and "Graph was down eight times"
+need different answers from whoever reads the table.
+
+**No overwrite:** the destination name is checked and suffixed. **Orphan sweep:** the cron
+deletes `_incoming` items with no live row, older than three hours, and tidies empty link
+folders. Debris stays in a visibly-named folder rather than an invisible one.
+
+Everything already verified is unchanged and still passing: the sniff rules, the six
+filename attacks, the 200 MB and 5-file caps, the type allowlist — all enforced at session
+creation, so a refused request never gets a URL.
+
+### The four tests that could not run, now run
+
+| | result |
+|---|---|
+| **(a)** a real wav uploads, verifies, moves | landed at `Pickups/A Cowboy's Runaway/Ann Dahlia/{chapter} - Chapter take one.wav`, confirmed by stat; quarantine empty afterwards |
+| **(b)** a zip renamed `.wav`, uploaded for real | **accepted at the signature, rejected on read-back** — "is not an audio file we recognise", quarantine item deleted, row carries `rejected_reason` |
+| **(c)** the same name twice | `… Chapter take one.wav` and `… Chapter take one (2).wav`, **both** still present, 16044 vs 32044 bytes |
+| **(d)** the cron's SUCCESS branch | `filed: 1, failed: 0` |
+
+(b) is the one that matters: the sniff was already proven on container bytes, but never on
+the read-back path, and that path is the entire justification for the quarantine folder.
+
+The **failure** branch is kept alongside: a row whose quarantined file is gone is not
+dropped — `attempts` incremented, rejection recorded, `filed_at` still null.
+
+### Pickups/ left clean, verified by listing
+
+Not inferred from delete status codes: `Pickups/A Cowboy's Runaway/Ann Dahlia/` held 2
+items before the run (`14 - pickups.txt`, `18 - pickups.txt`) and holds exactly those 2
+after. `_incoming` ends with 0 folders and 0 files.

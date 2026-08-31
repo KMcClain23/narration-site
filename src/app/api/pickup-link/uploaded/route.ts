@@ -1,31 +1,27 @@
 import { NextResponse } from "next/server";
-import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { clientIp, rateLimit } from "@/lib/pickup-link";
-import {
-  MAX_BYTES,
-  pickupsBucket,
-  pickupsR2,
-  sanitiseOriginalName,
-  sniffAudio,
-  sniffMatches,
-} from "@/lib/pickup-upload";
+import { MAX_BYTES, sanitiseOriginalName, sniffAudio, sniffMatches } from "@/lib/pickup-upload-rules";
+import { QUARANTINE_ROOT, deleteByPath, graphAppToken, itemByPath, readHead } from "@/lib/pickup-graph";
 
 /**
- * The bytes have landed in R2. Decide whether they may go any further.
+ * The bytes are in quarantine. Decide whether they may go any further.
  *
- * THIS IS WHERE THE CONTENT TYPE IS ACTUALLY ENFORCED. A presigned PUT accepts
- * whatever the browser sends — the signed content-type is a claim the client
- * made about a file it had not uploaded yet, and nothing about the signature
- * inspects a single byte. So the file is read back here, its leading bytes are
- * sniffed, and a mismatch is DELETED from R2 and never recorded.
+ * THIS IS WHERE THE CONTENT TYPE IS ACTUALLY ENFORCED. An upload session URL
+ * accepts whatever the browser sends it — the type declared at session creation
+ * is a claim about a file that had not been uploaded yet, and nothing about the
+ * session inspects a byte. So the first bytes are read back from OneDrive and
+ * sniffed, and a mismatch is DELETED from quarantine.
  *
- * That ordering matters: the object exists for a moment either way, but nothing
- * unverified is ever visible to the sweep that files into Dean's drive.
+ * That check happening AFTER arrival rather than before is the one property lost
+ * by dropping the R2 hop, and `Pickups/_incoming/` is what pays for it: nothing
+ * unverified is ever in the working folders, and the sweep only ever moves files
+ * that passed this.
  *
- * Recording the row is the LAST thing. An upload that fails the sniff leaves no
- * row, so `pending_pickup_uploads` can only ever hand the sweep files that were
- * checked.
+ * The row is created BEFORE the check so a rejection has somewhere to be
+ * recorded. A rejected row keeps `rejected_reason` and is terminal — it is not a
+ * retry, and faking that by exhausting `attempts` would make "this is not audio"
+ * indistinguishable from "Graph was down".
  */
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
@@ -33,15 +29,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Too many attempts. Wait a minute." }, { status: 429 });
   }
 
-  let bucket: string;
-  try {
-    bucket = pickupsBucket();
-  } catch {
-    return NextResponse.json({ error: "Uploads are not available." }, { status: 503 });
-  }
-
   let token: string;
-  let files: { key: string; name: string; contentType: string }[];
+  let files: { path: string; name: string; contentType: string }[];
   try {
     const body = await req.json();
     token = String(body.token ?? "");
@@ -59,65 +48,72 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "That link is no longer valid." }, { status: 403 });
   }
 
-  const r2 = pickupsR2();
+  let graph: string;
+  try {
+    graph = await graphAppToken();
+  } catch {
+    return NextResponse.json({ error: "Uploads are not available right now." }, { status: 503 });
+  }
+
   const accepted: { name: string; bytes: number }[] = [];
   const rejected: { name: string; reason: string }[] = [];
 
   for (const f of files) {
-    const key = String(f.key ?? "");
+    const path = String(f.path ?? "");
     const contentType = String(f.contentType ?? "");
+    const shown = sanitiseOriginalName(String(f.name ?? ""));
 
-    // THE KEY MUST BE ONE WE ISSUED. It came back from the browser, so it is
-    // untrusted: a key outside this link's prefix would let one narrator record
-    // an object belonging to another.
-    if (!key.startsWith(`pickups/${linkId}/`)) {
-      rejected.push({ name: f.name ?? key, reason: "not a key issued for this link" });
+    // THE PATH CAME BACK FROM THE BROWSER, so it is untrusted. A path outside
+    // this link's own quarantine folder would let one narrator claim another's
+    // upload.
+    if (!path.startsWith(`${QUARANTINE_ROOT}/${linkId}/`)) {
+      rejected.push({ name: shown, reason: "not a destination issued for this link" });
       continue;
     }
 
     try {
-      const head = await r2.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
-      const size = Number(head.ContentLength ?? 0);
-      if (size <= 0 || size > MAX_BYTES) {
-        await r2.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-        rejected.push({ name: f.name ?? key, reason: "wrong size" });
+      const item = await itemByPath(graph, path);
+      if (!item) {
+        rejected.push({ name: shown, reason: "the upload did not finish" });
+        continue;
+      }
+      if (item.size <= 0 || item.size > MAX_BYTES) {
+        await deleteByPath(graph, path);
+        rejected.push({ name: shown, reason: "wrong size" });
         continue;
       }
 
-      // Just the head of the file — enough to identify a container, and it
-      // avoids pulling 200 MB through this route to answer a 12-byte question.
-      const obj = await r2.send(
-        new GetObjectCommand({ Bucket: bucket, Key: key, Range: "bytes=0-63" }),
-      );
-      const bytes = await obj.Body!.transformToByteArray();
-      const sniffed = sniffAudio(bytes);
-
-      if (!sniffMatches(contentType, sniffed)) {
-        await r2.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-        rejected.push({
-          name: f.name ?? key,
-          reason: sniffed
-            ? `looks like ${sniffed}, not ${contentType}`
-            : "is not an audio file we recognise",
-        });
-        continue;
-      }
-
-      const { error } = await supabaseAdmin.rpc("record_pickup_upload", {
+      const { data: rowId, error } = await supabaseAdmin.rpc("record_pickup_upload", {
         p_token: token,
-        p_r2_key: key,
-        p_original_name: sanitiseOriginalName(String(f.name ?? "")),
+        p_quarantine_path: path,
+        p_original_name: shown,
         p_content_type: contentType,
-        p_bytes: size,
+        p_bytes: item.size,
       });
       if (error) {
-        rejected.push({ name: f.name ?? key, reason: "could not be recorded" });
+        await deleteByPath(graph, path);
+        rejected.push({ name: shown, reason: "could not be recorded" });
         continue;
       }
-      accepted.push({ name: sanitiseOriginalName(String(f.name ?? "")), bytes: size });
+
+      // Read back and sniff. A range read, not a download — enough to identify a
+      // container, which is the question being asked.
+      const head = await readHead(graph, path);
+      const sniffed = sniffAudio(head);
+      if (!sniffMatches(contentType, sniffed)) {
+        const reason = sniffed
+          ? `looks like ${sniffed}, not ${contentType}`
+          : "is not an audio file we recognise";
+        await deleteByPath(graph, path);
+        await supabaseAdmin.rpc("mark_upload_rejected", { p_id: rowId, p_reason: reason });
+        rejected.push({ name: shown, reason });
+        continue;
+      }
+
+      accepted.push({ name: shown, bytes: item.size });
     } catch (e) {
       console.error("upload check failed:", (e as Error).message);
-      rejected.push({ name: f.name ?? key, reason: "could not be read back" });
+      rejected.push({ name: shown, reason: "could not be read back" });
     }
   }
 

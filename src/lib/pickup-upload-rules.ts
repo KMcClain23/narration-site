@@ -40,14 +40,14 @@ export function extensionFor(contentType: string): string | null {
 /**
  * The server names the object. Always.
  *
- * `pickups/{link_id}/{uuid}.{ext}` — nothing from Ann appears in it, so `../`,
- * a colon, a null byte or a 300-character name cannot reach the key at all.
- * There is no sanitisation to get wrong here because there is no user input.
+ * `{link_id}/{uuid}.{ext}` — nothing from Ann appears in it, so `../`, a colon,
+ * a null byte or a 300-character name cannot reach the path at all. There is no
+ * sanitisation to get wrong here because there is no user input.
  */
-export function r2KeyFor(linkId: string, contentType: string): string | null {
+export function uploadKeyFor(linkId: string, contentType: string): string | null {
   const ext = extensionFor(contentType);
   if (!ext) return null;
-  return `pickups/${linkId}/${crypto.randomUUID()}.${ext}`;
+  return `${linkId}/${crypto.randomUUID()}.${ext}`;
 }
 
 /**
