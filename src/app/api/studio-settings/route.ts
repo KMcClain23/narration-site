@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { requireAdmin } from "@/lib/require-admin";
+import { requireAdmin, requireAdminOrInternal } from "@/lib/require-admin";
 import { SETTING_KEYS, type StudioSettingField } from "@/lib/studio-settings";
 import { getStudioSettings } from "@/lib/studio-settings-server";
 
@@ -14,7 +14,12 @@ import { getStudioSettings } from "@/lib/studio-settings-server";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const denied = await requireAdmin();
+  // GET also accepts the internal bearer: check-payments-costed exists because
+  // calling getStudioSettings directly proves the LOADER reads the rate and
+  // says nothing about the shape THIS route serves it in. It has to come
+  // through here. PATCH is unchanged and stays session-only — a writable rate
+  // would rewrite every estimate on the site.
+  const denied = await requireAdminOrInternal();
   if (denied) return denied;
 
   // Through the one loader, so the failure semantics are the same here as on

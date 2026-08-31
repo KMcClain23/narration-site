@@ -2,13 +2,16 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { dateOnlyToPacificNoon } from "@/lib/timezone";
 
-import { requireAdmin } from "@/lib/require-admin";
+import { requireAdmin, requireAdminOrInternal } from "@/lib/require-admin";
 
 
 
 // GET: admin gets all cards
 export async function GET(req: Request) {
-  const denied = await requireAdmin();
+  // READ ONLY. The internal bearer is accepted here so import-payments can
+  // match rows to projects; POST, PATCH and DELETE below are untouched and
+  // remain session-only.
+  const denied = await requireAdminOrInternal();
   if (denied) return denied;
   const { searchParams } = new URL(req.url);
 

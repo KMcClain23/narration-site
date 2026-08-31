@@ -2,6 +2,8 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { redirect } from "next/navigation";
 import { currentRole } from "@/lib/supabase/session";
+import { headers } from "next/headers";
+import { matchesInternalBearer, internalBearerHeader } from "@/lib/internal-bearer";
 
 // Defense in depth for admin server components.
 //
@@ -52,11 +54,32 @@ export async function isAdminRequest(): Promise<boolean> {
  */
 export async function isAdminOrInternal(req: Request): Promise<boolean> {
   if (await isAdminRequest()) return true;
+  return matchesInternalBearer(req.headers.get("authorization"));
+}
 
-  const secret = process.env.ADMIN_SECRET_KEY;
-  if (!secret) return false;
-  const header = req.headers.get("authorization") ?? "";
-  return header === `Bearer ${secret}`;
+/**
+ * The same decision where no `Request` object is in hand.
+ *
+ * Next hands route handlers a Request and server components nothing, so the
+ * gates below read the incoming headers instead. Same comparison, same file —
+ * see internal-bearer.ts for why that matters.
+ */
+async function hasInternalBearer(): Promise<boolean> {
+  return matchesInternalBearer((await headers()).get("authorization"));
+}
+
+/**
+ * Route-handler guard that also accepts the internal bearer.
+ *
+ * For handlers this deployment calls itself, and for the standing guards that
+ * must go THROUGH a route rather than around it — check-payments-costed exists
+ * precisely because calling the loader directly missed a route that wrapped its
+ * answer in a shape no client could read.
+ */
+export async function requireAdminOrInternal(): Promise<NextResponse | null> {
+  if (await isAdminRequest()) return null;
+  if (await hasInternalBearer()) return null;
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
 /**
@@ -65,8 +88,7 @@ export async function isAdminOrInternal(req: Request): Promise<boolean> {
  * The remaining legitimate use of ADMIN_SECRET_KEY. Not a login.
  */
 export function internalAuthHeaders(): Record<string, string> {
-  const secret = process.env.ADMIN_SECRET_KEY;
-  return secret ? { authorization: `Bearer ${secret}` } : {};
+  return internalBearerHeader();
 }
 
 /**
@@ -77,9 +99,17 @@ export function internalAuthHeaders(): Record<string, string> {
  * it has not.
  */
 export async function assertAdmin(): Promise<void> {
-  if (!(await isAdminRequest())) {
-    redirect("/admin/login");
-  }
+  if (await isAdminRequest()) return;
+  // The internal bearer, so check-first-render can render these pages.
+  //
+  // THIS DOES WIDEN THE PAGES to anyone holding ADMIN_SECRET_KEY. The trade was
+  // made deliberately: the alternative was a standing machine account with the
+  // admin role whose password lives in CI, which is a larger prize and a worse
+  // thing to rotate. The secret already authorises the API routes that serve
+  // this same data, it is header-only so no browser can be induced to send it,
+  // and middleware.ts accepts it on exactly the same terms.
+  if (await hasInternalBearer()) return;
+  redirect("/admin/login");
 }
 
 /**

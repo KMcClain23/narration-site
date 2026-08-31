@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { isAdminRequest } from "@/lib/require-admin";
+import { isAdminOrInternal } from "@/lib/require-admin";
 
 // Creates many payments in one call, for importing a processor export or a
 // batch of statements after review.
@@ -43,7 +43,17 @@ function fingerprint(cardId: string, amount: number, date: string | null): strin
 }
 
 export async function POST(req: Request) {
-  if (!(await isAdminRequest())) {
+  // THE ONE WIDENING IN THIS CHANGE THAT WRITES. import-payments reuses this
+  // route rather than carrying a second copy of the matching, de-duplication
+  // and insert rules — a second copy of financial write logic is a worse risk
+  // than the credential is.
+  //
+  // Flagged deliberately, because it is the only route here that CREATES
+  // records: anyone holding ADMIN_SECRET_KEY can now insert payments through
+  // it. If that trade is not wanted, the alternative is to delete
+  // import-payments — the historical import it was written for has already been
+  // run — and put this line back to isAdminRequest.
+  if (!(await isAdminOrInternal(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

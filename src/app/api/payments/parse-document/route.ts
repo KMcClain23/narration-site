@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/require-admin";
+import { isAdminOrInternal } from "@/lib/require-admin";
 import { buildContent, extractRows, MAX_UPLOAD_BYTES, mediaTypeFor } from "@/lib/document-parse";
 
 // Reads any money document and returns candidate payment rows for review.
@@ -126,7 +126,10 @@ double-counts income across every month, so read them precisely:
 - Return an empty rows array if this is not a financial document.`;
 
 export async function POST(req: Request) {
-  if (!(await isAdminRequest())) {
+  // The internal bearer is accepted so import-payments can reuse this parser
+  // rather than carry a second copy of it. This route WRITES NOTHING — it reads
+  // a document and returns rows.
+  if (!(await isAdminOrInternal(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   if (!process.env.ANTHROPIC_API_KEY) {

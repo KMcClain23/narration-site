@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ADMIN_COOKIE_NAME } from "@/lib/admin-auth";
 import { refreshSession } from "@/lib/supabase/middleware-session";
+import { matchesInternalBearer } from "@/lib/internal-bearer";
 
 /**
  * ONE AUTHENTICATION PATH: a Supabase session whose profiles.role is admin.
@@ -37,7 +38,14 @@ export async function middleware(req: NextRequest) {
     pathname === "/payments" ||
     pathname === "/released";
 
-  if (isAdminRoute || isBoardRoute || isNewAdminRoute) {
+  // The internal bearer gets through, so check-first-render can fetch these
+  // pages and prove they RENDER. It has to be here as well as in the page gate:
+  // a redirect at this layer never reaches the component, so the guard would be
+  // measuring the login page instead of the page it names. Header-only, so no
+  // browser attaches it by itself. See internal-bearer.ts.
+  const isInternal = matchesInternalBearer(req.headers.get("authorization"));
+
+  if ((isAdminRoute || isBoardRoute || isNewAdminRoute) && !isInternal) {
     // Editor is deliberately NOT enough: these routes are the admin, and an
     // editor who reaches them is sent to the login page, which now tells her she
     // is signed in and simply has no access here — rather than showing her a

@@ -3394,3 +3394,91 @@ Then Playwright against production:
 
 Dean signing in with his own credentials was confirmed by him earlier and is unchanged
 by this — nothing here touches the login page.
+
+---
+
+## U4 — the three broken callers, fixed per script (2026-08-30)
+
+All three authenticated with `cookie: dmn_admin_key=$ADMIN_SECRET_KEY`, dead since R1.
+Deliberately NOT one fix for all three — the criterion was **does it need HTTP at all?**
+
+### What each actually verifies
+
+| script | verifies | needs HTTP? |
+|---|---|---|
+| `check-first-render` | admin PAGES render server-side in the loading pass (`useEffect` does not run in SSR, so SSR *is* frame one) | **yes** — a rendering fact, not a data fact |
+| `check-payments-costed` | the ROUTE serves settings in the shape the client reads, and that rate produces real figures | **yes** for the shape half — it exists *because* `check-settings-honesty` calls the loader directly and cannot see the route |
+| `import-payments` | nothing; it is an operator tool that reuses the app's parse and insert endpoints | **yes** — the parser lives only in the route |
+
+All three needed HTTP, so all three took the bearer. No machine account was created.
+
+### The correction that matters: check-first-render was NOT failing loudly
+
+U3 reported these fail loudly on a non-200. That was **wrong for check-first-render**, and
+in the worst direction. Middleware answered its dead credential with a 307 to
+`/admin/login`; `fetch` follows redirects by default; the login page renders fine and
+returns 200. **The guard reported all 8 routes healthy while rendering the login page
+eight times**, and had done so since R1.
+
+Proven, not deduced: with a deliberately wrong `ADMIN_SECRET_KEY` the guard printed
+`OK — all 8 routes render` and exited 0.
+
+Hardened by `redirect: "manual"` (a redirect is a failure, not a detour) plus a check
+that the body is not the login form — because if the gate ever renders the form instead
+of redirecting, the status alone would not say so.
+
+### The mechanism
+
+One `matchesInternalBearer()` in `src/lib/internal-bearer.ts`, called by all three layers
+that now accept it — middleware, the page gate, the route handlers. Three copies of an
+auth comparison drifting apart is the failure this project keeps producing.
+
+Widened, each named: pages via `assertAdmin` + middleware; `/api/studio-settings` **GET**
+(PATCH untouched); `/api/board` **GET** (POST/PATCH/DELETE untouched);
+`/api/payments/parse-document` (writes nothing); `/api/payments/bulk`.
+
+**`/api/payments/bulk` is the one widening that WRITES**, and it is flagged in the route.
+Anyone holding `ADMIN_SECRET_KEY` can now insert payments. The alternative is to delete
+`import-payments` — the historical import it was written for has already been run — and
+put that line back. Dean's call.
+
+This does widen admin PAGE HTML to the secret. Taken deliberately over a standing admin
+machine account whose password lives in CI: header-only so no browser attaches it, and
+the same secret already authorises API routes serving the same data.
+
+### Verified — both halves, per guard
+
+**check-first-render**
+
+| | result |
+|---|---|
+| clean tree | PASS, all 8 routes 200 |
+| wrong secret | **FAIL**, all 8 report 307 (before hardening: passed) |
+| `/released` made to throw | **FAIL**, `/released -> 500` and **only** that route |
+
+**check-payments-costed**
+
+| | result |
+|---|---|
+| clean tree | PASS — 9400 through the route, 33 cards, 25 payments, 22 costed |
+| wrong secret | **FAIL** — `answered 401, not 200` (API route, no redirect to follow) |
+| route wraps `{data}` not `{settings}` | **FAIL** — the shape contract |
+| rate forced null through the route | **FAIL** — the assertion the outage would have failed |
+| restored | PASS again, same figures |
+
+**import-payments** is a tool, not a guard, and has no pass/fail to run — the historical
+documents are not present and `--apply` was not run. Its auth was verified directly:
+
+| request | status |
+|---|---|
+| `/api/board` GET, correct bearer | 200 |
+| `/api/board` GET, wrong bearer | 401 |
+| `/api/board` GET, **old cookie** | 401 — the dead credential stays dead |
+| `/api/board` POST, correct bearer | 401 — writes still session-only |
+
+### Noted, not changed
+
+`/expenses` is in middleware's matcher but in none of its route predicates, so middleware
+does not gate it; only `assertAdmin` in the page does. Not an exposure — the page gate
+holds, and it returned 307 under the wrong-secret mutation — but it is one layer of
+defence in depth rather than two, and unlike every sibling route.

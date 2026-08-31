@@ -53,15 +53,27 @@ function readAdminKey(): string {
   return line.slice("ADMIN_SECRET_KEY=".length).trim().replace(/^"|"$/g, "");
 }
 
+/**
+ * The internal bearer, as a header.
+ *
+ * Was `cookie: dmn_admin_key=<secret>`, which authenticated nothing once R1
+ * made the browser path session-only — every call here 401'd. The three routes
+ * this script uses now accept the bearer; /api/payments/bulk is the only one
+ * that writes, and that widening is called out at the top of that route.
+ */
+function adminHeaders(): Record<string, string> {
+  return { authorization: `Bearer ${readAdminKey()}` };
+}
+
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
-async function parseFile(file: string, cookie: string): Promise<ParsedRow[]> {
+async function parseFile(file: string, auth: Record<string, string>): Promise<ParsedRow[]> {
   const body = new FormData();
   body.append("file", new Blob([fs.readFileSync(file)]), path.basename(file));
 
   const res = await fetch(`${BASE}/api/payments/parse-document`, {
     method: "POST",
-    headers: { cookie },
+    headers: auth,
     body,
   });
   const json = await res.json();
@@ -87,9 +99,9 @@ async function main() {
   const overrides: Record<string, string> =
     args.includes("--map") && mapArg ? JSON.parse(fs.readFileSync(mapArg, "utf8")) : {};
 
-  const cookie = `dmn_admin_key=${readAdminKey()}`;
+  const auth = adminHeaders();
 
-  const cardsRes = await fetch(`${BASE}/api/board`, { headers: { cookie } });
+  const cardsRes = await fetch(`${BASE}/api/board`, { headers: auth });
   if (!cardsRes.ok) {
     console.error(`Could not load projects (${cardsRes.status}). Is the dev server running?`);
     process.exit(1);
@@ -112,7 +124,7 @@ async function main() {
   console.log(`\nReading ${files.length} file(s) from ${folder}\n`);
 
   const rows: ParsedRow[] = [];
-  for (const f of files) rows.push(...(await parseFile(f, cookie)));
+  for (const f of files) rows.push(...(await parseFile(f, auth)));
 
   // ---- match + classify -------------------------------------------------
   type Plan = { row: ParsedRow; card?: Card; action: "import" | "skip"; reason?: string };
@@ -191,7 +203,7 @@ async function main() {
 
   const res = await fetch(`${BASE}/api/payments/bulk`, {
     method: "POST",
-    headers: { cookie, "Content-Type": "application/json" },
+    headers: { ...auth, "Content-Type": "application/json" },
     body: JSON.stringify({ rows: payload }),
   });
   const result = await res.json();

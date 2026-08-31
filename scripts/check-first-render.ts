@@ -40,7 +40,7 @@ const ROUTES = [
   "/tools/contract-builder",
 ];
 
-function adminCookie(): string {
+function adminHeaders(): Record<string, string> {
   const secret = String(process.env.ADMIN_SECRET_KEY ?? "").trim();
   if (!secret) {
     console.error(
@@ -48,17 +48,30 @@ function adminCookie(): string {
     );
     process.exit(2);
   }
-  return `dmn_admin_key=${secret}`;
+  // A HEADER, not a cookie. This used to send `dmn_admin_key=<secret>`, which
+  // stopped authenticating anything when R1 made the browser path session-only
+  // — the guard could not run at all, and only failed loudly because it checks
+  // for 200. The bearer is the mechanism deliberately kept for exactly this:
+  // one part of the deployment calling another. No browser sends it by itself.
+  return { authorization: `Bearer ${secret}` };
 }
 
 async function main() {
-  const cookie = adminCookie();
+  const auth = adminHeaders();
   const failures: string[] = [];
 
   for (const route of ROUTES) {
     let status: number | string;
     try {
-      const res = await fetch(`${BASE}${route}`, { headers: { cookie } });
+      // MANUAL REDIRECTS, and this is the whole reason the guard is trustworthy.
+      //
+      // fetch follows a 307 by default. When the credential stopped working,
+      // middleware redirected every one of these to /admin/login — which
+      // renders fine and returns 200 — so this script reported all 8 routes
+      // healthy while rendering the login page eight times. It was GREEN for
+      // the entire period it could not authenticate. A redirect is now a
+      // failure, not a detour.
+      const res = await fetch(`${BASE}${route}`, { headers: auth, redirect: "manual" });
       status = res.status;
       const body = await res.text();
 
@@ -68,8 +81,14 @@ async function main() {
         body.includes("reading &#x27;push&#x27;") ||
         body.includes("reading 'push'");
 
-      if (res.status !== 200 || errored) {
-        failures.push(`${route} -> ${res.status}${errored ? " (error boundary rendered)" : ""}`);
+      // And a 200 that is the LOGIN page is not this page. Belt and braces with
+      // redirect:"manual" — if the gate ever starts rendering the login form in
+      // place of redirecting, the status alone would not say so.
+      const isLoginPage = body.includes('placeholder="Email"') && body.includes('placeholder="Password"');
+
+      if (res.status !== 200 || errored || isLoginPage) {
+        const why = errored ? " (error boundary rendered)" : isLoginPage ? " (served the LOGIN page)" : "";
+        failures.push(`${route} -> ${res.status}${why}`);
       }
     } catch (e) {
       status = e instanceof Error ? e.message : "unreachable";

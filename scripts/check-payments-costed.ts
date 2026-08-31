@@ -39,7 +39,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const BASE = process.env.CHECK_BASE_URL ?? "http://localhost:3000";
 
-function adminCookie(): string {
+function adminHeaders(): Record<string, string> {
   const secret = String(process.env.ADMIN_SECRET_KEY ?? "").trim();
   if (!secret) {
     console.error(
@@ -47,7 +47,12 @@ function adminCookie(): string {
     );
     process.exit(2);
   }
-  return `dmn_admin_key=${secret}`;
+  // A HEADER, not a cookie. This used to send `dmn_admin_key=<secret>`, which
+  // stopped authenticating anything when R1 made the browser path session-only
+  // — the guard could not run at all, and only failed loudly because it checks
+  // for 200. The bearer is the mechanism deliberately kept for exactly this:
+  // one part of the deployment calling another. No browser sends it by itself.
+  return { authorization: `Bearer ${secret}` };
 }
 
 let failures = 0;
@@ -60,10 +65,10 @@ function ok(msg: string) {
 }
 
 async function main() {
-  const cookie = adminCookie();
+  const auth = adminHeaders();
 
   // 1. THE ROUTE, not the function.
-  const res = await fetch(`${BASE}/api/studio-settings`, { headers: { cookie } });
+  const res = await fetch(`${BASE}/api/studio-settings`, { headers: auth });
   if (res.status !== 200) {
     fail(`/api/studio-settings answered ${res.status}, not 200`);
     console.log(`\n${failures} check(s) FAILED.`);
