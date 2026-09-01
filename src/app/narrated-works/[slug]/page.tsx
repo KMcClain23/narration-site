@@ -1,3 +1,5 @@
+import { PUBLIC_CARD_STATUSES } from "@/lib/public-catalogue";
+import { bookSlug, slugForCard } from "@/lib/book-slug";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Metadata } from "next";
@@ -31,25 +33,10 @@ const STATUS_TO_STYLE: Record<string, string> = {
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function titleToSlug(title: string): string {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
-
-// Confidential cards route on an id-based slug, never a title-derived one —
-// a slug based on the real title (or the redacted "Untitled Project") would
-// either leak the title or collide across every confidential card.
-//
-// Otherwise, prefer the stored board_cards.slug column, falling back to a
-// fresh title-derived slug only when it's unset — this must match /api/books'
-// mapCards() exactly (same priority order), since that's what the listing
-// page's links are actually built from. A card whose title was renamed after
-// its slug was set (slug columns don't auto-update) would otherwise have a
-// listing-page link this page could never find, since recomputing from the
-// current title gives a different string than the one actually linked to.
-function slugFor(card: { id: string; title: string; slug?: string | null; is_confidential?: boolean }): string {
-  if (card.is_confidential) return `confidential-${card.id}`;
-  return card.slug || titleToSlug(card.title ?? "");
-}
+// slugFor and its rules now live in @/lib/book-slug, imported above, so the
+// catalogue and this page cannot drift apart. `slugForCard` is aliased here
+// because the call sites below read better with the short name.
+const slugFor = slugForCard;
 
 const CONFIDENTIAL_TITLE = "Untitled Project";
 
@@ -93,7 +80,10 @@ async function getBook(slug: string) {
   const { data } = await supabaseAdmin
     .from("board_cards")
     .select("id, title, subtitle, author, cover_url, audible_link, ar_link, spotify_link, co_narrator, tags, description, status, trigger_warnings, released_at, is_confidential, narration_format, slug")
-    .in("status", ["contracted", "recording", "editing", "released"])
+    // THE SAME LIST /api/books FILTERS ON, imported rather than repeated. This
+    // page's own copy was missing "prepping", so the catalogue linked Ruined and
+    // The Wolf King's Bride and this returned 404 for both.
+    .in("status", PUBLIC_CARD_STATUSES)
     .is("archived_at", null);
   if (!data) return null;
   const card = data.find((c) => slugFor(c as { id: string; title: string; slug?: string | null; is_confidential?: boolean }) === slug);

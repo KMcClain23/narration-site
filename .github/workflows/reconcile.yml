@@ -76,3 +76,53 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npm run check-narrator-sync:ci
+
+      # ── Every catalogue link must actually open ──────────────────────────
+      #
+      # /api/books and /narrated-works/[slug] each kept their own status list
+      # and disagreed by one value, so Ruined and The Wolf King's Bride were
+      # listed, linked, and 404'd. Both endpoints were individually correct;
+      # the bug was in the gap, which is only visible by FOLLOWING the link.
+      #
+      # The lists are one import now, so this cannot recur the same way — but
+      # that is exactly what was said after admin-routes.ts and after the two
+      # narrator tables, and it came back a third time. This checks the
+      # behaviour rather than the arrangement.
+      #
+      # Against a LOCALLY BUILT server, not production: on a pull request the
+      # point is to check the code in the PR, and pointing it at the live site
+      # would report on whatever is already deployed.
+      - name: Build the site so the catalogue can be walked
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      - name: Every book on the catalogue must have a detail page that loads
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          npm run start &
+          SERVER_PID=$!
+          # Wait for a real 200 from the endpoint under test, not a fixed sleep:
+          # a sleep that is too short reports a connection error as a broken
+          # catalogue, which is the error-as-absence confusion in another suit.
+          for i in $(seq 1 40); do
+            if curl -sf -o /dev/null http://localhost:3000/api/books; then break; fi
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "the server exited before it answered"; exit 1
+            fi
+            sleep 2
+          done
+          curl -sf -o /dev/null http://localhost:3000/api/books || {
+            echo "the server never answered — this is a failure to check, not a pass"
+            kill $SERVER_PID 2>/dev/null || true
+            exit 1
+          }
+          npm run check-catalogue-links:ci
+          STATUS=$?
+          kill $SERVER_PID 2>/dev/null || true
+          exit $STATUS

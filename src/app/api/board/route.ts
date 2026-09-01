@@ -1,3 +1,4 @@
+import { bookSlug } from "@/lib/book-slug";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { dateOnlyToPacificNoon } from "@/lib/timezone";
@@ -37,13 +38,21 @@ export async function GET(req: Request) {
   return NextResponse.json({ cards: data });
 }
 
-function makeSlug(title: string): string {
-  return title.toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
-}
+/*
+  THIS ROUTE WRITES board_cards.slug, AND ITS RULE WAS NOT THE READERS' RULE.
+
+  It stripped punctuation instead of replacing it, so "The Wolf King's Bride"
+  became `the-wolf-kings-bride` here and `the-wolf-king-s-bride` everywhere that
+  derives from a title. Both forms are live: twelve cards carry a stored slug in
+  the writer's form, twenty-one derive in the readers'.
+
+  Nothing was broken by that, because the stored value wins on every surface —
+  but two rules for one string, one of which mints the value the others must
+  honour, is a trap with no failing test in front of it.
+
+  It now uses the shared function, so NEW cards are minted in the form the rest
+  of the site derives. The twelve stored slugs are untouched and still win.
+*/
 
 // POST: create card (admin)
 export async function POST(req: Request) {
@@ -89,7 +98,7 @@ export async function POST(req: Request) {
       pfh_rate:          pfh_rate     ?? 0,
       payment_type:      payment_type || "pfh",
       first_15_complete: first_15_complete ?? false,
-      slug:              slug || makeSlug(title.trim()),
+      slug:              slug || bookSlug(title.trim()),
       trigger_warnings:  Array.isArray(trigger_warnings) ? trigger_warnings : [],
       is_confidential:   Boolean(is_confidential),
       narration_format:  narration_format || null,

@@ -1,3 +1,4 @@
+import { PUBLIC_CARD_STATUSES } from "@/lib/public-catalogue";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Book, BookCategory } from "@/types/book";
@@ -94,10 +95,11 @@ export async function GET() {
   try {
     // Source of truth is board_cards. Try with slug first; fall back without
     // it if the column hasn't been migrated yet so the page never goes blank.
-    // "prepping" belongs here: it sits between contracted and recording, both
-    // of which are public, so omitting it made a title vanish from the public
-    // page partway through the pipeline and reappear once recording started.
-    const STATUS_FILTER = ["contracted", "prepping", "recording", "editing", "released"] as const;
+    //
+    // THE LIST IS IMPORTED, NOT DECLARED. This route and the detail page each
+    // kept their own copy and they disagreed by one value — "prepping" — so two
+    // books were listed here and 404'd there. See public-catalogue.ts.
+    const STATUS_FILTER = PUBLIC_CARD_STATUSES;
 
     const primary = await supabaseAdmin
       .from("board_cards")

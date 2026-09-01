@@ -1,5 +1,6 @@
 "use client";
 
+import { slugForCard } from "@/lib/book-slug";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -15,9 +16,6 @@ const FORMAT_PILL_LABEL: Record<string, string> = {
   multicast: "Multicast",
 };
 
-function makeSlug(title: string): string {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
 
 interface CoNarrator {
   id: string;
@@ -308,7 +306,9 @@ function BookCard({ book, statusBadge, author, onTagClick, coNarrators }: { book
     return [];
   })();
 
-  const bookSlug = book.slug || makeSlug(book.title);
+  // slugForCard, not a local rule: it carries the confidential id-based form
+  // and the stored-wins precedence that the detail page looks cards up by.
+  const bookSlug = slugForCard(book as { id: string; title: string; slug?: string | null; is_confidential?: boolean });
   const isConfidential = Boolean(book.is_confidential);
   return (
     <div

@@ -1,5 +1,6 @@
 "use client";
 
+import { bookSlug } from "@/lib/book-slug";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, usePathname } from "next/navigation";
@@ -99,9 +100,6 @@ const STATIC_INDEX: Entry[] = [
 
 // ─── slug helper (mirrors what the narrated-works pages use) ─────────────────
 
-function makeSlug(title: string): string {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
 
 const CATEGORY_LABEL: Record<string, string> = {
   "completed":   "Completed",
@@ -158,7 +156,7 @@ export function SiteSearch() {
           description?: string; co_narrator?: string[]; category?: string;
           cover_url?: string; slug?: string; is_confidential?: boolean;
         }>).filter(book => !book.is_confidential).map(book => {
-          const slug = book.slug || makeSlug(book.title);
+          const slug = book.slug || bookSlug(book.title);
           const coNarrators = Array.isArray(book.co_narrator)
             ? book.co_narrator.filter(Boolean)
             : [];

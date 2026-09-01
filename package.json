@@ -31,7 +31,9 @@
     "check-board-policies:ci": "npx --yes tsx scripts/check-board-policies.ts",
     "audio-folders": "npx --yes tsx --env-file=.env.local scripts/set-audio-folders.mjs",
     "test:wav": "npx --yes tsx --test scripts/wav-window.test.mjs",
-    "check-pickup-links": "npx --yes tsx --env-file=.env.local scripts/check-pickup-links.mjs"
+    "check-pickup-links": "npx --yes tsx --env-file=.env.local scripts/check-pickup-links.mjs",
+    "check-catalogue-links": "npx --yes tsx scripts/check-catalogue-links.mjs",
+    "check-catalogue-links:ci": "npx --yes tsx scripts/check-catalogue-links.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
