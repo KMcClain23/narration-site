@@ -25,6 +25,24 @@ export type AgendaItem = { id: string; title: string; hours: number | null; isBl
 export type AgendaDue = { id: string; title: string; deadline: string };
 
 /**
+ * Pickups Dean owes a narrator's booth, summarised.
+ *
+ * ── NOT PART OF THE DATE-BASED AGENDA, AND THAT IS THE POINT ───────────────
+ *
+ * Everything else here is scheduled work: sessions on a date, deadlines, hours
+ * left this week. A pickup has no date — only a `sent_at` — so it cannot be
+ * "due today" and must not be added to a due-today total. Doing that would make
+ * "nothing due today" false in a way no figure on the panel could explain.
+ *
+ * It travels as its own field so that "Nothing at the mic" and "3 pickups to
+ * re-record" can both be true at once, which today they are.
+ *
+ * `books` rather than a bare count: a number with no title is not actionable
+ * from a sidebar — it says something is owed without saying on what.
+ */
+export type AgendaPickups = { count: number; books: string[] };
+
+/**
  * Both totals run from today, not from Monday or the first.
  *
  * What is already spent is not a decision anyone can still make. The question
@@ -58,7 +76,7 @@ export async function GET() {
   // Whichever runs later bounds the one query that feeds all three figures.
   const lastDay = weekEnd > monthEnd ? weekEnd : monthEnd;
 
-  const [settingsRes, cardsRes, blocksRes] = await Promise.all([
+  const [settingsRes, cardsRes, blocksRes, pickupsRes] = await Promise.all([
     getStudioSettings(),
     supabaseAdmin
       .from("board_cards")
@@ -70,6 +88,36 @@ export async function GET() {
       .select("id, on_date, hours, label")
       .gte("on_date", today)
       .lte("on_date", lastDay),
+    /*
+      SENT ONLY, AND ASSIGNED TO HIM. Both halves are load-bearing.
+
+      `draft` is the editor still writing it — not handed over, so announcing it
+      promises work that does not exist yet. `returned` he has already
+      re-recorded and it is waiting on her. `resolved` and `dismissed` are
+      closed. Only `sent` is a line he still owes a booth.
+
+      The narrator row comes from owner_narrator_id() rather than a name or a
+      literal, because that is the same rule card_cast uses to decide whose book
+      it is, and two rules for "which narrator is Dean" is one rule too many.
+    */
+    (async (): Promise<{ title: string }[]> => {
+      const { data: ownerId } = await supabaseAdmin.rpc("owner_narrator_id");
+      // NO OWNER MEANS NO CLAIM, not "none outstanding". Returning an empty list
+      // here would render as "nothing to re-record", which is a statement about
+      // his workload made on the strength of a lookup that failed. The panel
+      // renders nothing at all instead, which is the honest shape of "unknown"
+      // for a summary that has no room to explain itself.
+      if (!ownerId) return [];
+      const { data } = await supabaseAdmin
+        .from("pickups")
+        .select("id, board_cards!inner(title, archived_at)")
+        .eq("status", "sent")
+        .eq("assigned_narrator_id", ownerId)
+        .is("board_cards.archived_at", null);
+      return ((data ?? []) as unknown as { board_cards: { title: string } | null }[])
+        .map(r => ({ title: r.board_cards?.title ?? "" }))
+        .filter(r => r.title !== "");
+    })(),
   ]);
 
   const cards = cardsRes.data ?? [];
@@ -137,6 +185,11 @@ export async function GET() {
   // travel as null rather than as a number computed from a guess.
   const ratesUnavailable = studio.settings.wordsPerNarrationHour == null;
 
+  // Distinct titles, in the order they come back. One book is named outright;
+  // several become a count, because three titles do not fit a sidebar line and
+  // truncating one to fit would name a book wrongly.
+  const pickupBooks = [...new Set(pickupsRes.map(r => r.title))];
+
   return NextResponse.json({
     date: today,
     items,
@@ -148,5 +201,7 @@ export async function GET() {
     weekHours: ratesUnavailable ? null : weekHours,
     monthHours: ratesUnavailable ? null : monthHours,
     ratesUnavailable,
+    // Beside the date-based figures, never inside them.
+    pickups: { count: pickupsRes.length, books: pickupBooks } satisfies AgendaPickups,
   });
 }

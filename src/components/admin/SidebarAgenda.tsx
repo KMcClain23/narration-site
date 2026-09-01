@@ -93,6 +93,39 @@ export function SidebarAgenda({ agenda }: { agenda: Agenda | null }) {
         )}
       </div>
 
+      {/*
+        PICKUPS SIT BESIDE THE DAY, NOT INSIDE IT.
+
+        Everything above is scheduled work on a date. A pickup has none — only a
+        sent_at — so it is not "due today" and adding it to a due-today total
+        would make "Nothing at the mic" read as a contradiction rather than as a
+        second true fact. Both can be true, and today both are.
+
+        NEVER A BARE COUNT. "3 pickups" without a title says something is owed
+        without saying on what, which is not actionable from a sidebar. One book
+        is named; several become a book count, because three titles do not fit
+        this width and a truncated title names the wrong book.
+
+        Nothing at all when there are none — not "0 pickups". The panel already
+        says what today holds; a second empty statement beside it is noise.
+      */}
+      {(agenda.pickups?.count ?? 0) > 0 && (
+        <div className="mt-2 border-t border-divider pt-2">
+          <Link href="/pickups" className="group block">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[12px] text-accent-amber-bright group-hover:underline">
+                {agenda.pickups!.count} pickup{agenda.pickups!.count === 1 ? "" : "s"} to re-record
+              </span>
+            </div>
+            <p className="truncate text-[11px] text-text-muted">
+              {agenda.pickups!.books.length === 1
+                ? agenda.pickups!.books[0]
+                : `${agenda.pickups!.books.length} books`}
+            </p>
+          </Link>
+        </div>
+      )}
+
       {agenda.dueSoon.length > 0 && (
         <div className="mt-2 border-t border-divider pt-2">
           <span className={adminType.label}>Due this week</span>

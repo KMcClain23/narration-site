@@ -28,11 +28,17 @@ export const dynamic = "force-dynamic";
  * now does, and the sections below group by it:
  *
  *   Waiting on you     returned pickups — the narrator is done, this is on her
- *   Your books         editor_id = her. The only section that is a queue.
+ *   Editing now        hers AND unfinished. The only section that is a queue.
+ *   Finished           hers and complete. History, so it is collapsed.
  *   Unclaimed          in editing, nobody holds it. Claimable, not assigned.
  *   With someone else  held by another editor. Empty today; it will not be.
  *   Coming next        recording and prepping — soon, but not hers yet
  *   Not yet            contracted and recast, collapsed
+ *
+ * "Your books" USED TO BE BOTH, and that was the merge worth undoing: Underworld
+ * Vows is complete and sat in the queue next to a book with chapters left. A
+ * finished book is not work, and one sitting in a list of work makes the list
+ * wrong about how much there is.
  *
  * EMPTY SECTIONS RENDER NOTHING. Most days several are empty, and a heading
  * over nothing reads as something failing to load.
@@ -157,9 +163,9 @@ function QueueTile({
 
 /** The quiet tile: things she is not working. No progress, smaller. */
 function QuietTile({
-  card, note, claimable,
+  card, note, claimable, mine,
 }: {
-  card: EditorCard; note?: string; claimable?: boolean;
+  card: EditorCard; note?: string; claimable?: boolean; mine?: boolean;
 }) {
   return (
     <Link
@@ -175,6 +181,7 @@ function QuietTile({
         </p>
       </div>
       {claimable && <ClaimButton cardId={card.id} mine={false} />}
+      {mine && <ClaimButton cardId={card.id} mine />}
     </Link>
   );
 }
@@ -245,7 +252,19 @@ export default async function EditorBoardPage() {
   // Hers, by delivery date. Sorting on the book's date is still the right order
   // to work in: that is reading the date as information, which it is, rather
   // than as a verdict on her, which it is not.
-  const mine = inEditing.filter(c => me !== null && c.editor_id === me).sort(byDelivery);
+  /*
+    HERS SPLITS IN TWO, on editing_completed_at.
+
+    A claimed book with a completion date is done — it is history, and history in
+    a queue overstates what is left. `editingStateOf` already draws exactly this
+    line for the tile label, so this reuses the fact rather than inventing a
+    second test for "finished".
+  */
+  const hers = inEditing.filter(c => me !== null && c.editor_id === me);
+  const editingNow = hers.filter(c => !c.editing_completed_at).sort(byDelivery);
+  const finished = hers
+    .filter(c => c.editing_completed_at)
+    .sort((a, b) => (b.editing_completed_at ?? "").localeCompare(a.editing_completed_at ?? ""));
   const unclaimed = inEditing.filter(c => c.editor_id === null).sort(byDelivery);
   const others = inEditing
     .filter(c => c.editor_id !== null && c.editor_id !== me)
@@ -308,9 +327,9 @@ export default async function EditorBoardPage() {
         </div>
       </Section>
 
-      <Section title="Your books" count={mine.length} hint={`${mine.length} claimed by you`}>
+      <Section title="Editing now" count={editingNow.length} hint={`${editingNow.length} in your queue`}>
         <div className="grid gap-3 sm:grid-cols-2">
-          {mine.map(c => (
+          {editingNow.map(c => (
             <QueueTile
               key={c.id}
               card={c}
@@ -321,6 +340,39 @@ export default async function EditorBoardPage() {
           ))}
         </div>
       </Section>
+
+      {/*
+        FINISHED IS COLLAPSED, and it is still hers.
+
+        Not dropped: she needs to see that a book she completed is accounted for,
+        and to hand it back when it is genuinely done with. Not expanded either —
+        it is the one section that never needs acting on, and open by default it
+        would push the actual queue below the fold as it grows.
+      */}
+      {finished.length > 0 && (
+        <details className="mb-8 rounded-xl border border-white/10 bg-white/[0.02]">
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm text-white/60 hover:text-white/85">
+            Finished — {finished.length} book{finished.length === 1 ? "" : "s"} you have completed
+          </summary>
+          <div className="grid gap-2 border-t border-white/10 p-3 sm:grid-cols-2">
+            {finished.map(c => (
+              <QuietTile
+                key={c.id}
+                card={c}
+                note={
+                  c.editing_completed_at
+                    ? `completed ${new Date(c.editing_completed_at).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      })}`
+                    : "complete"
+                }
+                mine
+              />
+            ))}
+          </div>
+        </details>
+      )}
 
       {/*
         NOT "YOUR BOOKS TOO". These are in editing and nobody holds them; whether

@@ -5,9 +5,15 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 
 /**
- * Claim and release, with HER JWT — the same pattern as every other editor
+ * Claim and UNCLAIM, with HER JWT — the same pattern as every other editor
  * write: `.rpc()` straight from the browser, so `assert_editor_access` is
  * evaluated against a caller who exists.
+ *
+ * "UNCLAIM", NOT "RELEASE". The RPC is still release_card_editing — the database
+ * word for giving up a claim is fine in the database. On screen it is not:
+ * "released" already means PUBLISHED on this very page, where a "12 released →"
+ * link sits at the top. One word meaning two things within a single screen is
+ * how somebody eventually hands back a book they meant to look at.
  *
  * A REFUSAL IS SHOWN, NOT SWALLOWED. `claim_card_for_editing` raises when
  * somebody else holds the book and names them; that message is the only way she
@@ -64,7 +70,7 @@ export function ClaimButton({
             : "rounded-full bg-[#D4AF37] px-3 py-1 text-[11px] font-bold text-black transition-opacity hover:opacity-85 disabled:opacity-50"
         }
       >
-        {busy ? "…" : mine ? "Release" : "Claim"}
+        {busy ? "…" : mine ? "Unclaim" : "Claim"}
       </button>
       {error && <span className="text-[11px] text-rose-300">{error}</span>}
     </span>

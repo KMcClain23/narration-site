@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { AgendaDue, AgendaItem } from "@/app/api/agenda/route";
+import type { AgendaDue, AgendaItem, AgendaPickups } from "@/app/api/agenda/route";
 
 export type Agenda = {
   date: string;
@@ -18,6 +18,14 @@ export type Agenda = {
   monthHours: number | null;
   /** True when the rate is unavailable, so the sidebar can say why the hours are gone. */
   ratesUnavailable?: boolean;
+  /**
+   * Pickups Dean still owes a booth. Beside the date figures, never in them —
+   * a pickup has no date, so it cannot be "due today".
+   *
+   * Optional because a cached response from before this shipped has no such
+   * field, and the sidebar must render that as "none" rather than crashing.
+   */
+  pickups?: AgendaPickups;
 };
 
 /**
