@@ -1,16 +1,61 @@
-import { PUBLIC_CARD_STATUSES } from "@/lib/public-catalogue";
+import { PUBLIC_CARD_STATUSES, type PublicCardStatus } from "@/lib/public-catalogue";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Book, BookCategory } from "@/types/book";
 import { rankCompleted } from "@/lib/book-ranking";
 
-// board_cards.status → Book.category
-const STATUS_TO_CATEGORY: Record<string, BookCategory> = {
+/**
+ * board_cards.status → Book.category.
+ *
+ * ── EXHAUSTIVE BY TYPE, NOT BY CARE ────────────────────────────────────────
+ *
+ * This was `Record<string, BookCategory>` with four keys and a
+ * `?? "coming-soon"` at every call site. "prepping" was missing, so Ruined and
+ * The Wolf King's Bride fell through the default and were silently labelled
+ * "coming soon" — which happened to be a fair label, which is exactly why
+ * nobody noticed it was a default rather than a decision.
+ *
+ * That is the FOURTH incomplete status list found in this codebase, after
+ * admin-routes, the two narrator tables, and the catalogue filter itself. The
+ * value was fine; the SHAPE is what keeps producing this.
+ *
+ * Keyed on PublicCardStatus, every status must now have an explicit entry, and
+ * adding one to PUBLIC_CARD_STATUSES breaks the build here until somebody
+ * decides what it means. A silent default is how this class of bug hides — the
+ * same shape as the Android enum's unknown → SENT collapse, one layer up.
+ *
+ * prepping → "coming-soon" is Dean's call, made deliberately and written down
+ * rather than arrived at by falling through.
+ */
+const STATUS_TO_CATEGORY: Record<PublicCardStatus, BookCategory> = {
   contracted: "coming-soon",
+  prepping:   "coming-soon",
   recording:  "in-progress",
   editing:    "in-progress",
   released:   "completed",
 };
+
+/**
+ * The category for a status, refusing to guess.
+ *
+ * UNREACHABLE IN PRACTICE — the query filters on PUBLIC_CARD_STATUSES and the
+ * map is keyed on the same union, so the two cannot disagree without the build
+ * failing first. It throws anyway, because "unreachable" is a claim about
+ * today's code and the whole point of this change is that the previous
+ * arrangement was also fine right up until it was not. The route's try/catch
+ * turns this into a named error rather than a quietly mislabelled catalogue.
+ */
+function categoryFor(status: unknown): BookCategory {
+  const c = STATUS_TO_CATEGORY[status as PublicCardStatus];
+  if (!c) {
+    throw new Error(
+      `board_cards.status ${JSON.stringify(status)} has no category. It reached ` +
+        `the catalogue without being in PUBLIC_CARD_STATUSES, so those two lists ` +
+        `have come apart — see src/lib/public-catalogue.ts.`,
+    );
+  }
+  return c;
+}
 
 type MappedCard = { id: unknown; title: unknown; subtitle: unknown; author: unknown; link: string; ar_link: string; spotify_link: string; cover_url: string; tags: unknown[]; description: string; category: string; co_narrator: unknown[]; sort_order: number; slug: string | null; is_confidential: boolean; narration_format: string | null; released_at: string | null; amazon_rating: number | null; amazon_review_count: number | null };
 
@@ -45,7 +90,7 @@ function mapCards(data: Record<string, unknown>[]): MappedCard[] {
           cover_url:       "",
           tags:            Array.isArray(card.tags) ? card.tags : [],
           description:     "",
-          category:        STATUS_TO_CATEGORY[card.status as string] ?? "coming-soon",
+          category:        categoryFor(card.status),
           co_narrator:     [],
           sort_order:      (card.sort_order as number) || 0,
           // Always id-based, never card.slug — the stored slug column is
@@ -76,7 +121,7 @@ function mapCards(data: Record<string, unknown>[]): MappedCard[] {
         cover_url:   (card.cover_url   as string),
         tags:        Array.isArray(card.tags) ? card.tags : [],
         description: (card.description as string) || "",
-        category:    STATUS_TO_CATEGORY[card.status as string] ?? "coming-soon",
+        category:    categoryFor(card.status),
         co_narrator: (cn as unknown[]).filter(Boolean),
         sort_order:  (card.sort_order  as number) || 0,
         slug:        (card.slug as string) || null,

@@ -2,6 +2,7 @@ import {
   chapterMatches, clipWindow, isHeader, parseWavHeader, timestampToSeconds,
   to16Bit, wavHeaderFor,
 } from "./wav.ts";
+import { chapterDir, clipName } from "./paths.ts";
 
 /**
  * Step 6 of the send: a ±10 second clip per pickup, cut from the book's
@@ -81,7 +82,6 @@ export async function cutClips(
   chapter: string,
   narratorSegment: string,
   rows: Array<{ id: string; timestamp_at: string }>,
-  sanitiseSegment: (s: string) => string,
 ): Promise<ClipOutcome[]> {
   const out: ClipOutcome[] = [];
 
@@ -192,8 +192,10 @@ export async function cutClips(
       clip.set(wavHead);
       clip.set(bytes, wavHead.length);
 
-      const name = `${sanitiseSegment(`${chapter} - ${row.timestamp_at} clip`)}.wav`;
-      const folder = `Pickups/${card.bookSegment}/${narratorSegment}`;
+      const name = clipName(row.timestamp_at);
+      // The chapter is a folder now; the "clip " prefix is what distinguishes
+      // a clip from a manifest or an uploaded take inside it.
+      const folder = chapterDir(card.bookSegment, narratorSegment, chapter);
       // rename, not replace: a second send of the same chapter must not
       // overwrite a clip a narrator may already be listening to.
       const put = await fetch(

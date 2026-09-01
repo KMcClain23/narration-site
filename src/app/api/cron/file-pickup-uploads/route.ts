@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { notifyEditorsOfFiling } from "@/lib/notify-filed";
+import { chapterDir, sanitiseSegment, takeName } from "@/lib/pickup-paths";
 import {
   QUARANTINE_ROOT,
   childrenById,
@@ -30,15 +31,6 @@ import {
  */
 
 /** The forbidden set, exactly as the manifest already solves it. Two book titles contain colons. */
-function sanitiseSegment(raw: string): string {
-  const cleaned = (raw ?? "")
-    .replace(/["*:<>?/\\|]/g, "-")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\.+$/, "")
-    .trim();
-  return cleaned.length > 0 ? cleaned : "Untitled";
-}
 
 /** Abandoned quarantine items older than this are debris, not work in progress. */
 const ORPHAN_AGE_MS = 3 * 60 * 60 * 1000;
@@ -106,8 +98,10 @@ export async function GET(req: Request) {
     try {
       const ext = row.quarantine_path.split(".").pop() ?? "bin";
       const book = row.pickups_folder ?? sanitiseSegment(row.book_title);
-      const folder = `Pickups/${book}/${sanitiseSegment(row.narrator_name)}`;
-      const name = `${sanitiseSegment(`${row.chapter} - ${row.original_name}`)}.${ext}`;
+      // A CHAPTER LEVEL, so a narrator folder does not accumulate 23 chapters'
+      // worth of loose files. The prefix says what kind of file it is.
+      const folder = chapterDir(book, row.narrator_name, row.chapter);
+      const name = takeName(row.original_name, ext);
 
       // moveItem suffixes rather than overwriting, and returns the path it
       // actually used — the requested one would be a lie after a suffix — plus

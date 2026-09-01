@@ -1,4 +1,5 @@
 import { cutClips, type ClipOutcome } from "./clips.ts";
+import { chapterDir, manifestName, sanitiseSegment } from "./paths.ts";
 
 /**
  * Send a chapter's pickups to their narrators, and file the manifest.
@@ -65,17 +66,6 @@ const SITE_ORIGIN = Deno.env.get("PICKUPS_SITE_ORIGIN") ?? "https://www.dmnarrat
  * which reads like a bad path rather than a bad character, and is exactly the
  * kind of error someone loses an afternoon to.
  */
-export function sanitiseSegment(raw: string): string {
-  const cleaned = (raw ?? "")
-    .replace(/["*:<>?/\\|]/g, "-")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\.+$/, "")
-    .trim();
-  // Never an empty segment: an empty path component silently reparents the file
-  // to the level above, which is worse than an obviously wrong name.
-  return cleaned.length > 0 ? cleaned : "Untitled";
-}
 
 // ── the message ─────────────────────────────────────────────────────────────
 
@@ -341,12 +331,12 @@ async function graphAppToken(): Promise<string> {
  */
 async function uploadManifest(
   token: string,
-  bookSegment: string,
-  narratorSegment: string,
+  /** The full chapter folder, from chapterDir — book, narrator and chapter. */
+  folder: string,
   fileName: string,
   body: string,
 ): Promise<string> {
-  const path = `Pickups/${bookSegment}/${narratorSegment}/${fileName}`;
+  const path = `${folder}/${fileName}`;
   const url =
     `https://graph.microsoft.com/v1.0/users/${DRIVE_USER}/drive/root:/${encodeURI(path)}:/content`;
   const res = await fetch(url, {
@@ -623,11 +613,13 @@ Deno.serve(async (req: Request) => {
         const name = narrator?.display_name ?? "unknown";
         const rows = groups.get(narratorId) ?? [];
         try {
+          // The chapter is a FOLDER now, not a filename prefix — so a
+          // narrator folder holds one entry per chapter instead of a flat list
+          // of every manifest, clip and take across the whole book.
           const path = await uploadManifest(
             token,
-            bookSegment,
-            sanitiseSegment(name),
-            sanitiseSegment(`${chapter} - pickups`) + ".txt",
+            chapterDir(bookSegment, name, chapter),
+            manifestName(),
             manifestText(card.title, chapter, name, sentAt, rows),
           );
           await adminClient
@@ -659,7 +651,6 @@ Deno.serve(async (req: Request) => {
             chapter,
             sanitiseSegment(name),
             rows.map(r => ({ id: r.id, timestamp_at: r.timestamp_at })),
-            sanitiseSegment,
           );
           clips.push(...cut);
         } catch (e) {

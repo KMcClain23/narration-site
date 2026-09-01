@@ -159,9 +159,28 @@ export async function ensureFolder(
     body: JSON.stringify({
       name,
       folder: {},
-      "@microsoft.graph.conflictBehavior": "return",
+      /*
+        "fail", NOT "return".
+
+        Graph rejects "return" on this endpoint outright — 400, "The value for
+        name@conflictBehavior is invalid". This went unnoticed because it is
+        only reached when a folder genuinely does not exist: the check above
+        returns early otherwise, and uploadManifest's PUT-to-path creates
+        parents on its own. So the first genuinely new book or narrator folder
+        created through THIS path would have failed the filing.
+
+        Found while migrating the pickups tree, where every chapter folder was
+        new.
+      */
+      "@microsoft.graph.conflictBehavior": "fail",
     }),
   });
+  // A conflict means something created it between the check and now. Re-read it
+  // rather than failing a filing over a race.
+  if (res.status === 409) {
+    const raced = await itemByPath(token, path);
+    if (raced) return { id: raced.id, webUrl: raced.webUrl };
+  }
   if (!res.ok) throw new Error(`mkdir ${res.status}: ${(await res.text()).slice(0, 150)}`);
   const made = await res.json();
   return { id: made.id as string, webUrl: made.webUrl ?? null };
