@@ -38,6 +38,7 @@
     "migrate-pickup-chapters": "npx --yes tsx --env-file=.env.local scripts/migrate-pickup-chapters.mjs",
     "check-android-dtos": "npx --yes tsx --env-file=.env.local scripts/check-android-dtos.mjs",
     "check-editing-progress": "npx --yes tsx --env-file=.env.local scripts/check-editing-progress.mjs",
+    "check-fresh-link": "npx --yes tsx --conditions=react-server --env-file=.env.local scripts/check-fresh-link.mjs",
     "check-android-dtos:ci": "npx --yes tsx scripts/check-android-dtos.mjs"
   },
   "dependencies": {

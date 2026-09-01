@@ -7,6 +7,7 @@ import type {
   EditorCardDetail, EditorPickup, CastMember, UploadCount, PickupNote, ChapterProgress,
 } from "@/lib/editor-data";
 import { ChapterField, chapterOptions, defaultChapter } from "./ChapterField";
+import { FreshLinkButtons, type PickupBatch } from "@/components/pickups/FreshLinkButtons";
 
 /**
  * Her writes — ALL of them through the gated functions, with her JWT.
@@ -250,6 +251,7 @@ export function EditorCardClient({
   uploads,
   notes,
   chapterProgress,
+  batches,
   userId,
 }: {
   card: EditorCardDetail;
@@ -264,6 +266,8 @@ export function EditorCardClient({
   uploads: UploadCount[];
   notes: PickupNote[];
   chapterProgress: ChapterProgress[];
+  /** (chapter, narrator) pairs that already have a link. Never an address. */
+  batches: PickupBatch[];
   userId: string | null;
 }) {
   const router = useRouter();
@@ -907,6 +911,15 @@ export function EditorCardClient({
                   </button>
                 )}
               </div>
+
+              {/* REPLACING A LINK, NOT SENDING ONE. Rendered from the link table,
+                  so a chapter that was never sent shows nothing here at all and
+                  the only way to reach a narrator for the first time stays the
+                  Send button above. Per narrator, because the token is. */}
+              <FreshLinkButtons
+                batches={batches.filter(b => b.chapter === chapter)}
+                className="mt-2"
+              />
 
               {/* ONCE, AGAINST THE CHAPTER — not repeated under every line.
                   A note about the spliced file is one fact about the chapter,

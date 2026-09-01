@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
+import { FreshLinkButtons, type PickupBatch } from "@/components/pickups/FreshLinkButtons";
 
 /**
  * Every write here is a FUNCTION CALL — resolve_pickup and mark_pickup_returned,
@@ -101,11 +102,14 @@ const STORAGE_KEY = "dmn.pickups.collapsed";
 export function PickupsClient({
   pickups,
   ownerNarratorId,
+  batches,
 }: {
   pickups: AdminPickup[];
   /** Which assignee is Dean, from narrators.profile_id. Null means nothing lands
    *  in "Needs you" rather than everything doing so. */
   ownerNarratorId: string | null;
+  /** (book, chapter, narrator) triples that already have a link. Never an address. */
+  batches: PickupBatch[];
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -508,6 +512,27 @@ To close it instead and keep the record, use Close.`)) {
                             {showClosed && c.closed.length > 0 ? ` · ${c.closed.length} closed` : ""}
                           </span>
                         </div>
+
+                        {/* REPLACES A LINK, NEVER SENDS ONE. Driven by the link
+                            table, so a chapter that was never sent shows nothing
+                            here — sending is the editor's, on her own page.
+                            Split per narrator because a two-hander chapter has
+                            two tokens and only one of them is broken.
+
+                            ONE BATCH CANNOT APPEAR HERE, and it is the right
+                            one to lose: a chapter whose only pickups are Dean's
+                            own sent rows. Those are lifted out into "Needs you"
+                            above, so the chapter has nothing left in this tree
+                            and never renders. That batch is Dean's link to
+                            himself — the single case where "she cannot open her
+                            link" has nobody to happen to. It is still on the
+                            editor card page, which lists every chapter. */}
+                        <FreshLinkButtons
+                          batches={batches.filter(
+                            x => x.card_id === b.cardId && x.chapter === c.chapter,
+                          )}
+                          className="mb-2"
+                        />
                         <ul className="space-y-2">
                           {c.open.map(p => (
                             <Row key={p.id} p={p} />

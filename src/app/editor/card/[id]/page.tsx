@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { currentSession } from "@/lib/supabase/session";
 import {
   editorBoard, editorCardDetail, editorPickups, editorCardCast, editorUploads, editorNotes, editorChapterProgress,
+  editorPickupBatches,
 } from "@/lib/editor-data";
 import { EditorCardClient } from "./EditorCardClient";
 
@@ -26,7 +27,8 @@ export default async function EditorCardPage({
 }) {
   const { id } = await params;
 
-  const [session, card, board, allPickups, cast, uploads, allNotes, allProgress] = await Promise.all([
+  const [session, card, board, allPickups, cast, uploads, allNotes, allProgress, allBatches] =
+    await Promise.all([
     currentSession(),
     editorCardDetail(id),
     // THE EDITING COLUMNS COME FROM THE BOARD FUNCTION, not the detail one.
@@ -47,6 +49,10 @@ export default async function EditorCardPage({
     editorNotes(),
     // The per-chapter SET. Its own read, because board_for_editor is frozen.
     editorChapterProgress(),
+    // Which (chapter, narrator) pairs have ever had a link, so "send a fresh
+    // link" can only ever REPLACE one. Read from pickup_links, not from
+    // pickups — see pickup_batches_for_editor.
+    editorPickupBatches(),
   ]);
   const progress = board.find(c => c.id === id) ?? null;
 
@@ -74,6 +80,7 @@ export default async function EditorCardPage({
         uploads={uploads.filter(u => u.card_id === id)}
         notes={allNotes.filter(n => n.card_id === id)}
         chapterProgress={allProgress.filter(c => c.card_id === id)}
+        batches={allBatches.filter(b => b.card_id === id)}
         userId={session?.userId ?? null}
       />
     </>

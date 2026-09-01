@@ -1,6 +1,7 @@
 import "server-only";
 
 import { userScopedClient } from "@/lib/supabase/session";
+import type { PickupBatch } from "@/components/pickups/FreshLinkButtons";
 
 /**
  * Every read the editor surface makes, in one place, and all of them through
@@ -343,6 +344,8 @@ export type PickupNote = {
  * board_for_editor: that return type is frozen by the shipped Android DTO, and
  * a column added to it empties the board on every installed copy.
  */
+export type { PickupBatch };
+
 export type ChapterProgress = {
   card_id: string;
   chapter: string;
@@ -366,4 +369,19 @@ export async function editorUploads(): Promise<UploadCount[]> {
   const db = await userScopedClient();
   const { data, error } = await db.rpc("uploads_for_editor");
   return unwrap<UploadCount[]>(data as UploadCount[], error, "uploads_for_editor");
+}
+
+/**
+ * Batches a link has ever been issued for — the row set behind "send a fresh
+ * link". Its own function because neither screen groups by narrator, and a link
+ * belongs to one.
+ *
+ * NEVER CARRIES AN ADDRESS, only `has_email`. The editor is deliberately not
+ * shown narrator email anywhere else and this read is no exception; the route
+ * that sends holds the service key and looks it up there.
+ */
+export async function editorPickupBatches(): Promise<PickupBatch[]> {
+  const db = await userScopedClient();
+  const { data, error } = await db.rpc("pickup_batches_for_editor");
+  return unwrap<PickupBatch[]>(data as PickupBatch[], error, "pickup_batches_for_editor");
 }

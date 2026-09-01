@@ -2,6 +2,7 @@ import { assertAdmin } from "@/lib/require-admin";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PickupsClient, type AdminPickup } from "./PickupsClient";
+import type { PickupBatch } from "@/components/pickups/FreshLinkButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,21 @@ export default async function PickupsPage() {
     .not("profile_id", "is", null)
     .maybeSingle();
   const ownerNarratorId = ownerRow?.id ?? null;
+
+  /*
+    WHICH BATCHES HAVE EVER HAD A LINK, for "send a fresh link".
+
+    Through the same gated function the editor calls, not a direct select on
+    pickup_links. The rule for what counts as a replaceable batch — a link
+    exists, and the counts describe what a token would actually open — belongs
+    in one place, and this page reading the table itself is how that rule ends
+    up written twice and drifting.
+
+    assert_editor_access returns early for service_role, so calling it through
+    supabaseAdmin is the same answer the editor gets.
+  */
+  const { data: batchRows } = await supabaseAdmin.rpc("pickup_batches_for_editor");
+  const batches = (batchRows ?? []) as PickupBatch[];
 
   // Titles come from a join because a pickup that says only "chapter 12" is not
   // actionable — he needs to know which book before anything else.
@@ -100,7 +116,7 @@ export default async function PickupsPage() {
   // inside the first is how a page ends up scrolling twice.
   return (
     <AdminLayout>
-      <PickupsClient pickups={pickups} ownerNarratorId={ownerNarratorId} />
+      <PickupsClient pickups={pickups} ownerNarratorId={ownerNarratorId} batches={batches} />
     </AdminLayout>
   );
 }
