@@ -39,6 +39,16 @@ export type BatchRow = {
   should_be: string | null;
   note: string | null;
   status: string;
+  /**
+   * Non-null when a ±10s clip exists for this pickup.
+   *
+   * It is the PICKUP's id, not the OneDrive item id — the page builds a player
+   * URL from it and the redirect resolves the real location server-side, so the
+   * narrator's browser never learns a drive address.
+   */
+  clip_id: string | null;
+  /** Why there is no clip. Null with a null clip_id means it was never tried. */
+  clip_skip_reason: string | null;
 };
 
 /**

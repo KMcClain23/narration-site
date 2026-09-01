@@ -137,6 +137,35 @@ export function NarratorConfirm({
                 {r.note?.trim() || r.kind}
               </p>
             )}
+            {/*
+              THE CLIP, WHERE THE CORRECTION IS.
+
+              Playback only. There is deliberately no record button: a pickup has
+              to cut invisibly into the finished chapter — same mic, same chain,
+              same room tone — and a browser recording never will. The narrator
+              hears this, then re-records properly in their own booth and uploads
+              through the path that already exists below.
+
+              Absent rather than explained when there is no clip. The reasons are
+              all about our side (no source file yet, no chapter match) and none
+              of them are the narrator's to act on; a line telling them why they
+              cannot hear something is noise on a page they are working from.
+            */}
+            {r.clip_id && (
+              <div className="mt-3">
+                <audio
+                  controls
+                  preload="none"
+                  src={`/api/p/${token}/clip/${r.pickup_id}`}
+                  className="h-9 w-full max-w-md"
+                >
+                  Your browser cannot play audio.
+                </audio>
+                <p className="mt-1 text-[11px] text-white/35">
+                  Ten seconds either side of {r.timestamp_at}
+                </p>
+              </div>
+            )}
             {muted && <p className="mt-2 text-xs text-white/40">Marked re-recorded</p>}
           </div>
         </div>

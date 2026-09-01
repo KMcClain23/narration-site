@@ -1,3 +1,5 @@
+import { cutClips, type ClipOutcome } from "./clips.ts";
+
 /**
  * Send a chapter's pickups to their narrators, and file the manifest.
  *
@@ -14,6 +16,7 @@
  *   3. send one email per narrator
  *   4. ONLY on acceptance, move those narrators' pickups to SENT
  *   5. file the manifest — and a failure here does NOT undo step 4
+ *   6. cut a clip per pickup — and a failure here undoes nothing either
  *
  * If the transition ran first and the send failed, pickups would read as SENT
  * with nobody told: invisible, and the exact failure shape this project keeps
@@ -437,7 +440,7 @@ Deno.serve(async (req: Request) => {
   // ---- 2. gather --------------------------------------------------------
   const { data: card, error: cardError } = await adminClient
     .from("board_cards")
-    .select("id, title, pickups_folder")
+    .select("id, title, pickups_folder, audio_folder_item_id")
     .eq("id", cardId)
     .single();
   if (cardError || !card) return json({ error: "No such book" }, 404);
@@ -597,6 +600,7 @@ Deno.serve(async (req: Request) => {
   // manifest is the record. manifest_path stays null, which is visible and
   // retryable rather than a silent gap.
   const manifests: Array<{ narrator: string; path?: string; error?: string }> = [];
+  const clips: ClipOutcome[] = [];
   if (emailed.length > 0) {
     const bookSegment = card.pickups_folder ?? sanitiseSegment(card.title);
     // Recorded on first use so the same book always resolves to the same folder,
@@ -634,6 +638,40 @@ Deno.serve(async (req: Request) => {
         } catch (e) {
           manifests.push({ narrator: name, error: String(e).slice(0, 200) });
         }
+
+        /*
+          ── 6. the clips ────────────────────────────────────────────────
+
+          Inside the manifest loop because it needs the same narrator segment,
+          but in its OWN try: a clip that cannot be cut must not cost the
+          manifest, and neither may cost the send. Every failure lands as a
+          clip_skip_reason on the row and a line in the report below.
+        */
+        try {
+          const cut = await cutClips(
+            token,
+            adminClient,
+            {
+              title: card.title,
+              audioFolderItemId: card.audio_folder_item_id ?? null,
+              bookSegment,
+            },
+            chapter,
+            sanitiseSegment(name),
+            rows.map(r => ({ id: r.id, timestamp_at: r.timestamp_at })),
+            sanitiseSegment,
+          );
+          clips.push(...cut);
+        } catch (e) {
+          // The cutter handles its own failures; reaching here means something
+          // outside them. Recorded, never rethrown.
+          for (const r of rows) {
+            clips.push({
+              pickup: r.id, at: r.timestamp_at,
+              skip: "graph_unavailable", detail: String(e).slice(0, 150),
+            });
+          }
+        }
       }
     }
   }
@@ -646,6 +684,9 @@ Deno.serve(async (req: Request) => {
     skipped,
     failed,
     manifests,
+    // Named per pickup so a missing clip is visible in the same response that
+    // confirms the email went out, rather than being discovered later.
+    clips,
   }, failed.length > 0 ? 207 : 200);
 });
 
