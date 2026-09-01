@@ -67,7 +67,24 @@ const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt"];
  */
 const POLL_INTERVAL_MS = 12_000;
 
-async function uploadManuscript(file: File, onProgress: (pct: number) => void): Promise<{ key: string; format: "pdf" | "docx" | "txt" }> {
+/**
+ * Upload a manuscript to OneDrive's Scripts/ folder.
+ *
+ * A GRAPH UPLOAD SESSION, not a presigned R2 PUT. The old path wrote into a
+ * bucket that answers an uncredentialed GET with the real bytes; see the
+ * upload-url route. The bytes still go straight from this browser to storage —
+ * they never pass through the app — but the storage is now the same drive the
+ * audio lives on, reachable only by the app-only Graph token.
+ *
+ * IT RETURNS THE ITEM ID. That is the durable address: Scripts/ is a folder
+ * Dean works in, and a file there will eventually be renamed or moved. The path
+ * is kept only so a person can be told where it went.
+ */
+async function uploadManuscript(
+  file: File,
+  title: string,
+  onProgress: (pct: number) => void,
+): Promise<{ itemId: string; path: string; format: "pdf" | "docx" | "txt" }> {
   const name = file.name.toLowerCase();
   // Sent explicitly rather than trusting file.type, which browsers leave empty
   // for .txt often enough that relying on it would reject valid uploads.
@@ -80,24 +97,40 @@ async function uploadManuscript(file: File, onProgress: (pct: number) => void): 
   const res = await fetch("/api/admin/manuscripts/upload-url", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename: file.name, contentType }),
+    // The title names the file, because the filename is what links the script
+    // to a board card later.
+    body: JSON.stringify({ filename: file.name, contentType, title }),
   });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Failed to get upload URL");
-  const { uploadUrl, key, format } = await res.json();
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Failed to start the upload");
+  const { uploadUrl, path, format } = await res.json();
 
-  await new Promise<void>((resolve, reject) => {
+  const itemId = await new Promise<string>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", uploadUrl);
-    xhr.setRequestHeader("Content-Type", contentType);
+    // A OneDrive upload session REQUIRES Content-Range even for a single PUT.
+    // The narrator's upload learned this the same way; without it the session
+    // rejects the chunk and the error does not say why.
+    xhr.setRequestHeader("Content-Range", `bytes 0-${file.size - 1}/${file.size}`);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
     };
-    xhr.onload = () => (xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (HTTP ${xhr.status})`)));
+    xhr.onload = () => {
+      if (xhr.status >= 300) return reject(new Error(`Upload failed (HTTP ${xhr.status})`));
+      // The final chunk's response IS the driveItem. Taking the id from here
+      // avoids a second lookup and a race with a rename.
+      try {
+        const item = JSON.parse(xhr.responseText);
+        if (item?.id) return resolve(item.id as string);
+      } catch {
+        /* fall through to the explicit failure below */
+      }
+      reject(new Error("The upload finished but OneDrive returned no file id."));
+    };
     xhr.onerror = () => reject(new Error("Upload failed — network error."));
     xhr.send(file);
   });
 
-  return { key, format };
+  return { itemId, path, format };
 }
 
 function StatusBadge({ manuscript }: { manuscript: ManuscriptRow }) {
@@ -168,7 +201,7 @@ function UploadModal({
     setStage("uploading");
     setProgress(0);
     try {
-      const { key, format } = await uploadManuscript(file, setProgress);
+      const { itemId, path, format } = await uploadManuscript(file, title.trim(), setProgress);
       setStage("creating");
       const res = await fetch("/api/admin/manuscripts", {
         method: "POST",
@@ -176,7 +209,8 @@ function UploadModal({
         body: JSON.stringify({
           title: title.trim(),
           author: author.trim() || undefined,
-          key,
+          itemId,
+          path,
           format,
           pages_only: pagesOnly && format === "pdf",
         }),

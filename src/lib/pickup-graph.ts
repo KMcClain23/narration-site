@@ -59,16 +59,27 @@ const byPath = (path: string) => `${ROOT}/root:/${encodeURI(path)}:`;
  * expires in about an hour, and can do nothing else — which is why handing it to
  * a browser is acceptable where a general Graph token would not be.
  */
-export async function createUploadSession(token: string, path: string): Promise<string> {
+export async function createUploadSession(
+  token: string,
+  path: string,
+  /**
+   * What to do if the path is taken. Valid values are fail | replace | rename —
+   * "return" is NOT one of them and Graph 400s on it, which this codebase has
+   * already been caught by once.
+   *
+   * QUARANTINE DEFAULTS TO "fail": its names are server-chosen UUIDs, so a
+   * collision means something is wrong and failing beats silently renaming.
+   * A script re-uploaded for the same book wants "replace" — it is a corrected
+   * draft of the same document, and "Book (1).pdf" would break the one-file-per-
+   * book convention the whole Scripts/ folder rests on.
+   */
+  conflictBehavior: "fail" | "replace" | "rename" = "fail",
+): Promise<string> {
   const res = await fetch(`${byPath(path)}/createUploadSession`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      item: {
-        // Quarantine names are server-chosen UUIDs, so a collision means
-        // something is wrong; failing is better than silently renaming.
-        "@microsoft.graph.conflictBehavior": "fail",
-      },
+      item: { "@microsoft.graph.conflictBehavior": conflictBehavior },
     }),
   });
   if (!res.ok) throw new Error(`createUploadSession ${res.status}: ${(await res.text()).slice(0, 200)}`);

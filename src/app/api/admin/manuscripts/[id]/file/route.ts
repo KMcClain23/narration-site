@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireAdmin } from "@/lib/require-admin";
-import { r2, R2_BUCKETS } from "@/lib/r2";
-import { DRIVE_USER, graphAppToken } from "@/lib/pickup-graph";
+import { readManuscriptSource } from "@/lib/manuscript-source";
 
 /**
  * The manuscript's source file, streamed back for the page viewer.
@@ -33,6 +31,9 @@ import { DRIVE_USER, graphAppToken } from "@/lib/pickup-graph";
  * been linked yet, must still open. The fallback says which store answered in
  * a response header so a row that is quietly still on the old path is visible
  * rather than assumed migrated.
+ *
+ * The reading itself lives in manuscript-source.ts, because four routes needed
+ * it and four copies is how three of them would have been left behind.
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const denied = await requireAdmin();
@@ -69,58 +70,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       },
     });
 
-  /* ── OneDrive first, by id ─────────────────────────────────────────────── */
-  if (manuscript.source_item_id) {
-    try {
-      const token = await graphAppToken();
-      const res = await fetch(
-        `https://graph.microsoft.com/v1.0/users/${DRIVE_USER}/drive/items/` +
-          `${encodeURIComponent(manuscript.source_item_id)}/content`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      if (res.ok) {
-        return send(new Uint8Array(await res.arrayBuffer()), "onedrive");
-      }
-      // 404/410 mean the script has been moved out or deleted. That is a
-      // definite answer and it is said as one — not silently retried against a
-      // stale R2 copy that may be a different draft.
-      if (res.status === 404 || res.status === 410) {
-        return NextResponse.json(
-          {
-            error:
-              `The script is no longer in OneDrive at ${manuscript.source_path ?? "its recorded location"}. ` +
-              `It has been moved or deleted; re-link it from Scripts/.`,
-          },
-          { status: 410 },
-        );
-      }
-      // Anything else is "could not find out", and falls through to the
-      // fallback rather than declaring the file gone.
-      console.error(`manuscript ${id}: Graph ${res.status}`);
-    } catch (e) {
-      console.error(`manuscript ${id}: Graph unreachable — ${String(e).slice(0, 160)}`);
-    }
-  }
-
-  /* ── R2, only for rows not yet moved ───────────────────────────────────── */
-  if (!manuscript.source_r2_key) {
-    return NextResponse.json(
-      {
-        error: manuscript.source_item_id
-          ? "The script could not be read from OneDrive just now. Try again in a moment."
-          : "No source file is linked for this manuscript.",
-      },
-      { status: manuscript.source_item_id ? 502 : 404 },
-    );
-  }
-
-  try {
-    const obj = await r2.send(
-      new GetObjectCommand({ Bucket: R2_BUCKETS.media.name, Key: manuscript.source_r2_key }),
-    );
-    if (!obj.Body) return NextResponse.json({ error: "Source file is empty." }, { status: 404 });
-    return send(await obj.Body.transformToByteArray(), "r2-legacy");
-  } catch {
-    return NextResponse.json({ error: "Could not read the source file." }, { status: 502 });
-  }
+  const source = await readManuscriptSource(manuscript);
+  if ("failed" in source) return NextResponse.json({ error: source.failed }, { status: 502 });
+  if ("gone" in source) return NextResponse.json({ error: source.gone }, { status: 410 });
+  return send(source.bytes, source.store);
 }

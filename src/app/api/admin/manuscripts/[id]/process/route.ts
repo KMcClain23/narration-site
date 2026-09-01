@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
-import { r2, R2_BUCKETS } from "@/lib/r2";
+import { readManuscriptSource } from "@/lib/manuscript-source";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { parseManuscript, PARSE_BUDGET_MS, toStorableText } from "@/lib/manuscript-parser";
 import { nextCharacterColor } from "@/lib/character-colors";
@@ -59,7 +58,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const { data: manuscript, error: fetchError } = await supabaseAdmin
     .from("manuscripts")
-    .select("id, source_r2_key")
+    .select("id, source_item_id, source_r2_key")
     .eq("id", id)
     .single();
 
@@ -67,11 +66,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Manuscript not found" }, { status: 404 });
   }
 
+  /*
+    THE SOURCE COMES FROM ONE READER, and its three outcomes stay apart here.
+
+    "Could not reach OneDrive" must not mark a manuscript failed: that writes a
+    permanent-looking error onto a row whose file is fine, and the person who
+    reads it re-uploads a book that was never missing. A transient failure is
+    answered 502 and the row is left alone to be retried.
+  */
+  const source = await readManuscriptSource(manuscript);
+  if ("failed" in source) {
+    return NextResponse.json({ error: source.failed }, { status: 502 });
+  }
+  if ("gone" in source) {
+    await supabaseAdmin.from("manuscripts")
+      .update({ status: "failed", error_message: source.gone }).eq("id", id);
+    return NextResponse.json({ error: source.gone }, { status: 410 });
+  }
+
   try {
-    const obj = await r2.send(
-      new GetObjectCommand({ Bucket: R2_BUCKETS.media.name, Key: manuscript.source_r2_key })
-    );
-    const bytes = await obj.Body!.transformToByteArray();
+    const bytes = source.bytes;
 
     const started = Date.now();
     console.log(`[manuscripts/process] ${id} — parsing ${bytes.length} bytes`);

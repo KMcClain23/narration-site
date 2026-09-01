@@ -1,11 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { r2, R2_BUCKETS, R2_PREFIXES } from "@/lib/r2";
-import { sanitizeName } from "@/lib/sanitize-name";
 import { requireAdmin } from "@/lib/require-admin";
+import { createUploadSession, graphAppToken } from "@/lib/pickup-graph";
+import { sanitiseSegment } from "@/lib/pickup-paths";
 
-// Same bucket, client, and presigned-PUT pattern as /api/upload-person-photo/upload-url.
+/**
+ * Where a manuscript upload goes. OneDrive's Scripts/, not R2.
+ *
+ * ── WHY THIS CHANGED ───────────────────────────────────────────────────────
+ *
+ * It minted a presigned PUT into R2_BUCKETS.media — the bucket that serves
+ * book covers and branding, and which has R2_MEDIA_PUBLIC_BASE_URL configured.
+ * An uncredentialed GET on that base URL returned 206 and the real PDF bytes;
+ * it was measured before the existing objects were removed. Every manuscript
+ * uploaded through here was readable by anyone who had the key, and the proxy
+ * that "kept the bucket private" only ever hid the key.
+ *
+ * Deleting those objects without changing this route would have closed the hole
+ * until the next upload.
+ *
+ * ── AND WHY AN UPLOAD SESSION, NOT A SERVER FORWARD ────────────────────────
+ *
+ * Manuscripts run to 18 MB and Vercel caps a serverless request body far below
+ * that, so the bytes must not pass through this app. A Graph upload session is
+ * the same shape as a presigned PUT — bound to ONE path, short-lived, write-only
+ * — and it is the machinery the narrator's audio upload already uses for files
+ * up to 200 MB. Reusing it is one mechanism rather than two.
+ *
+ * ── THE NAME IS THE BOOK ───────────────────────────────────────────────────
+ *
+ * Scripts/ is flat with one file per book, and the link to a card is made by
+ * matching the FILENAME to a card title. So the destination is named from the
+ * title the uploader gave, not from whatever the file on their disk is called —
+ * "manuscript-final-v3.pdf" would be unlinkable forever.
+ */
+
 const ALLOWED_TYPES: Record<string, "pdf" | "docx" | "txt"> = {
   "application/pdf": "pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
@@ -16,7 +44,7 @@ export async function POST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
   try {
-    const { filename, contentType } = await req.json();
+    const { filename, contentType, title } = await req.json();
 
     // Browsers are inconsistent about the MIME type they report for .txt —
     // some send text/plain, others fall back to application/octet-stream or an
@@ -33,20 +61,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing filename" }, { status: 400 });
     }
 
-    const base = sanitizeName(filename.replace(/\.[^.]+$/, "")) || "manuscript";
-    const key = `${R2_PREFIXES.manuscripts}${Date.now()}-${base}.${format}`;
+    // The book's title decides the name, because the title is what links it to
+    // a card later. Falling back to the file's own name keeps an upload with no
+    // title from failing outright, but it will need linking by hand.
+    const base =
+      typeof title === "string" && title.trim()
+        ? sanitiseSegment(title.trim())
+        : sanitiseSegment(filename.replace(/\.[^.]+$/, "")) || "manuscript";
+    const path = `Scripts/${base}.${format}`;
 
-    const command = new PutObjectCommand({
-      Bucket: R2_BUCKETS.media.name,
-      Key: key,
-      ContentType: contentType,
-    });
+    const token = await graphAppToken();
+    // REPLACE: a re-upload is a corrected draft of the same book, and a
+    // "Book (1).pdf" beside it would break the one-file-per-book convention
+    // that the whole Scripts/ folder and its card matching rest on.
+    const uploadUrl = await createUploadSession(token, path, "replace");
 
-    const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 600 });
-
-    return NextResponse.json({ uploadUrl, key, format });
+    return NextResponse.json({ uploadUrl, path, format });
   } catch (e) {
     console.error("[manuscripts/upload-url]", e);
-    return NextResponse.json({ error: "Failed to generate upload URL" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to start the upload" }, { status: 500 });
   }
 }

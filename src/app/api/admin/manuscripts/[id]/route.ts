@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { r2, R2_BUCKETS } from "@/lib/r2";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { countNumberedChapters } from "@/lib/unnumbered-sections";
+import { countNumberedChapters } from "@/lib/unnumbered-sections";
+
 import { requireAdmin } from "@/lib/require-admin";
 
 // GET: poll status — the manuscripts.status column plus a chapter count,
@@ -67,11 +68,19 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     supabaseAdmin.from("manuscripts").select("source_r2_key").eq("id", id).single(),
   ]);
 
-  // The source upload is included now. Processing used to delete it before
-  // parsing, so by the time anything reached here there was never a source file
-  // left to clean up; it survives a failed parse on purpose (so the parse can
-  // be retried), which means deleting the manuscript has to take it with it or
-  // every failed upload leaves a file in the bucket permanently.
+  /*
+    THE SCRIPT IN OneDrive IS NOT DELETED, and that is a change.
+
+    While manuscripts lived in R2 they were app-managed uploads, so deleting the
+    row had to take the object with it or a failed parse left a file in the
+    bucket for ever. Scripts/ is not that: it is a folder DEAN puts files in,
+    beside Spliced/ and Pickups/, and the file there may be the only copy of a
+    manuscript he was sent. Deleting a database row must not reach into his
+    drive and remove it.
+
+    So only R2 keys are cleaned up here — the legacy source, and the character
+    voice samples, which are still app-managed uploads.
+  */
   const keys = [
     ...(characters ?? []).map((c) => c.voice_sample_key),
     manuscript?.source_r2_key,

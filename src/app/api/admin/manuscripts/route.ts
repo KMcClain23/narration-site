@@ -15,13 +15,15 @@ export async function POST(req: Request) {
   const denied = await requireAdmin();
   if (denied) return denied;
   try {
-    const { title, author, key, format, pages_only } = await req.json();
+    const { title, author, itemId, path, format, pages_only } = await req.json();
 
     if (!title || typeof title !== "string") {
       return NextResponse.json({ error: "Missing title" }, { status: 400 });
     }
-    if (!key || typeof key !== "string") {
-      return NextResponse.json({ error: "Missing key" }, { status: 400 });
+    // THE ITEM ID IS REQUIRED. A row with no locator is a manuscript nothing
+    // can ever read, and it would sit in the list looking uploaded.
+    if (!itemId || typeof itemId !== "string") {
+      return NextResponse.json({ error: "Missing the uploaded file's id" }, { status: 400 });
     }
     const pagesOnly = pages_only === true && format === "pdf";
 
@@ -34,7 +36,11 @@ export async function POST(req: Request) {
       .insert({
         title,
         author: typeof author === "string" && author.trim() ? author.trim() : null,
-        source_r2_key: key,
+        // THE ID, NOT THE PATH. Scripts/ is a folder Dean works in; a file
+        // there gets renamed and moved, and an id survives both. The path is
+        // recorded beside it for display only and is never resolved.
+        source_item_id: itemId ?? null,
+        source_path: typeof path === "string" ? path : null,
         source_format: format,
         // Skipping the parse means there is nothing to wait for: the book is
         // ready to mark up on the page as soon as it finishes uploading.
