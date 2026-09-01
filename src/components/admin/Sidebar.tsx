@@ -8,6 +8,7 @@ import { BUSINESS, PROFILE_PHOTO_URL, ROLE_LABEL } from "@/lib/business-identity
 import {
   LayoutGrid, Calendar, CheckCircle2, Users, Mail, Wrench, DollarSign, Settings as SettingsIcon,
   ChevronLeft, ChevronRight, LogOut, Receipt, Mic2,
+  Activity,
 } from "lucide-react";
 import { SidebarSection, type NavItem } from "./SidebarSection";
 import { useUnreadInquiries } from "./useUnreadInquiries";
@@ -34,6 +35,9 @@ const NAV_GROUPS: NavItem[][] = [
     // pickups "where he works", and this is what makes that true.
     { label: "Pickups", href: "/pickups", icon: Mic2 },
     { label: "Schedule", href: "/schedule", icon: Calendar },
+    // The log. A page with no way to reach it is not delivered — the same
+    // reason Pickups is in this group.
+    { label: "Activity", href: "/activity", icon: Activity },
   ],
   [
     { label: "Payments", href: "/payments", icon: DollarSign },

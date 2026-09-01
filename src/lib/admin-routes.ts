@@ -37,6 +37,7 @@ const EXACT = new Set([
   "/settings",
   "/payments",
   "/pickups",
+  "/activity",
   "/expenses",
   "/released",
 ]);

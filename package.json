@@ -36,6 +36,8 @@
     "check-catalogue-links": "npx --yes tsx scripts/check-catalogue-links.mjs",
     "check-internal-links": "node scripts/check-internal-links.mjs",
     "check-env": "npx --yes tsx --env-file=.env.local scripts/check-env.mjs",
+    "check-activity-log": "npx --yes tsx --env-file=.env.local scripts/check-activity-log.mjs",
+    "check-spliced-watch": "npx --yes tsx --conditions=react-server --env-file=.env.local scripts/check-spliced-watch.mjs",
     "check-env:build": "node scripts/check-env.mjs --build",
     "check-internal-links:ci": "node scripts/check-internal-links.mjs",
     "check-catalogue-links:ci": "npx --yes tsx scripts/check-catalogue-links.mjs",

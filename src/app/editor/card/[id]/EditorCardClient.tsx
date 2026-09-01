@@ -8,6 +8,7 @@ import type {
 } from "@/lib/editor-data";
 import { ChapterField, chapterOptions, defaultChapter } from "./ChapterField";
 import { FreshLinkButtons, type PickupBatch } from "@/components/pickups/FreshLinkButtons";
+import { CompleteBookDialog } from "@/components/pickups/CompleteBookDialog";
 
 /**
  * Her writes — ALL of them through the gated functions, with her JWT.
@@ -394,10 +395,34 @@ export function EditorCardClient({
       }),
     );
 
+  /*
+    COMPLETING ASKS FIRST; REOPENING DOES NOT.
+
+    They are not symmetrical. "Ready to submit to the rights holder" is a claim
+    that leaves this app — reopening only takes it back, and a confirmation on
+    the undo would be friction on the safe direction.
+  */
+  const [confirmingComplete, setConfirmingComplete] = useState(false);
+
   const setComplete = (complete: boolean) =>
     run(complete ? "Marking complete" : "Reopening", () =>
       supabase.rpc("set_editing_complete", { p_card_id: card.id, p_complete: complete }),
     );
+
+  /*
+    The facts the dialog states, read at the moment of pressing.
+
+    OPEN MEANS sent OR returned — everything not yet resolved or dismissed.
+    `returned` counts: the narrator has re-recorded it but nobody has verified
+    it, so it is still outstanding work on this book and the whole point of the
+    warning is that it is not visible from up here.
+  */
+  const completionFacts = {
+    title: card.title,
+    chaptersDone: doneSet.size,
+    chaptersTotal: total === "" ? null : Number(total),
+    openPickups: pickups.filter(p => p.status === "sent" || p.status === "returned").length,
+  };
 
   async function submitPickup() {
     const payload = {
@@ -680,13 +705,17 @@ export function EditorCardClient({
                 <span className="text-xs text-[#E0C15A]">
                   All {chapterKeys.length} chapters done — mark the book complete?
                 </span>
+                {/* THE SAME DIALOG. Filling the last chapter still only
+                    prompts — it does not complete — and the prompt must lead to
+                    the same confirmation as the button below, or there would be
+                    a path to completion that never shows the open pickups. */}
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => void setComplete(true)}
+                  onClick={() => setConfirmingComplete(true)}
                   className="rounded-lg bg-[#D4AF37] px-3 py-1.5 text-xs font-bold text-black hover:bg-[#E0C15A] disabled:opacity-40"
                 >
-                  Mark complete
+                  Complete and mastered
                 </button>
               </div>
             )}
@@ -730,13 +759,26 @@ export function EditorCardClient({
               className={`${field} mt-1 w-20 text-center`}
             />
           </label>
+          {/*
+            THE BUTTON NAMES THE BUSINESS EVENT, not the database one.
+            "Mark complete" is what the column is called; "complete and
+            mastered" is what Dean is actually declaring, and it is the sentence
+            he uses. Given the weight of a milestone rather than sitting at the
+            same size as the number field beside it.
+          */}
           <button
             type="button"
             disabled={busy}
-            onClick={() => void setComplete(!editingCompletedAt)}
-            className="mt-4 rounded-lg border border-white/20 px-3 py-1.5 text-xs text-white/70 transition-colors hover:bg-white/5 disabled:opacity-40"
+            onClick={() =>
+              editingCompletedAt ? void setComplete(false) : setConfirmingComplete(true)
+            }
+            className={
+              editingCompletedAt
+                ? "mt-4 rounded-lg border border-white/20 px-3 py-1.5 text-xs text-white/70 transition-colors hover:bg-white/5 disabled:opacity-40"
+                : "mt-4 rounded-xl bg-[#D4AF37] px-4 py-2 text-sm font-bold text-black transition-colors hover:bg-[#E0C15A] disabled:opacity-40"
+            }
           >
-            {editingCompletedAt ? "Reopen" : "Mark complete"}
+            {editingCompletedAt ? "Reopen" : "Complete and mastered"}
           </button>
         </div>
       </section>
@@ -866,6 +908,18 @@ export function EditorCardClient({
           )}
         </div>
       </section>
+      )}
+
+      {confirmingComplete && (
+        <CompleteBookDialog
+          facts={completionFacts}
+          busy={busy}
+          onCancel={() => setConfirmingComplete(false)}
+          onConfirm={() => {
+            setConfirmingComplete(false);
+            void setComplete(true);
+          }}
+        />
       )}
 
       {/* ------------------------------------------------------------ pickups */}

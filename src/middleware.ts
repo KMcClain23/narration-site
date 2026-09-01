@@ -109,7 +109,7 @@ export const config = {
     // not match them, so middleware refreshes the cookie and passes them
     // through rather than bouncing an editor off her own audio.
     "/api/pickups/:path*",
-    "/inquiries", "/tools", "/tools/:path*", "/settings", "/payments", "/pickups", "/expenses", "/released",
+    "/inquiries", "/tools", "/tools/:path*", "/settings", "/payments", "/pickups", "/activity", "/expenses", "/released",
     // The editor pages are matched for SESSION REFRESH ONLY. They are gated in
     // their own layout, against a different admitted set (editor or admin) —
     // adding them to the admin predicates above would bounce Marizete off her

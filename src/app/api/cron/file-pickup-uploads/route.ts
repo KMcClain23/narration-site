@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { notifyEditorsOfFiling } from "@/lib/notify-filed";
 import { chapterDir, sanitiseSegment, takeName } from "@/lib/pickup-paths";
 import { cutClips, type ClipOutcome } from "@/lib/pickup-clip-cutter";
+import { watchSpliced, type SplicedReport } from "@/lib/spliced-watch";
 import {
   QUARANTINE_ROOT,
   childrenById,
@@ -334,7 +335,22 @@ export async function GET(req: Request) {
     notified.push({ linkId, outcome: JSON.stringify(outcome) });
   }
 
+  /*
+    ── NOTICE WHAT DEAN SPLICED ─────────────────────────────────────────────
+
+    Last, and in its own try, because it is the only part of this route that
+    tells somebody something rather than moving their files. A Graph delta
+    failure must not cost the filing that already succeeded above.
+  */
+  let spliced: SplicedReport = { announced: [], waiting: [], skipped: [] };
+  try {
+    spliced = await watchSpliced(supabaseAdmin, await graphAppToken());
+  } catch (e) {
+    spliced.error = String(e).slice(0, 300);
+  }
+
   return NextResponse.json({
+    spliced,
     filed: filed.length,
     failed: failed.length,
     swept,
