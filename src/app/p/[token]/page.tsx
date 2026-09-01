@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { batchByToken, clientIp, rateLimit } from "@/lib/pickup-link";
+import { batchByToken, clientIp, notesByToken, rateLimit } from "@/lib/pickup-link";
 import { NarratorConfirm } from "./NarratorConfirm";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +58,8 @@ export default async function NarratorPickupPage({
   if (!(await rateLimit(clientIp(h), "read", 30, 60))) return <Expired />;
 
   const rows = await batchByToken(token);
+  // Read after the batch, so a dead token never reaches it.
+  const notes = rows ? await notesByToken(token) : [];
   if (!rows) return <Expired />;
 
   const { book_title, chapter, narrator_name } = rows[0];
@@ -73,7 +75,7 @@ export default async function NarratorPickupPage({
           {/^\d/.test(chapter.trim()) ? `Chapter ${chapter}` : chapter}
         </p>
 
-        <NarratorConfirm token={token} outstanding={outstanding} done={done} />
+        <NarratorConfirm token={token} outstanding={outstanding} done={done} notes={notes} />
 
         <p className="mt-10 text-xs text-white/30">
           Marking these re-recorded tells Dean and Marizete the audio is ready to check. It

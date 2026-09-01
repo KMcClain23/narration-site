@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { BatchRow } from "@/lib/pickup-link";
+import type { BatchRow, TokenNote } from "@/lib/pickup-link";
 
 /**
  * The list, and the one action.
@@ -15,12 +15,40 @@ import type { BatchRow } from "@/lib/pickup-link";
  * never reaches a database call from this browser, because `anon` has EXECUTE on
  * none of the functions involved.
  */
+/**
+ * A message about the batch or one line, from Dean or Marizete.
+ *
+ * DELIBERATELY NOT STYLED LIKE THE CORRECTION. On this page the said/should-be
+ * pair is an instruction to perform; a note is somebody talking. If a note read
+ * like a correction, "I edited the spliced file and saved over it" would look
+ * like a line to re-record — which is the exact confusion this page can least
+ * afford, because the narrator acts on it alone in a booth.
+ */
+function Notes({ notes }: { notes: TokenNote[] }) {
+  if (notes.length === 0) return null;
+  return (
+    <div className="mt-3 space-y-2">
+      {notes.map(n => (
+        <div key={n.id} className="rounded-lg border-l-2 border-sky-400/60 bg-sky-400/[0.07] px-3 py-2">
+          <p className="text-xs text-sky-200/80">
+            {n.author_name}
+            <span className="text-white/35"> · {n.author_kind}</span>
+          </p>
+          <p className="mt-0.5 whitespace-pre-wrap text-[15px] text-white/90">{n.body}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function NarratorConfirm({
   token,
+  notes,
   outstanding,
   done,
 }: {
   token: string;
+  notes: TokenNote[];
   outstanding: BatchRow[];
   done: BatchRow[];
 }) {
@@ -28,6 +56,8 @@ export function NarratorConfirm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [checked, setChecked] = useState<Set<string>>(() => new Set());
+  /** Ann's message back. Optional — an empty one writes no row. */
+  const [reply, setReply] = useState("");
 
   /**
    * ATTACHING IS OPTIONAL AND NEVER MARKS ANYTHING.
@@ -68,7 +98,7 @@ export function NarratorConfirm({
       const res = await fetch("/api/pickup-link/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, pickupIds: [...checked] }),
+        body: JSON.stringify({ token, pickupIds: [...checked], note: reply.trim() || null }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || typeof body.moved !== "number") {
@@ -166,6 +196,7 @@ export function NarratorConfirm({
                 </p>
               </div>
             )}
+            <Notes notes={notes.filter(n => n.pickup_id === r.pickup_id)} />
             {muted && <p className="mt-2 text-xs text-white/40">Marked re-recorded</p>}
           </div>
         </div>
@@ -258,9 +289,15 @@ export function NarratorConfirm({
         </p>
       )}
 
+      {/* BATCH NOTES, ONCE, ABOVE THE LIST.
+          A note about the chapter's file belongs to the chapter, not to any one
+          line — repeating it under five corrections would read as five separate
+          things to do. */}
+      <Notes notes={notes.filter(n => n.link_id)} />
+
       {outstanding.length > 0 ? (
         <>
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-white/50">
+          <h2 className="mb-3 mt-4 text-sm font-bold uppercase tracking-wide text-white/50">
             {outstanding.length} to re-record
           </h2>
           <ul className="space-y-2">
@@ -269,7 +306,25 @@ export function NarratorConfirm({
             ))}
           </ul>
 
-          <div className="mt-5 flex flex-wrap items-center gap-3">
+          {/* ── THE REPLY CHANNEL ANN DID NOT HAVE ─────────────────────────
+              Every message on this page used to travel one way. Optional, and
+              an empty one writes no row: a note is context, never a gate, so
+              confirming without typing must work exactly as it always did. */}
+          <label className="mt-5 block">
+            <span className="text-xs uppercase tracking-wide text-white/40">
+              Anything to tell the editor? (optional)
+            </span>
+            <textarea
+              value={reply}
+              onChange={e => setReply(e.target.value)}
+              rows={2}
+              maxLength={2000}
+              placeholder="e.g. couldn't hear the noise on the third one"
+              className="mt-1 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[15px] text-white placeholder-white/25 focus:border-[#D4AF37]/50 focus:outline-none"
+            />
+          </label>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               type="button"
               disabled={busy || checked.size === 0}

@@ -166,8 +166,45 @@ export function PickupsClient({
     }
   }
 
-  const markReturned = (id: string) =>
-    call(id, () => supabase.rpc("mark_pickup_returned", { p_id: id }));
+  /**
+   * Re-recorded, optionally saying what was actually done.
+   *
+   * The prompt is deliberately skippable — a note is context, not a gate, and
+   * an empty one writes no row. It exists because "returned" and "returned, and
+   * I fixed the spliced file myself so there is no take to look for" are
+   * different facts that looked identical to Marizete.
+   *
+   * The note attaches to the BATCH server-side: the thing being explained is
+   * usually the file, and the file is per-chapter.
+   */
+  const markReturned = (id: string) => {
+    const note = window.prompt(
+      "Anything to tell the editor? (optional — e.g. \"I edited the spliced file and saved over it, ready to master\")",
+      "",
+    );
+    // null means Cancel, which is "do not mark it at all" rather than "mark it
+    // with no note" — pressing Escape by accident must not still write.
+    if (note === null) return Promise.resolve();
+    return call(id, async () => {
+      const res = await supabase.rpc("mark_pickup_returned", { p_id: id, p_note: note || null });
+      if (!res.error) {
+        /*
+          THE STATE CHANGE IS DONE; THE EMAIL IS BEST EFFORT.
+
+          Awaited so a failure is visible in the network log, but its outcome is
+          deliberately not checked: the pickup is already returned, and nothing
+          about a failed notification makes that untrue. Same asymmetry as the
+          filing sweep.
+        */
+        await fetch("/api/pickups/notify-returned", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pickupId: id }),
+        }).catch(() => {});
+      }
+      return res;
+    });
+  };
   const forceClose = (id: string) =>
     call(id, () => supabase.rpc("resolve_pickup", { p_id: id, p_status: "dismissed" }));
 

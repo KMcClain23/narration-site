@@ -101,14 +101,48 @@ export async function batchByToken(token: string): Promise<BatchRow[] | null> {
 }
 
 /** Returns how many rows moved. 0 for a dead token or ids outside the batch. */
-export async function markReturnedByToken(token: string, pickupIds: string[]): Promise<number> {
+export async function markReturnedByToken(
+  token: string,
+  pickupIds: string[],
+  /** Ann's reply, if she left one. The channel she did not previously have. */
+  note: string | null = null,
+): Promise<number> {
   const { data, error } = await supabaseAdmin.rpc("mark_returned_by_token", {
     p_token: token,
     p_pickup_ids: pickupIds,
+    p_note: note,
   });
   if (error) {
     console.error("mark_returned_by_token failed:", error.message);
     return 0;
   }
   return (data as number) ?? 0;
+}
+
+/** A note on this batch or on one of its pickups, for the narrator's page. */
+export type TokenNote = {
+  id: string;
+  pickup_id: string | null;
+  link_id: string | null;
+  body: string;
+  author_name: string;
+  author_kind: string;
+  created_at: string;
+};
+
+/**
+ * Notes the holder of this token may see.
+ *
+ * Scoped in the DATABASE to the token's own batch, the same rule
+ * mark_returned_by_token applies to the ids it is handed. Returns [] on any
+ * failure rather than throwing: a note is context, and a page that will not
+ * render because a note could not be read is worse than a page without it.
+ */
+export async function notesByToken(token: string): Promise<TokenNote[]> {
+  const { data, error } = await supabaseAdmin.rpc("notes_by_token", { p_token: token });
+  if (error) {
+    console.error("notes_by_token failed:", error.message);
+    return [];
+  }
+  return (data ?? []) as TokenNote[];
 }

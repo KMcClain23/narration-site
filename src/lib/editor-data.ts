@@ -312,6 +312,35 @@ export type UploadCount = {
   latest_filed_id: string | null;
 };
 
+/**
+ * A message ABOUT a pickup or a batch, in either direction.
+ *
+ * Distinct from `EditorPickup.note`, which is the raiser's correction text and
+ * is written once. These carry replies: Dean saying he fixed the spliced file
+ * himself, Ann saying she could not hear one, Marizete saying what she closed.
+ *
+ * `pickup_id` set means it is about one line; `link_id` set means it is about
+ * the whole chapter. Exactly one is ever set.
+ */
+export type PickupNote = {
+  id: string;
+  card_id: string;
+  chapter: string;
+  pickup_id: string | null;
+  link_id: string | null;
+  body: string;
+  author_name: string;
+  /** "admin" | "editor" | "narrator" — who is speaking, for the attribution. */
+  author_kind: string;
+  created_at: string;
+};
+
+export async function editorNotes(): Promise<PickupNote[]> {
+  const db = await userScopedClient();
+  const { data, error } = await db.rpc("pickup_notes_for_editor");
+  return unwrap<PickupNote[]>(data as PickupNote[], error, "pickup_notes_for_editor");
+}
+
 export async function editorUploads(): Promise<UploadCount[]> {
   const db = await userScopedClient();
   const { data, error } = await db.rpc("uploads_for_editor");

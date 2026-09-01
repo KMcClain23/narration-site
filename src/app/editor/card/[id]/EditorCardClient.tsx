@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import type {
-  EditorCardDetail, EditorPickup, CastMember, UploadCount,
+  EditorCardDetail, EditorPickup, CastMember, UploadCount, PickupNote,
 } from "@/lib/editor-data";
 import { ChapterField, chapterOptions, defaultChapter } from "./ChapterField";
 
@@ -32,6 +32,36 @@ const KINDS = [
   { value: "sentence", label: "Sentence" },
   { value: "other", label: "Other" },
 ] as const;
+
+/**
+ * A message ABOUT a pickup, from whoever sent it back or closed it.
+ *
+ * VISUALLY DISTINCT FROM THE CORRECTION, deliberately and at some cost to
+ * tidiness. The correction is the line to re-record; a note is somebody talking
+ * about the fix. Rendering them alike would let "I edited the spliced file and
+ * saved over it" be read as a line to perform, which is the one confusion this
+ * whole feature must not create.
+ *
+ * So: a left rule, an attribution, a different weight, and never the
+ * quotation-mark treatment the said/should-be pair gets.
+ */
+function NoteBlock({ notes }: { notes: PickupNote[] }) {
+  if (notes.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-1.5">
+      {notes.map(n => (
+        <div key={n.id} className="border-l-2 border-sky-400/50 bg-sky-400/[0.06] px-3 py-2">
+          <p className="text-[11px] text-sky-200/70">
+            {n.author_name}
+            <span className="text-white/30"> · {n.author_kind} · </span>
+            {new Date(n.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+          </p>
+          <p className="mt-0.5 whitespace-pre-wrap text-[13px] text-white/85">{n.body}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** Only a misread carries the said/should-be pair — the database refuses one half without the other. */
 const needsSaidPair = (kind: string) => kind === "misread";
@@ -218,6 +248,7 @@ export function EditorCardClient({
   pickups,
   cast,
   uploads,
+  notes,
   userId,
 }: {
   card: EditorCardDetail;
@@ -230,6 +261,7 @@ export function EditorCardClient({
   cast: CastMember[];
   /** Narrator audio for this card, per chapter. Filed and pending kept apart. */
   uploads: UploadCount[];
+  notes: PickupNote[];
   userId: string | null;
 }) {
   const router = useRouter();
@@ -349,10 +381,25 @@ export function EditorCardClient({
    * there forever. The database already refuses `resolved` from anything but
    * `returned`, so this button only appears where the server would accept it.
    */
-  const closePickup = (id: string, status: "resolved" | "dismissed") =>
-    run(status === "resolved" ? "Closing pickup" : "Dismissing pickup", () =>
-      supabase.rpc("resolve_pickup", { p_id: id, p_status: status }),
+  /**
+   * Close or dismiss, optionally recording why.
+   *
+   * PER LINE, unlike the note on Re-recorded: "closing this, the fix is in" is
+   * about the correction just closed, not about the chapter's file. Skippable —
+   * Cancel abandons the whole action, an empty note simply writes no row.
+   */
+  const closePickup = (id: string, status: "resolved" | "dismissed") => {
+    const note = window.prompt(
+      status === "resolved"
+        ? "Anything to record about this fix? (optional)"
+        : "Why are you dismissing this? (optional)",
+      "",
     );
+    if (note === null) return Promise.resolve();
+    return run(status === "resolved" ? "Closing pickup" : "Dismissing pickup", () =>
+      supabase.rpc("resolve_pickup", { p_id: id, p_status: status, p_note: note || null }),
+    );
+  };
 
   /**
    * SEND GOES THROUGH THE EDGE FUNCTION, and only through it.
@@ -744,6 +791,11 @@ export function EditorCardClient({
                 )}
               </div>
 
+              {/* ONCE, AGAINST THE CHAPTER — not repeated under every line.
+                  A note about the spliced file is one fact about the chapter,
+                  and five copies of it would read as five findings. */}
+              <NoteBlock notes={notes.filter(n => n.link_id && n.chapter === chapter)} />
+
               <ul className="mt-3 space-y-2">
                 {list.map(p => {
                   const editable = isEditableBy(p, userId);
@@ -758,6 +810,9 @@ export function EditorCardClient({
                           {p.timestamp_at} · {p.status}
                           {p.assigned_narrator_name ? ` · ${p.assigned_narrator_name}` : ""}
                         </p>
+                        {/* Notes about THIS line — "I could not hear that one",
+                            "closing it, the fix is in". */}
+                        <NoteBlock notes={notes.filter(n => n.pickup_id === p.id)} />
                       </div>
                       {p.status === "returned" && (
                         <div className="flex shrink-0 items-center gap-3">

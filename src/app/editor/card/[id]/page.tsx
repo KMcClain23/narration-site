@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { currentSession } from "@/lib/supabase/session";
 import {
-  editorBoard, editorCardDetail, editorPickups, editorCardCast, editorUploads,
+  editorBoard, editorCardDetail, editorPickups, editorCardCast, editorUploads, editorNotes,
 } from "@/lib/editor-data";
 import { EditorCardClient } from "./EditorCardClient";
 
@@ -26,7 +26,7 @@ export default async function EditorCardPage({
 }) {
   const { id } = await params;
 
-  const [session, card, board, allPickups, cast, uploads] = await Promise.all([
+  const [session, card, board, allPickups, cast, uploads, allNotes] = await Promise.all([
     currentSession(),
     editorCardDetail(id),
     // THE EDITING COLUMNS COME FROM THE BOARD FUNCTION, not the detail one.
@@ -42,6 +42,9 @@ export default async function EditorCardPage({
     // instead of quietly offering the wrong people.
     editorCardCast(id),
     editorUploads(),
+    // Replies ABOUT the pickups, in either direction — distinct from
+    // pickups.note, which is the raiser's correction text.
+    editorNotes(),
   ]);
   const progress = board.find(c => c.id === id) ?? null;
 
@@ -67,6 +70,7 @@ export default async function EditorCardPage({
         pickups={allPickups.filter(p => p.card_id === card.id)}
         cast={cast}
         uploads={uploads.filter(u => u.card_id === id)}
+        notes={allNotes.filter(n => n.card_id === id)}
         userId={session?.userId ?? null}
       />
     </>

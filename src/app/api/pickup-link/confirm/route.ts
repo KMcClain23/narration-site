@@ -30,10 +30,15 @@ export async function POST(req: Request) {
 
   let token: string;
   let pickupIds: string[];
+  let note: string | null = null;
   try {
     const body = await req.json();
     token = String(body.token ?? "");
     pickupIds = Array.isArray(body.pickupIds) ? body.pickupIds.map(String) : [];
+    // Optional, and capped. A reply, not an essay — and an unbounded string
+    // from an unauthenticated page is a thing to bound at the door.
+    const raw = typeof body.note === "string" ? body.note.trim() : "";
+    note = raw ? raw.slice(0, 2000) : null;
   } catch {
     return NextResponse.json({ error: "Bad request." }, { status: 400 });
   }
@@ -46,7 +51,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Too many at once." }, { status: 400 });
   }
 
-  const moved = await markReturnedByToken(token, pickupIds);
+  const moved = await markReturnedByToken(token, pickupIds, note);
 
   // ── STATE FIRST, THEN EMAIL — AND THIS IS THE OPPOSITE OF send-pickups ────
   //
