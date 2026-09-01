@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/check-env.mjs --build",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -34,6 +35,8 @@
     "check-pickup-links": "npx --yes tsx --env-file=.env.local scripts/check-pickup-links.mjs",
     "check-catalogue-links": "npx --yes tsx scripts/check-catalogue-links.mjs",
     "check-internal-links": "node scripts/check-internal-links.mjs",
+    "check-env": "npx --yes tsx --env-file=.env.local scripts/check-env.mjs",
+    "check-env:build": "node scripts/check-env.mjs --build",
     "check-internal-links:ci": "node scripts/check-internal-links.mjs",
     "check-catalogue-links:ci": "npx --yes tsx scripts/check-catalogue-links.mjs",
     "test:paths": "npx --yes tsx --test scripts/pickup-paths.test.mjs",
