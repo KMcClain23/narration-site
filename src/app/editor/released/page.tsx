@@ -25,19 +25,19 @@ export default async function EditorReleasedPage() {
 
   return (
     <>
-      <Link href="/editor" className="text-xs text-white/40 hover:text-white/70">
+      <Link href="/editor" className="text-xs text-text-dim hover:text-text-body">
         ← Your books
       </Link>
 
       <div className="mb-5 mt-3 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-lg font-bold">Released</h1>
-        <p className="text-xs text-white/40">
+        <p className="text-xs text-text-dim">
           {released.length} book{released.length === 1 ? "" : "s"}
         </p>
       </div>
 
       {released.length === 0 ? (
-        <p className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm text-white/50">
+        <p className="rounded-2xl border border-divider bg-surface p-6 text-sm text-text-muted">
           Nothing released yet.
         </p>
       ) : (
@@ -46,16 +46,16 @@ export default async function EditorReleasedPage() {
             <Link
               key={c.id}
               href={`/editor/card/${c.id}`}
-              className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-2.5 transition-colors hover:border-white/25"
+              className="flex items-center gap-3 rounded-xl border border-divider bg-surface p-2.5 transition-colors hover:border-surface-border"
             >
-              <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/5">
+              <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-lg border border-divider bg-surface">
                 {c.cover_url ? (
                   <Image src={c.cover_url} alt="" fill sizes="40px" className="object-cover" />
                 ) : null}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-white/80">{c.title}</p>
-                <p className="truncate text-[11px] text-white/40">{c.author ?? "—"}</p>
+                <p className="truncate text-sm text-text-body">{c.title}</p>
+                <p className="truncate text-[11px] text-text-dim">{c.author ?? "—"}</p>
               </div>
             </Link>
           ))}

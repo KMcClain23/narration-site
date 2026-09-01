@@ -107,23 +107,39 @@ export function CorrectionDiff({
   labelClass?: string;
 }) {
   const d = diffPickup(said, shouldBe);
-  const Wrap = clamp ? Clamped : ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div className={className}>{children}</div>
-  );
+
+  /*
+    A FUNCTION THAT RETURNS JSX, NOT A COMPONENT DECLARED DURING RENDER.
+
+    This was `const Wrap = clamp ? Clamped : ({children}) => <div/>`, which
+    creates a NEW component type on every render of the non-clamping branch —
+    React then unmounts and remounts the subtree each time, discarding any state
+    inside it. Harmless for a plain div today and a trap the moment anything
+    stateful goes in there, which is exactly what Clamped is on the other
+    branch. Calling a helper avoids inventing a type at all.
+  */
+  const wrap = (className: string, children: React.ReactNode) =>
+    clamp ? (
+      <Clamped className={className}>{children}</Clamped>
+    ) : (
+      <div className={className}>{children}</div>
+    );
 
   return (
     <dl className="mt-2 space-y-1">
       <div className="flex flex-wrap items-baseline gap-x-3">
         <dt className={labelClass}>Said</dt>
-        <Wrap className={`min-w-0 flex-1 break-words ${saidClass}`}>
-          {d.said.length > 0 ? <Marked tokens={d.said} mode="said" /> : "—"}
-        </Wrap>
+        {wrap(
+          `min-w-0 flex-1 break-words ${saidClass}`,
+          d.said.length > 0 ? <Marked tokens={d.said} mode="said" /> : "—",
+        )}
       </div>
       <div className="flex flex-wrap items-baseline gap-x-3">
         <dt className={labelClass}>Should be</dt>
-        <Wrap className={`min-w-0 flex-1 break-words ${shouldBeClass}`}>
-          {d.shouldBe.length > 0 ? <Marked tokens={d.shouldBe} mode="shouldBe" /> : "—"}
-        </Wrap>
+        {wrap(
+          `min-w-0 flex-1 break-words ${shouldBeClass}`,
+          d.shouldBe.length > 0 ? <Marked tokens={d.shouldBe} mode="shouldBe" /> : "—",
+        )}
       </div>
     </dl>
   );

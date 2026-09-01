@@ -33,7 +33,7 @@ export function ChapterField({
   const options = chapterOptions(chapters, chaptersTotal);
 
   const field =
-    "w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 focus:border-[#D4AF37]/50 focus:outline-none";
+    "w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm text-text-primary placeholder-text-faint focus:border-accent-amber/50 focus:outline-none";
 
   if (options.length === 0) {
     // The 22 with no chapter data at all. Unchanged on purpose.
@@ -55,11 +55,11 @@ export function ChapterField({
       className={field}
       aria-label="Chapter"
     >
-      <option value="" className="bg-[#0A0D3A]">
+      <option value="" className="bg-surface">
         Which chapter?
       </option>
       {options.map(o => (
-        <option key={o} value={o} className="bg-[#0A0D3A]">
+        <option key={o} value={o} className="bg-surface">
           {/^\d+$/.test(o) ? `Chapter ${o}` : o}
         </option>
       ))}

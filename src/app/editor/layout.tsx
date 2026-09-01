@@ -4,6 +4,7 @@ import { currentSession } from "@/lib/supabase/session";
 import { roleAdmits } from "@/lib/route-access";
 import { NoAccessPanel } from "@/components/auth/NoAccessPanel";
 import { SignOutButton } from "@/app/admin/login/SignOutButton";
+import { AdminTheme } from "@/components/admin/AdminTheme";
 
 /**
  * THE EDITOR SURFACE — Marizete's, and Dean's to look at.
@@ -43,9 +44,29 @@ export default async function EditorLayout({ children }: { children: React.React
     );
   }
 
+  /*
+    THE ADMIN LOOK, WITHOUT THE ADMIN NAVIGATION.
+
+    This surface was wearing the PUBLIC palette — the marketing navy and the
+    marketing gold, both hardcoded here as hex literals — because it never opted
+    into the admin design system at all. Dean's pages get that system through
+    AdminLayout, and hers read as a different product beside them. The admin
+    amber is deliberately duller than the public gold, which is most of the
+    difference he was reacting to.
+
+    AdminTheme, not AdminLayout. AdminLayout renders AdminShell, whose sidebar
+    and tab bar point at /board, /payments, /contacts and the rest — every one of
+    which Marizete cannot open. She would get a navigation full of dead ends and
+    a "no access" panel behind each one. She needs the theming shell, and this is
+    it: .admin-root, Manrope, and the semantic tokens.
+
+    The header below stays hers. It is not AdminShell's chrome wearing new
+    colours; it is the same one-line header she has always had, now built from
+    admin tokens.
+  */
   return (
-    <div className="min-h-screen bg-[#06082E] text-white">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#06082E]/85 backdrop-blur-xl">
+    <AdminTheme className="min-h-screen">
+      <header className="sticky top-0 z-40 border-b border-divider bg-background/85 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-5">
           <Link href="/editor" className="text-sm font-bold tracking-tight">
             Editing
@@ -54,11 +75,11 @@ export default async function EditorLayout({ children }: { children: React.React
             {/* Dean sees this and she does not: it is how he knows the page he is
                 looking at is hers, not a variant of his own. */}
             {session.role === "admin" && (
-              <span className="rounded-full border border-[#D4AF37]/40 px-2.5 py-0.5 text-[11px] text-[#D4AF37]">
+              <span className="rounded-full border border-accent-amber/40 px-2.5 py-0.5 text-[11px] text-accent-amber">
                 viewing as admin
               </span>
             )}
-            <span className="hidden text-xs text-white/40 sm:inline">{session.email}</span>
+            <span className="hidden text-xs text-text-dim sm:inline">{session.email}</span>
             <div className="w-24">
               <SignOutButton returnTo="/admin/login?next=/editor" />
             </div>
@@ -66,6 +87,6 @@ export default async function EditorLayout({ children }: { children: React.React
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-5 py-6">{children}</main>
-    </div>
+    </AdminTheme>
   );
 }

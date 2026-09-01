@@ -63,12 +63,12 @@ export default async function EditorCardPage({
 
   return (
     <>
-      <Link href="/editor" className="text-xs text-white/40 hover:text-white/70">
+      <Link href="/editor" className="text-xs text-text-dim hover:text-text-body">
         ← All books
       </Link>
 
       <h1 className="mt-3 text-lg font-bold">{card.title}</h1>
-      <p className="text-sm text-white/50">{card.author ?? "—"}</p>
+      <p className="text-sm text-text-muted">{card.author ?? "—"}</p>
 
       <EditorCardClient
         card={card}

@@ -35,8 +35,8 @@ export function TakeLinks({
   className?: string;
 }) {
   const tone = gone
-    ? "border-rose-400/40 text-rose-300 hover:bg-rose-400/10"
-    : "border-emerald-400/40 text-emerald-300 hover:bg-emerald-400/10";
+    ? "border-alert-red/40 text-alert-red hover:bg-alert-red/10"
+    : "border-capacity-light/40 text-capacity-light hover:bg-capacity-light/10";
 
   return (
     <span className={`inline-flex items-center gap-1.5 ${className}`}>
@@ -56,7 +56,7 @@ export function TakeLinks({
         target="_blank"
         rel="noreferrer"
         // SECONDARY, and it looks it. Plain text, no border, muted.
-        className="text-[11px] text-white/35 underline-offset-2 transition-colors hover:text-white/70 hover:underline"
+        className="text-[11px] text-text-dim underline-offset-2 transition-colors hover:text-text-body hover:underline"
       >
         open in OneDrive
       </a>

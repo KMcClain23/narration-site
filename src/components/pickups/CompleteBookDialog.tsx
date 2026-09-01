@@ -87,32 +87,32 @@ export function CompleteBookDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="complete-book-title"
-        className="w-full max-w-md rounded-2xl border border-[#D4AF37]/40 bg-[#0A0D3A] p-5 shadow-2xl"
+        className="w-full max-w-md rounded-2xl border border-accent-amber/40 bg-surface p-5 shadow-2xl"
       >
-        <p className="text-[11px] uppercase tracking-[1px] text-[#D4AF37]">Mastered</p>
-        <h2 id="complete-book-title" className="mt-1 text-lg font-bold text-white">
+        <p className="text-[11px] uppercase tracking-[1px] text-accent-amber">Mastered</p>
+        <h2 id="complete-book-title" className="mt-1 text-lg font-bold text-text-primary">
           Mark {facts.title} complete and mastered?
         </h2>
-        <p className="mt-2 text-sm text-white/70">
+        <p className="mt-2 text-sm text-text-body">
           This says the book is finished and ready to submit to the rights holder.
         </p>
 
         {/* THE FACTS, in the order they matter. */}
-        <ul className="mt-4 space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm">
-          <li className={chaptersShort ? "text-amber-200" : "text-white/70"}>
+        <ul className="mt-4 space-y-2 rounded-xl border border-divider bg-surface p-3 text-sm">
+          <li className={chaptersShort ? "text-accent-amber" : "text-text-body"}>
             {chaptersLine}
             {chaptersShort && (
-              <span className="block text-xs text-amber-200/80">
+              <span className="block text-xs text-accent-amber/80">
                 {facts.chaptersTotal! - facts.chaptersDone} not marked done yet.
               </span>
             )}
           </li>
-          <li className={facts.openPickups > 0 ? "font-semibold text-amber-200" : "text-white/70"}>
+          <li className={facts.openPickups > 0 ? "font-semibold text-accent-amber" : "text-text-body"}>
             {facts.openPickups === 0
               ? "No pickups are open."
               : `${facts.openPickups} pickup${facts.openPickups === 1 ? " is" : "s are"} still open.`}
             {facts.openPickups > 0 && (
-              <span className="block text-xs font-normal text-amber-200/80">
+              <span className="block text-xs font-normal text-accent-amber/80">
                 {/* Named as a consequence, not as a rule. He is being told what
                     this means, not told he may not. */}
                 Submitting with corrections outstanding means they will not be in
@@ -127,7 +127,7 @@ export function CompleteBookDialog({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="rounded-xl border border-white/20 px-4 py-2 text-sm text-white/70 transition-colors hover:bg-white/5 disabled:opacity-40"
+            className="rounded-xl border border-surface-border px-4 py-2 text-sm text-text-body transition-colors hover:bg-surface disabled:opacity-40"
           >
             Not yet
           </button>
@@ -136,7 +136,7 @@ export function CompleteBookDialog({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className="rounded-xl bg-[#D4AF37] px-4 py-2 text-sm font-bold text-black transition-colors hover:bg-[#E0C15A] disabled:opacity-40"
+            className="rounded-xl bg-accent-amber px-4 py-2 text-sm font-bold text-black transition-colors hover:bg-accent-amber-bright disabled:opacity-40"
           >
             {busy ? "Marking…" : "Complete and mastered"}
           </button>

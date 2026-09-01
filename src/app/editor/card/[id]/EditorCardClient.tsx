@@ -54,13 +54,13 @@ function NoteBlock({ notes }: { notes: PickupNote[] }) {
   return (
     <div className="mt-2 space-y-1.5">
       {notes.map(n => (
-        <div key={n.id} className="border-l-2 border-sky-400/50 bg-sky-400/[0.06] px-3 py-2">
-          <p className="text-[11px] text-sky-200/70">
+        <div key={n.id} className="border-l-2 border-status-prepping/50 bg-status-prepping/[0.06] px-3 py-2">
+          <p className="text-[11px] text-status-prepping/70">
             {n.author_name}
-            <span className="text-white/30"> · {n.author_kind} · </span>
+            <span className="text-text-faint"> · {n.author_kind} · </span>
             {new Date(n.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
           </p>
-          <p className="mt-0.5 whitespace-pre-wrap text-[13px] text-white/85">{n.body}</p>
+          <p className="mt-0.5 whitespace-pre-wrap text-[13px] text-text-primary">{n.body}</p>
         </div>
       ))}
     </div>
@@ -168,7 +168,7 @@ function NarratorPicker({
   if (cast.length === 0) {
     // card_cast always returns at least Dean, so this is unreachable unless the
     // function changed. Say so rather than rendering an empty row.
-    return <p className="text-sm text-red-300">No cast for this book.</p>;
+    return <p className="text-sm text-alert-red">No cast for this book.</p>;
   }
 
   // NO SECOND PERSON ANYWHERE IN HERE. `is_owner` marks whose book it is, and
@@ -176,9 +176,9 @@ function NarratorPicker({
   // told her she was him. "primary narrator" is true for every viewer.
   if (cast.length === 1) {
     return (
-      <p className="text-sm text-white/60">
-        This pickup is for <span className="font-semibold text-white">{cast[0].display_name}</span>
-        <span className="text-white/40"> — the only narrator on this book.</span>
+      <p className="text-sm text-text-muted">
+        This pickup is for <span className="font-semibold text-text-primary">{cast[0].display_name}</span>
+        <span className="text-text-dim"> — the only narrator on this book.</span>
       </p>
     );
   }
@@ -186,7 +186,7 @@ function NarratorPicker({
   if (cast.length === 2) {
     return (
       <div>
-        <p className="mb-2 text-xs uppercase tracking-wide text-white/40">Whose read?</p>
+        <p className="mb-2 text-xs uppercase tracking-wide text-text-dim">Whose read?</p>
         <div className="grid grid-cols-2 gap-3">
           {cast.map(c => {
             const on = value === c.narrator_id;
@@ -198,12 +198,12 @@ function NarratorPicker({
                 className={[
                   "rounded-xl border px-4 py-3 text-left transition-colors",
                   on
-                    ? "border-[#D4AF37] bg-[#D4AF37]/15 text-white"
-                    : "border-white/15 bg-white/5 text-white/70 hover:border-white/30",
+                    ? "border-accent-amber bg-accent-amber/15 text-text-primary"
+                    : "border-surface-border bg-surface text-text-body hover:border-surface-border",
                 ].join(" ")}
               >
                 <span className="block text-sm font-semibold">{c.display_name}</span>
-                <span className="block text-[11px] text-white/40">
+                <span className="block text-[11px] text-text-dim">
                   {c.is_owner ? "primary narrator" : "co-narrator"}
                 </span>
               </button>
@@ -216,7 +216,7 @@ function NarratorPicker({
 
   return (
     <div>
-      <p className="mb-2 text-xs uppercase tracking-wide text-white/40">Whose read?</p>
+      <p className="mb-2 text-xs uppercase tracking-wide text-text-dim">Whose read?</p>
       <div className="flex flex-wrap gap-2">
         {cast.map(c => {
           const on = value === c.narrator_id;
@@ -228,13 +228,13 @@ function NarratorPicker({
               className={[
                 "rounded-full border px-3.5 py-1.5 text-sm transition-colors",
                 on
-                  ? "border-[#D4AF37] bg-[#D4AF37]/15 font-semibold text-white"
-                  : "border-white/15 bg-white/5 text-white/70 hover:border-white/30",
+                  ? "border-accent-amber bg-accent-amber/15 font-semibold text-text-primary"
+                  : "border-surface-border bg-surface text-text-body hover:border-surface-border",
               ].join(" ")}
             >
               {c.display_name}
               {c.is_owner && (
-                <span className="ml-1.5 text-[11px] text-white/40">primary</span>
+                <span className="ml-1.5 text-[11px] text-text-dim">primary</span>
               )}
             </button>
           );
@@ -574,17 +574,17 @@ export function EditorCardClient({
   }
 
   const field =
-    "w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 focus:border-[#D4AF37]/50 focus:outline-none";
+    "w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm text-text-primary placeholder-text-faint focus:border-accent-amber/50 focus:outline-none";
 
   return (
     <div className="mt-6 space-y-6">
       {error && (
-        <p className="rounded-xl border border-rose-400/40 bg-rose-500/10 px-4 py-2.5 text-sm text-rose-200">
+        <p className="rounded-xl border border-alert-red/40 bg-alert-red/10 px-4 py-2.5 text-sm text-alert-red">
           {error}
         </p>
       )}
       {notice && (
-        <p className="rounded-xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-4 py-2.5 text-sm text-[#E0C15A]">
+        <p className="rounded-xl border border-accent-amber/40 bg-accent-amber/10 px-4 py-2.5 text-sm text-accent-amber-bright">
           {notice}
         </p>
       )}
@@ -596,11 +596,19 @@ export function EditorCardClient({
           often have been missed — the page she opens anyway has to carry the
           signal on its own. */}
       {pickups.some(p => p.status === "returned") && (
-        <section className="rounded-2xl border border-[#D4AF37]/50 bg-[#D4AF37]/[0.08] p-4">
-          <h2 className="text-sm font-bold text-[#E0C15A]">
+        /* A SURFACE WITH AN AMBER EDGE, not a gold box.
+
+           It was a bright gold panel with gold buttons and it dominated the
+           page — the "too much contrast saying LOOK HERE at everything" Dean
+           described. The signal it carries is real and stays: it is the only
+           actionable thing on the page. But the amber is now a left rule and a
+           heading, and the body sits on the ordinary surface, so it reads as
+           the first thing rather than the loudest. */
+        <section className="rounded-2xl border border-surface-border border-l-2 border-l-accent-amber bg-surface p-4">
+          <h2 className="text-sm font-bold text-accent-amber">
             {pickups.filter(p => p.status === "returned").length} re-recorded, waiting on you
           </h2>
-          <p className="mt-0.5 text-xs text-white/50">
+          <p className="mt-0.5 text-xs text-text-muted">
             Listen, then close each one.
           </p>
           <ul className="mt-3 space-y-2">
@@ -609,10 +617,10 @@ export function EditorCardClient({
               .map(p => (
                 <li
                   key={p.id}
-                  className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-white/15 bg-white/[0.04] px-3 py-2.5"
+                  className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-surface-border bg-surface-raised px-3 py-2.5"
                 >
                   <div className="min-w-0">
-                    <p className="text-[11px] text-white/50">
+                    <p className="text-[11px] text-text-muted">
                       {/^\d/.test(p.chapter.trim()) ? `Chapter ${p.chapter}` : p.chapter} ·{" "}
                       {p.timestamp_at}
                       {p.assigned_narrator_name ? ` · ${p.assigned_narrator_name}` : ""}
@@ -622,12 +630,12 @@ export function EditorCardClient({
                         said={p.said}
                         shouldBe={p.should_be}
                         clamp
-                        labelClass="w-20 shrink-0 text-[10px] uppercase tracking-wide text-white/35"
-                        saidClass="text-sm text-white/55"
-                        shouldBeClass="text-sm font-semibold text-white/90"
+                        labelClass="w-20 shrink-0 text-[10px] uppercase tracking-wide text-text-dim"
+                        saidClass="text-sm text-text-muted"
+                        shouldBeClass="text-sm font-semibold text-text-primary"
                       />
                     ) : (
-                      <p className="mt-0.5 break-words text-sm text-white/90">{summary(p)}</p>
+                      <p className="mt-0.5 break-words text-sm text-text-primary">{summary(p)}</p>
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
@@ -635,7 +643,7 @@ export function EditorCardClient({
                       type="button"
                       disabled={busy}
                       onClick={() => void closePickup(p.id, "resolved")}
-                      className="rounded-lg bg-[#D4AF37] px-3 py-1.5 text-xs font-bold text-black transition-colors hover:bg-[#E0C15A] disabled:opacity-40"
+                      className="rounded-lg bg-accent-amber px-3 py-1.5 text-xs font-bold text-black transition-colors hover:bg-accent-amber-bright disabled:opacity-40"
                     >
                       Verify &amp; close
                     </button>
@@ -643,7 +651,7 @@ export function EditorCardClient({
                       type="button"
                       disabled={busy}
                       onClick={() => void closePickup(p.id, "dismissed")}
-                      className="text-xs text-white/50 underline-offset-2 hover:text-white/80 hover:underline"
+                      className="text-xs text-text-muted underline-offset-2 hover:text-text-body hover:underline"
                     >
                       Dismiss
                     </button>
@@ -660,18 +668,18 @@ export function EditorCardClient({
           on a pickup forced her to either lie about the number or leave the
           ones after it uncounted. The stored fact is a set now; the count is
           derived from it and still feeds the hub bar and the phone. */}
-      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <section className="rounded-2xl border border-divider bg-surface p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-bold">Editing progress</h2>
-          <span className="text-xs text-white/40">
+          <span className="text-xs text-text-dim">
             {doneCount}
             {chapterKeys.length > 0 ? ` of ${chapterKeys.length}` : ""} done
-            {editingCompletedAt && <span className="ml-2 text-emerald-300">· complete</span>}
+            {editingCompletedAt && <span className="ml-2 text-capacity-light">· complete</span>}
           </span>
         </div>
 
         {progressError && (
-          <p className="mt-2 text-xs text-rose-300">{progressError}</p>
+          <p className="mt-2 text-xs text-alert-red">{progressError}</p>
         )}
 
         {chapterKeys.length > 0 ? (
@@ -696,8 +704,8 @@ export function EditorCardClient({
                     title={isDone ? `${key} — done, click to undo` : `${key} — mark done`}
                     className={
                       (isDone
-                        ? "border-[#D4AF37] bg-[#D4AF37] text-black "
-                        : "border-white/15 text-white/60 hover:border-white/35 hover:text-white/90 ") +
+                        ? "border-accent-amber bg-accent-amber text-black "
+                        : "border-surface-border text-text-muted hover:border-surface-border hover:text-text-primary ") +
                       "rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 " +
                       (numeric ? "min-w-[2.4rem] tabular-nums" : "")
                     }
@@ -714,8 +722,8 @@ export function EditorCardClient({
               decided for her would be wrong exactly when it mattered.
             */}
             {allDone && !editingCompletedAt && (
-              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-3 py-2">
-                <span className="text-xs text-[#E0C15A]">
+              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-accent-amber/40 bg-accent-amber/10 px-3 py-2">
+                <span className="text-xs text-accent-amber-bright">
                   All {chapterKeys.length} chapters done — mark the book complete?
                 </span>
                 {/* THE SAME DIALOG. Filling the last chapter still only
@@ -726,7 +734,7 @@ export function EditorCardClient({
                   type="button"
                   disabled={busy}
                   onClick={() => setConfirmingComplete(true)}
-                  className="rounded-lg bg-[#D4AF37] px-3 py-1.5 text-xs font-bold text-black hover:bg-[#E0C15A] disabled:opacity-40"
+                  className="rounded-lg bg-accent-amber px-3 py-1.5 text-xs font-bold text-black hover:bg-accent-amber-bright disabled:opacity-40"
                 >
                   Complete and mastered
                 </button>
@@ -742,7 +750,7 @@ export function EditorCardClient({
           */
           <div className="mt-3 space-y-2">
             <div className="flex flex-wrap items-center gap-3">
-              <label className="text-xs text-white/50">
+              <label className="text-xs text-text-muted">
                 Chapters edited
                 <input
                   inputMode="numeric"
@@ -752,16 +760,16 @@ export function EditorCardClient({
                   className={`${field} mt-1 w-20 text-center text-base font-semibold`}
                 />
               </label>
-              <span className="pt-4 text-sm text-white/40">of —</span>
+              <span className="pt-4 text-sm text-text-dim">of —</span>
             </div>
-            <p className="text-[11px] text-white/40">
+            <p className="text-[11px] text-text-dim">
               Set the chapter count to track chapters individually.
             </p>
           </div>
         )}
 
-        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/10 pt-3">
-          <label className="text-[11px] text-white/40">
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-divider pt-3">
+          <label className="text-[11px] text-text-dim">
             Chapters in the book
             <input
               inputMode="numeric"
@@ -787,8 +795,8 @@ export function EditorCardClient({
             }
             className={
               editingCompletedAt
-                ? "mt-4 rounded-lg border border-white/20 px-3 py-1.5 text-xs text-white/70 transition-colors hover:bg-white/5 disabled:opacity-40"
-                : "mt-4 rounded-xl bg-[#D4AF37] px-4 py-2 text-sm font-bold text-black transition-colors hover:bg-[#E0C15A] disabled:opacity-40"
+                ? "mt-4 rounded-lg border border-surface-border px-3 py-1.5 text-xs text-text-body transition-colors hover:bg-surface disabled:opacity-40"
+                : "mt-4 rounded-xl bg-accent-amber px-4 py-2 text-sm font-bold text-black transition-colors hover:bg-accent-amber-bright disabled:opacity-40"
             }
           >
             {editingCompletedAt ? "Reopen" : "Complete and mastered"}
@@ -803,19 +811,19 @@ export function EditorCardClient({
         <button
           type="button"
           onClick={() => setFormOpen(true)}
-          className="w-full rounded-2xl border border-dashed border-white/20 py-3 text-sm text-white/60 transition-colors hover:border-[#D4AF37]/50 hover:text-white/85"
+          className="w-full rounded-2xl border border-dashed border-surface-border py-3 text-sm text-text-muted transition-colors hover:border-accent-amber/50 hover:text-text-primary"
         >
           + Raise a pickup
         </button>
       ) : (
-      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <section className="rounded-2xl border border-divider bg-surface p-4">
         <div className="flex items-baseline justify-between">
           <h2 className="text-sm font-bold">{editingId ? "Edit pickup" : "Raise a pickup"}</h2>
           {!editingId && (
             <button
               type="button"
               onClick={() => setFormOpen(false)}
-              className="text-xs text-white/40 hover:text-white/70"
+              className="text-xs text-text-dim hover:text-text-body"
             >
               Close
             </button>
@@ -841,7 +849,7 @@ export function EditorCardClient({
               her phone to choose between four things. And the kind drives the
               form below it. */}
           <div className="sm:col-span-2">
-            <p className="mb-2 text-xs uppercase tracking-wide text-white/40">What kind?</p>
+            <p className="mb-2 text-xs uppercase tracking-wide text-text-dim">What kind?</p>
             <div className="grid grid-cols-4 gap-2">
               {KINDS.map(k => {
                 const on = draft.kind === k.value;
@@ -853,8 +861,8 @@ export function EditorCardClient({
                     className={[
                       "rounded-xl border px-2 py-2.5 text-sm transition-colors",
                       on
-                        ? "border-[#D4AF37] bg-[#D4AF37]/15 font-semibold text-white"
-                        : "border-white/15 bg-white/5 text-white/70 hover:border-white/30",
+                        ? "border-accent-amber bg-accent-amber/15 font-semibold text-text-primary"
+                        : "border-surface-border bg-surface text-text-body hover:border-surface-border",
                     ].join(" ")}
                   >
                     {k.label}
@@ -902,7 +910,7 @@ export function EditorCardClient({
             type="button"
             disabled={busy}
             onClick={() => void submitPickup()}
-            className="rounded-xl bg-[#D4AF37] px-4 py-2 text-sm font-bold text-black transition-colors hover:bg-[#E0C15A] disabled:opacity-40"
+            className="rounded-xl bg-accent-amber px-4 py-2 text-sm font-bold text-black transition-colors hover:bg-accent-amber-bright disabled:opacity-40"
           >
             {editingId ? "Save changes" : "Raise pickup"}
           </button>
@@ -914,7 +922,7 @@ export function EditorCardClient({
                 setDraft(emptyDraft(cast, draft.chapter));
                 setEditingId(null);
               }}
-              className="rounded-xl border border-white/20 px-4 py-2 text-sm text-white/70 transition-colors hover:bg-white/5"
+              className="rounded-xl border border-surface-border px-4 py-2 text-sm text-text-body transition-colors hover:bg-surface"
             >
               Cancel
             </button>
@@ -940,7 +948,7 @@ export function EditorCardClient({
         {[...byChapter.entries()].map(([chapter, list]) => {
           const sendableCount = list.filter(p => isEditableBy(p, userId)).length;
           return (
-            <div key={chapter} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <div key={chapter} className="rounded-2xl border border-divider bg-surface p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-bold">
                   Chapter {chapter || "—"}
@@ -966,7 +974,7 @@ export function EditorCardClient({
                           />
                         )}
                         {u.pending > 0 && (
-                          <span className="ml-2 rounded-full border border-white/15 px-2 py-0.5 text-[11px] font-normal text-white/40">
+                          <span className="ml-2 rounded-full border border-surface-border px-2 py-0.5 text-[11px] font-normal text-text-dim">
                             {u.pending} still filing
                           </span>
                         )}
@@ -979,7 +987,7 @@ export function EditorCardClient({
                     type="button"
                     disabled={busy}
                     onClick={() => void sendChapter(chapter)}
-                    className="rounded-lg border border-[#D4AF37]/50 px-3 py-1.5 text-xs font-bold text-[#D4AF37] transition-colors hover:bg-[#D4AF37]/10 disabled:opacity-40"
+                    className="rounded-lg border border-accent-amber/50 px-3 py-1.5 text-xs font-bold text-accent-amber transition-colors hover:bg-accent-amber/10 disabled:opacity-40"
                   >
                     Send {sendableCount} draft{sendableCount === 1 ? "" : "s"}
                   </button>
@@ -1006,7 +1014,7 @@ export function EditorCardClient({
                   return (
                     <li
                       key={p.id}
-                      className="flex items-start justify-between gap-3 rounded-xl border border-white/10 px-3 py-2"
+                      className="flex items-start justify-between gap-3 rounded-xl border border-divider px-3 py-2"
                     >
                       <div className="min-w-0">
                         {p.kind === "misread" ? (
@@ -1014,17 +1022,17 @@ export function EditorCardClient({
                             said={p.said}
                             shouldBe={p.should_be}
                             clamp
-                            labelClass="w-20 shrink-0 text-[10px] uppercase tracking-wide text-white/35"
-                            saidClass="text-sm text-white/55"
-                            shouldBeClass="text-sm font-semibold text-white/90"
+                            labelClass="w-20 shrink-0 text-[10px] uppercase tracking-wide text-text-dim"
+                            saidClass="text-sm text-text-muted"
+                            shouldBeClass="text-sm font-semibold text-text-primary"
                           />
                         ) : (
                           /* WAS `truncate` — a one-line ellipsis, which on a
                              note-only pickup cut off the instruction itself.
                              Two lines and an expand control instead. */
-                          <p className="line-clamp-2 break-words text-sm text-white/90">{summary(p)}</p>
+                          <p className="line-clamp-2 break-words text-sm text-text-primary">{summary(p)}</p>
                         )}
-                        <p className="text-[11px] text-white/40">
+                        <p className="text-[11px] text-text-dim">
                           {p.timestamp_at} · {p.status}
                           {p.assigned_narrator_name ? ` · ${p.assigned_narrator_name}` : ""}
                         </p>
@@ -1038,7 +1046,7 @@ export function EditorCardClient({
                             type="button"
                             disabled={busy}
                             onClick={() => void closePickup(p.id, "resolved")}
-                            className="rounded-lg bg-[#D4AF37] px-3 py-1.5 text-xs font-bold text-black transition-colors hover:bg-[#E0C15A] disabled:opacity-40"
+                            className="rounded-lg bg-accent-amber px-3 py-1.5 text-xs font-bold text-black transition-colors hover:bg-accent-amber-bright disabled:opacity-40"
                           >
                             Verify &amp; close
                           </button>
@@ -1046,7 +1054,7 @@ export function EditorCardClient({
                             type="button"
                             disabled={busy}
                             onClick={() => void closePickup(p.id, "dismissed")}
-                            className="text-xs text-white/50 underline-offset-2 hover:text-white/80 hover:underline"
+                            className="text-xs text-text-muted underline-offset-2 hover:text-text-body hover:underline"
                           >
                             Dismiss
                           </button>
@@ -1069,7 +1077,7 @@ export function EditorCardClient({
                                 assigned_narrator_id: p.assigned_narrator_id ?? "",
                               });
                             }}
-                            className="text-xs text-white/50 hover:text-white"
+                            className="text-xs text-text-muted hover:text-text-primary"
                           >
                             Edit
                           </button>
@@ -1077,7 +1085,7 @@ export function EditorCardClient({
                             type="button"
                             disabled={busy}
                             onClick={() => void removePickup(p.id)}
-                            className="text-xs text-rose-300/70 hover:text-rose-300"
+                            className="text-xs text-alert-red/70 hover:text-alert-red"
                           >
                             Delete
                           </button>

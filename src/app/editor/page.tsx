@@ -76,16 +76,16 @@ function deliveryLabel(deadline: string | null): string {
 }
 
 function deliveryStyle(deadline: string | null): string {
-  if (!deadline) return "border-white/15 text-white/40";
+  if (!deadline) return "border-surface-border text-text-dim";
   const days = (new Date(`${deadline}T00:00:00`).getTime() - Date.now()) / DAY;
   // Amber, and only amber. The rose alarm is gone deliberately — see above.
-  return days < 7 ? "border-amber-400/30 text-amber-200/80" : "border-white/15 text-white/50";
+  return days < 7 ? "border-accent-amber/30 text-accent-amber/80" : "border-surface-border text-text-muted";
 }
 
 function Cover({ url, size }: { url: string | null; size: "lg" | "sm" }) {
   const box = size === "lg" ? "h-24 w-16" : "h-14 w-10";
   return (
-    <div className={`relative ${box} shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/5`}>
+    <div className={`relative ${box} shrink-0 overflow-hidden rounded-lg border border-divider bg-surface`}>
       {url ? <Image src={url} alt="" fill sizes="64px" className="object-cover" /> : null}
     </div>
   );
@@ -135,7 +135,7 @@ function TakeBadge({ u }: { u: UploadCount }) {
     // uuid name — and a link that leads only to an explanation of why it cannot
     // lead anywhere is worse than plain text.
     return (
-      <span className="rounded-full border border-white/20 px-2 py-0.5 text-[11px] text-white/50">
+      <span className="rounded-full border border-surface-border px-2 py-0.5 text-[11px] text-text-muted">
         {u.pending} take{u.pending === 1 ? "" : "s"} filing · {u.narrator_name} · {chapter}
       </span>
     );
@@ -169,24 +169,30 @@ function QueueTile({
   const done = card.chapters_edited ?? 0;
 
   return (
-    <article className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition-colors hover:border-[#D4AF37]/40">
+    <article className="rounded-2xl border border-divider bg-surface p-4 transition-colors hover:border-accent-amber/40">
       <Link href={`/editor/card/${card.id}`} className="flex gap-4">
         <Cover url={card.cover_url} size="lg" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-white">{card.title}</p>
-          <p className="truncate text-xs text-white/50">{card.author ?? "—"}</p>
+          <p className="truncate text-sm font-semibold text-text-primary">{card.title}</p>
+          <p className="truncate text-xs text-text-muted">{card.author ?? "—"}</p>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className={`rounded-full border px-2 py-0.5 text-[11px] ${deliveryStyle(card.deadline)}`}>
               {deliveryLabel(card.deadline)}
             </span>
             {returned > 0 && (
-              <span className="rounded-full bg-[#D4AF37] px-2 py-0.5 text-[11px] font-bold text-black">
+              <span className="rounded-full bg-accent-amber px-2 py-0.5 text-[11px] font-bold text-black">
                 {returned} to check
               </span>
             )}
             {openPickups > 0 && (
-              <span className="rounded-full border border-rose-400/40 px-2 py-0.5 text-[11px] text-rose-300">
+              /* NEUTRAL, NOT ALERT. Dean's words: "15 pickups is a good bit of
+                 information but why is it alert red?" A count of outstanding
+                 pickups is a fact about the book, not something wrong with it —
+                 the alert colour was claiming urgency the number does not have,
+                 and it sat beside "to check", which IS actionable, flattening
+                 the difference between them. */
+              <span className="rounded-full bg-pill-neutral-bg/40 px-2 py-0.5 text-[11px] text-pill-neutral-text">
                 {openPickups} pickup{openPickups === 1 ? "" : "s"}
               </span>
             )}
@@ -198,7 +204,7 @@ function QueueTile({
             bar with an invented denominator would be a lie — so with no total,
             the count stands alone and the bar is absent.
           */}
-          <div className="mt-2 flex items-center gap-2 text-[11px] text-white/40">
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-text-dim">
             <span>{EDITING_LABEL[state]}</span>
             {total > 0 ? (
               <span>· {done} of {total} chapters</span>
@@ -207,9 +213,9 @@ function QueueTile({
             ) : null}
           </div>
           {total > 0 && (
-            <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10">
+            <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-surface-raised">
               <div
-                className="h-full rounded-full bg-[#D4AF37]"
+                className="h-full rounded-full bg-accent-amber"
                 style={{ width: `${Math.min(100, Math.round((done / total) * 100))}%` }}
               />
             </div>
@@ -218,7 +224,7 @@ function QueueTile({
       </Link>
 
       {/* Outside the Link. Every item here goes somewhere else of its own. */}
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-divider pt-3">
         {takes.map(u => (
           <TakeBadge key={`${u.chapter}-${u.narrator_name}`} u={u} />
         ))}
@@ -229,7 +235,7 @@ function QueueTile({
             href={`/api/pickups/folder/${card.id}`}
             target="_blank"
             rel="noreferrer"
-            className="text-[11px] text-white/40 hover:text-white/70"
+            className="text-[11px] text-text-dim hover:text-text-body"
           >
             Open folder →
           </a>
@@ -249,12 +255,12 @@ function QuietTile({
   card: EditorCard; note?: string; claimable?: boolean; mine?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-2.5 transition-colors hover:border-white/25">
+    <div className="flex items-center gap-3 rounded-xl border border-divider bg-surface p-2.5 transition-colors hover:border-surface-border">
       <Link href={`/editor/card/${card.id}`} className="flex min-w-0 flex-1 items-center gap-3">
         <Cover url={card.cover_url} size="sm" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm text-white/80">{card.title}</p>
-          <p className="truncate text-[11px] text-white/40">
+          <p className="truncate text-sm text-text-body">{card.title}</p>
+          <p className="truncate text-[11px] text-text-dim">
             {note ?? card.status}
             {card.deadline ? ` · ${deliveryLabel(card.deadline)}` : ""}
           </p>
@@ -276,9 +282,9 @@ function Section({
   if (count === 0) return null;
   return (
     <section className="mb-8">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2 border-b border-white/10 pb-2">
-        <h2 className="text-base font-bold text-white">{title}</h2>
-        <span className="text-xs text-white/40">{hint ?? `${count}`}</span>
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2 border-b border-divider pb-2">
+        <h2 className="text-base font-bold text-text-primary">{title}</h2>
+        <span className="text-xs text-text-dim">{hint ?? `${count}`}</span>
       </div>
       {children}
     </section>
@@ -402,7 +408,7 @@ export default async function EditorBoardPage() {
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-lg font-bold">Editing</h1>
         {released.length > 0 && (
-          <Link href="/editor/released" className="text-xs text-white/40 hover:text-white/70">
+          <Link href="/editor/released" className="text-xs text-text-dim hover:text-text-body">
             {released.length} released →
           </Link>
         )}
@@ -419,12 +425,12 @@ export default async function EditorBoardPage() {
             <Link
               key={card.id}
               href={`/editor/card/${card.id}`}
-              className="flex items-center gap-3 rounded-xl border border-[#D4AF37]/50 bg-[#D4AF37]/[0.08] p-3 transition-colors hover:bg-[#D4AF37]/[0.14]"
+              className="flex items-center gap-3 rounded-xl border border-accent-amber/50 bg-accent-amber/[0.08] p-3 transition-colors hover:bg-accent-amber/[0.14]"
             >
               <Cover url={card.cover_url} size="sm" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-white">{card.title}</p>
-                <p className="text-[11px] text-[#E0C15A]">
+                <p className="truncate text-sm font-semibold text-text-primary">{card.title}</p>
+                <p className="text-[11px] text-accent-amber-bright">
                   {n} re-recorded pickup{n === 1 ? "" : "s"} to check
                 </p>
               </div>
@@ -456,11 +462,11 @@ export default async function EditorBoardPage() {
         would push the actual queue below the fold as it grows.
       */}
       {finished.length > 0 && (
-        <details className="mb-8 rounded-xl border border-white/10 bg-white/[0.02]">
-          <summary className="cursor-pointer list-none px-4 py-3 text-sm text-white/60 hover:text-white/85">
+        <details className="mb-8 rounded-xl border border-divider bg-surface">
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm text-text-muted hover:text-text-primary">
             Finished — {finished.length} book{finished.length === 1 ? "" : "s"} you have completed
           </summary>
-          <div className="grid gap-2 border-t border-white/10 p-3 sm:grid-cols-2">
+          <div className="grid gap-2 border-t border-divider p-3 sm:grid-cols-2">
             {finished.map(c => (
               <QuietTile
                 key={c.id}
@@ -503,11 +509,11 @@ export default async function EditorBoardPage() {
         present, explained, not offered.
       */}
       {elsewhere.length > 0 && (
-        <details className="mb-8 rounded-xl border border-white/10 bg-white/[0.02]">
-          <summary className="cursor-pointer list-none px-4 py-3 text-sm text-white/60 hover:text-white/85">
+        <details className="mb-8 rounded-xl border border-divider bg-surface">
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm text-text-muted hover:text-text-primary">
             Edited elsewhere — {elsewhere.length} book{elsewhere.length === 1 ? "" : "s"} someone else is posting
           </summary>
-          <div className="grid gap-2 border-t border-white/10 p-3 sm:grid-cols-2">
+          <div className="grid gap-2 border-t border-divider p-3 sm:grid-cols-2">
             {elsewhere.map(c => (
               <QuietTile key={c.id} card={c} note="edited elsewhere" />
             ))}
@@ -532,11 +538,11 @@ export default async function EditorBoardPage() {
       </Section>
 
       {notYet.length > 0 && (
-        <details className="mb-8 rounded-xl border border-white/10 bg-white/[0.02]">
-          <summary className="cursor-pointer list-none px-4 py-3 text-sm text-white/60 hover:text-white/85">
+        <details className="mb-8 rounded-xl border border-divider bg-surface">
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm text-text-muted hover:text-text-primary">
             Not yet — {notYet.length} book{notYet.length === 1 ? "" : "s"} not recorded
           </summary>
-          <div className="grid gap-2 border-t border-white/10 p-3 sm:grid-cols-2">
+          <div className="grid gap-2 border-t border-divider p-3 sm:grid-cols-2">
             {notYet.map(c => (
               <QuietTile key={c.id} card={c} note={c.status === "recast" ? "recast" : "contracted"} />
             ))}
@@ -545,7 +551,7 @@ export default async function EditorBoardPage() {
       )}
 
       {cards.length === 0 && (
-        <p className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm text-white/50">
+        <p className="rounded-2xl border border-divider bg-surface p-6 text-sm text-text-muted">
           No books yet.
         </p>
       )}

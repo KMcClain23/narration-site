@@ -141,7 +141,7 @@ export function FreshLinkButtons({
                   ? "Emails a replacement link for pickups this narrator already has. Nothing else changes."
                   : `${b.narrator_name} has no email address on file.`
               }
-              className="rounded-lg border border-white/20 px-2.5 py-1 text-[11px] text-white/60 transition-colors hover:border-white/40 hover:text-white/90 disabled:opacity-40"
+              className="rounded-lg border border-surface-border px-2.5 py-1 text-[11px] text-text-muted transition-colors hover:border-surface-border hover:text-text-primary disabled:opacity-40"
             >
               {sent ? "Send another link" : "Send a fresh link"} · {b.narrator_name}
             </button>
@@ -149,13 +149,13 @@ export function FreshLinkButtons({
             {/* Context for the decision, not decoration: whether the link she
                 holds still works, and roughly when it went out. Someone asking
                 "did she ever get one?" can answer it without leaving. */}
-            <span className="text-[11px] text-white/30">
+            <span className="text-[11px] text-text-faint">
               {b.link_live ? "link live" : "no live link"}
               {last ? ` · sent ${last}` : ""}
             </span>
 
             {msg?.text && (
-              <span className={`text-[11px] ${msg.bad ? "text-rose-300" : "text-emerald-300"}`}>
+              <span className={`text-[11px] ${msg.bad ? "text-alert-red" : "text-capacity-light"}`}>
                 {msg.text}
               </span>
             )}

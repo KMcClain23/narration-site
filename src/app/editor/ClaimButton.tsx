@@ -66,13 +66,13 @@ export function ClaimButton({
         disabled={busy}
         className={
           mine
-            ? "rounded-full border border-white/20 px-3 py-1 text-[11px] text-white/60 transition-colors hover:border-white/40 hover:text-white/85 disabled:opacity-50"
-            : "rounded-full bg-[#D4AF37] px-3 py-1 text-[11px] font-bold text-black transition-opacity hover:opacity-85 disabled:opacity-50"
+            ? "rounded-full border border-surface-border px-3 py-1 text-[11px] text-text-muted transition-colors hover:border-surface-border hover:text-text-primary disabled:opacity-50"
+            : "rounded-full bg-accent-amber px-3 py-1 text-[11px] font-bold text-black transition-opacity hover:opacity-85 disabled:opacity-50"
         }
       >
         {busy ? "…" : mine ? "Unclaim" : "Claim"}
       </button>
-      {error && <span className="text-[11px] text-rose-300">{error}</span>}
+      {error && <span className="text-[11px] text-alert-red">{error}</span>}
     </span>
   );
 }
