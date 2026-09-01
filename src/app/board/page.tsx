@@ -214,6 +214,17 @@ export default function BoardV2Page() {
         // calendar is saved, without waiting for a board refetch.
         recording_dates: updated.recording_dates,
         words_recorded: updated.words_recorded,
+        /*
+          CARRIED FROM THE PREVIOUS ROW, not from the save.
+
+          The edit modal does not touch this flag — an editor sets it from her
+          own page — so `updated` has no opinion about it. Reading it off the
+          card already in state keeps a book that Marizete marked from silently
+          losing that mark the next time Dean saves an unrelated field.
+        */
+        edited_externally: prev[idx]?.edited_externally ?? null,
+        edited_externally_by: prev[idx]?.edited_externally_by ?? null,
+        edited_externally_by_name: prev[idx]?.edited_externally_by_name ?? null,
         created_at: updated.created_at,
       };
       return idx === -1 ? [...prev, projected] : prev.map((c, i) => (i === idx ? projected : c));

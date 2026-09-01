@@ -74,6 +74,19 @@ export function BoardCardContent({
         {/* 2. Author row */}
         <p className="mt-1 truncate text-sm font-medium text-accent-amber">{card.author || " "}</p>
 
+        {/* Edited elsewhere, and BY WHOSE ACCOUNT. Dean marking a book is a
+            statement about the production; Marizete marking one is a statement
+            about herself. Same flag, different claim, so the qualifier is the
+            whole point of showing it. */}
+        {card.edited_externally && (
+          <p className="mt-1 truncate text-[13px] text-text-muted">
+            Edited elsewhere
+            {card.edited_externally_by_name
+              ? ` — marked by ${card.edited_externally_by_name}`
+              : ""}
+          </p>
+        )}
+
         {/* 3. Co-narrator row — empty but height-preserving when solo */}
         <p className="mt-0.5 truncate text-[13px] text-text-muted">
           {coNarrators.length ? `with ${coNarrators.join(", ")}` : " "}

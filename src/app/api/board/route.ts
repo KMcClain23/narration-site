@@ -35,7 +35,36 @@ export async function GET(req: Request) {
   const { data, error } = await query;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ cards: data });
+
+  /*
+    WHO ASSERTED "edited elsewhere", resolved to a name.
+
+    The flag alone cannot distinguish "a production company is editing this",
+    which is Dean's claim, from "I am not editing this", which is Marizete's.
+    They have the same effect on her list and are different statements, so his
+    board is told which — a null `edited_externally_by` is his own marking, a
+    uuid is an editor's.
+
+    Resolved here rather than by widening editor_assignments(): that function is
+    decoded by the Android app with ignoreUnknownKeys = false, so a column added
+    to it empties the board on every installed build.
+  */
+  const cards = data ?? [];
+  const assertedBy = [...new Set(
+    cards.map(c => c.edited_externally_by).filter((v): v is string => !!v),
+  )];
+  if (assertedBy.length > 0) {
+    const { data: people } = await supabaseAdmin
+      .from("profiles").select("id, display_name").in("id", assertedBy);
+    const byId = new Map((people ?? []).map(p => [p.id, p.display_name]));
+    for (const c of cards) {
+      c.edited_externally_by_name = c.edited_externally_by
+        ? byId.get(c.edited_externally_by) ?? null
+        : null;
+    }
+  }
+
+  return NextResponse.json({ cards });
 }
 
 /*

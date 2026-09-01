@@ -12,6 +12,7 @@ import {
 import { currentSession } from "@/lib/supabase/session";
 import { ClaimButton } from "./ClaimButton";
 import { TakeLinks } from "@/components/pickups/TakeLinks";
+import { HubDrag, DropZone, DragTile, MoveButton } from "./HubDrag";
 
 export const dynamic = "force-dynamic";
 
@@ -160,9 +161,11 @@ function TakeBadge({ u }: { u: UploadCount }) {
  * outside it, as a sibling.
  */
 function QueueTile({
-  card, openPickups, returned, takes,
+  card, openPickups, returned, takes, extra,
 }: {
   card: EditorCard; openPickups: number; returned: number; takes: UploadCount[];
+  /** The non-drag equivalent for the move this section allows. */
+  extra?: React.ReactNode;
 }) {
   const state = editingStateOf(card.chapters_edited, card.editing_completed_at);
   const total = card.chapters_total ?? 0;
@@ -240,7 +243,8 @@ function QueueTile({
             Open folder →
           </a>
         )}
-        <span className="ml-auto">
+        <span className="ml-auto flex items-center gap-2">
+          {extra}
           <ClaimButton cardId={card.id} mine />
         </span>
       </div>
@@ -250,9 +254,11 @@ function QueueTile({
 
 /** The quiet tile: things she is not working. No progress, smaller. */
 function QuietTile({
-  card, note, claimable, mine,
+  card, note, claimable, mine, extra,
 }: {
   card: EditorCard; note?: string; claimable?: boolean; mine?: boolean;
+  /** The non-drag equivalent for whichever move this tile's section allows. */
+  extra?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-divider bg-surface p-2.5 transition-colors hover:border-surface-border">
@@ -270,6 +276,7 @@ function QuietTile({
           invalid, and the same nesting on QueueTile is what took the hub down. */}
       {claimable && <ClaimButton cardId={card.id} mine={false} />}
       {mine && <ClaimButton cardId={card.id} mine />}
+      {extra}
     </div>
   );
 }
@@ -360,7 +367,23 @@ export default async function EditorBoardPage() {
     second test for "finished".
   */
   const hers = inEditing.filter(c => me !== null && c.editor_id === me);
-  const editingNow = hers.filter(c => !c.editing_completed_at).sort(byDelivery);
+  /*
+    ONCE ON THE PAGE, NOT TWICE.
+
+    "Waiting on you" is not a separate set of books — it is the urgent view of
+    the same queue, and it is deliberately not filtered to books she has claimed
+    (see the note above it). So a book that is hers AND has re-recorded pickups
+    was landing in both sections, which is what made A Cowboy's Runaway appear
+    twice: the waiting tile and the queue tile, one above the other.
+
+    The waiting tile wins, because it carries the reason the book is urgent. It
+    links to the card, where the progress and the takes are, so nothing is lost
+    by not drawing the second tile as well.
+  */
+  const waitingIds = new Set(waiting.map(w => w.card.id));
+  const editingNow = hers
+    .filter(c => !c.editing_completed_at && !waitingIds.has(c.id))
+    .sort(byDelivery);
   const finished = hers
     .filter(c => c.editing_completed_at)
     .sort((a, b) => (b.editing_completed_at ?? "").localeCompare(a.editing_completed_at ?? ""));
@@ -404,7 +427,7 @@ export default async function EditorBoardPage() {
   const waitingTotal = waiting.reduce((n, w) => n + w.n, 0);
 
   return (
-    <>
+    <HubDrag>
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-lg font-bold">Editing</h1>
         {released.length > 0 && (
@@ -439,18 +462,34 @@ export default async function EditorBoardPage() {
         </div>
       </Section>
 
+      {/* HER QUEUE IS THE "mine" ZONE. Dropping a book here claims it; dragging
+          one out releases it. "Waiting on you" above is a view of the same
+          books — it is not a separate zone, because a book cannot be waiting on
+          her without being hers. */}
       <Section title="Editing now" count={editingNow.length} hint={`${editingNow.length} in your queue`}>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {editingNow.map(c => (
-            <QueueTile
-              key={c.id}
-              card={c}
-              openPickups={openByCard.get(c.id) ?? 0}
-              returned={returnedByCard.get(c.id) ?? 0}
-              takes={takesByCard.get(c.id) ?? []}
-            />
-          ))}
-        </div>
+        <DropZone zone="mine">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {editingNow.map(c => (
+              <DragTile key={c.id} cardId={c.id} title={c.title} from="mine">
+                <QueueTile
+                  card={c}
+                  openPickups={openByCard.get(c.id) ?? 0}
+                  returned={returnedByCard.get(c.id) ?? 0}
+                  takes={takesByCard.get(c.id) ?? []}
+                  extra={
+                    <MoveButton
+                      cardId={c.id}
+                      title={c.title}
+                      from="mine"
+                      to="elsewhere"
+                      label="Edited elsewhere"
+                    />
+                  }
+                />
+              </DragTile>
+            ))}
+          </div>
+        </DropZone>
       </Section>
 
       {/*
@@ -493,11 +532,30 @@ export default async function EditorBoardPage() {
         implies she is behind on them.
       */}
       <Section title="Unclaimed" count={unclaimed.length} hint="in editing · nobody assigned">
-        <div className="grid gap-2 sm:grid-cols-2">
-          {unclaimed.map(c => (
-            <QuietTile key={c.id} card={c} note="unclaimed" claimable />
-          ))}
-        </div>
+        <DropZone zone="unclaimed">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {unclaimed.map(c => (
+              <DragTile key={c.id} cardId={c.id} title={c.title} from="unclaimed">
+                <QuietTile
+                  card={c}
+                  note="unclaimed"
+                  claimable
+                  /* THE NON-DRAG EQUIVALENT. Claim is already a button; this is
+                     what makes the other legal move reachable without a mouse. */
+                  extra={
+                    <MoveButton
+                      cardId={c.id}
+                      title={c.title}
+                      from="unclaimed"
+                      to="elsewhere"
+                      label="Edited elsewhere"
+                    />
+                  }
+                />
+              </DragTile>
+            ))}
+          </div>
+        </DropZone>
       </Section>
 
       {/*
@@ -513,11 +571,27 @@ export default async function EditorBoardPage() {
           <summary className="cursor-pointer list-none px-4 py-3 text-sm text-text-muted hover:text-text-primary">
             Edited elsewhere — {elsewhere.length} book{elsewhere.length === 1 ? "" : "s"} someone else is posting
           </summary>
-          <div className="grid gap-2 border-t border-divider p-3 sm:grid-cols-2">
-            {elsewhere.map(c => (
-              <QuietTile key={c.id} card={c} note="edited elsewhere" />
-            ))}
-          </div>
+          <DropZone zone="elsewhere" className="border-t border-divider p-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              {elsewhere.map(c => (
+                <DragTile key={c.id} cardId={c.id} title={c.title} from="elsewhere">
+                  <QuietTile
+                    card={c}
+                    note="edited elsewhere"
+                    extra={
+                      <MoveButton
+                        cardId={c.id}
+                        title={c.title}
+                        from="elsewhere"
+                        to="unclaimed"
+                        label="Not edited elsewhere"
+                      />
+                    }
+                  />
+                </DragTile>
+              ))}
+            </div>
+          </DropZone>
         </details>
       )}
 
@@ -555,6 +629,6 @@ export default async function EditorBoardPage() {
           No books yet.
         </p>
       )}
-    </>
+    </HubDrag>
   );
 }

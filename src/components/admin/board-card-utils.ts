@@ -302,6 +302,17 @@ export type BoardV2Card = {
   recording_dates: string[] | null;
   /** Words of this narrator's share already recorded. */
   words_recorded: number | null;
+  /**
+   * Somebody outside is doing the post.
+   *
+   * WHO SAID SO MATTERS. Null `edited_externally_by` means Dean marked it — "a
+   * production company is editing this". A uuid means an editor did, which is
+   * the weaker claim "I am not editing this". They have the same effect on her
+   * list and are not the same statement, so the board says which.
+   */
+  edited_externally: boolean | null;
+  edited_externally_by: string | null;
+  edited_externally_by_name?: string | null;
   created_at: string;
 };
 
