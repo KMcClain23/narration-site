@@ -277,6 +277,14 @@ export type UploadCount = {
   filed: number;
   pending: number;
   /**
+   * Filed, and since CONFIRMED absent from the drive. A subset of `filed`.
+   *
+   * Not subtracted from it. A take that arrived and was filed and has since been
+   * lost is a different fact from one that never arrived, and the first is the
+   * one worth acting on.
+   */
+  missing: number;
+  /**
    * The most recent FILED upload, for the link.
    *
    * Null when nothing in this group has been filed yet — which is exactly when

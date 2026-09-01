@@ -51,6 +51,16 @@ export type Resolvable = {
   label: string;
   /** Called when a legacy path lookup finds the item, so the row self-heals. */
   onLocatorFound?: (itemId: string, webUrl: string | null) => Promise<void>;
+  /**
+   * Called ONLY when Graph gave a DEFINITE answer that the thing is gone.
+   *
+   * Never from the 502 branch. A lookup that could not be made is not evidence
+   * of absence, and treating it as one would mark every filed take in the
+   * system missing during a single Graph outage.
+   */
+  onConfirmedMissing?: () => Promise<void>;
+  /** Called when it resolves — clears a stale "missing", e.g. after a restore. */
+  onConfirmedPresent?: () => Promise<void>;
 };
 
 /** Admin or editor. Both need to open a take; nobody else may. */
@@ -152,6 +162,14 @@ export async function resolveAndRedirect(target: Resolvable): Promise<NextRespon
   }
 
   if (item === null || item.deleted) {
+    /*
+      THE DEFINITE BRANCH, and the only one that records absence.
+
+      Graph answered — 404, 410, or an item carrying a deleted facet. That is a
+      fact about the file, and it is written down so the badge stops claiming
+      the take is there. The 502 branch above deliberately does NOT do this.
+    */
+    await target.onConfirmedMissing?.().catch(() => {});
     return page(
       410,
       item?.deleted ? "That file is in the recycle bin" : `That ${target.kind} is no longer in OneDrive`,
@@ -174,6 +192,11 @@ export async function resolveAndRedirect(target: Resolvable): Promise<NextRespon
       `The ${target.kind} exists, but OneDrive did not return a link for it.`,
     );
   }
+
+  // IT RESOLVED. If the row was marked missing, the file has come back — a
+  // restore from the recycle bin — and the mark is cleared. The same write-back
+  // that heals a locator-less row, running in the other direction.
+  await target.onConfirmedPresent?.().catch(() => {});
 
   // 303, so a browser follows with GET regardless of how it got here.
   return NextResponse.redirect(item.webUrl, 303);

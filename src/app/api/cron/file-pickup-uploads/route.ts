@@ -6,6 +6,7 @@ import {
   childrenById,
   deleteInsideQuarantine,
   graphAppToken,
+  itemById,
   itemByPath,
   moveItem,
   quarantineFolder,
@@ -211,6 +212,52 @@ export async function GET(req: Request) {
     }
   }
 
+  /*
+    ── RE-VERIFY WHAT IS ALREADY FILED ──────────────────────────────────────
+
+    filed_at records that a file was PLACED in the book's folder. Nothing
+    re-checks, so the hub badge could offer a take that had been deleted months
+    ago — which it did, for the one real row in the table.
+
+    The resolver learns the truth at click time, but a take nobody clicks stays
+    unverified indefinitely, and "correct once somebody has already been misled"
+    is not correct. One Graph lookup per filed upload, bounded, once a cycle.
+
+    ONLY A DEFINITE ANSWER IS WRITTEN DOWN. 404, 410 or a deleted facet stamps
+    missing_since; a resolve clears it, so a restore from the recycle bin heals
+    the row. A THROW — token, network, throttling, 5xx — writes NOTHING and
+    leaves the row exactly as it was. Marking every take missing because Graph
+    was briefly unreachable would be the error-as-absence collapse in the most
+    expensive place this codebase has one.
+  */
+  const verified = { checked: 0, nowMissing: 0, cameBack: 0, unknown: 0 };
+  try {
+    const { data: toVerify } = await supabaseAdmin.rpc("filed_uploads_to_verify", { p_limit: 200 });
+    for (const row of (toVerify ?? []) as {
+      id: string; onedrive_item_id: string; missing_since: string | null;
+    }[]) {
+      verified.checked++;
+      try {
+        const item = await itemById(graph, row.onedrive_item_id);
+        if (item === null || item.deleted) {
+          if (!row.missing_since) {
+            await supabaseAdmin.rpc("mark_upload_missing", { p_id: row.id });
+            verified.nowMissing++;
+          }
+        } else if (row.missing_since) {
+          await supabaseAdmin.rpc("mark_upload_present", { p_id: row.id });
+          verified.cameBack++;
+        }
+      } catch {
+        // Could not find out. NOT absence — the row is left alone.
+        verified.unknown++;
+      }
+    }
+  } catch (e) {
+    // The whole pass failing must not touch a single row's state.
+    sweepErrors.push(`verify: ${(e as Error).message.slice(0, 150)}`);
+  }
+
   // ── STATE FIRST, THEN EMAIL — the THIRD place these two orderings sit side
   //    by side, and the third different reason. ────────────────────────────
   //
@@ -240,6 +287,7 @@ export async function GET(req: Request) {
     filed: filed.length,
     failed: failed.length,
     swept,
+    verified,
     notified,
     paths: filed,
     errors: failed,

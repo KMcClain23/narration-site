@@ -109,14 +109,32 @@ function TakeBadge({ u }: { u: UploadCount }) {
   const chapter = /^\d/.test(u.chapter.trim()) ? `ch ${u.chapter}` : u.chapter;
 
   if (u.filed > 0 && u.latest_filed_id) {
+    /*
+      MISSING IS MARKED, NOT HIDDEN.
+
+      Dropping the badge to "0 takes" would erase the fact that a narrator
+      uploaded something which has since been lost — the one thing here Dean
+      would actually act on. So the take still shows, struck through and
+      labelled, and it stays CLICKABLE: the resolver's page already explains
+      the state better than a badge can, and it is also what re-checks and
+      clears the mark if the file has been restored.
+    */
+    const gone = u.missing > 0;
     return (
       <a
         href={`/api/pickups/file/${u.latest_filed_id}`}
         target="_blank"
         rel="noreferrer"
-        className="rounded-full border border-emerald-400/40 px-2 py-0.5 text-[11px] text-emerald-300 transition-colors hover:bg-emerald-400/10"
+        className={
+          gone
+            ? "rounded-full border border-rose-400/40 px-2 py-0.5 text-[11px] text-rose-300 transition-colors hover:bg-rose-400/10"
+            : "rounded-full border border-emerald-400/40 px-2 py-0.5 text-[11px] text-emerald-300 transition-colors hover:bg-emerald-400/10"
+        }
       >
-        {u.filed} take{u.filed === 1 ? "" : "s"} · {u.narrator_name} · {chapter}
+        <span className={gone ? "line-through" : undefined}>
+          {u.filed} take{u.filed === 1 ? "" : "s"} · {u.narrator_name} · {chapter}
+        </span>
+        {gone && <span className="ml-1 no-underline"> · missing</span>}
       </a>
     );
   }

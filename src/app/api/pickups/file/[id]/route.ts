@@ -50,6 +50,13 @@ export async function GET(
     label: data.original_name || "That take",
     // A row filed before locators existed heals itself the first time it is
     // opened, so the path lookup happens once rather than on every click.
+    // Only the definite branch reaches these — see pickup-resolve.
+    onConfirmedMissing: async () => {
+      await supabaseAdmin.rpc("mark_upload_missing", { p_id: id });
+    },
+    onConfirmedPresent: async () => {
+      await supabaseAdmin.rpc("mark_upload_present", { p_id: id });
+    },
     onLocatorFound: async (itemId, webUrl) => {
       await supabaseAdmin
         .from("pickup_uploads")
