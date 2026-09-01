@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import type {
-  EditorCardDetail, EditorPickup, CastMember, UploadCount, PickupNote,
+  EditorCardDetail, EditorPickup, CastMember, UploadCount, PickupNote, ChapterProgress,
 } from "@/lib/editor-data";
 import { ChapterField, chapterOptions, defaultChapter } from "./ChapterField";
 
@@ -249,6 +249,7 @@ export function EditorCardClient({
   cast,
   uploads,
   notes,
+  chapterProgress,
   userId,
 }: {
   card: EditorCardDetail;
@@ -262,6 +263,7 @@ export function EditorCardClient({
   /** Narrator audio for this card, per chapter. Filed and pending kept apart. */
   uploads: UploadCount[];
   notes: PickupNote[];
+  chapterProgress: ChapterProgress[];
   userId: string | null;
 }) {
   const router = useRouter();
@@ -273,6 +275,20 @@ export function EditorCardClient({
   /** A send that partly worked: some emailed, some not. Neither an error nor a success. */
   const [notice, setNotice] = useState("");
   const [edited, setEdited] = useState(String(chaptersEdited ?? ""));
+
+  /*
+    THE SET, held locally so a toggle can be optimistic.
+
+    Seeded from the server on every render of the page; a toggle updates it
+    immediately and then RECONCILES against what the function returns. A failed
+    toggle puts the button back rather than leaving it looking set — a button
+    that says "done" for a chapter the database does not think is done is the
+    worst outcome available here, because she will not click it again.
+  */
+  const [doneSet, setDoneSet] = useState<Set<string>>(
+    () => new Set(chapterProgress.map(c => c.chapter)),
+  );
+  const [progressError, setProgressError] = useState("");
   const [total, setTotal] = useState(String(chaptersTotal ?? ""));
   const [formOpen, setFormOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(() =>
@@ -313,6 +329,58 @@ export function EditorCardClient({
     }
   }
 
+  /** Every chapter this book can show, by the SAME rule the picker uses. */
+  const chapterKeys = chapterOptions(card.chapters, total === "" ? null : Number(total));
+  const doneCount = doneSet.size;
+  const allDone = chapterKeys.length > 0 && chapterKeys.every(k => doneSet.has(k));
+
+  /**
+   * One click, optimistic, reconciled on the response.
+   *
+   * The function returns BOTH the new state and the recomputed count, so the
+   * client never has to derive "how many are done" for itself — deriving it is
+   * how a count and a set drift apart in the first place.
+   */
+  async function toggleChapter(key: string) {
+    if (busy) return;
+    const wasDone = doneSet.has(key);
+    setProgressError("");
+    setDoneSet(prev => {
+      const next = new Set(prev);
+      if (wasDone) next.delete(key); else next.add(key);
+      return next;
+    });
+
+    const { data, error: e } = await supabase.rpc("toggle_chapter_done", {
+      p_card_id: card.id,
+      p_chapter: key,
+    });
+
+    if (e) {
+      // VISIBLY REVERT. Silently leaving the optimistic state would show her a
+      // chapter as done that is not.
+      setDoneSet(prev => {
+        const next = new Set(prev);
+        if (wasDone) next.add(key); else next.delete(key);
+        return next;
+      });
+      setProgressError(`${key}: ${e.message}`);
+      return;
+    }
+
+    // Reconcile against the server's answer rather than trusting the guess.
+    const row = (data as { done: boolean; chapters_edited: number }[] | null)?.[0];
+    if (row) {
+      setDoneSet(prev => {
+        const next = new Set(prev);
+        if (row.done) next.add(key); else next.delete(key);
+        return next;
+      });
+      setEdited(String(row.chapters_edited));
+    }
+    startTransition(() => router.refresh());
+  }
+
   const saveProgress = () =>
     run("Saving progress", () =>
       supabase.rpc("set_editing_progress", {
@@ -321,19 +389,6 @@ export function EditorCardClient({
         p_chapters_total: total === "" ? null : Number(total),
       }),
     );
-
-  /** +1, saved immediately. The number field is for corrections, not for counting. */
-  async function bumpEdited(by: number) {
-    const next = Math.max(0, (Number(edited) || 0) + by);
-    setEdited(String(next));
-    await run("Saving progress", () =>
-      supabase.rpc("set_editing_progress", {
-        p_card_id: card.id,
-        p_chapters_edited: next,
-        p_chapters_total: total === "" ? null : Number(total),
-      }),
-    );
-  }
 
   const setComplete = (complete: boolean) =>
     run(complete ? "Marking complete" : "Reopening", () =>
@@ -557,47 +612,109 @@ export function EditorCardClient({
         </section>
       )}
 
-      {/* ── progress, as a stepper ────────────────────────────────────────
-          THE COMMON ACTION IS "I finished another chapter" — one more than
-          before. It was two number fields and a Save button, so the most
-          frequent thing on the page cost a tap, a keyboard, a correction and a
-          second tap. +1 saves on the spot; the number stays editable for
-          corrections; total is demoted because it is set once, and it is what
-          gives the hub a progress bar at all. */}
+      {/* ── progress, as a GRID OF CHAPTERS ───────────────────────────────
+          A COUNT MEANT "THE FIRST N", and that was the problem. The stepper
+          could only say how many were done, never WHICH — so a chapter blocked
+          on a pickup forced her to either lie about the number or leave the
+          ones after it uncounted. The stored fact is a set now; the count is
+          derived from it and still feeds the hub bar and the phone. */}
       <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-        <h2 className="text-sm font-bold">Editing progress</h2>
-
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void bumpEdited(1)}
-            className="rounded-xl bg-[#D4AF37] px-6 py-3 text-base font-bold text-black transition-colors hover:bg-[#E0C15A] disabled:opacity-40"
-          >
-            +1 chapter
-          </button>
-
-          <label className="text-xs text-white/50">
-            Edited
-            <input
-              inputMode="numeric"
-              value={edited}
-              onChange={e => setEdited(e.target.value.replace(/[^0-9]/g, ""))}
-              onBlur={() => void saveProgress()}
-              className={`${field} mt-1 w-20 text-center text-base font-semibold`}
-            />
-          </label>
-
-          <span className="pt-4 text-sm text-white/40">
-            {total ? `of ${total}` : "of —"}
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-bold">Editing progress</h2>
+          <span className="text-xs text-white/40">
+            {doneCount}
+            {chapterKeys.length > 0 ? ` of ${chapterKeys.length}` : ""} done
+            {editingCompletedAt && <span className="ml-2 text-emerald-300">· complete</span>}
           </span>
-
-          {editingCompletedAt && (
-            <span className="pt-4 text-xs text-emerald-300">complete</span>
-          )}
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-3">
+        {progressError && (
+          <p className="mt-2 text-xs text-rose-300">{progressError}</p>
+        )}
+
+        {chapterKeys.length > 0 ? (
+          <>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {chapterKeys.map(key => {
+                const isDone = doneSet.has(key);
+                /*
+                  FRONT MATTER IS A CHAPTER HERE. Dedication, Trigger Warnings
+                  and Prologue carry no number and every array card has two or
+                  three of them — they are real things to edit, and a grid that
+                  showed only numbers would silently drop them.
+                */
+                const numeric = /^\d+$/.test(key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void toggleChapter(key)}
+                    aria-pressed={isDone}
+                    title={isDone ? `${key} — done, click to undo` : `${key} — mark done`}
+                    className={
+                      (isDone
+                        ? "border-[#D4AF37] bg-[#D4AF37] text-black "
+                        : "border-white/15 text-white/60 hover:border-white/35 hover:text-white/90 ") +
+                      "rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 " +
+                      (numeric ? "min-w-[2.4rem] tabular-nums" : "")
+                    }
+                  >
+                    {key}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/*
+              ASKED ONCE, NEVER AUTOMATIC. Filling the last chapter does not
+              complete the book — she may want a final pass, and a page that
+              decided for her would be wrong exactly when it mattered.
+            */}
+            {allDone && !editingCompletedAt && (
+              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-3 py-2">
+                <span className="text-xs text-[#E0C15A]">
+                  All {chapterKeys.length} chapters done — mark the book complete?
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void setComplete(true)}
+                  className="rounded-lg bg-[#D4AF37] px-3 py-1.5 text-xs font-bold text-black hover:bg-[#E0C15A] disabled:opacity-40"
+                >
+                  Mark complete
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          /*
+            TWO THIRDS OF THE CATALOGUE HAVE NO CHAPTER DATA AT ALL — 22 of 33
+            cards. There is nothing to draw a grid from, so the number field
+            stays and the page says what would make a grid possible, rather
+            than rendering an empty row that reads as a book with no chapters.
+          */
+          <div className="mt-3 space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="text-xs text-white/50">
+                Chapters edited
+                <input
+                  inputMode="numeric"
+                  value={edited}
+                  onChange={e => setEdited(e.target.value.replace(/[^0-9]/g, ""))}
+                  onBlur={() => void saveProgress()}
+                  className={`${field} mt-1 w-20 text-center text-base font-semibold`}
+                />
+              </label>
+              <span className="pt-4 text-sm text-white/40">of —</span>
+            </div>
+            <p className="text-[11px] text-white/40">
+              Set the chapter count to track chapters individually.
+            </p>
+          </div>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/10 pt-3">
           <label className="text-[11px] text-white/40">
             Chapters in the book
             <input

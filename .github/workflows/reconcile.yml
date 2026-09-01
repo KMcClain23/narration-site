@@ -77,6 +77,40 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npm run check-narrator-sync:ci
 
+      # ── The Android DTOs must match the functions they decode ────────────
+      #
+      # The app decodes with ignoreUnknownKeys = false, so a column added to a
+      # function it reads does not degrade a row — it throws and empties the
+      # screen, on every build already installed.
+      #
+      # editor_assignments() was widened for the website and the Editing tab
+      # went to "No books are in editing": plausible, quiet and wrong.
+      # DecoderExposureTest existed and missed it, because it pinned one DTO
+      # while the audit behind it listed fourteen relations.
+      #
+      # Needs the Android repo checked out beside this one; skipped with a
+      # LOUD note when it is absent, never reported as a pass.
+      - name: Check out the Android repo
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          repository: KMcClain23/dmn-admin-android
+          path: dmn-admin-android
+          token: ${{ secrets.ANDROID_REPO_TOKEN }}
+
+      - name: Every decoded relation must match its DTO
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANDROID_REPO: dmn-admin-android
+        run: |
+          if [ ! -d dmn-admin-android/app/src/main/java ]; then
+            echo "::warning::the Android repo was not checked out — DTO drift was NOT checked."
+            echo "Add ANDROID_REPO_TOKEN, or run 'npm run check-android-dtos' locally before a release."
+            exit 0
+          fi
+          npm run check-android-dtos:ci
+
       # ── Every catalogue link must actually open ──────────────────────────
       #
       # /api/books and /narrated-works/[slug] each kept their own status list

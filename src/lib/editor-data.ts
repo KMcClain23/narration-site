@@ -335,6 +335,27 @@ export type PickupNote = {
   created_at: string;
 };
 
+/**
+ * One chapter marked edited.
+ *
+ * THE SET BEHIND chapters_edited, which stays an integer and is derived from
+ * the count of these rows. It comes from its OWN function, never from
+ * board_for_editor: that return type is frozen by the shipped Android DTO, and
+ * a column added to it empties the board on every installed copy.
+ */
+export type ChapterProgress = {
+  card_id: string;
+  chapter: string;
+  done_at: string;
+  done_by_name: string | null;
+};
+
+export async function editorChapterProgress(): Promise<ChapterProgress[]> {
+  const db = await userScopedClient();
+  const { data, error } = await db.rpc("chapter_progress_for_editor");
+  return unwrap<ChapterProgress[]>(data as ChapterProgress[], error, "chapter_progress_for_editor");
+}
+
 export async function editorNotes(): Promise<PickupNote[]> {
   const db = await userScopedClient();
   const { data, error } = await db.rpc("pickup_notes_for_editor");
