@@ -10,8 +10,8 @@ import { DRIVE_USER, graphAppToken } from "@/lib/pickup-graph";
  * ── ONE READER, BECAUSE THERE WERE FOUR CALLERS ────────────────────────────
  *
  * The parse route, the viewer route, the delete route and the upload route each
- * had their own idea of where a manuscript's bytes were, all of them
- * `source_r2_key` against a bucket that turned out to be public. Moving the
+ * had their own idea of where a manuscript's bytes were, all of them the R2
+ * key (now `legacy_r2_key`) against a bucket that turned out to be public. Moving the
  * store with four copies of the read would have moved three of them.
  *
  * ── ONEDRIVE FIRST, BY ID ──────────────────────────────────────────────────
@@ -31,7 +31,7 @@ import { DRIVE_USER, graphAppToken } from "@/lib/pickup-graph";
  * that reported "no source file" during a Graph outage would mark a manuscript
  * failed and leave somebody re-uploading a book that was never missing.
  */
-export type ManuscriptSource = { source_item_id: string | null; source_r2_key: string | null };
+export type ManuscriptSource = { source_item_id: string | null; legacy_r2_key: string | null };
 
 export type SourceResult =
   | { bytes: Uint8Array; store: "onedrive" | "r2-legacy" }
@@ -63,10 +63,10 @@ export async function readManuscriptSource(m: ManuscriptSource): Promise<SourceR
   }
 
   /* Rows uploaded before the move. Read, never written. */
-  if (!m.source_r2_key) return { gone: "No source file is linked for this manuscript." };
+  if (!m.legacy_r2_key) return { gone: "No source file is linked for this manuscript." };
   try {
     const obj = await r2.send(
-      new GetObjectCommand({ Bucket: R2_BUCKETS.media.name, Key: m.source_r2_key }),
+      new GetObjectCommand({ Bucket: R2_BUCKETS.media.name, Key: m.legacy_r2_key }),
     );
     if (!obj.Body) return { gone: "The stored source file is empty." };
     return { bytes: await obj.Body.transformToByteArray(), store: "r2-legacy" };

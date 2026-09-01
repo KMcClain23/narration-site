@@ -56,7 +56,7 @@ export function TakeLinks({
         target="_blank"
         rel="noreferrer"
         // SECONDARY, and it looks it. Plain text, no border, muted.
-        className="text-[11px] text-text-dim underline-offset-2 transition-colors hover:text-text-body hover:underline"
+        className="text-[11px] text-text-body underline-offset-2 transition-colors hover:text-text-primary hover:underline"
       >
         open in OneDrive
       </a>

@@ -33,6 +33,8 @@ let failures = 0;
 const ck = (n, p, d = "") => { console.log(`  ${p ? "ok  " : "FAIL"} ${n}${d ? ` — ${d}` : ""}`); if (!p) failures++; };
 
 let userId = null, untracked = null;
+/** Taken before anything runs, so only THIS run's events are removed. */
+const startedAt = new Date().toISOString();
 const snap = {};
 
 /** Exactly how BoardRepository.setEditingProgress builds the payload. */
@@ -145,7 +147,16 @@ try {
   console.error("\nHARNESS ERROR:", e.message);
   failures++;
 } finally {
-  // Back to exactly what was there.
+  // Back to exactly what was there — INCLUDING THE LOG.
+  //
+  // Toggling chapter 10 writes chapter_done, and on a card with no prior
+  // history it writes editing_started too. Restoring chapter_progress without
+  // removing those left the activity feed claiming a book edited for weeks
+  // began at 21:02, attributed to nobody once the probe account was deleted.
+  // A harness that writes to a real book's history has to unwrite it.
+  await admin.from("activity_events").delete()
+    .eq("card_id", COWBOY).gte("at", startedAt)
+    .in("kind", ["editing_started", "chapter_done", "chapter_undone"]);
   await admin.from("chapter_progress").delete().eq("card_id", COWBOY);
   if (snap.cowboy?.set?.length) {
     await admin.from("chapter_progress").insert(snap.cowboy.set.map(ch => ({ card_id: COWBOY, chapter: ch })));

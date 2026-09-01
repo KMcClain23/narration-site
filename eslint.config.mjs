@@ -32,6 +32,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // VENDORED AND MINIFIED. pdf.worker.min.mjs is pdf.js's build output shipped
+    // as a static asset; linting it reports six errors about code nobody here
+    // wrote and nobody here may edit. Ignoring it is not a suppression — it is
+    // saying it is not our source.
+    "public/pdfjs/**",
   ]),
 ]);
 

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/check-env.mjs --build",
+    "prebuild": "node scripts/check-env.mjs --build && node scripts/check-lint.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -37,6 +37,8 @@
     "check-internal-links": "node scripts/check-internal-links.mjs",
     "check-env": "npx --yes tsx --env-file=.env.local scripts/check-env.mjs",
     "check-activity-log": "npx --yes tsx --env-file=.env.local scripts/check-activity-log.mjs",
+    "check-no-probe-accounts": "npx --yes tsx --env-file=.env.local scripts/check-no-probe-accounts.mjs",
+    "check-lint": "node scripts/check-lint.mjs",
     "link-scripts": "npx --yes tsx --conditions=react-server --env-file=.env.local scripts/link-scripts.mjs",
     "test:title-match": "npx --yes tsx --conditions=react-server --test scripts/title-match.test.mjs",
     "check-spliced-watch": "npx --yes tsx --conditions=react-server --env-file=.env.local scripts/check-spliced-watch.mjs",

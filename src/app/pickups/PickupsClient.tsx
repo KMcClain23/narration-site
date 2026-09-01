@@ -355,7 +355,9 @@ To close it instead and keep the record, use Close.`)) {
             : "border-surface-border bg-surface"
         }`}
       >
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        {/* THE SAME STRUCTURE AS THE EDITOR CARD's rows, and for the same
+            reason — this list has the longest corrections in the system. */}
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="rounded bg-surface-raised px-2 py-0.5 font-mono text-sm font-medium tabular-nums text-text-primary">

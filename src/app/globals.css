@@ -231,8 +231,14 @@ html {
   --color-accent-amber-dim: #7a5a2e;
   --color-accent-amber-bright: #d4a34e;
 
-  --color-alert-red: #c85a5a;
-  --color-capacity-light: #6a9c6e;
+  /* #c85a5a measured 3.40:1 on surface-raised — below AA for the 11-13px text
+     it is actually used for (error messages, the "missing" take badge). Hue and
+     saturation are unchanged; only lightness moved, the least it could and
+     still clear 4.5:1 on all three admin surfaces. */
+  --color-alert-red: #d27979;
+  /* 4.43:1 on surface-raised, marginally under. Same treatment: lightness
+     nudged 0.008, nothing else. */
+  --color-capacity-light: #6c9e70;
 
   --color-pill-neutral-bg: #4a5265;
   --color-pill-neutral-text: #c4c9d6;

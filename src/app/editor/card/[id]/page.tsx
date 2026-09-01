@@ -63,7 +63,7 @@ export default async function EditorCardPage({
 
   return (
     <>
-      <Link href="/editor" className="text-xs text-text-dim hover:text-text-body">
+      <Link href="/editor" className="text-xs text-text-body hover:text-text-primary">
         ← All books
       </Link>
 

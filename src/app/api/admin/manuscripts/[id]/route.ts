@@ -65,7 +65,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
   const [{ data: characters }, { data: manuscript }] = await Promise.all([
     supabaseAdmin.from("characters").select("voice_sample_key").eq("manuscript_id", id),
-    supabaseAdmin.from("manuscripts").select("source_r2_key").eq("id", id).single(),
+    supabaseAdmin.from("manuscripts").select("legacy_r2_key").eq("id", id).single(),
   ]);
 
   /*
@@ -83,7 +83,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   */
   const keys = [
     ...(characters ?? []).map((c) => c.voice_sample_key),
-    manuscript?.source_r2_key,
+    manuscript?.legacy_r2_key,
   ].filter((k): k is string => !!k);
 
   await Promise.all(

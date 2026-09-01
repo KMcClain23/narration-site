@@ -25,13 +25,13 @@ export default async function EditorReleasedPage() {
 
   return (
     <>
-      <Link href="/editor" className="text-xs text-text-dim hover:text-text-body">
+      <Link href="/editor" className="text-xs text-text-body hover:text-text-primary">
         ← Your books
       </Link>
 
       <div className="mb-5 mt-3 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-lg font-bold">Released</h1>
-        <p className="text-xs text-text-dim">
+        <p className="text-xs text-text-muted">
           {released.length} book{released.length === 1 ? "" : "s"}
         </p>
       </div>
@@ -55,7 +55,7 @@ export default async function EditorReleasedPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-text-body">{c.title}</p>
-                <p className="truncate text-[11px] text-text-dim">{c.author ?? "—"}</p>
+                <p className="truncate text-[11px] text-text-muted">{c.author ?? "—"}</p>
               </div>
             </Link>
           ))}

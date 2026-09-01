@@ -57,7 +57,7 @@ function NoteBlock({ notes }: { notes: PickupNote[] }) {
         <div key={n.id} className="border-l-2 border-status-prepping/50 bg-status-prepping/[0.06] px-3 py-2">
           <p className="text-[11px] text-status-prepping/70">
             {n.author_name}
-            <span className="text-text-faint"> · {n.author_kind} · </span>
+            <span className="text-text-muted"> · {n.author_kind} · </span>
             {new Date(n.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
           </p>
           <p className="mt-0.5 whitespace-pre-wrap text-[13px] text-text-primary">{n.body}</p>
@@ -178,7 +178,7 @@ function NarratorPicker({
     return (
       <p className="text-sm text-text-muted">
         This pickup is for <span className="font-semibold text-text-primary">{cast[0].display_name}</span>
-        <span className="text-text-dim"> — the only narrator on this book.</span>
+        <span className="text-text-muted"> — the only narrator on this book.</span>
       </p>
     );
   }
@@ -186,7 +186,7 @@ function NarratorPicker({
   if (cast.length === 2) {
     return (
       <div>
-        <p className="mb-2 text-xs uppercase tracking-wide text-text-dim">Whose read?</p>
+        <p className="mb-2 text-xs uppercase tracking-wide text-text-muted">Whose read?</p>
         <div className="grid grid-cols-2 gap-3">
           {cast.map(c => {
             const on = value === c.narrator_id;
@@ -203,7 +203,7 @@ function NarratorPicker({
                 ].join(" ")}
               >
                 <span className="block text-sm font-semibold">{c.display_name}</span>
-                <span className="block text-[11px] text-text-dim">
+                <span className="block text-[11px] text-text-muted">
                   {c.is_owner ? "primary narrator" : "co-narrator"}
                 </span>
               </button>
@@ -216,7 +216,7 @@ function NarratorPicker({
 
   return (
     <div>
-      <p className="mb-2 text-xs uppercase tracking-wide text-text-dim">Whose read?</p>
+      <p className="mb-2 text-xs uppercase tracking-wide text-text-muted">Whose read?</p>
       <div className="flex flex-wrap gap-2">
         {cast.map(c => {
           const on = value === c.narrator_id;
@@ -234,7 +234,7 @@ function NarratorPicker({
             >
               {c.display_name}
               {c.is_owner && (
-                <span className="ml-1.5 text-[11px] text-text-dim">primary</span>
+                <span className="ml-1.5 text-[11px] text-text-muted">primary</span>
               )}
             </button>
           );
@@ -615,11 +615,31 @@ export function EditorCardClient({
             {pickups
               .filter(p => p.status === "returned")
               .map(p => (
+                /*
+                  THE ACTIONS STAY RIGHT, WHATEVER THE TEXT DOES.
+
+                  This was `flex flex-wrap` with an unsized text column, so once
+                  a correction was long enough the action column wrapped below
+                  it — the buttons on the 09:56 pickup sat under the text while
+                  the two shorter rows above kept theirs on the right. A control
+                  that moves depending on content is a control the eye has to
+                  hunt for.
+
+                  min-w-0 IS THE PART THAT WAS MISSING. A flex child will not
+                  shrink below its content width without it, so the text column
+                  pushed its sibling out rather than wrapping its own text.
+                  flex-1 then lets it take the remaining space and shrink-0
+                  holds the buttons.
+
+                  flex-col sm:flex-row, not flex-wrap: they still stack on a
+                  genuinely narrow viewport, which is right, but never because
+                  the text got long.
+                */
                 <li
                   key={p.id}
-                  className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-surface-border bg-surface-raised px-3 py-2.5"
+                  className="flex flex-col items-start justify-between gap-3 rounded-xl border border-surface-border bg-surface-raised px-3 py-2.5 sm:flex-row"
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-[11px] text-text-muted">
                       {/^\d/.test(p.chapter.trim()) ? `Chapter ${p.chapter}` : p.chapter} ·{" "}
                       {p.timestamp_at}
@@ -630,7 +650,7 @@ export function EditorCardClient({
                         said={p.said}
                         shouldBe={p.should_be}
                         clamp
-                        labelClass="w-20 shrink-0 text-[10px] uppercase tracking-wide text-text-dim"
+                        labelClass="w-20 shrink-0 text-[10px] uppercase tracking-wide text-text-muted"
                         saidClass="text-sm text-text-muted"
                         shouldBeClass="text-sm font-semibold text-text-primary"
                       />
@@ -651,7 +671,7 @@ export function EditorCardClient({
                       type="button"
                       disabled={busy}
                       onClick={() => void closePickup(p.id, "dismissed")}
-                      className="text-xs text-text-muted underline-offset-2 hover:text-text-body hover:underline"
+                      className="text-xs text-text-body underline-offset-2 hover:text-text-primary hover:underline"
                     >
                       Dismiss
                     </button>
@@ -671,7 +691,7 @@ export function EditorCardClient({
       <section className="rounded-2xl border border-divider bg-surface p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-bold">Editing progress</h2>
-          <span className="text-xs text-text-dim">
+          <span className="text-xs text-text-muted">
             {doneCount}
             {chapterKeys.length > 0 ? ` of ${chapterKeys.length}` : ""} done
             {editingCompletedAt && <span className="ml-2 text-capacity-light">· complete</span>}
@@ -760,16 +780,16 @@ export function EditorCardClient({
                   className={`${field} mt-1 w-20 text-center text-base font-semibold`}
                 />
               </label>
-              <span className="pt-4 text-sm text-text-dim">of —</span>
+              <span className="pt-4 text-sm text-text-muted">of —</span>
             </div>
-            <p className="text-[11px] text-text-dim">
+            <p className="text-[11px] text-text-muted">
               Set the chapter count to track chapters individually.
             </p>
           </div>
         )}
 
         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-divider pt-3">
-          <label className="text-[11px] text-text-dim">
+          <label className="text-[11px] text-text-muted">
             Chapters in the book
             <input
               inputMode="numeric"
@@ -811,7 +831,7 @@ export function EditorCardClient({
         <button
           type="button"
           onClick={() => setFormOpen(true)}
-          className="w-full rounded-2xl border border-dashed border-surface-border py-3 text-sm text-text-muted transition-colors hover:border-accent-amber/50 hover:text-text-primary"
+          className="w-full rounded-2xl border border-dashed border-surface-border py-3 text-sm text-text-body transition-colors hover:border-accent-amber/50 hover:text-text-primary"
         >
           + Raise a pickup
         </button>
@@ -823,7 +843,7 @@ export function EditorCardClient({
             <button
               type="button"
               onClick={() => setFormOpen(false)}
-              className="text-xs text-text-dim hover:text-text-body"
+              className="text-xs text-text-muted hover:text-text-body"
             >
               Close
             </button>
@@ -849,7 +869,7 @@ export function EditorCardClient({
               her phone to choose between four things. And the kind drives the
               form below it. */}
           <div className="sm:col-span-2">
-            <p className="mb-2 text-xs uppercase tracking-wide text-text-dim">What kind?</p>
+            <p className="mb-2 text-xs uppercase tracking-wide text-text-muted">What kind?</p>
             <div className="grid grid-cols-4 gap-2">
               {KINDS.map(k => {
                 const on = draft.kind === k.value;
@@ -974,7 +994,7 @@ export function EditorCardClient({
                           />
                         )}
                         {u.pending > 0 && (
-                          <span className="ml-2 rounded-full border border-surface-border px-2 py-0.5 text-[11px] font-normal text-text-dim">
+                          <span className="ml-2 rounded-full border border-surface-border px-2 py-0.5 text-[11px] font-normal text-text-muted">
                             {u.pending} still filing
                           </span>
                         )}
@@ -1012,17 +1032,20 @@ export function EditorCardClient({
                 {list.map(p => {
                   const editable = isEditableBy(p, userId);
                   return (
+                    /* Same rule as the panel above: the text column shrinks,
+                       the actions do not, and they only stack on a narrow
+                       viewport. */
                     <li
                       key={p.id}
-                      className="flex items-start justify-between gap-3 rounded-xl border border-divider px-3 py-2"
+                      className="flex flex-col items-start justify-between gap-3 rounded-xl border border-divider px-3 py-2 sm:flex-row"
                     >
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         {p.kind === "misread" ? (
                           <CorrectionDiff
                             said={p.said}
                             shouldBe={p.should_be}
                             clamp
-                            labelClass="w-20 shrink-0 text-[10px] uppercase tracking-wide text-text-dim"
+                            labelClass="w-20 shrink-0 text-[10px] uppercase tracking-wide text-text-muted"
                             saidClass="text-sm text-text-muted"
                             shouldBeClass="text-sm font-semibold text-text-primary"
                           />
@@ -1032,7 +1055,7 @@ export function EditorCardClient({
                              Two lines and an expand control instead. */
                           <p className="line-clamp-2 break-words text-sm text-text-primary">{summary(p)}</p>
                         )}
-                        <p className="text-[11px] text-text-dim">
+                        <p className="text-[11px] text-text-muted">
                           {p.timestamp_at} · {p.status}
                           {p.assigned_narrator_name ? ` · ${p.assigned_narrator_name}` : ""}
                         </p>
@@ -1054,7 +1077,7 @@ export function EditorCardClient({
                             type="button"
                             disabled={busy}
                             onClick={() => void closePickup(p.id, "dismissed")}
-                            className="text-xs text-text-muted underline-offset-2 hover:text-text-body hover:underline"
+                            className="text-xs text-text-body underline-offset-2 hover:text-text-primary hover:underline"
                           >
                             Dismiss
                           </button>

@@ -10,7 +10,8 @@ import { readManuscriptSource } from "@/lib/manuscript-source";
  *
  * It said: "Proxied rather than handed out as a signed URL: the bucket stays
  * private, the admin cookie remains the only key." The first clause was not
- * true. `source_r2_key` pointed into R2_BUCKETS.media — the same bucket as
+ * true. The R2 key column — now named `legacy_r2_key` for exactly this reason
+ * — pointed into R2_BUCKETS.media, the same bucket as
  * book-covers/ and branding/ — which has R2_MEDIA_PUBLIC_BASE_URL configured
  * and answers an UNCREDENTIALED GET with 206 and the actual PDF bytes. It was
  * checked before this change and it returned `%PDF-`.
@@ -42,7 +43,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const { data: manuscript } = await supabaseAdmin
     .from("manuscripts")
-    .select("source_item_id, source_path, source_r2_key, source_format, title")
+    .select("source_item_id, source_path, legacy_r2_key, source_format, title")
     .eq("id", id)
     .single();
 

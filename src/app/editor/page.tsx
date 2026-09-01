@@ -76,7 +76,7 @@ function deliveryLabel(deadline: string | null): string {
 }
 
 function deliveryStyle(deadline: string | null): string {
-  if (!deadline) return "border-surface-border text-text-dim";
+  if (!deadline) return "border-surface-border text-text-muted";
   const days = (new Date(`${deadline}T00:00:00`).getTime() - Date.now()) / DAY;
   // Amber, and only amber. The rose alarm is gone deliberately — see above.
   return days < 7 ? "border-accent-amber/30 text-accent-amber/80" : "border-surface-border text-text-muted";
@@ -204,7 +204,7 @@ function QueueTile({
             bar with an invented denominator would be a lie — so with no total,
             the count stands alone and the bar is absent.
           */}
-          <div className="mt-2 flex items-center gap-2 text-[11px] text-text-dim">
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-text-muted">
             <span>{EDITING_LABEL[state]}</span>
             {total > 0 ? (
               <span>· {done} of {total} chapters</span>
@@ -235,7 +235,7 @@ function QueueTile({
             href={`/api/pickups/folder/${card.id}`}
             target="_blank"
             rel="noreferrer"
-            className="text-[11px] text-text-dim hover:text-text-body"
+            className="text-[11px] text-text-body hover:text-text-primary"
           >
             Open folder →
           </a>
@@ -260,7 +260,7 @@ function QuietTile({
         <Cover url={card.cover_url} size="sm" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm text-text-body">{card.title}</p>
-          <p className="truncate text-[11px] text-text-dim">
+          <p className="truncate text-[11px] text-text-muted">
             {note ?? card.status}
             {card.deadline ? ` · ${deliveryLabel(card.deadline)}` : ""}
           </p>
@@ -284,7 +284,7 @@ function Section({
     <section className="mb-8">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2 border-b border-divider pb-2">
         <h2 className="text-base font-bold text-text-primary">{title}</h2>
-        <span className="text-xs text-text-dim">{hint ?? `${count}`}</span>
+        <span className="text-xs text-text-muted">{hint ?? `${count}`}</span>
       </div>
       {children}
     </section>
@@ -408,7 +408,7 @@ export default async function EditorBoardPage() {
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-lg font-bold">Editing</h1>
         {released.length > 0 && (
-          <Link href="/editor/released" className="text-xs text-text-dim hover:text-text-body">
+          <Link href="/editor/released" className="text-xs text-text-body hover:text-text-primary">
             {released.length} released →
           </Link>
         )}

@@ -67,7 +67,7 @@ export default async function EditorLayout({ children }: { children: React.React
   return (
     <AdminTheme className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-divider bg-background/85 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-5">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
           <Link href="/editor" className="text-sm font-bold tracking-tight">
             Editing
           </Link>
@@ -79,14 +79,17 @@ export default async function EditorLayout({ children }: { children: React.React
                 viewing as admin
               </span>
             )}
-            <span className="hidden text-xs text-text-dim sm:inline">{session.email}</span>
+            <span className="hidden text-xs text-text-muted sm:inline">{session.email}</span>
             <div className="w-24">
               <SignOutButton returnTo="/admin/login?next=/editor" />
             </div>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-5 py-6">{children}</main>
+      {/* max-w-6xl, and AFTER the flex fix above, not instead of it. Widening
+          alone only moves the breakpoint at which the actions wrap again — a
+          correction longer than the 09:56 one certainly exists. */}
+      <main className="mx-auto max-w-6xl px-5 py-6">{children}</main>
     </AdminTheme>
   );
 }

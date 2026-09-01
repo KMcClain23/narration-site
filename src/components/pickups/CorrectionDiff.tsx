@@ -81,7 +81,7 @@ function Clamped({ children, className }: { children: React.ReactNode; className
         <button
           type="button"
           onClick={() => setOpen(o => !o)}
-          className="mt-0.5 text-xs text-text-dim underline-offset-2 hover:text-accent-amber hover:underline"
+          className="mt-0.5 text-xs text-text-body underline-offset-2 hover:text-accent-amber hover:underline"
         >
           {open ? "Show less" : "Show more"}
         </button>
@@ -97,7 +97,7 @@ export function CorrectionDiff({
   /** Tailwind classes for the two values, so each surface keeps its own type. */
   saidClass = "text-[15px] text-text-muted",
   shouldBeClass = "text-[15px] font-semibold text-text-primary",
-  labelClass = "w-20 shrink-0 text-xs uppercase tracking-wide text-text-dim",
+  labelClass = "w-20 shrink-0 text-xs uppercase tracking-wide text-text-muted",
 }: {
   said: string | null;
   shouldBe: string | null;

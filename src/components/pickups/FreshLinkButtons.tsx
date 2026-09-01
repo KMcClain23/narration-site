@@ -149,7 +149,7 @@ export function FreshLinkButtons({
             {/* Context for the decision, not decoration: whether the link she
                 holds still works, and roughly when it went out. Someone asking
                 "did she ever get one?" can answer it without leaving. */}
-            <span className="text-[11px] text-text-faint">
+            <span className="text-[11px] text-text-muted">
               {b.link_live ? "link live" : "no live link"}
               {last ? ` · sent ${last}` : ""}
             </span>

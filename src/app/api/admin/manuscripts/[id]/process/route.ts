@@ -58,7 +58,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const { data: manuscript, error: fetchError } = await supabaseAdmin
     .from("manuscripts")
-    .select("id, source_item_id, source_r2_key")
+    .select("id, source_item_id, legacy_r2_key")
     .eq("id", id)
     .single();
 
