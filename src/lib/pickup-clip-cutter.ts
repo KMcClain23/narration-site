@@ -1,12 +1,32 @@
 import {
-  chapterMatches, clipWindow, isHeader, parseWavHeader, timestampToSeconds,
-  to16Bit, wavHeaderFor,
-} from "./wav.ts";
-import { chapterDir, clipName } from "./paths.ts";
+  chapterMatches, clipWindow, isAudioFile, isHeader, parseWavHeader,
+  timestampToSeconds, to16Bit, wavHeaderFor,
+} from "./wav";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import { chapterDir, clipName } from "./pickup-paths";
 
 /**
- * Step 6 of the send: a ±10 second clip per pickup, cut from the book's
- * combined chapter file.
+ * A ±10 second clip per pickup, cut from the book's combined chapter file.
+ *
+ * ── IT LIVES HERE, AND ONLY HERE ───────────────────────────────────────────
+ *
+ * It began as step 6 of the Edge Function's send. Cutting had to become
+ * RETRYABLE — a spliced file still uploading when Send was pressed cost that
+ * batch its clips permanently — and the retry belongs in the sweep, which is
+ * Next.js.
+ *
+ * Sharing one module across the two runtimes is not possible: Deno requires the
+ * `.ts` extension on relative imports and the Next build rejects it. So rather
+ * than keep two copies of two hundred lines of Graph and byte arithmetic — the
+ * duplication that produced the slug bug, the status-list bug and the paths
+ * twin — cutting moved wholly to the sweep and the Edge Function now only
+ * GATES the send.
+ *
+ * The cost is that clips appear within a cron cycle rather than instantly. That
+ * is acceptable because the email links to a page that reads live: a clip
+ * arriving ten minutes later shows up on the link the narrator already has, with
+ * no re-send and no second email. It is the same trade the upload path makes.
  *
  * ── NOTHING IN HERE MAY BLOCK A SEND ───────────────────────────────────────
  *
@@ -68,16 +88,15 @@ async function graphJson(token: string, url: string): Promise<Record<string, unk
 const mmss = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
 
+/**
+ * Cut every outstanding clip for one (book, chapter, narrator) batch.
+ *
+ * EVERY OUTCOME GOES THROUGH record_clip_attempt, so attempts accrue and the
+ * 48-hour cap applies however this was reached.
+ */
 export async function cutClips(
   token: string,
-  admin: {
-    from: (t: string) => {
-      update: (v: Record<string, unknown>) => {
-        eq: (c: string, v: string) => Promise<unknown>;
-        in: (c: string, v: string[]) => Promise<unknown>;
-      };
-    };
-  },
+  admin: SupabaseClient,
   card: { title: string; audioFolderItemId: string | null; bookSegment: string },
   chapter: string,
   narratorSegment: string,
@@ -85,9 +104,14 @@ export async function cutClips(
 ): Promise<ClipOutcome[]> {
   const out: ClipOutcome[] = [];
 
+  const record = async (id: string, skip: ClipSkip, detail?: string) => {
+    await admin.rpc("record_clip_attempt", { p_id: id, p_reason: skip, p_error: detail ?? null });
+  };
   const skipAll = async (skip: ClipSkip, detail?: string): Promise<ClipOutcome[]> => {
-    await admin.from("pickups").update({ clip_skip_reason: skip }).in("id", rows.map(r => r.id));
-    for (const r of rows) out.push({ pickup: r.id, at: r.timestamp_at, skip, detail });
+    for (const r of rows) {
+      await record(r.id, skip, detail);
+      out.push({ pickup: r.id, at: r.timestamp_at, skip, detail });
+    }
     return out;
   };
 
@@ -111,7 +135,9 @@ export async function cutClips(
     );
     if (listed === null) return await skipAll("no_source_folder", "the folder no longer exists");
     children = ((listed.value ?? []) as Array<Record<string, unknown>>)
-      .filter(c => c.file)
+      // AUDIO ONLY, decided before anything looks at chapter names — see
+      // isAudioFile. desktop.ini and Thumbs.db arrive on their own.
+      .filter(c => c.file && isAudioFile(String(c.name ?? "")))
       .map(c => ({ id: c.id as string, name: c.name as string, size: Number(c.size ?? 0) }));
   } catch (e) {
     return await skipAll("graph_unavailable", String(e).slice(0, 150));
@@ -152,8 +178,7 @@ export async function cutClips(
   for (const row of rows) {
     const at = timestampToSeconds(row.timestamp_at);
     if (at === null) {
-      await admin.from("pickups")
-        .update({ clip_skip_reason: "timestamp_past_end" }).eq("id", row.id);
+      await record(row.id, "timestamp_past_end", "could not be read as a timestamp");
       out.push({
         pickup: row.id, at: row.timestamp_at, skip: "timestamp_past_end",
         detail: `could not be read as a timestamp`,
@@ -170,8 +195,10 @@ export async function cutClips(
         that behind a clip of the last ten seconds, which is a plausible wrong
         answer and the worst kind.
       */
-      await admin.from("pickups")
-        .update({ clip_skip_reason: "timestamp_past_end" }).eq("id", row.id);
+      await record(
+        row.id, "timestamp_past_end",
+        `past the end of the file, which runs ${mmss(window.durationSeconds)}`,
+      );
       out.push({
         pickup: row.id, at: row.timestamp_at, skip: "timestamp_past_end",
         detail: `past the end of the file, which runs ${mmss(window.durationSeconds)}`,
@@ -210,6 +237,8 @@ export async function cutClips(
       const made = await put.json();
 
       const seconds = Number((window.toSeconds - window.fromSeconds).toFixed(2));
+      // Success clears the reason and the provisional flag together — a row
+      // that has a clip is not waiting for anything.
       await admin.from("pickups").update({
         clip_item_id: made.id ?? null,
         clip_web_url: made.webUrl ?? null,
@@ -219,6 +248,8 @@ export async function cutClips(
         clip_seconds: seconds,
         clip_cut_at: new Date().toISOString(),
         clip_skip_reason: null,
+        clip_skip_final: false,
+        clip_last_error: null,
       }).eq("id", row.id);
 
       out.push({
@@ -229,8 +260,7 @@ export async function cutClips(
         clamped: window.clampedStart ? "start" : window.clampedEnd ? "end" : undefined,
       });
     } catch (e) {
-      await admin.from("pickups")
-        .update({ clip_skip_reason: "graph_unavailable" }).eq("id", row.id);
+      await record(row.id, "graph_unavailable", String(e).slice(0, 150));
       out.push({
         pickup: row.id, at: row.timestamp_at,
         skip: "graph_unavailable", detail: String(e).slice(0, 150),

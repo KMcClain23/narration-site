@@ -15,9 +15,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  chapterMatches, clipWindow, isHeader, parseWavHeader, timestampToSeconds,
-  to16Bit, wavHeaderFor,
-} from "../supabase/functions/send-pickups/wav.ts";
+  chapterMatches, clipWindow, isAudioFile, isHeader, parseWavHeader,
+  timestampToSeconds, to16Bit, wavHeaderFor,
+} from "../src/lib/wav.ts";
 
 /** Build a WAV header in front of `dataLen` bytes, with optional extra chunks. */
 function fixture({ bits = 16, channels = 1, rate = 44100, dataLen = 88200, extra = [] } = {}) {
@@ -229,4 +229,28 @@ test("exactly one file matches chapter 23 in the real folder listing", () => {
   assert.deepEqual(folder.filter(f => chapterMatches(f, "23")), ["Chapter 23.wav"]);
   assert.deepEqual(folder.filter(f => chapterMatches(f, "3")), ["Chapter 3.wav"]);
   assert.deepEqual(folder.filter(f => chapterMatches(f, "99")), []);
+});
+
+// ── non-audio files ───────────────────────────────────────────────────────
+test("only audio files are ever candidates", () => {
+  for (const good of ["Chapter 5.wav", "Chapter 5.WAV", "x.mp3", "y.m4a", "z.flac"]) {
+    assert.ok(isAudioFile(good), good);
+  }
+  // These arrive on their own: Windows writes them into any folder it renders.
+  for (const bad of ["desktop.ini", "Thumbs.db", "notes.txt", "Chapter 5", "cover.jpg"]) {
+    assert.ok(!isAudioFile(bad), bad);
+  }
+});
+
+test("a non-audio file that LOOKS like a chapter is still not a candidate", () => {
+  // This is the case that matters. "desktop.ini" never matched a chapter, but
+  // these do — and a second candidate produces ambiguous_chapter_match and no
+  // clip at all, which has already happened once from a stray file.
+  const folder = ["Chapter 5.wav", "Chapter 5.ini", "Chapter 5 - Copy.txt", "desktop.ini"];
+  const candidates = folder.filter(isAudioFile).filter(f => chapterMatches(f, "5"));
+  assert.deepEqual(candidates, ["Chapter 5.wav"], "exactly one candidate must survive");
+
+  // Without the audio filter there would be three, and the cutter would refuse.
+  const withoutFilter = folder.filter(f => chapterMatches(f, "5"));
+  assert.equal(withoutFilter.length, 3, "the filter is doing real work here");
 });

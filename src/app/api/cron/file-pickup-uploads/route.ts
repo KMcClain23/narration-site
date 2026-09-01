@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { notifyEditorsOfFiling } from "@/lib/notify-filed";
 import { chapterDir, sanitiseSegment, takeName } from "@/lib/pickup-paths";
+import { cutClips, type ClipOutcome } from "@/lib/pickup-clip-cutter";
 import {
   QUARANTINE_ROOT,
   childrenById,
@@ -252,6 +253,62 @@ export async function GET(req: Request) {
     sweepErrors.push(`verify: ${(e as Error).message.slice(0, 150)}`);
   }
 
+  /*
+    ── CUT THE CLIPS THAT DID NOT CUT ───────────────────────────────────────
+
+    Clips were cut once, at send, and never again — so a spliced file still
+    uploading when Send was pressed cost that batch its clips permanently.
+    Measured: chapter 23's source became visible NINE MINUTES after the send,
+    chapter 5's seventy-two seconds after, and chapter 6 — the only batch with
+    clips — won by eleven seconds.
+
+    The gate on Send now prevents the common case. This catches what it misses:
+    a file visible to the check but not yet fully readable, a source folder set
+    after the fact, a Graph blip. The same shape the upload path already has —
+    land now, file later, attempts recording progress.
+
+    RETRYABLE ONLY. pickups_needing_clips excludes not_wav, unreadable_header,
+    ambiguous_chapter_match and timestamp_past_end, because none of them are
+    fixed by waiting and the last is a real finding that must stay visible.
+  */
+  const clipsCut: ClipOutcome[] = [];
+  try {
+    const { data: pending } = await supabaseAdmin.rpc("pickups_needing_clips", { p_limit: 50 });
+    const rows = (pending ?? []) as {
+      id: string; card_id: string; chapter: string; timestamp_at: string;
+      narrator_name: string; book_title: string;
+      pickups_folder: string | null; audio_folder_item_id: string | null;
+    }[];
+
+    // Grouped by (card, chapter, narrator): the cutter reads the chapter's
+    // header ONCE per group rather than once per pickup.
+    const groups = new Map<string, typeof rows>();
+    for (const r of rows) {
+      const key = `${r.card_id}|${r.chapter}|${r.narrator_name}`;
+      groups.set(key, [...(groups.get(key) ?? []), r]);
+    }
+
+    for (const group of groups.values()) {
+      const first = group[0];
+      const cut = await cutClips(
+        graph,
+        supabaseAdmin,
+        {
+          title: first.book_title,
+          audioFolderItemId: first.audio_folder_item_id,
+          bookSegment: first.pickups_folder ?? sanitiseSegment(first.book_title),
+        },
+        first.chapter,
+        sanitiseSegment(first.narrator_name),
+        group.map(r => ({ id: r.id, timestamp_at: r.timestamp_at })),
+      );
+      clipsCut.push(...cut);
+    }
+  } catch (e) {
+    // Clip retry failing must not touch the filing that already succeeded.
+    sweepErrors.push(`clips: ${(e as Error).message.slice(0, 150)}`);
+  }
+
   // ── STATE FIRST, THEN EMAIL — the THIRD place these two orderings sit side
   //    by side, and the third different reason. ────────────────────────────
   //
@@ -282,6 +339,11 @@ export async function GET(req: Request) {
     failed: failed.length,
     swept,
     verified,
+    clips: {
+      attempted: clipsCut.length,
+      cut: clipsCut.filter(c => c.path).length,
+      skipped: clipsCut.filter(c => c.skip).map(c => `${c.at}: ${c.skip}`),
+    },
     notified,
     paths: filed,
     errors: failed,

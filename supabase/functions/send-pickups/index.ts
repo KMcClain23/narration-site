@@ -1,5 +1,6 @@
-import { cutClips, type ClipOutcome } from "./clips.ts";
-import { chapterDir, manifestName, sanitiseSegment } from "./paths.ts";
+import {
+  chapterDir, chapterMatches, isAudioFile, manifestName, sanitiseSegment,
+} from "./paths.ts";
 
 /**
  * Send a chapter's pickups to their narrators, and file the manifest.
@@ -12,12 +13,13 @@ import { chapterDir, manifestName, sanitiseSegment } from "./paths.ts";
  *
  * ── THE ORDER IS THE WHOLE POINT ────────────────────────────────────────────
  *
+ *   0. REFUSE if a clip was on offer and its source file is not yet visible
  *   1. verify the caller is admin or editor
  *   2. gather the chapter's DRAFT pickups, grouped by narrator
  *   3. send one email per narrator
  *   4. ONLY on acceptance, move those narrators' pickups to SENT
  *   5. file the manifest — and a failure here does NOT undo step 4
- *   6. cut a clip per pickup — and a failure here undoes nothing either
+ *   6. (clips are cut by the sweep, not here — see the gate at step 0)
  *
  * If the transition ran first and the send failed, pickups would read as SENT
  * with nobody told: invisible, and the exact failure shape this project keeps
@@ -435,6 +437,45 @@ Deno.serve(async (req: Request) => {
     .single();
   if (cardError || !card) return json({ error: "No such book" }, 404);
 
+  /*
+    ── STEP 0, BEFORE ANY EMAIL LEAVES ──────────────────────────────────────
+
+    Checked here rather than after the drafts are gathered, so a refusal costs
+    nothing and changes nothing. See clipSourceMissing for why this reverses
+    "a clip never blocks a send".
+  */
+  /*
+    THE WHOLE GATE IS INSIDE A try. A GATE THAT CRASHES IS WORSE THAN NO GATE.
+
+    The first version of this threw a ReferenceError — one missing name in an
+    import — and every send on a book with a source folder returned 500. That is
+    strictly worse than the missing clips it was added to prevent: it stopped
+    the work rather than degrading it.
+
+    So the only outcome this block can produce, other than a deliberate 409, is
+    to fall through and let the send proceed. Refusing is a decision; failing is
+    not a reason to refuse.
+  */
+  if (card.audio_folder_item_id) {
+    let blockedChapter = false;
+    try {
+      const gateToken = await graphAppToken();
+      blockedChapter = await clipSourceMissing(gateToken, card.audio_folder_item_id, chapter);
+    } catch (e) {
+      console.error(`clip gate could not run, allowing the send: ${String(e).slice(0, 200)}`);
+      blockedChapter = false;
+    }
+    if (blockedChapter) {
+      return json({
+        error:
+          `Chapter ${chapter} isn't in OneDrive yet. It may still be uploading — ` +
+          `try again in a minute.`,
+        blocked: "clip_source_missing",
+        chapter,
+      }, 409);
+    }
+  }
+
   const { data: drafts, error: draftError } = await adminClient
     .from("pickups")
     .select("id, chapter, timestamp_at, kind, said, should_be, note, assigned_narrator_id")
@@ -590,7 +631,6 @@ Deno.serve(async (req: Request) => {
   // manifest is the record. manifest_path stays null, which is visible and
   // retryable rather than a silent gap.
   const manifests: Array<{ narrator: string; path?: string; error?: string }> = [];
-  const clips: ClipOutcome[] = [];
   if (emailed.length > 0) {
     const bookSegment = card.pickups_folder ?? sanitiseSegment(card.title);
     // Recorded on first use so the same book always resolves to the same folder,
@@ -631,38 +671,6 @@ Deno.serve(async (req: Request) => {
           manifests.push({ narrator: name, error: String(e).slice(0, 200) });
         }
 
-        /*
-          ── 6. the clips ────────────────────────────────────────────────
-
-          Inside the manifest loop because it needs the same narrator segment,
-          but in its OWN try: a clip that cannot be cut must not cost the
-          manifest, and neither may cost the send. Every failure lands as a
-          clip_skip_reason on the row and a line in the report below.
-        */
-        try {
-          const cut = await cutClips(
-            token,
-            adminClient,
-            {
-              title: card.title,
-              audioFolderItemId: card.audio_folder_item_id ?? null,
-              bookSegment,
-            },
-            chapter,
-            sanitiseSegment(name),
-            rows.map(r => ({ id: r.id, timestamp_at: r.timestamp_at })),
-          );
-          clips.push(...cut);
-        } catch (e) {
-          // The cutter handles its own failures; reaching here means something
-          // outside them. Recorded, never rethrown.
-          for (const r of rows) {
-            clips.push({
-              pickup: r.id, at: r.timestamp_at,
-              skip: "graph_unavailable", detail: String(e).slice(0, 150),
-            });
-          }
-        }
       }
     }
   }
@@ -675,11 +683,64 @@ Deno.serve(async (req: Request) => {
     skipped,
     failed,
     manifests,
-    // Named per pickup so a missing clip is visible in the same response that
-    // confirms the email went out, rather than being discovered later.
-    clips,
   }, failed.length > 0 ? 207 : 200);
 });
+
+
+/**
+ * ── STEP 0: REFUSE A SEND WHOSE CLIP SOURCE IS NOT THERE YET ───────────────
+ *
+ * THIS REVERSES A STATED RULE, and the reversal is the point of this comment.
+ *
+ * "A missing clip must never block a send" was written deliberately, and it was
+ * right when a clip was a bonus. It is wrong now, and the measurements are why:
+ *
+ *   ch 23 -> Ann   sent 01:22:21   source visible 01:31:08   9 min late
+ *   ch  5 -> Ann   sent 03:08:26   source visible 03:09:38   72 sec late
+ *   ch  6 -> both  sent 04:57:49   source visible 04:57:38   11 sec in time
+ *
+ * Chapter 6 is the only batch that got clips, and it won by eleven seconds.
+ * Everything else lost them permanently, because cutting happened once. A
+ * pickup sent without its clip is a worse pickup — the narrator works from text
+ * alone — and ninety seconds of waiting is cheaper than that.
+ *
+ * ── IT BLOCKS ONLY WHEN A CLIP WAS GENUINELY ON OFFER ─────────────────────
+ *
+ * TWENTY-TWO OF THIRTY-THREE CARDS HAVE NO CHAPTER DATA AT ALL. A gate that
+ * cannot tell "still uploading" from "never set up for clips" would make two
+ * thirds of the catalogue unsendable, which is far worse than a missing clip.
+ * So: no audio_folder_item_id, no gate.
+ *
+ * And it blocks only on ABSENCE. not_wav, unreadable_header and
+ * ambiguous_chapter_match are all real problems, and none of them is fixed by
+ * waiting a minute — refusing on those would trap her with no way forward.
+ *
+ * VISIBILITY IS ASKED OF GRAPH, not of a stored path: the question is whether
+ * the API can read the file NOW, which is exactly what the cutter will need.
+ */
+async function clipSourceMissing(
+  token: string,
+  audioFolderItemId: string | null,
+  chapter: string,
+): Promise<boolean> {
+  // Clips were never on offer for this book.
+  if (!audioFolderItemId) return false;
+
+  const res = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${DRIVE_USER}/drive/items/${audioFolderItemId}` +
+      `/children?$top=400&$select=name,file`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  // A LOOKUP THAT FAILED IS NOT AN ABSENT FILE. Refusing the send because Graph
+  // was briefly unreachable would block work over a network blip; the sweep
+  // retries the clip either way.
+  if (!res.ok) return false;
+
+  const children = ((await res.json()).value ?? []) as Array<{ name?: string; file?: unknown }>;
+  return !children.some(
+    c => c.file && isAudioFile(String(c.name ?? "")) && chapterMatches(String(c.name ?? ""), chapter),
+  );
+}
 
 function json(body: unknown, status = 200): Response {
   // CORS on EVERY response, not just the happy one. Without it the browser can

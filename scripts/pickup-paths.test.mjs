@@ -16,6 +16,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import * as web from "../src/lib/pickup-paths.ts";
+import * as webWav from "../src/lib/wav.ts";
 import * as edge from "../supabase/functions/send-pickups/paths.ts";
 
 /**
@@ -117,4 +118,34 @@ test("a colon in a timestamp cannot create a path separator", () => {
   // ":" is illegal in a OneDrive name and would break the URL if it survived.
   assert.ok(!web.clipName("1:02:11").includes(":"));
   assert.equal(web.clipName("1:02:11"), "clip 1-02-11.wav");
+});
+
+// ── the gate's copies of the matcher must agree too ───────────────────────
+//
+// The Edge Function gates the send and needs chapterMatches + isAudioFile, but
+// the cutter (and its originals) now live on the Next side. Same runtime
+// boundary, same answer: twins, pinned.
+test("isAudioFile agrees across the boundary", () => {
+  for (const f of [
+    "Chapter 5.wav", "Chapter 5.WAV", "x.mp3", "y.M4A", "z.flac",
+    "desktop.ini", "Thumbs.db", "notes.txt", "Chapter 5", "cover.jpg", "",
+  ]) {
+    assert.equal(edge.isAudioFile(f), webWav.isAudioFile(f), `isAudioFile(${JSON.stringify(f)})`);
+  }
+});
+
+test("chapterMatches agrees across the boundary", () => {
+  const files = [
+    "Chapter 5.wav", "Chapter 20.wav", "Chapter 2.wav", "Chapter 23.wav",
+    "Unmasked Hearts Chapter 17.mp3", "Epilogue.wav", "Authors Note.wav",
+    "Opening Credits.mp3", "desktop.ini",
+  ];
+  for (const f of files) {
+    for (const c of CHAPTERS) {
+      assert.equal(
+        edge.chapterMatches(f, c), webWav.chapterMatches(f, c),
+        `chapterMatches(${JSON.stringify(f)}, ${JSON.stringify(c)})`,
+      );
+    }
+  }
 });

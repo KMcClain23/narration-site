@@ -277,6 +277,29 @@ export function timestampToSeconds(raw: string): number | null {
 }
 
 /**
+ * Audio, by extension.
+ *
+ * ── NON-AUDIO FILES ARE NEVER CONSIDERED, NOT CONSIDERED AND REJECTED ──────
+ *
+ * Windows drops desktop.ini into any folder it renders, and Thumbs.db follows;
+ * neither is put there by a person and neither will be tidied away. Today
+ * "desktop.ini" happens not to match any chapter — but "Chapter 5.ini" or
+ * "Chapter 5 - Copy.txt" would, and a second candidate does not produce a wrong
+ * clip, it produces ambiguous_chapter_match and NO clip at all. That has
+ * already happened once, from a stray file left in the folder by this project.
+ *
+ * So the filter is on what a file IS, before anything asks which chapter it
+ * looks like.
+ */
+const AUDIO_EXTENSIONS = ["wav", "mp3", "m4a", "flac", "aiff", "aif", "ogg"];
+
+export function isAudioFile(fileName: string): boolean {
+  const dot = (fileName ?? "").lastIndexOf(".");
+  if (dot < 0) return false;
+  return AUDIO_EXTENSIONS.includes(fileName.slice(dot + 1).toLowerCase());
+}
+
+/**
  * Does this file name hold this chapter?
  *
  * ONE MATCH PROCEEDS; ZERO OR MANY IS A STATED SKIP. Cutting from the wrong

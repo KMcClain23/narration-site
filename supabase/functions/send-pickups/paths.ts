@@ -68,3 +68,39 @@ export function takeName(originalName: string, extension: string): string {
   const ext = (extension ?? "").replace(/^\.+/, "").toLowerCase() || "bin";
   return `${sanitiseSegment(`take - ${originalName}`)}.${ext}`;
 }
+
+/**
+ * Audio, by extension. The twin of src/lib/wav.ts's copy.
+ *
+ * The gate needs it so a stray desktop.ini can never be mistaken for the
+ * chapter's source and let a send through on a file that is not audio.
+ */
+const AUDIO_EXTENSIONS = ["wav", "mp3", "m4a", "flac", "aiff", "aif", "ogg"];
+
+export function isAudioFile(fileName: string): boolean {
+  const dot = (fileName ?? "").lastIndexOf(".");
+  if (dot < 0) return false;
+  return AUDIO_EXTENSIONS.includes(fileName.slice(dot + 1).toLowerCase());
+}
+
+/**
+ * Does this file name hold this chapter? The twin of src/lib/wav.ts's copy.
+ *
+ * Both are pinned character-for-character by scripts/pickup-paths.test.mjs.
+ */
+export function chapterMatches(fileName: string, chapter: string): boolean {
+  const stem = fileName.replace(/\.[a-z0-9]+$/i, "");
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  const nFile = norm(stem);
+  const nChap = norm(chapter);
+  if (!nChap) return false;
+
+  if (/^\d+$/.test(nChap)) {
+    // `\\s`, not `\s`: inside a template literal `\s` is just "s", which would
+    // make this `(^|s)(chapters*)?5(s|$)` and match almost anything. The parity
+    // test caught exactly that the first time this twin was written.
+    return new RegExp(`(^|\\s)(chapter\\s*)?${nChap}(\\s|$)`).test(nFile);
+  }
+  return nFile === nChap || nFile.endsWith(` ${nChap}`);
+}
