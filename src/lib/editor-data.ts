@@ -66,13 +66,30 @@ export type EditorCard = {
   editor_id: string | null;
   /** Display name of the holder, for "claimed by X". Null when unclaimed. */
   editor_name: string | null;
+  /**
+   * Somebody other than her is editing this book.
+   *
+   * Deliberately NOT derived from production_type: How an Angel Dies: Wrath is
+   * indie and still externally edited, so that field would catch two of the
+   * three and miss the one Dean named. Who commissions a book and who edits it
+   * are different facts.
+   */
+  edited_externally: boolean;
 };
 
-/** One row of editor_assignments(). Only CLAIMED cards appear. */
+/**
+ * One row of editor_assignments().
+ *
+ * A row exists when a card is CLAIMED or EXTERNALLY EDITED — both are answers
+ * to "can she pick this up". A card absent from the result is unclaimed and
+ * claimable, which is what the hub reads.
+ */
 export type EditorAssignment = {
   card_id: string;
-  editor_id: string;
-  editor_name: string;
+  editor_id: string | null;
+  editor_name: string | null;
+  /** Somebody outside is doing the post. Not derivable from production_type. */
+  edited_externally: boolean;
 };
 
 /**
@@ -188,8 +205,9 @@ export async function editorBoard(): Promise<EditorCard[]> {
     db.rpc("board_for_editor"),
     db.rpc("editor_assignments"),
   ]);
-  const cards = unwrap<Omit<EditorCard, "editor_id" | "editor_name">[]>(
-    board.data as Omit<EditorCard, "editor_id" | "editor_name">[],
+  type BoardRow = Omit<EditorCard, "editor_id" | "editor_name" | "edited_externally">;
+  const cards = unwrap<BoardRow[]>(
+    board.data as BoardRow[],
     board.error,
     "board_for_editor",
   );
@@ -203,6 +221,7 @@ export async function editorBoard(): Promise<EditorCard[]> {
     ...c,
     editor_id: by.get(c.id)?.editor_id ?? null,
     editor_name: by.get(c.id)?.editor_name ?? null,
+    edited_externally: by.get(c.id)?.edited_externally ?? false,
   }));
 }
 

@@ -32,6 +32,7 @@ export const dynamic = "force-dynamic";
  *   Editing now        hers AND unfinished. The only section that is a queue.
  *   Finished           hers and complete. History, so it is collapsed.
  *   Unclaimed          in editing, nobody holds it. Claimable, not assigned.
+ *   Edited elsewhere   somebody outside is doing the post. Not hers to take.
  *   With someone else  held by another editor. Empty today; it will not be.
  *   Coming next        recording and prepping — soon, but not hers yet
  *   Not yet            contracted and recast, collapsed
@@ -366,7 +367,20 @@ export default async function EditorBoardPage() {
   const finished = hers
     .filter(c => c.editing_completed_at)
     .sort((a, b) => (b.editing_completed_at ?? "").localeCompare(a.editing_completed_at ?? ""));
-  const unclaimed = inEditing.filter(c => c.editor_id === null).sort(byDelivery);
+  /*
+    UNCLAIMED MEANS CLAIMABLE, so an externally edited book is not in it.
+
+    Three of the eight books in editing are being posted by somebody else —
+    Spotify, Blue Nose Audio, and a production company on How an Angel Dies. A
+    Claim button on those offers her work she cannot do, and the refusal would
+    come from a person rather than from the app.
+  */
+  const unclaimed = inEditing
+    .filter(c => c.editor_id === null && !c.edited_externally)
+    .sort(byDelivery);
+  const elsewhere = inEditing
+    .filter(c => c.edited_externally && c.editor_id === null)
+    .sort((a, b) => a.title.localeCompare(b.title));
   const others = inEditing
     .filter(c => c.editor_id !== null && c.editor_id !== me)
     .sort((a, b) => a.title.localeCompare(b.title));
@@ -488,6 +502,27 @@ export default async function EditorBoardPage() {
           ))}
         </div>
       </Section>
+
+      {/*
+        QUIET, AND STILL SHOWN.
+
+        Hiding them would be a different lie: they are in editing, they are part
+        of the book list she is looking at, and their absence would read as work
+        that had vanished. Collapsed, with no Claim button, is the honest shape —
+        present, explained, not offered.
+      */}
+      {elsewhere.length > 0 && (
+        <details className="mb-8 rounded-xl border border-white/10 bg-white/[0.02]">
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm text-white/60 hover:text-white/85">
+            Edited elsewhere — {elsewhere.length} book{elsewhere.length === 1 ? "" : "s"} someone else is posting
+          </summary>
+          <div className="grid gap-2 border-t border-white/10 p-3 sm:grid-cols-2">
+            {elsewhere.map(c => (
+              <QuietTile key={c.id} card={c} note="edited elsewhere" />
+            ))}
+          </div>
+        </details>
+      )}
 
       <Section title="With someone else" count={others.length} hint="claimed">
         <div className="grid gap-2 sm:grid-cols-2">
