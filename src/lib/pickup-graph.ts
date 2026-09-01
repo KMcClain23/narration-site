@@ -87,12 +87,49 @@ export async function readHead(token: string, path: string, bytes = 63): Promise
   return new Uint8Array(await res.arrayBuffer());
 }
 
-export async function itemByPath(token: string, path: string): Promise<{ id: string; size: number } | null> {
+export async function itemByPath(
+  token: string, path: string,
+): Promise<{ id: string; size: number; webUrl: string | null } | null> {
   const res = await fetch(byPath(path), { headers: { Authorization: `Bearer ${token}` } });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`stat ${res.status}`);
   const json = await res.json();
-  return { id: json.id as string, size: Number(json.size ?? 0) };
+  return { id: json.id as string, size: Number(json.size ?? 0), webUrl: json.webUrl ?? null };
+}
+
+/**
+ * An item BY ID, which is the only address that survives a rename or a move.
+ *
+ * ── THE THREE OUTCOMES ARE KEPT APART, AND THAT IS THE ENTIRE POINT ────────
+ *
+ *   { … }   it is there; `webUrl` is where it is NOW
+ *   null    Graph says it is gone (404 or 410) — a definite answer
+ *   throws  the lookup could not be made: token, network, 5xx, throttling
+ *
+ * Collapsing the last two into "gone" is the failure this project keeps
+ * finding: a drive-wide search once returned 403 and `(json.value ?? [])` turned
+ * a permission failure into "no hits", which was then reported as evidence. A
+ * caller here must be able to tell "the file has been deleted" from "I could not
+ * find out", because it is about to tell a person one of those two things.
+ */
+export async function itemById(
+  token: string, id: string,
+): Promise<{ id: string; name: string; webUrl: string | null; deleted: boolean } | null> {
+  const res = await fetch(`${ROOT}/items/${encodeURIComponent(id)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  // 404 and 410 are both "no longer there", said two ways.
+  if (res.status === 404 || res.status === 410) return null;
+  if (!res.ok) throw new Error(`item ${res.status}: ${(await res.text()).slice(0, 150)}`);
+  const json = await res.json();
+  // An item in the recycle bin still resolves; `deleted` is a facet Graph sets.
+  // It is NOT the same as gone, and the caller says so differently.
+  return {
+    id: json.id as string,
+    name: (json.name as string) ?? "",
+    webUrl: json.webUrl ?? null,
+    deleted: json.deleted != null,
+  };
 }
 
 export async function deleteByPath(token: string, path: string): Promise<void> {
@@ -104,9 +141,11 @@ export async function deleteByPath(token: string, path: string): Promise<void> {
 }
 
 /** Create a folder if it is missing, so a move has somewhere to land. */
-async function ensureFolder(token: string, path: string): Promise<string> {
+export async function ensureFolder(
+  token: string, path: string,
+): Promise<{ id: string; webUrl: string | null }> {
   const existing = await itemByPath(token, path);
-  if (existing) return existing.id;
+  if (existing) return { id: existing.id, webUrl: existing.webUrl };
 
   const parts = path.split("/");
   const name = parts.pop()!;
@@ -124,7 +163,8 @@ async function ensureFolder(token: string, path: string): Promise<string> {
     }),
   });
   if (!res.ok) throw new Error(`mkdir ${res.status}: ${(await res.text()).slice(0, 150)}`);
-  return (await res.json()).id as string;
+  const made = await res.json();
+  return { id: made.id as string, webUrl: made.webUrl ?? null };
 }
 
 /**
@@ -136,12 +176,15 @@ async function ensureFolder(token: string, path: string): Promise<string> {
  * "chapter 12.wav" twice is the normal case.
  *
  * Returns the path actually used, which is what gets recorded: the requested one
- * would be a lie the moment a suffix was added.
+ * would be a lie the moment a suffix was added — AND the item id and webUrl from
+ * the move response, because a path is not a locator. Anything that later offers
+ * this file to a person must address it by id; the path is a record of where it
+ * went, not a working address.
  */
 export async function moveItem(
   token: string, fromPath: string, destFolder: string, desiredName: string,
-): Promise<string> {
-  const folderId = await ensureFolder(token, destFolder);
+): Promise<{ path: string; id: string | null; webUrl: string | null; folder: { id: string; webUrl: string | null } }> {
+  const folder = await ensureFolder(token, destFolder);
 
   const dot = desiredName.lastIndexOf(".");
   const stem = dot > 0 ? desiredName.slice(0, dot) : desiredName;
@@ -156,10 +199,20 @@ export async function moveItem(
   const res = await fetch(byPath(fromPath), {
     method: "PATCH",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ parentReference: { id: folderId }, name }),
+    body: JSON.stringify({ parentReference: { id: folder.id }, name }),
   });
   if (!res.ok) throw new Error(`move ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  return `${destFolder}/${name}`;
+  // The PATCH response IS the moved item, so the locator costs no extra call.
+  // Parsed defensively: a move that succeeded must not be reported as failed
+  // because the body was not what was expected, and a missing id degrades to
+  // "no locator stored" rather than losing the filing.
+  const moved = await res.json().catch(() => ({}) as Record<string, unknown>);
+  return {
+    path: `${destFolder}/${name}`,
+    id: (moved as { id?: string }).id ?? null,
+    webUrl: (moved as { webUrl?: string }).webUrl ?? null,
+    folder,
+  };
 }
 
 /** Children of a folder, or [] when the folder does not exist. */

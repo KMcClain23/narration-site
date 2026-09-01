@@ -263,8 +263,27 @@ export const EDITING_LABEL: Record<EditingState, string> = {
  * can be played; pending is still in quarantine under a uuid name and cannot be
  * found yet. One combined number would tell her audio is ready when it is not —
  * the same reason the "filed" email fires on filed_at rather than on upload.
+ *
+ * FILED STILL DOES NOT MEAN STILL THERE. filed_at records that the file was
+ * placed in the folder; nothing re-checks, and the one real row in the table
+ * points at a file Dean has since deleted. That is why the badge links to a
+ * resolving endpoint rather than to a path — see /api/pickups/file/[id].
  */
-export type UploadCount = { card_id: string; chapter: string; filed: number; pending: number };
+export type UploadCount = {
+  card_id: string;
+  chapter: string;
+  /** Whose take it is. "1 audio file" never said, and a take belongs to somebody. */
+  narrator_name: string;
+  filed: number;
+  pending: number;
+  /**
+   * The most recent FILED upload, for the link.
+   *
+   * Null when nothing in this group has been filed yet — which is exactly when
+   * there is nothing to open, so the badge must not offer a link.
+   */
+  latest_filed_id: string | null;
+};
 
 export async function editorUploads(): Promise<UploadCount[]> {
   const db = await userScopedClient();

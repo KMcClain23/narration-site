@@ -92,7 +92,7 @@ export async function GET(req: Request) {
   const rows = (pending ?? []) as {
     id: string; link_id: string; quarantine_path: string; original_name: string;
     content_type: string; book_title: string; pickups_folder: string | null;
-    chapter: string; narrator_name: string; attempts: number;
+    chapter: string; narrator_name: string; attempts: number; card_id: string;
   }[];
 
   /** Filed count per batch this run, so five files produce ONE email naming five. */
@@ -109,10 +109,41 @@ export async function GET(req: Request) {
       const name = `${sanitiseSegment(`${row.chapter} - ${row.original_name}`)}.${ext}`;
 
       // moveItem suffixes rather than overwriting, and returns the path it
-      // actually used — the requested one would be a lie after a suffix.
-      const actual = await moveItem(graph, row.quarantine_path, folder, name);
-      await supabaseAdmin.rpc("mark_upload_filed", { p_id: row.id, p_path: actual });
-      filed.push(actual);
+      // actually used — the requested one would be a lie after a suffix — plus
+      // the item id and webUrl from the move response.
+      const moved = await moveItem(graph, row.quarantine_path, folder, name);
+
+      /*
+        THE LOCATOR IS STORED AT FILING TIME, because this is the only moment it
+        is free. The move response IS the item, so id and webUrl cost no extra
+        call; going back for them later means a lookup that can fail, on a file
+        that may by then be gone.
+
+        The path is still recorded, and is still not an address. filed_at says
+        the file was PLACED there — see mark_upload_filed — and the one row in
+        this table was filed to a path whose file Dean has since deleted. Only
+        the item id can be resolved at click time to find out which.
+      */
+      await supabaseAdmin.rpc("mark_upload_filed", {
+        p_id: row.id,
+        p_path: moved.path,
+        p_item_id: moved.id,
+        p_web_url: moved.webUrl,
+      });
+
+      // The book folder, one level up. Recorded from the same run because
+      // pickups_folder holds a NAME and cannot address anything after a rename.
+      // Best effort: a failure here must not un-file a file that did move.
+      if (row.card_id) {
+        const { error: folderErr } = await supabaseAdmin.rpc("record_pickups_folder", {
+          p_card_id: row.card_id,
+          p_item_id: moved.folder.id,
+          p_web_url: moved.folder.webUrl,
+        });
+        if (folderErr) console.warn(`could not record folder locator: ${folderErr.message}`);
+      }
+
+      filed.push(moved.path);
       filedPerLink.set(row.link_id, (filedPerLink.get(row.link_id) ?? 0) + 1);
     } catch (e) {
       const message = (e as Error).message;

@@ -103,6 +103,11 @@ export const config = {
   matcher: [
     "/admin/:path*", "/board", "/board/archive", "/board/card/:path*",
     "/schedule", "/contacts", "/contacts/:path*",
+    // SESSION REFRESH ONLY, like /editor below. These resolve a OneDrive link
+    // and are gated in the handler against admin-or-editor; requiresAdmin does
+    // not match them, so middleware refreshes the cookie and passes them
+    // through rather than bouncing an editor off her own audio.
+    "/api/pickups/:path*",
     "/inquiries", "/tools", "/tools/:path*", "/settings", "/payments", "/pickups", "/expenses", "/released",
     // The editor pages are matched for SESSION REFRESH ONLY. They are gated in
     // their own layout, against a different admitted set (editor or admin) —

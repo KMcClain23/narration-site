@@ -7,6 +7,7 @@ import {
   editingStateOf,
   EDITING_LABEL,
   type EditorCard,
+  type UploadCount,
 } from "@/lib/editor-data";
 import { currentSession } from "@/lib/supabase/session";
 import { ClaimButton } from "./ClaimButton";
@@ -88,76 +89,146 @@ function Cover({ url, size }: { url: string | null; size: "lg" | "sm" }) {
   );
 }
 
-/** The full tile: a book she holds, where progress and pickups matter. */
+/**
+ * One narrator's takes for one chapter, said plainly.
+ *
+ * "1 audio file" was true and useless: it did not say whose take it was, which
+ * chapter it belonged to, or whether it had actually landed — all three of which
+ * the query already knew, and the last of which pickup_uploads has always
+ * separated via filed_at.
+ *
+ * FILED AND FILING ARE DIFFERENT BADGES, not one number. Filed is in the book's
+ * folder and can be opened; filing is still in quarantine under a uuid name and
+ * cannot be found by anybody. A combined count would tell her audio is ready
+ * when it is not.
+ *
+ * The filed badge is a LINK to a resolving endpoint, never to a path: filed_at
+ * says the file was placed there, not that it is still there.
+ */
+function TakeBadge({ u }: { u: UploadCount }) {
+  const chapter = /^\d/.test(u.chapter.trim()) ? `ch ${u.chapter}` : u.chapter;
+
+  if (u.filed > 0 && u.latest_filed_id) {
+    return (
+      <a
+        href={`/api/pickups/file/${u.latest_filed_id}`}
+        target="_blank"
+        rel="noreferrer"
+        className="rounded-full border border-emerald-400/40 px-2 py-0.5 text-[11px] text-emerald-300 transition-colors hover:bg-emerald-400/10"
+      >
+        {u.filed} take{u.filed === 1 ? "" : "s"} · {u.narrator_name} · {chapter}
+      </a>
+    );
+  }
+  if (u.pending > 0) {
+    // NOT A LINK. There is nothing to open — the file is in quarantine under a
+    // uuid name — and a link that leads only to an explanation of why it cannot
+    // lead anywhere is worse than plain text.
+    return (
+      <span className="rounded-full border border-white/20 px-2 py-0.5 text-[11px] text-white/50">
+        {u.pending} take{u.pending === 1 ? "" : "s"} filing · {u.narrator_name} · {chapter}
+      </span>
+    );
+  }
+  return null;
+}
+
+/**
+ * The full tile: a book she holds, where progress and pickups matter.
+ *
+ * ── THE LINK DOES NOT WRAP THE WHOLE TILE, AND IT CANNOT ───────────────────
+ *
+ * It used to. Then the tile grew things that are themselves interactive — the
+ * take badges open a file, the folder link opens OneDrive, Unclaim posts an RPC
+ * — and an anchor inside an anchor is invalid HTML that browsers resolve however
+ * they like. Worse, this is a Server Component, so the `onClick` that would have
+ * been needed to stop the outer link swallowing those taps cannot exist here at
+ * all: passing an event handler to a DOM element from a server component throws
+ * at render, which is precisely how this was found — the whole hub 500'd.
+ *
+ * So the Link covers the READING part of the tile and the interactive row sits
+ * outside it, as a sibling.
+ */
 function QueueTile({
-  card, openPickups, returned, filedAudio,
+  card, openPickups, returned, takes,
 }: {
-  card: EditorCard; openPickups: number; returned: number; filedAudio: number;
+  card: EditorCard; openPickups: number; returned: number; takes: UploadCount[];
 }) {
   const state = editingStateOf(card.chapters_edited, card.editing_completed_at);
   const total = card.chapters_total ?? 0;
   const done = card.chapters_edited ?? 0;
 
   return (
-    <Link
-      href={`/editor/card/${card.id}`}
-      className="group flex gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition-colors hover:border-[#D4AF37]/40 hover:bg-white/[0.06]"
-    >
-      <Cover url={card.cover_url} size="lg" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-white">{card.title}</p>
-        <p className="truncate text-xs text-white/50">{card.author ?? "—"}</p>
+    <article className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition-colors hover:border-[#D4AF37]/40">
+      <Link href={`/editor/card/${card.id}`} className="flex gap-4">
+        <Cover url={card.cover_url} size="lg" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-white">{card.title}</p>
+          <p className="truncate text-xs text-white/50">{card.author ?? "—"}</p>
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className={`rounded-full border px-2 py-0.5 text-[11px] ${deliveryStyle(card.deadline)}`}>
-            {deliveryLabel(card.deadline)}
-          </span>
-          {returned > 0 && (
-            <span className="rounded-full bg-[#D4AF37] px-2 py-0.5 text-[11px] font-bold text-black">
-              {returned} to check
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className={`rounded-full border px-2 py-0.5 text-[11px] ${deliveryStyle(card.deadline)}`}>
+              {deliveryLabel(card.deadline)}
             </span>
-          )}
-          {filedAudio > 0 && (
-            <span className="rounded-full border border-emerald-400/40 px-2 py-0.5 text-[11px] text-emerald-300">
-              {filedAudio} audio file{filedAudio === 1 ? "" : "s"}
-            </span>
-          )}
-          {openPickups > 0 && (
-            <span className="rounded-full border border-rose-400/40 px-2 py-0.5 text-[11px] text-rose-300">
-              {openPickups} pickup{openPickups === 1 ? "" : "s"}
-            </span>
-          )}
-        </div>
-
-        {/*
-          HONEST PROGRESS. Only one card has chapters_total, so the others have
-          no percentage to show. A bar at 0% would read as "nothing done" and a
-          bar with an invented denominator would be a lie — so with no total, the
-          count stands alone and the bar is absent. The stepper fills totals in
-          over time.
-        */}
-        <div className="mt-2 flex items-center gap-2 text-[11px] text-white/40">
-          <span>{EDITING_LABEL[state]}</span>
-          {total > 0 ? (
-            <span>· {done} of {total} chapters</span>
-          ) : done > 0 ? (
-            <span>· {done} chapter{done === 1 ? "" : "s"} edited</span>
-          ) : null}
-        </div>
-        {total > 0 && (
-          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-[#D4AF37]"
-              style={{ width: `${Math.min(100, Math.round((done / total) * 100))}%` }}
-            />
+            {returned > 0 && (
+              <span className="rounded-full bg-[#D4AF37] px-2 py-0.5 text-[11px] font-bold text-black">
+                {returned} to check
+              </span>
+            )}
+            {openPickups > 0 && (
+              <span className="rounded-full border border-rose-400/40 px-2 py-0.5 text-[11px] text-rose-300">
+                {openPickups} pickup{openPickups === 1 ? "" : "s"}
+              </span>
+            )}
           </div>
-        )}
 
-        <div className="mt-3">
-          <ClaimButton cardId={card.id} mine />
+          {/*
+            HONEST PROGRESS. Only one card has chapters_total, so the others have
+            no percentage to show. A bar at 0% would read as "nothing done" and a
+            bar with an invented denominator would be a lie — so with no total,
+            the count stands alone and the bar is absent.
+          */}
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-white/40">
+            <span>{EDITING_LABEL[state]}</span>
+            {total > 0 ? (
+              <span>· {done} of {total} chapters</span>
+            ) : done > 0 ? (
+              <span>· {done} chapter{done === 1 ? "" : "s"} edited</span>
+            ) : null}
+          </div>
+          {total > 0 && (
+            <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-[#D4AF37]"
+                style={{ width: `${Math.min(100, Math.round((done / total) * 100))}%` }}
+              />
+            </div>
+          )}
         </div>
+      </Link>
+
+      {/* Outside the Link. Every item here goes somewhere else of its own. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
+        {takes.map(u => (
+          <TakeBadge key={`${u.chapter}-${u.narrator_name}`} u={u} />
+        ))}
+        {takes.length > 0 && (
+          // Resolved server-side too: pickups_folder holds a NAME, which stops
+          // addressing anything the moment the folder is renamed.
+          <a
+            href={`/api/pickups/folder/${card.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[11px] text-white/40 hover:text-white/70"
+          >
+            Open folder →
+          </a>
+        )}
+        <span className="ml-auto">
+          <ClaimButton cardId={card.id} mine />
+        </span>
       </div>
-    </Link>
+    </article>
   );
 }
 
@@ -168,21 +239,22 @@ function QuietTile({
   card: EditorCard; note?: string; claimable?: boolean; mine?: boolean;
 }) {
   return (
-    <Link
-      href={`/editor/card/${card.id}`}
-      className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-2.5 transition-colors hover:border-white/25"
-    >
-      <Cover url={card.cover_url} size="sm" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-white/80">{card.title}</p>
-        <p className="truncate text-[11px] text-white/40">
-          {note ?? card.status}
-          {card.deadline ? ` · ${deliveryLabel(card.deadline)}` : ""}
-        </p>
-      </div>
+    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-2.5 transition-colors hover:border-white/25">
+      <Link href={`/editor/card/${card.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+        <Cover url={card.cover_url} size="sm" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm text-white/80">{card.title}</p>
+          <p className="truncate text-[11px] text-white/40">
+            {note ?? card.status}
+            {card.deadline ? ` · ${deliveryLabel(card.deadline)}` : ""}
+          </p>
+        </div>
+      </Link>
+      {/* Siblings of the link, not children: a button inside an anchor is
+          invalid, and the same nesting on QueueTile is what took the hub down. */}
       {claimable && <ClaimButton cardId={card.id} mine={false} />}
       {mine && <ClaimButton cardId={card.id} mine />}
-    </Link>
+    </div>
   );
 }
 
@@ -212,12 +284,23 @@ export default async function EditorBoardPage() {
   ]);
   const me = session?.userId ?? null;
 
-  // Audio waiting per book. FILED only — a pending upload is still in quarantine
-  // under a uuid name, and pointing her at a folder where she cannot find it is
-  // worse than saying nothing.
-  const filedByCard = new Map<string, number>();
+  /*
+    Takes per book, KEPT AS ROWS rather than summed.
+
+    Summing was the bug in the old badge: "1 audio file" is what is left after
+    throwing away the narrator, the chapter and whether it had landed. Each row
+    is one narrator's takes for one chapter and renders as its own badge.
+  */
+  const takesByCard = new Map<string, UploadCount[]>();
   for (const u of uploads) {
-    if (u.filed > 0) filedByCard.set(u.card_id, (filedByCard.get(u.card_id) ?? 0) + u.filed);
+    if (u.filed === 0 && u.pending === 0) continue;
+    const list = takesByCard.get(u.card_id) ?? [];
+    list.push(u);
+    takesByCard.set(u.card_id, list);
+  }
+  for (const list of takesByCard.values()) {
+    // Filed first — those can be opened; still-filing rows are just news.
+    list.sort((a, b) => (b.filed > 0 ? 1 : 0) - (a.filed > 0 ? 1 : 0) || a.chapter.localeCompare(b.chapter));
   }
 
   const openByCard = new Map<string, number>();
@@ -335,7 +418,7 @@ export default async function EditorBoardPage() {
               card={c}
               openPickups={openByCard.get(c.id) ?? 0}
               returned={returnedByCard.get(c.id) ?? 0}
-              filedAudio={filedByCard.get(c.id) ?? 0}
+              takes={takesByCard.get(c.id) ?? []}
             />
           ))}
         </div>
