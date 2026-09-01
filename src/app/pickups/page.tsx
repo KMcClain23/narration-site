@@ -3,6 +3,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PickupsClient, type AdminPickup } from "./PickupsClient";
 import type { PickupBatch } from "@/components/pickups/FreshLinkButtons";
+import type { UploadCount } from "@/lib/editor-data";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,17 @@ export default async function PickupsPage() {
   */
   const { data: batchRows } = await supabaseAdmin.rpc("pickup_batches_for_editor");
   const batches = (batchRows ?? []) as PickupBatch[];
+
+  /*
+    THE FILED TAKES, so Dean can download one from here.
+
+    The same gated function the editor surface uses, not a direct select on
+    pickup_uploads — "what counts as a filed take, and is it missing" is one
+    rule and it lives in that function. He has the same need she does: the
+    narrator's audio, in a DAW, not a OneDrive preview page.
+  */
+  const { data: uploadRows } = await supabaseAdmin.rpc("uploads_for_editor");
+  const uploads = (uploadRows ?? []) as UploadCount[];
 
   // Titles come from a join because a pickup that says only "chapter 12" is not
   // actionable — he needs to know which book before anything else.
@@ -116,7 +128,12 @@ export default async function PickupsPage() {
   // inside the first is how a page ends up scrolling twice.
   return (
     <AdminLayout>
-      <PickupsClient pickups={pickups} ownerNarratorId={ownerNarratorId} batches={batches} />
+      <PickupsClient
+        pickups={pickups}
+        ownerNarratorId={ownerNarratorId}
+        batches={batches}
+        uploads={uploads}
+      />
     </AdminLayout>
   );
 }

@@ -113,7 +113,23 @@ export function page(status: number, heading: string, detail: string, extra = ""
  * redirected to, because a stale address that happens to still resolve to
  * something else is worse than an honest failure.
  */
-export async function resolveAndRedirect(target: Resolvable): Promise<NextResponse> {
+export async function resolveAndRedirect(
+  target: Resolvable,
+  /**
+   * WHAT TO HAND BACK when it resolves.
+   *
+   * "open" is the OneDrive page — a SharePoint preview, right for "show me
+   * where this lives". "download" is @microsoft.graph.downloadUrl, which is
+   * pre-authenticated, short-lived, and hands the browser the actual bytes
+   * under the file's own name.
+   *
+   * A VARIANT, NOT A SECOND ENDPOINT. The three outcomes — 303, 410 gone, 502
+   * could-not-find-out — are the whole value of this function, and a download
+   * route that re-implemented them would get one of them wrong. This is the
+   * only line that differs between the two.
+   */
+  as: "open" | "download" = "open",
+): Promise<NextResponse> {
   let item: Awaited<ReturnType<typeof itemById>>;
   try {
     const token = await graphAppToken();
@@ -136,7 +152,17 @@ export async function resolveAndRedirect(target: Resolvable): Promise<NextRespon
       */
       const byPath = await itemByPath(token, target.storedPath);
       if (byPath) {
-        item = { id: byPath.id, name: "", webUrl: byPath.webUrl, deleted: false };
+        // A path lookup does not carry a download URL. Rather than guess one,
+        // the id it just found is looked up again below — the row heals on this
+        // click and downloads correctly on this click too.
+        item = {
+          id: byPath.id, name: "", webUrl: byPath.webUrl,
+          downloadUrl: null, deleted: false,
+        };
+        if (as === "download") {
+          const withUrl = await itemById(token, byPath.id);
+          if (withUrl) item = withUrl;
+        }
         // Best effort: failing to memoise must not fail the click.
         await target.onLocatorFound?.(byPath.id, byPath.webUrl).catch(() => {});
       } else {
@@ -185,11 +211,15 @@ export async function resolveAndRedirect(target: Resolvable): Promise<NextRespon
     );
   }
 
-  if (!item.webUrl) {
+  const address = as === "download" ? item.downloadUrl : item.webUrl;
+  if (!address) {
     return page(
       502,
       "No address came back",
-      `The ${target.kind} exists, but OneDrive did not return a link for it.`,
+      as === "download"
+        ? `The ${target.kind} is there, but OneDrive did not return a download ` +
+          `link for it. Opening it in OneDrive should still work.`
+        : `The ${target.kind} exists, but OneDrive did not return a link for it.`,
     );
   }
 
@@ -198,6 +228,16 @@ export async function resolveAndRedirect(target: Resolvable): Promise<NextRespon
   // that heals a locator-less row, running in the other direction.
   await target.onConfirmedPresent?.().catch(() => {});
 
-  // 303, so a browser follows with GET regardless of how it got here.
-  return NextResponse.redirect(item.webUrl, 303);
+  /*
+    REDIRECT, NEVER PROXY.
+
+    A take can be 200 MB. Streaming it through this route would put every byte
+    through Vercel for no gain: the download URL is already pre-authenticated,
+    already ranged, and already serves the file under its own descriptive name
+    — "take - Closing Credits.mp3" — which is exactly what should land in her
+    downloads folder.
+
+    303, so a browser follows with GET regardless of how it got here.
+  */
+  return NextResponse.redirect(address, 303);
 }

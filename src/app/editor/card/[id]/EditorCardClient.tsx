@@ -9,6 +9,8 @@ import type {
 import { ChapterField, chapterOptions, defaultChapter } from "./ChapterField";
 import { FreshLinkButtons, type PickupBatch } from "@/components/pickups/FreshLinkButtons";
 import { CompleteBookDialog } from "@/components/pickups/CompleteBookDialog";
+import { CorrectionDiff } from "@/components/pickups/CorrectionDiff";
+import { TakeLinks } from "@/components/pickups/TakeLinks";
 
 /**
  * Her writes — ALL of them through the gated functions, with her JWT.
@@ -615,7 +617,18 @@ export function EditorCardClient({
                       {p.timestamp_at}
                       {p.assigned_narrator_name ? ` · ${p.assigned_narrator_name}` : ""}
                     </p>
-                    <p className="mt-0.5 break-words text-sm text-white/90">{summary(p)}</p>
+                    {p.kind === "misread" ? (
+                      <CorrectionDiff
+                        said={p.said}
+                        shouldBe={p.should_be}
+                        clamp
+                        labelClass="w-20 shrink-0 text-[10px] uppercase tracking-wide text-white/35"
+                        saidClass="text-sm text-white/55"
+                        shouldBeClass="text-sm font-semibold text-white/90"
+                      />
+                    ) : (
+                      <p className="mt-0.5 break-words text-sm text-white/90">{summary(p)}</p>
+                    )}
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
                     <button
@@ -940,10 +953,17 @@ export function EditorCardClient({
                     if (!u) return null;
                     return (
                       <>
-                        {u.filed > 0 && (
-                          <span className="ml-2 rounded-full border border-emerald-400/40 px-2 py-0.5 text-[11px] font-normal text-emerald-300">
-                            {u.filed} audio file{u.filed === 1 ? "" : "s"}
-                          </span>
+                        {u.filed > 0 && u.latest_filed_id && (
+                          /* DOWNLOAD, not preview. She is putting this into a
+                             DAW; OneDrive's preview page is three clicks from
+                             the file. The missing mark rides along, and a
+                             deleted take still lands on the explanation. */
+                          <TakeLinks
+                            className="ml-2 align-middle font-normal"
+                            uploadId={u.latest_filed_id}
+                            gone={u.missing > 0}
+                            label={`${u.filed} audio file${u.filed === 1 ? "" : "s"}`}
+                          />
                         )}
                         {u.pending > 0 && (
                           <span className="ml-2 rounded-full border border-white/15 px-2 py-0.5 text-[11px] font-normal text-white/40">
@@ -989,7 +1009,21 @@ export function EditorCardClient({
                       className="flex items-start justify-between gap-3 rounded-xl border border-white/10 px-3 py-2"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm text-white/90">{summary(p)}</p>
+                        {p.kind === "misread" ? (
+                          <CorrectionDiff
+                            said={p.said}
+                            shouldBe={p.should_be}
+                            clamp
+                            labelClass="w-20 shrink-0 text-[10px] uppercase tracking-wide text-white/35"
+                            saidClass="text-sm text-white/55"
+                            shouldBeClass="text-sm font-semibold text-white/90"
+                          />
+                        ) : (
+                          /* WAS `truncate` — a one-line ellipsis, which on a
+                             note-only pickup cut off the instruction itself.
+                             Two lines and an expand control instead. */
+                          <p className="line-clamp-2 break-words text-sm text-white/90">{summary(p)}</p>
+                        )}
                         <p className="text-[11px] text-white/40">
                           {p.timestamp_at} · {p.status}
                           {p.assigned_narrator_name ? ` · ${p.assigned_narrator_name}` : ""}

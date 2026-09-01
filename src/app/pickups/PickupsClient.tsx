@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
 import { FreshLinkButtons, type PickupBatch } from "@/components/pickups/FreshLinkButtons";
+import { CorrectionDiff } from "@/components/pickups/CorrectionDiff";
+import { TakeLinks } from "@/components/pickups/TakeLinks";
+import type { UploadCount } from "@/lib/editor-data";
 
 /**
  * Every write here is a FUNCTION CALL — resolve_pickup and mark_pickup_returned,
@@ -103,6 +106,7 @@ export function PickupsClient({
   pickups,
   ownerNarratorId,
   batches,
+  uploads,
 }: {
   pickups: AdminPickup[];
   /** Which assignee is Dean, from narrators.profile_id. Null means nothing lands
@@ -110,6 +114,8 @@ export function PickupsClient({
   ownerNarratorId: string | null;
   /** (book, chapter, narrator) triples that already have a link. Never an address. */
   batches: PickupBatch[];
+  /** Filed takes per book and chapter, so a take can be downloaded from here. */
+  uploads: UploadCount[];
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -318,18 +324,10 @@ To close it instead and keep the record, use Close.`)) {
     if (p.kind === "misread") {
       return (
         <dl className="mt-2 space-y-1">
-          <div className="flex flex-wrap items-baseline gap-x-3">
-            <dt className="w-20 shrink-0 text-xs uppercase tracking-wide text-text-dim">Said</dt>
-            <dd className="min-w-0 break-words text-[15px] text-text-muted line-through decoration-text-dim">
-              {p.said || "—"}
-            </dd>
-          </div>
-          <div className="flex flex-wrap items-baseline gap-x-3">
-            <dt className="w-20 shrink-0 text-xs uppercase tracking-wide text-text-dim">Should be</dt>
-            <dd className="min-w-0 break-words text-[15px] font-semibold text-text-primary">
-              {p.shouldBe || "—"}
-            </dd>
-          </div>
+          {/* CLAMPED HERE, and only here-and-like: this is a list to scan, and a
+              thirty-word correction pushes four rows off the screen. Nothing is
+              hidden — the control expands it in place. */}
+          <CorrectionDiff said={p.said} shouldBe={p.shouldBe} clamp />
           {p.note?.trim() && (
             <div className="flex flex-wrap items-baseline gap-x-3">
               <dt className="w-20 shrink-0 text-xs uppercase tracking-wide text-text-dim">Note</dt>
@@ -512,6 +510,23 @@ To close it instead and keep the record, use Close.`)) {
                             {showClosed && c.closed.length > 0 ? ` · ${c.closed.length} closed` : ""}
                           </span>
                         </div>
+
+                        {/* THE NARRATOR'S TAKE, downloadable. Against the
+                            chapter, because a take is per chapter and per
+                            narrator — the same grain uploads_for_editor
+                            reports it at. */}
+                        {uploads
+                          .filter(x => x.card_id === b.cardId && x.chapter === c.chapter
+                                    && x.filed > 0 && x.latest_filed_id)
+                          .map(x => (
+                            <TakeLinks
+                              key={`${x.card_id}-${x.chapter}-${x.narrator_name}`}
+                              className="mb-2"
+                              uploadId={x.latest_filed_id!}
+                              gone={x.missing > 0}
+                              label={`${x.filed} take${x.filed === 1 ? "" : "s"} · ${x.narrator_name}`}
+                            />
+                          ))}
 
                         {/* REPLACES A LINK, NEVER SENDS ONE. Driven by the link
                             table, so a chapter that was never sent shows nothing

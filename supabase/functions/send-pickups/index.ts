@@ -1,6 +1,7 @@
 import {
   chapterDir, chapterMatches, isAudioFile, manifestName, sanitiseSegment,
 } from "./paths.ts";
+import { diffPickup } from "./diff.ts";
 
 /**
  * Send a chapter's pickups to their narrators, and file the manifest.
@@ -103,6 +104,48 @@ function pickupParts(p: Pickup): { when: string; kind: string; detail: string; e
   };
 }
 
+/**
+ * The correction as EMAIL HTML, with the changed words marked.
+ *
+ * ── THE PLAIN TEXT DELIBERATELY DOES NOT GET THIS ──────────────────────────
+ *
+ * plainBody stays the sentence it already was. There is no honest way to mark a
+ * word in plain text — asterisks and CAPS both read as emphasis rather than as
+ * "this is the difference" — and inventing a convention she has never been
+ * taught would be worse than the two full versions she already gets. The HTML
+ * gains a SIGNAL, not information: every word appears in both renderings.
+ *
+ * ── INLINE STYLES, LIKE EVERYTHING ELSE IN THIS FILE ───────────────────────
+ *
+ * Gmail strips a <style> block and Outlook renders through Word. <s> and <u>
+ * are ancient HTML that survive both, and text-decoration is set inline as well
+ * so a client that drops the tags' default styling still shows the mark.
+ */
+function correctionHtml(p: Pickup): string {
+  const d = diffPickup(p.said ?? "", p.should_be ?? "");
+  const mark = (
+    tokens: { text: string; changed: boolean }[],
+    tag: "s" | "u",
+    decoration: string,
+  ) =>
+    tokens
+      .map(t =>
+        t.changed
+          ? `<${tag} style="text-decoration:${decoration};">${esc(t.text)}</${tag}>`
+          : esc(t.text),
+      )
+      .join(" ");
+
+  const said = mark(d.said, "s", "line-through");
+  const should = mark(d.shouldBe, "u", "underline");
+  return (
+    `<span style="color:#8b93a7;">said</span> ` +
+    `<span style="color:#c4c9d6;">\u201c${said}\u201d</span><br />` +
+    `<span style="color:#8b93a7;">should be</span> ` +
+    `<span style="color:#ffffff;font-weight:bold;">\u201c${should}\u201d</span>`
+  );
+}
+
 /** The one-line form, used by the plain text AND the manifest. */
 function describe(p: Pickup): string {
   const { when, kind, detail, extra } = pickupParts(p);
@@ -194,7 +237,7 @@ function htmlBody(
         <td style="padding:12px 0;border-bottom:1px solid #1A2070;">
           <span style="display:inline-block;font-family:Consolas,Menlo,monospace;font-size:14px;font-weight:bold;color:${GOLD};background-color:#141A4A;padding:3px 8px;border-radius:4px;">${esc(when)}</span>
           <span style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8b93a7;padding-left:8px;text-transform:uppercase;letter-spacing:1px;">${esc(kind)}</span>
-          <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#e8ebf2;padding-top:8px;">${esc(detail)}</div>
+          <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#e8ebf2;padding-top:8px;">${p.kind === "misread" ? correctionHtml(p) : esc(detail)}</div>
           ${extra ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#8b93a7;padding-top:4px;">${esc(extra)}</div>` : ""}
         </td>
       </tr>`;

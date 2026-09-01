@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { BatchRow, TokenNote } from "@/lib/pickup-link";
+import { CorrectionDiff } from "@/components/pickups/CorrectionDiff";
 
 /**
  * The list, and the one action.
@@ -143,18 +144,16 @@ export function NarratorConfirm({
             </span>
             {r.kind === "misread" ? (
               <dl className="mt-2 space-y-1">
-                <div className="flex flex-wrap items-baseline gap-x-3">
-                  <dt className="w-24 shrink-0 text-xs uppercase tracking-wide text-white/40">Said</dt>
-                  <dd className="min-w-0 break-words text-[15px] text-white/50 line-through">
-                    {r.said || "—"}
-                  </dd>
-                </div>
-                <div className="flex flex-wrap items-baseline gap-x-3">
-                  <dt className="w-24 shrink-0 text-xs uppercase tracking-wide text-white/40">Should be</dt>
-                  <dd className="min-w-0 break-words text-[15px] font-semibold text-white">
-                    {r.should_be || "—"}
-                  </dd>
-                </div>
+                {/* NEVER CLAMPED HERE. She works from this text at the
+                    microphone; a correction she has to click to finish reading
+                    is a correction she can misread. */}
+                <CorrectionDiff
+                  said={r.said}
+                  shouldBe={r.should_be}
+                  labelClass="w-24 shrink-0 text-xs uppercase tracking-wide text-white/40"
+                  saidClass="text-[15px] text-white/50"
+                  shouldBeClass="text-[15px] font-semibold text-white"
+                />
                 {r.note?.trim() && (
                   <div className="flex flex-wrap items-baseline gap-x-3">
                     <dt className="w-24 shrink-0 text-xs uppercase tracking-wide text-white/40">Note</dt>
@@ -281,6 +280,79 @@ export function NarratorConfirm({
 
   const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
 
+  /*
+    ATTACH BEFORE CONFIRM.
+
+    The order was pickups -> note -> Mark re-recorded -> attach. Confirming is
+    the terminal act on this page, so anything below it reads as optional
+    tidying — and the moment she presses it the page says "nothing else is
+    needed from you", which is an invitation to close the tab with the file
+    still sitting on her desktop.
+
+    The real sequence is: listen, re-record, attach the file, say you are done.
+    So the panel moves ABOVE the note and the button.
+
+    Nothing else about it changes. Still optional, still marks nothing, still
+    collapses to one line when nothing is outstanding — which is why it is
+    declared once here and rendered in both branches rather than duplicated.
+  */
+  const attachPanel = (
+    <>
+        {/* ── attaching audio, entirely optional ──────────────────────────
+            DEMOTED, NOT REMOVED, once nothing is outstanding. A full-size upload
+            panel under "nothing else is needed from you" contradicts the sentence
+            above it — but hiding it outright would send her back to email the
+            moment she remembers a file, so it collapses to one quiet line she can
+            open again. Attaching still marks nothing, in either state. */}
+        {outstanding.length === 0 && !attachOpen ? (
+          <button
+            type="button"
+            onClick={() => setAttachOpen(true)}
+            className="mt-10 block text-sm text-white/50 underline-offset-2 transition-colors hover:text-white/80 hover:underline"
+          >
+            Sent another take? Attach it
+          </button>
+        ) : (
+        <section className="mt-10 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+          <h2 className="text-sm font-bold">Attach the re-recorded audio</h2>
+          <p className="mt-1 text-xs text-white/50">
+            Optional — if you have already sent the files another way, skip this. Up to 5
+            files, 200 MB each. WAV, FLAC, MP3 or M4A.
+          </p>
+
+          <input
+            ref={fileInput}
+            type="file"
+            multiple
+            accept=".wav,.flac,.mp3,.m4a,audio/*"
+            disabled={!!uploading}
+            onChange={e => void attach(e.target.files)}
+            className="mt-4 block w-full text-sm text-white/70 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-white/15 disabled:opacity-40"
+          />
+
+          {uploading && <p className="mt-3 text-sm text-[#D4AF37]">{uploading}</p>}
+          {uploadError && (
+            <p className="mt-3 rounded-lg border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+              {uploadError}
+            </p>
+          )}
+
+          {attached.length > 0 && (
+            <ul className="mt-4 space-y-1.5">
+              {attached.map((a, i) => (
+                <li key={`${a.name}-${i}`} className="flex items-center gap-2 text-sm text-white/80">
+                  <span className="text-emerald-400">received</span>
+                  <span className="truncate">{a.name}</span>
+                  <span className="text-xs text-white/40">{mb(a.bytes)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        )}
+    </>
+  );
+
   return (
     <div className="mt-8">
       {error && (
@@ -305,6 +377,8 @@ export function NarratorConfirm({
               <Item key={r.pickup_id} r={r} />
             ))}
           </ul>
+
+          {attachPanel}
 
           {/* ── THE REPLY CHANNEL ANN DID NOT HAVE ─────────────────────────
               Every message on this page used to travel one way. Optional, and
@@ -346,62 +420,12 @@ export function NarratorConfirm({
           </div>
         </>
       ) : (
+        <>
         <p className="rounded-xl border border-white/10 bg-white/[0.03] p-6 text-sm text-white/60">
           Everything here has been marked re-recorded. Nothing else is needed from you.
         </p>
-      )}
-
-      {/* ── attaching audio, entirely optional ──────────────────────────
-          DEMOTED, NOT REMOVED, once nothing is outstanding. A full-size upload
-          panel under "nothing else is needed from you" contradicts the sentence
-          above it — but hiding it outright would send her back to email the
-          moment she remembers a file, so it collapses to one quiet line she can
-          open again. Attaching still marks nothing, in either state. */}
-      {outstanding.length === 0 && !attachOpen ? (
-        <button
-          type="button"
-          onClick={() => setAttachOpen(true)}
-          className="mt-10 block text-sm text-white/50 underline-offset-2 transition-colors hover:text-white/80 hover:underline"
-        >
-          Sent another take? Attach it
-        </button>
-      ) : (
-      <section className="mt-10 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-        <h2 className="text-sm font-bold">Attach the re-recorded audio</h2>
-        <p className="mt-1 text-xs text-white/50">
-          Optional — if you have already sent the files another way, skip this. Up to 5
-          files, 200 MB each. WAV, FLAC, MP3 or M4A.
-        </p>
-
-        <input
-          ref={fileInput}
-          type="file"
-          multiple
-          accept=".wav,.flac,.mp3,.m4a,audio/*"
-          disabled={!!uploading}
-          onChange={e => void attach(e.target.files)}
-          className="mt-4 block w-full text-sm text-white/70 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-white/15 disabled:opacity-40"
-        />
-
-        {uploading && <p className="mt-3 text-sm text-[#D4AF37]">{uploading}</p>}
-        {uploadError && (
-          <p className="mt-3 rounded-lg border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
-            {uploadError}
-          </p>
-        )}
-
-        {attached.length > 0 && (
-          <ul className="mt-4 space-y-1.5">
-            {attached.map((a, i) => (
-              <li key={`${a.name}-${i}`} className="flex items-center gap-2 text-sm text-white/80">
-                <span className="text-emerald-400">received</span>
-                <span className="truncate">{a.name}</span>
-                <span className="text-xs text-white/40">{mb(a.bytes)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+          {attachPanel}
+        </>
       )}
 
       {done.length > 0 && (

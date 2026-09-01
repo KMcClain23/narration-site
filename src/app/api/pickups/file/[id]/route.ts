@@ -4,7 +4,13 @@ import { page, requireStaff, resolveAndRedirect } from "@/lib/pickup-resolve";
 export const dynamic = "force-dynamic";
 
 /**
- * Open a filed take, resolving its Graph id at THIS moment.
+ * Open OR DOWNLOAD a filed take, resolving its Graph id at THIS moment.
+ *
+ * `?as=download` hands back @microsoft.graph.downloadUrl instead of the
+ * SharePoint page. One route, because the three outcomes — it redirects, the
+ * file is gone, the lookup failed — are the same three either way, and a
+ * separate download endpoint would be a second place for them to drift. It is
+ * also the same gate: admin or editor, applied before any read.
  *
  * The row is read with the service key AFTER the session has been checked —
  * `requireStaff` runs first and returns before any read happens. The route
@@ -12,7 +18,7 @@ export const dynamic = "force-dynamic";
  * not a permission check and has never been treated as one here.
  */
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const denied = await requireStaff();
@@ -42,6 +48,10 @@ export async function GET(
     );
   }
 
+  // Anything that is not exactly "download" is an open. A typo must not
+  // silently produce the other behaviour.
+  const as = new URL(req.url).searchParams.get("as") === "download" ? "download" : "open";
+
   return resolveAndRedirect({
     itemId: data.onedrive_item_id,
     storedUrl: data.onedrive_web_url,
@@ -63,5 +73,5 @@ export async function GET(
         .update({ onedrive_item_id: itemId, onedrive_web_url: webUrl })
         .eq("id", id);
     },
-  });
+  }, as);
 }

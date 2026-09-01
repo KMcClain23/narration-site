@@ -11,6 +11,7 @@ import {
 } from "@/lib/editor-data";
 import { currentSession } from "@/lib/supabase/session";
 import { ClaimButton } from "./ClaimButton";
+import { TakeLinks } from "@/components/pickups/TakeLinks";
 
 export const dynamic = "force-dynamic";
 
@@ -122,21 +123,11 @@ function TakeBadge({ u }: { u: UploadCount }) {
     */
     const gone = u.missing > 0;
     return (
-      <a
-        href={`/api/pickups/file/${u.latest_filed_id}`}
-        target="_blank"
-        rel="noreferrer"
-        className={
-          gone
-            ? "rounded-full border border-rose-400/40 px-2 py-0.5 text-[11px] text-rose-300 transition-colors hover:bg-rose-400/10"
-            : "rounded-full border border-emerald-400/40 px-2 py-0.5 text-[11px] text-emerald-300 transition-colors hover:bg-emerald-400/10"
-        }
-      >
-        <span className={gone ? "line-through" : undefined}>
-          {u.filed} take{u.filed === 1 ? "" : "s"} · {u.narrator_name} · {chapter}
-        </span>
-        {gone && <span className="ml-1 no-underline"> · missing</span>}
-      </a>
+      <TakeLinks
+        uploadId={u.latest_filed_id}
+        gone={gone}
+        label={`${u.filed} take${u.filed === 1 ? "" : "s"} · ${u.narrator_name} · ${chapter}`}
+      />
     );
   }
   if (u.pending > 0) {

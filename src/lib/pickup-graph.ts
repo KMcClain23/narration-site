@@ -114,7 +114,21 @@ export async function itemByPath(
  */
 export async function itemById(
   token: string, id: string,
-): Promise<{ id: string; name: string; webUrl: string | null; deleted: boolean } | null> {
+): Promise<{
+  id: string;
+  name: string;
+  webUrl: string | null;
+  /**
+   * The pre-authenticated download URL Graph returns on the driveItem.
+   *
+   * SHORT-LIVED, AND NEVER STORED. It carries its own authorisation and expires
+   * in minutes, so it is fetched at click time and handed straight to the
+   * browser — the same rule as the item id versus the path, one level down: the
+   * id is the durable handle, this is the momentary one.
+   */
+  downloadUrl: string | null;
+  deleted: boolean;
+} | null> {
   const res = await fetch(`${ROOT}/items/${encodeURIComponent(id)}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -128,6 +142,7 @@ export async function itemById(
     id: json.id as string,
     name: (json.name as string) ?? "",
     webUrl: json.webUrl ?? null,
+    downloadUrl: json["@microsoft.graph.downloadUrl"] ?? null,
     deleted: json.deleted != null,
   };
 }

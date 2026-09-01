@@ -16,6 +16,26 @@ export const dynamic = "force-dynamic";
  * `<audio src>`. An inline player needs the bytes, so this fetches them
  * server-side and passes them through.
  *
+ * ── WHY IT MUST ANSWER RANGE REQUESTS ──────────────────────────────────────
+ *
+ * It did not, and every clip on the narrator's page read 0:00 / 0:00.
+ *
+ * `<audio>` opens with `Range: bytes=0-`. This route answered 200 with no
+ * Content-Length and no Accept-Ranges, so the browser had bytes but no length:
+ * `duration` came back Infinity, `readyState` stopped at HAVE_METADATA, and
+ * `error` was null. Nothing failed. The player simply never learned how long
+ * the audio was, and a duration of Infinity renders as 0:00 — which reads as a
+ * broken clip and had Ann and Dean concluding the files were bad.
+ *
+ * The files were never bad. Two clips cut two seconds apart from the same
+ * source, byte-identical in size, behaved "differently" only in whether anyone
+ * pressed play past a display that said there was nothing there.
+ *
+ * So the client's Range header is passed straight through to Graph, whose
+ * /content endpoint already supports it, and the 206, Content-Range and
+ * Content-Length come back with it. A request with no Range still gets an
+ * explicit Content-Length, which is what makes duration computable at all.
+ *
  * ── THE TOKEN IS THE CREDENTIAL, AND IT IS CHECKED AGAINST THIS PICKUP ─────
  *
  * ANON GAINS NO PRIVILEGE — the same decision the narrator page was built on.
@@ -28,7 +48,7 @@ export const dynamic = "force-dynamic";
  * reason the page does not distinguish expired from unknown.
  */
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ token: string; pickupId: string }> },
 ) {
   const { token, pickupId } = await params;
@@ -68,21 +88,45 @@ export async function GET(
   // records that the clip was placed there, not that it is still there.
   if (item === null || item.deleted) return new NextResponse("Clip no longer in OneDrive", { status: 410 });
 
+  // PASSED THROUGH, NOT INVENTED. Whatever the player asked for is what Graph
+  // is asked for, so a seek to the middle of the clip costs one ranged read
+  // rather than the whole file.
+  const range = req.headers.get("range");
   const content = await fetch(
     `https://graph.microsoft.com/v1.0/users/Dean@DMNarration.com/drive/items/${encodeURIComponent(data.clip_item_id)}/content`,
-    { headers: { Authorization: `Bearer ${graph}` } },
+    {
+      headers: {
+        Authorization: `Bearer ${graph}`,
+        ...(range ? { Range: range } : {}),
+      },
+    },
   );
   if (!content.ok || !content.body) {
     return new NextResponse("Could not read the clip", { status: 502 });
   }
 
+  const headers = new Headers({
+    "Content-Type": "audio/wav",
+    // WITHOUT THIS THE PLAYER NEVER ASKS FOR A RANGE and can never seek.
+    "Accept-Ranges": "bytes",
+    // Small and immutable once cut, but private: it is somebody's unreleased
+    // audio and must not sit in a shared cache.
+    "Cache-Control": "private, max-age=3600",
+    "Content-Disposition": "inline",
+  });
+
+  // Mirrored from upstream rather than recomputed. Content-Range in particular
+  // has to agree with the bytes actually being sent, and Graph is the only
+  // thing that knows what it served.
+  const length = content.headers.get("content-length");
+  const contentRange = content.headers.get("content-range");
+  if (length) headers.set("Content-Length", length);
+  if (contentRange) headers.set("Content-Range", contentRange);
+
+  // Graph answers 206 to a ranged request; that status is the player's signal
+  // that ranges work, so it is passed on rather than flattened to 200.
   return new NextResponse(content.body, {
-    headers: {
-      "Content-Type": "audio/wav",
-      // Small and immutable once cut, but private: it is somebody's unreleased
-      // audio and must not sit in a shared cache.
-      "Cache-Control": "private, max-age=3600",
-      "Content-Disposition": "inline",
-    },
+    status: content.status === 206 ? 206 : 200,
+    headers,
   });
 }
