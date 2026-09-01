@@ -41,7 +41,12 @@ const EXACT = new Set([
   "/released",
 ]);
 
-const PREFIXES = ["/admin", "/board/card", "/contacts", "/tools"];
+// "/board/card" was here, protecting a page that does not exist. That is worse
+// than harmless: this file is the one place a person looks to ask "what admin
+// routes are there?", so listing the path VOUCHED for it, and a dead link to
+// /board/card/[id] sat on /pickups reading as deliberate. A route listing is
+// evidence about the app, and evidence has to be true to be worth having.
+const PREFIXES = ["/admin", "/contacts", "/tools"];
 
 /** The editor surface: private, but not admin-only. */
 const EDITOR_PREFIX = "/editor";

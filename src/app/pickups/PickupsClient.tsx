@@ -545,8 +545,13 @@ To close it instead and keep the record, use Close.`)) {
                   </div>
                 )}
 
+                {/* /board/card/[id] DOES NOT EXIST AND NEVER HAS — src/app/board
+                    holds page.tsx and archive/page.tsx, nothing else. This link
+                    404'd for every book on the page. /board reads ?editCard on
+                    mount and opens the modal, which is the same mechanism
+                    /board/archive has been using all along. */}
                 <Link
-                  href={`/board/card/${b.cardId}`}
+                  href={`/board?editCard=${b.cardId}`}
                   className="block border-t border-divider px-4 py-2 text-xs text-text-dim transition-colors hover:text-accent-amber"
                 >
                   Open the card

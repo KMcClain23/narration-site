@@ -101,7 +101,8 @@ function clearStaleAdminKey(req: NextRequest, res: NextResponse): void {
 
 export const config = {
   matcher: [
-    "/admin/:path*", "/board", "/board/archive", "/board/card/:path*",
+    // No "/board/card/:path*" — that route does not exist. See admin-routes.ts.
+    "/admin/:path*", "/board", "/board/archive",
     "/schedule", "/contacts", "/contacts/:path*",
     // SESSION REFRESH ONLY, like /editor below. These resolve a OneDrive link
     // and are gated in the handler against admin-or-editor; requiresAdmin does

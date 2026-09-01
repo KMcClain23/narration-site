@@ -164,9 +164,13 @@ const PAYMENT_TYPES = [
 ] as const;
 
 // The number that has actually been producing every historical earnings
-// estimate across this codebase (board/page.tsx, /board/[token], and
-// /board/card/[id]) — a stale tooltip elsewhere said 9,300, but the real
-// divisor everywhere has always been 9,400. Fixed the stale string too.
+// estimate across this codebase — a stale tooltip elsewhere said 9,300, but the
+// real divisor everywhere has always been 9,400. Fixed the stale string too.
+//
+// This used to cite "/board/[token]" and "/board/card/[id]" as the callers.
+// NEITHER ROUTE EXISTS. The single definition is studio-settings.ts's
+// wordsPerFinishedHour; a comment naming routes that are not there is how
+// /board/card came to look real enough to link to.
 
 // Mobile sheet motion. Entering decelerates into place so the eye can follow
 // it; leaving accelerates away, because nobody wants to wait to watch
