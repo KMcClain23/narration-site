@@ -80,7 +80,23 @@ type Pickup = {
   said: string;
   should_be: string;
   note: string;
+  /** What sort of noise, for kind = "noise". Null otherwise. */
+  noise_type: string | null;
 };
+
+/**
+ * "mouth_click" -> "Mouth click".
+ *
+ * NO SHARED LIST AND NO TWIN. The database values are already the words once
+ * the underscore is a space, so this needs nothing kept in step with
+ * src/lib/noise-types.ts — unlike paths.ts and diff.ts, which do. A list that
+ * does not have to exist is the one that cannot drift.
+ */
+function noiseLabel(v: string | null): string {
+  if (!v) return "";
+  const words = v.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 /**
  * ONE PICKUP, BROKEN INTO ITS PARTS — the single source for all three renderings.
@@ -99,7 +115,12 @@ function pickupParts(p: Pickup): { when: string; kind: string; detail: string; e
     kind: p.kind,
     detail: p.kind === "misread"
       ? `said "${p.said}" \u2014 should be "${p.should_be}"`
-      : (p.note?.trim() || "(no note)"),
+      // NOISE SAYS WHICH KIND. It is the whole reason the field exists: Ann
+      // acts differently on a plosive than on a chair bump, and the email and
+      // the manifest are where she reads it. describe() feeds both.
+      : p.kind === "noise" && p.noise_type
+        ? `${noiseLabel(p.noise_type)}${p.note?.trim() ? ` \u2014 ${p.note.trim()}` : ""}`
+        : (p.note?.trim() || "(no note)"),
     extra: p.kind === "misread" && p.note?.trim() ? p.note.trim() : "",
   };
 }
@@ -521,7 +542,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: drafts, error: draftError } = await adminClient
     .from("pickups")
-    .select("id, chapter, timestamp_at, kind, said, should_be, note, assigned_narrator_id")
+    .select("id, chapter, timestamp_at, kind, said, should_be, note, noise_type, assigned_narrator_id")
     .eq("card_id", cardId)
     .eq("chapter", chapter)
     .eq("status", "draft")

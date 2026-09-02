@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { currentSession } from "@/lib/supabase/session";
 import {
   editorBoard, editorCardDetail, editorPickups, editorCardCast, editorUploads, editorNotes, editorChapterProgress,
-  editorPickupBatches,
+  editorPickupBatches, editorNoiseTypes,
 } from "@/lib/editor-data";
 import { EditorCardClient } from "./EditorCardClient";
 
@@ -27,7 +27,7 @@ export default async function EditorCardPage({
 }) {
   const { id } = await params;
 
-  const [session, card, board, allPickups, cast, uploads, allNotes, allProgress, allBatches] =
+  const [session, card, board, allPickups, cast, uploads, allNotes, allProgress, allBatches, noiseTypes] =
     await Promise.all([
     currentSession(),
     editorCardDetail(id),
@@ -53,6 +53,8 @@ export default async function EditorCardPage({
     // link" can only ever REPLACE one. Read from pickup_links, not from
     // pickups — see pickup_batches_for_editor.
     editorPickupBatches(),
+    // Its own read — pickups_for_editor is frozen by the shipped Android DTO.
+    editorNoiseTypes(),
   ]);
   const progress = board.find(c => c.id === id) ?? null;
 
@@ -81,6 +83,7 @@ export default async function EditorCardPage({
         notes={allNotes.filter(n => n.card_id === id)}
         chapterProgress={allProgress.filter(c => c.card_id === id)}
         batches={allBatches.filter(b => b.card_id === id)}
+        noiseTypes={noiseTypes}
         userId={session?.userId ?? null}
       />
     </>

@@ -35,6 +35,14 @@ export type BatchRow = {
   pickup_id: string;
   timestamp_at: string;
   kind: string;
+  /**
+   * What sort of noise, for kind = "noise". Null otherwise.
+   *
+   * ON HER PAGE BECAUSE IT IS FOR HER. She is being asked to re-record
+   * something; a plosive is her mouth, a bump is her room, sibilance is often
+   * a de-esser rather than a retake. "Noise" alone makes her guess.
+   */
+  noise_type: string | null;
   said: string | null;
   should_be: string | null;
   note: string | null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo} from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import type {
@@ -10,6 +10,7 @@ import { ChapterField, chapterOptions, defaultChapter } from "./ChapterField";
 import { FreshLinkButtons, type PickupBatch } from "@/components/pickups/FreshLinkButtons";
 import { CompleteBookDialog } from "@/components/pickups/CompleteBookDialog";
 import { CorrectionDiff } from "@/components/pickups/CorrectionDiff";
+import { NOISE_TYPES, noiseLabel } from "@/lib/noise-types";
 import { TakeLinks } from "@/components/pickups/TakeLinks";
 
 /**
@@ -75,14 +76,28 @@ function isEditableBy(p: EditorPickup, userId: string | null): boolean {
   return p.status === "draft" && !!userId && p.created_by === userId;
 }
 
-function summary(p: EditorPickup): string {
+function summary(p: EditorPickup, noise?: string): string {
   if (p.kind === "misread") return `said "${p.said ?? ""}" — should be "${p.should_be ?? ""}"`;
   const note = (p.note ?? "").trim();
-  return note || (KINDS.find(k => k.value === p.kind)?.label ?? "Other");
+  const label = KINDS.find(k => k.value === p.kind)?.label ?? "Other";
+  /*
+    THE NOISE TYPE LEADS, and the note follows it.
+
+    "Noise · plosive" then whatever she wrote. A note is optional and often
+    empty, so putting the type inside it would lose it exactly when it is the
+    only thing there is.
+  */
+  if (p.kind === "noise" && noise) {
+    const head = `${label} · ${noiseLabel(noise)}`;
+    return note ? `${head} — ${note}` : head;
+  }
+  return note || label;
 }
 
 type Draft = {
   chapter: string;
+  /** Only meaningful when kind is "noise"; cleared by the server otherwise. */
+  noise_type: string;
   timestamp_at: string;
   kind: string;
   said: string;
@@ -181,6 +196,7 @@ function emptyDraft(cast: CastMember[], chapter = ""): Draft {
     chapter,
     timestamp_at: "",
     kind: "misread",
+    noise_type: "",
     said: "",
     should_be: "",
     note: "",
@@ -301,6 +317,7 @@ export function EditorCardClient({
   notes,
   chapterProgress,
   batches,
+  noiseTypes: noiseTypeRows,
   userId,
 }: {
   card: EditorCardDetail;
@@ -317,6 +334,8 @@ export function EditorCardClient({
   chapterProgress: ChapterProgress[];
   /** (chapter, narrator) pairs that already have a link. Never an address. */
   batches: PickupBatch[];
+  /** pickup id -> noise type, read separately because the pickup RPC is frozen. */
+  noiseTypes: { pickup_id: string; noise_type: string }[];
   userId: string | null;
 }) {
   const router = useRouter();
@@ -450,6 +469,11 @@ export function EditorCardClient({
     that leaves this app — reopening only takes it back, and a confirmation on
     the undo would be friction on the safe direction.
   */
+  const noiseTypes = useMemo(
+    () => new Map(noiseTypeRows.map(r => [r.pickup_id, r.noise_type])),
+    [noiseTypeRows],
+  );
+
   const [confirmingComplete, setConfirmingComplete] = useState(false);
 
   const setComplete = (complete: boolean) =>
@@ -499,6 +523,9 @@ export function EditorCardClient({
       p_should_be: needsSaidPair(draft.kind) ? draft.should_be.trim() : "",
       p_note: draft.note.trim(),
       p_assigned_narrator_id: draft.assigned_narrator_id || null,
+      // Sent always; the server clears it for any kind that is not noise, so a
+      // draft switched away from Noise cannot carry an invisible value.
+      p_noise_type: draft.kind === "noise" ? draft.noise_type || "other" : null,
     };
     const okDone = editingId
       ? await run("Saving pickup", () =>
@@ -719,7 +746,7 @@ export function EditorCardClient({
                         shouldBeClass="text-sm font-semibold text-text-primary"
                       />
                     ) : (
-                      <p className="mt-0.5 break-words text-sm text-text-primary">{summary(p)}</p>
+                      <p className="mt-0.5 break-words text-sm text-text-primary">{summary(p, noiseTypes.get(p.id))}</p>
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
@@ -955,6 +982,42 @@ export function EditorCardClient({
               })}
             </div>
           </div>
+
+          {/*
+            WHAT SORT OF NOISE — chosen, not typed.
+
+            Only when Noise is selected, and presented the same way the kinds
+            above are, because it is the same question one level down. Ann is
+            being asked to re-record something: a plosive is her mouth, a bump
+            is her room, sibilance is usually a de-esser. "Noise" alone makes
+            her guess which.
+          */}
+          {draft.kind === "noise" && (
+            <div className="sm:col-span-2">
+              <p className="mb-2 text-xs uppercase tracking-wide text-text-muted">What sort of noise?</p>
+              <div className="grid grid-cols-3 gap-2">
+                {NOISE_TYPES.map(v => {
+                  const on = draft.noise_type === v;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setDraft({ ...draft, noise_type: v })}
+                      className={[
+                        "rounded-xl border px-2 py-2.5 text-sm transition-colors",
+                        on
+                          ? "border-accent-amber bg-accent-amber/15 font-semibold text-text-primary"
+                          : "border-surface-border bg-surface text-text-body hover:border-surface-border",
+                      ].join(" ")}
+                    >
+                      {noiseLabel(v)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="sm:col-span-2">
             <NarratorPicker
               cast={cast}
@@ -1117,7 +1180,7 @@ export function EditorCardClient({
                           /* WAS `truncate` — a one-line ellipsis, which on a
                              note-only pickup cut off the instruction itself.
                              Two lines and an expand control instead. */
-                          <p className="line-clamp-2 break-words text-sm text-text-primary">{summary(p)}</p>
+                          <p className="line-clamp-2 break-words text-sm text-text-primary">{summary(p, noiseTypes.get(p.id))}</p>
                         )}
                         <p className="text-[11px] text-text-muted">
                           {p.timestamp_at} · {p.status}
@@ -1158,6 +1221,7 @@ export function EditorCardClient({
                                 chapter: p.chapter,
                                 timestamp_at: maskTimestamp(p.timestamp_at),
                                 kind: p.kind,
+                                noise_type: noiseTypes.get(p.id) ?? "",
                                 said: p.said ?? "",
                                 should_be: p.should_be ?? "",
                                 note: p.note ?? "",

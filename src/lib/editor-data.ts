@@ -385,3 +385,20 @@ export async function editorPickupBatches(): Promise<PickupBatch[]> {
   const { data, error } = await db.rpc("pickup_batches_for_editor");
   return unwrap<PickupBatch[]>(data as PickupBatch[], error, "pickup_batches_for_editor");
 }
+
+/**
+ * What sort of noise each noise pickup is.
+ *
+ * ITS OWN FUNCTION, because pickups_for_editor is frozen: the Android app
+ * decodes it through Postgrest with no serializer, so ignoreUnknownKeys = false
+ * and one extra column empties the whole list on every installed 0.3.0. The
+ * same arrangement chapter_progress_for_editor already uses, for the same
+ * reason.
+ */
+export async function editorNoiseTypes(): Promise<{ pickup_id: string; noise_type: string }[]> {
+  const db = await userScopedClient();
+  const { data, error } = await db.rpc("pickup_noise_types_for_editor");
+  return unwrap<{ pickup_id: string; noise_type: string }[]>(
+    data as { pickup_id: string; noise_type: string }[], error, "pickup_noise_types_for_editor",
+  );
+}

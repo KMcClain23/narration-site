@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { BatchRow, TokenNote } from "@/lib/pickup-link";
 import { CorrectionDiff } from "@/components/pickups/CorrectionDiff";
+import { noiseLabel } from "@/lib/noise-types";
 
 /**
  * The list, and the one action.
@@ -163,7 +164,9 @@ export function NarratorConfirm({
               </dl>
             ) : (
               <p className="mt-2 break-words text-[15px] text-white">
-                {r.note?.trim() || r.kind}
+                {r.kind === "noise" && r.noise_type
+                  ? `Noise · ${noiseLabel(r.noise_type)}${r.note?.trim() ? ` — ${r.note.trim()}` : ""}`
+                  : r.note?.trim() || r.kind}
               </p>
             )}
             {/*

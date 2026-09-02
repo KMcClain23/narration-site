@@ -39,6 +39,7 @@
     "check-activity-log": "npx --yes tsx --env-file=.env.local scripts/check-activity-log.mjs",
     "check-no-probe-accounts": "npx --yes tsx --env-file=.env.local scripts/check-no-probe-accounts.mjs",
     "check-no-test-residue": "npx --yes tsx --env-file=.env.local scripts/check-no-test-residue.mjs",
+    "check-noise-types": "npx --yes tsx --env-file=.env.local scripts/check-noise-types.mjs",
     "test:timestamp": "npx --yes tsx --test scripts/timestamp-mask.test.mjs",
     "check-editor-moves": "npx --yes tsx --env-file=.env.local scripts/check-editor-moves.mjs",
     "check-lint": "node scripts/check-lint.mjs",
