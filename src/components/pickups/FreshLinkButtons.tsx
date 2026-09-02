@@ -56,10 +56,20 @@ function whenSent(iso: string | null): string {
 export function FreshLinkButtons({
   batches,
   className = "",
+  showReminder = false,
 }: {
   /** Already filtered to one card and chapter by the caller. */
   batches: PickupBatch[];
   className?: string;
+  /**
+   * Offer "Remind her" as well.
+   *
+   * ONLY WHERE SOMETHING IS ACTUALLY PENDING. A reminder about work that has
+   * already come back is noise, and on a verified chapter it is nonsense — so
+   * the caller says where it belongs rather than this guessing from counts it
+   * cannot see the context for.
+   */
+  showReminder?: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [said, setSaid] = useState<Record<string, { text: string; bad: boolean }>>({});
@@ -69,6 +79,42 @@ export function FreshLinkButtons({
   const [done, setDone] = useState<Record<string, boolean>>({});
 
   if (batches.length === 0) return null;
+
+  /*
+    A NUDGE, NOT A NEW LINK — and the two sit side by side deliberately.
+
+    "Send a fresh link" REVOKES the token she is holding; this one changes
+    nothing at all. They are one keystroke apart on screen, so the labels have
+    to carry the difference: one says remind, the other says send a fresh link,
+    and the refusals name the other when it is the right choice.
+  */
+  async function remind(b: PickupBatch) {
+    if (busy) return;
+    setBusy(b.narrator_id);
+    setSaid(s => ({ ...s, [b.narrator_id]: { text: "", bad: false } }));
+    try {
+      const res = await fetch("/api/pickups/remind", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId: b.card_id, chapter: b.chapter, narratorId: b.narrator_id }),
+      });
+      if (!res.ok) {
+        setSaid(s => ({ ...s, [b.narrator_id]: {
+          text: res.status === 401 ? "Your session has expired — sign in again." : `Failed (${res.status}).`,
+          bad: true } }));
+        return;
+      }
+      const { outcome } = (await res.json()) as
+        { outcome: { sent: true; email: string; outstanding: number } | { sent: false; refused: string } };
+      setSaid(s => ({ ...s, [b.narrator_id]: outcome.sent
+        ? { text: `Reminded ${outcome.email} about ${outcome.outstanding} pickup${outcome.outstanding === 1 ? "" : "s"}.`, bad: false }
+        : { text: outcome.refused, bad: true } }));
+    } catch (e) {
+      setSaid(s => ({ ...s, [b.narrator_id]: { text: (e as Error).message || "That did not go through.", bad: true } }));
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function send(b: PickupBatch) {
     if (busy) return;
@@ -145,6 +191,18 @@ export function FreshLinkButtons({
             >
               {sent ? "Send another link" : "Send a fresh link"} · {b.narrator_name}
             </button>
+
+            {showReminder && b.open_count > 0 && (
+              <button
+                type="button"
+                disabled={busy !== null || !b.has_email}
+                onClick={() => void remind(b)}
+                title="Emails a nudge about the pickups she already has. Nothing is issued and nothing is revoked."
+                className="rounded-lg border border-surface-border px-2.5 py-1 text-[11px] text-text-body transition-colors hover:border-accent-amber/50 hover:text-text-primary disabled:opacity-40"
+              >
+                Remind {b.narrator_name}
+              </button>
+            )}
 
             {/* Context for the decision, not decoration: whether the link she
                 holds still works, and roughly when it went out. Someone asking

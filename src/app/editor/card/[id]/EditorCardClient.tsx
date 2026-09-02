@@ -684,7 +684,7 @@ export function EditorCardClient({
     markup would be three places for the send button, the take badges, the
     fresh-link controls and the note blocks to drift apart.
   */
-  function ChapterGroups({ only }: { only: (p: EditorPickup) => boolean }) {
+  function ChapterGroups({ only, remind = false }: { only: (p: EditorPickup) => boolean; remind?: boolean }) {
     const groups = new Map<string, EditorPickup[]>();
     for (const p of pickups.filter(only)) {
       const list = groups.get(p.chapter) ?? [];
@@ -752,6 +752,7 @@ export function EditorCardClient({
               <FreshLinkButtons
                 batches={batches.filter(b => b.chapter === chapter)}
                 className="mt-2"
+                showReminder={remind}
               />
 
               {/* ONCE, AGAINST THE CHAPTER — not repeated under every line.
@@ -1245,7 +1246,7 @@ export function EditorCardClient({
               {pendingList.length} out with the narrator
             </span>
           </h2>
-          <ChapterGroups only={p => p.status === "sent"} />
+          <ChapterGroups only={p => p.status === "sent"} remind />
         </section>
       )}
 
