@@ -116,17 +116,63 @@ function defaultAssignee(cast: CastMember[]): string {
  * two existing rows were normalised in the same change.
  */
 export function maskTimestamp(raw: string): string {
-  const d = (raw ?? "").replace(/[^0-9]/g, "").slice(0, 5);
+  const text = raw ?? "";
+  const d = text.replace(/[^0-9]/g, "").slice(0, 5);
   if (d.length === 0) return "";
+
+  /*
+    ── SHE TYPED A SEPARATOR; HONOUR IT ─────────────────────────────────────
+
+    A typed ":" was thrown away and the shape re-derived from the digit count,
+    which is what made "13:47" unrecoverable. "1:05" is unambiguous — the
+    minutes are what precede the colon — and needs no guessing at all.
+
+    A typed "." opens the tenths slot on its own, so "1:01." accepts one more
+    digit rather than needing a fifth.
+  */
+  const typed = /^(\d{1,2}):(\d{0,2})(?:\.(\d?))?$/.exec(text.trim());
+  if (typed) {
+    const [, mm, ss, tenths] = typed;
+    return `${mm}:${ss}${tenths !== undefined ? `.${tenths}` : ""}`;
+  }
+  // A trailing separator mid-type: "13:" and "1:01." are both legitimate
+  // half-finished states and must survive the keystroke that made them.
+  const trailing = /^(\d{1,2}):$/.exec(text.trim());
+  if (trailing) return `${trailing[1]}:`;
+  const trailingDot = /^(\d{1,2}):(\d{2})\.$/.exec(text.trim());
+  if (trailingDot) return `${trailingDot[1]}:${trailingDot[2]}.`;
+
   if (d.length <= 2) return d;
-  if (d.length <= 4) return `${d.slice(0, d.length - 2).padStart(2, "0")}:${d.slice(-2)}`;
+  /*
+    ── AND NO PADDING WHILE TYPING ──────────────────────────────────────────
+
+    This was `.padStart(2, "0")`, and the zero it inserted at three digits
+    became part of the input on the NEXT keystroke: "134" rendered "01:34", so
+    the fourth digit landed in the tenths slot and "13:47" was stored as
+    "01:34.7". Every timestamp of ten minutes or more was wrong, and a wrong
+    timestamp cuts the clip from the wrong part of the chapter — the narrator
+    then re-records a line that was never wrong.
+
+    Padding is normaliseTimestamp's job and it already does it on save. A mask
+    that edits what it has already produced cannot be idempotent, and this one
+    was not.
+  */
+  if (d.length <= 4) return `${d.slice(0, d.length - 2)}:${d.slice(-2)}`;
   return `${d.slice(0, 2)}:${d.slice(2, 4)}.${d.slice(4)}`;
 }
 
-/** What is stored: padded, so string ordering is time ordering. */
-export function normaliseTimestamp(v: string): string {
+/**
+ * What is stored: padded, so string ordering is time ordering.
+ *
+ * RETURNS NULL FOR A TIME THAT CANNOT EXIST. Seconds were matched as `(\d{2})`
+ * with no range check, so the mask's own "02:63.0" stored happily — and 63
+ * seconds is not a place in a chapter. The caller refuses the save and says so
+ * rather than coercing it to something she did not type.
+ */
+export function normaliseTimestamp(v: string): string | null {
   const m = /^(\d{1,2}):(\d{2})(?:\.(\d))?$/.exec((v ?? "").trim());
-  if (!m) return (v ?? "").trim();
+  if (!m) return (v ?? "").trim() === "" ? "" : null;
+  if (Number(m[2]) > 59) return null;
   return `${m[1].padStart(2, "0")}:${m[2]}${m[3] ? `.${m[3]}` : ""}`;
 }
 
@@ -427,9 +473,27 @@ export function EditorCardClient({
   };
 
   async function submitPickup() {
+    /*
+      REFUSED, NOT COERCED.
+
+      normaliseTimestamp returns null for a time that cannot exist — 63 seconds
+      is not a place in a chapter, and it used to store happily because seconds
+      were matched as two digits with no range check. Silently correcting it
+      would put the pickup somewhere she did not choose, and the clip would be
+      cut from there.
+    */
+    const at = normaliseTimestamp(draft.timestamp_at);
+    if (at === null) {
+      setError(
+        `"${draft.timestamp_at}" is not a time in the chapter. ` +
+          `Use mm:ss, with seconds under 60 — for example 13:47.`,
+      );
+      return;
+    }
+
     const payload = {
       p_chapter: draft.chapter.trim(),
-      p_timestamp_at: normaliseTimestamp(draft.timestamp_at),
+      p_timestamp_at: at,
       p_kind: draft.kind,
       p_said: needsSaidPair(draft.kind) ? draft.said.trim() : "",
       p_should_be: needsSaidPair(draft.kind) ? draft.should_be.trim() : "",
