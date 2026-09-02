@@ -720,7 +720,7 @@ export function EditorCardClient({
                             uploadId={u.latest_filed_id}
                             filed={u.filed}
                             missing={u.missing}
-                            missingNames={u.missing_names}
+                            missingTakes={u.missing_takes}
                             label={`${u.filed} audio file${u.filed === 1 ? "" : "s"}`}
                           />
                         )}

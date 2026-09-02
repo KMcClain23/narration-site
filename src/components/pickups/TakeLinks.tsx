@@ -1,3 +1,9 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/browser";
+
 /**
  * A filed take: download it, or go and look at it in OneDrive.
  *
@@ -41,13 +47,31 @@
  * "1 of 2 takes missing" is still a puzzle. "Closing Credits — no longer in
  * OneDrive" is answerable at a glance, because Dean knows whether he deleted
  * it. Behind the disclosure, not in the header, so the header stays scannable.
+ *
+ * ── AND HE CAN REMOVE THE RECORD ───────────────────────────────────────────
+ *
+ * "I don't want this missing forever." Closing Credits.mp3 was a test upload he
+ * deleted on purpose, and its row would report missing on chapter 6 for ever.
+ *
+ * DELETE APPEARS ONLY ON A ROW THAT IS ALREADY MISSING. Deleting the record of
+ * a file that still exists would leave a file nobody is tracking; the database
+ * function refuses it too, so the absence of the button is a convenience and
+ * not the enforcement.
+ *
+ * It removes the ROW, never anything in OneDrive — the file is already gone,
+ * and reaching for it would either fail or succeed against whatever has taken
+ * its place. And the deletion writes an activity event: the sweep exists to
+ * surface files that vanish, so a button that erased the evidence would defeat
+ * it. The badge stops nagging; the log still remembers.
  */
+
+export type MissingTake = { id: string; name: string | null };
 
 export function TakeLinks({
   uploadId,
   filed,
   missing = 0,
-  missingNames = [],
+  missingTakes = [],
   label,
   className = "",
 }: {
@@ -56,15 +80,38 @@ export function TakeLinks({
   filed: number;
   /** How many of those are no longer in OneDrive. */
   missing?: number;
-  /** Their original names, for the disclosure. */
-  missingNames?: string[] | null;
+  /** The ones that are gone — id and name together, so the delete can name it. */
+  missingTakes?: MissingTake[] | null;
   /** What the badge says — "1 take · Ann Dahlia · ch 5". */
   label: string;
   className?: string;
 }) {
-  const names = missingNames ?? [];
+  const supabase = createClient();
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  const takes = missingTakes ?? [];
   const allGone = filed > 0 && missing >= filed;
   const someGone = missing > 0 && !allGone;
+
+  async function remove(t: MissingTake) {
+    if (busy) return;
+    setBusy(t.id);
+    setError("");
+    // A PLAIN RPC WITH HER OWN JWT — the same shape as every other editor
+    // write. Nothing here can reach Graph: there is no route in between.
+    const { error: err } = await supabase.rpc("delete_missing_upload", { p_upload_id: t.id });
+    setBusy(null);
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    setConfirming(null);
+    startTransition(() => router.refresh());
+  }
 
   const tone = allGone
     ? "border-alert-red/40 text-alert-red hover:bg-alert-red/10"
@@ -92,17 +139,51 @@ export function TakeLinks({
         </span>
       )}
 
-      {missing > 0 && names.length > 0 && (
+      {missing > 0 && takes.length > 0 && (
         <details className="text-[11px]">
           <summary className="cursor-pointer list-none text-text-muted underline-offset-2 hover:text-text-body hover:underline">
             which?
           </summary>
           <span className="mt-0.5 block text-text-muted">
-            {names.map(n => (
-              <span key={n} className="block">
-                {n} — no longer in OneDrive
+            {takes.map(t => (
+              <span key={t.id} className="block py-0.5">
+                {t.name || "an unnamed take"} — no longer in OneDrive
+                {confirming === t.id ? (
+                  // NAMED IN THE CONFIRMATION. "Delete this record?" is a
+                  // question about something the reader has to go and find;
+                  // naming the file is what makes it answerable.
+                  <span className="ml-2 inline-flex items-center gap-2">
+                    <span className="text-text-body">
+                      Remove the record of {t.name || "this take"}? The file is already gone.
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => void remove(t)}
+                      className="rounded border border-alert-red/50 px-1.5 py-0.5 text-alert-red hover:bg-alert-red/10 disabled:opacity-40"
+                    >
+                      {busy === t.id ? "…" : "Delete"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirming(null)}
+                      className="text-text-muted underline-offset-2 hover:text-text-body hover:underline"
+                    >
+                      Keep
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { setConfirming(t.id); setError(""); }}
+                    className="ml-2 text-text-muted underline-offset-2 hover:text-alert-red hover:underline"
+                  >
+                    delete this record
+                  </button>
+                )}
               </span>
             ))}
+            {error && <span className="block text-alert-red">{error}</span>}
           </span>
         </details>
       )}

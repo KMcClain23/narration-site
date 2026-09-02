@@ -527,7 +527,7 @@ To close it instead and keep the record, use Close.`)) {
                               uploadId={x.latest_filed_id!}
                               filed={x.filed}
                               missing={x.missing}
-                              missingNames={x.missing_names}
+                              missingTakes={x.missing_takes}
                               label={`${x.filed} take${x.filed === 1 ? "" : "s"} · ${x.narrator_name}`}
                             />
                           ))}
