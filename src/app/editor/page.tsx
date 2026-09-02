@@ -76,6 +76,12 @@ function deliveryLabel(deadline: string | null): string {
   return `delivery ${when}`;
 }
 
+/** Whole days since an ISO instant, or null when there is none. */
+function daysSince(iso: string | null): number | null {
+  if (!iso) return null;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / DAY);
+}
+
 function deliveryStyle(deadline: string | null): string {
   if (!deadline) return "border-surface-border text-text-muted";
   const days = (new Date(`${deadline}T00:00:00`).getTime() - Date.now()) / DAY;
@@ -112,21 +118,15 @@ function TakeBadge({ u }: { u: UploadCount }) {
   const chapter = /^\d/.test(u.chapter.trim()) ? `ch ${u.chapter}` : u.chapter;
 
   if (u.filed > 0 && u.latest_filed_id) {
-    /*
-      MISSING IS MARKED, NOT HIDDEN.
-
-      Dropping the badge to "0 takes" would erase the fact that a narrator
-      uploaded something which has since been lost — the one thing here Dean
-      would actually act on. So the take still shows, struck through and
-      labelled, and it stays CLICKABLE: the resolver's page already explains
-      the state better than a badge can, and it is also what re-checks and
-      clears the mark if the file has been restored.
-    */
-    const gone = u.missing > 0;
+    /* Missing is marked, not hidden — and TakeLinks decides HOW, because
+       "some of them" and "all of them" are different facts and saying both as
+       "missing" is what made a chapter with usable audio look empty. */
     return (
       <TakeLinks
         uploadId={u.latest_filed_id}
-        gone={gone}
+        filed={u.filed}
+        missing={u.missing}
+        missingNames={u.missing_names}
         label={`${u.filed} take${u.filed === 1 ? "" : "s"} · ${u.narrator_name} · ${chapter}`}
       />
     );
@@ -423,11 +423,94 @@ export default async function EditorBoardPage() {
     .filter(c => c.status === "contracted" || c.status === "recast")
     .sort((a, b) => a.title.localeCompare(b.title));
 
+  /*
+    ── WHAT THE RAIL SAYS ──────────────────────────────────────────────────
+
+    Her outstanding work, not Dean's recording agenda. The admin side has a
+    SidebarAgenda about hours at the mic and deadlines; none of that is her
+    question. Hers is "what is on me, how much is left, and what has been
+    sitting longest".
+
+    Every figure here is derived from the same lists the sections below render,
+    so the rail and the page can never disagree — a summary computed from its
+    own query is a second answer to the same question.
+  */
+  const chaptersLeft = editingNow.reduce((n, c) => {
+    const total = c.chapters_total ?? 0;
+    const done = c.chapters_edited ?? 0;
+    // A book with no chapter count contributes nothing rather than a guess.
+    return n + (total > 0 ? Math.max(0, total - done) : 0);
+  }, 0);
+  const booksWithoutCounts = editingNow.filter(c => !c.chapters_total).length;
+
+  const oldestPending = pickups
+    .filter(p => p.status === "sent" && p.sent_at)
+    .sort((a, b) => (a.sent_at ?? "").localeCompare(b.sent_at ?? ""))[0];
+  // Through a helper, like deliveryLabel above: calling Date.now() directly in
+  // a component body is an impure call during render and eslint says so.
+  const oldestDays = daysSince(oldestPending?.sent_at ?? null);
+  const oldestBook = oldestPending ? byId.get(oldestPending.card_id)?.title ?? null : null;
+
   const released = cards.filter(c => c.status === "released");
   const waitingTotal = waiting.reduce((n, w) => n + w.n, 0);
 
   return (
     <HubDrag>
+      {/*
+        THE LEFT COLUMN, which was dead space at max-w-6xl.
+
+        Sticky rather than fixed, so it scrolls with the page on a short viewport
+        instead of overlapping the footer, and it drops out entirely below lg —
+        on a phone the numbers would push the actual work off the first screen,
+        which is the opposite of what the rail is for.
+      */}
+      <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8">
+        <aside className="mb-6 hidden lg:sticky lg:top-20 lg:mb-0 lg:block lg:self-start">
+          <p className="mb-3 text-xs uppercase tracking-[1px] text-text-muted">On you</p>
+          <dl className="space-y-3 rounded-xl border border-divider bg-surface p-4">
+            <div>
+              <dt className="text-[11px] uppercase tracking-wide text-text-muted">Ready for review</dt>
+              <dd className={waiting.length > 0 ? "text-2xl font-bold text-accent-amber" : "text-2xl font-bold text-text-body"}>
+                {waiting.length}
+                <span className="ml-1.5 text-[11px] font-normal text-text-muted">
+                  {waiting.length === 1 ? "book" : "books"}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[11px] uppercase tracking-wide text-text-muted">Chapters left</dt>
+              <dd className="text-2xl font-bold text-text-body">
+                {chaptersLeft}
+                {/* SAID, NOT SILENTLY EXCLUDED. A book with no chapter count
+                    contributes nothing to the number above, and a total that
+                    quietly omits part of its input is the failure this project
+                    keeps finding. */}
+                {booksWithoutCounts > 0 && (
+                  <span className="ml-1.5 text-[11px] font-normal text-text-muted">
+                    + {booksWithoutCounts} book{booksWithoutCounts === 1 ? "" : "s"} with no count
+                  </span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[11px] uppercase tracking-wide text-text-muted">Longest waiting</dt>
+              <dd className="text-sm text-text-body">
+                {oldestDays === null ? (
+                  <span className="text-text-muted">Nothing out with a narrator</span>
+                ) : (
+                  <>
+                    {oldestDays === 0 ? "Today" : `${oldestDays} day${oldestDays === 1 ? "" : "s"}`}
+                    {oldestBook && (
+                      <span className="block truncate text-[11px] text-text-muted">{oldestBook}</span>
+                    )}
+                  </>
+                )}
+              </dd>
+            </div>
+          </dl>
+        </aside>
+
+        <div className="min-w-0">
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-lg font-bold">Editing</h1>
         {released.length > 0 && (
@@ -439,7 +522,7 @@ export default async function EditorBoardPage() {
 
       {/* The narrator has done their part; this is the one thing genuinely on her. */}
       <Section
-        title="Waiting on you"
+        title="Ready for review"
         count={waiting.length}
         hint={`${waitingTotal} re-recorded pickup${waitingTotal === 1 ? "" : "s"}`}
       >
@@ -466,7 +549,7 @@ export default async function EditorBoardPage() {
           one out releases it. "Waiting on you" above is a view of the same
           books — it is not a separate zone, because a book cannot be waiting on
           her without being hers. */}
-      <Section title="Editing now" count={editingNow.length} hint={`${editingNow.length} in your queue`}>
+      <Section title="Currently working on" count={editingNow.length} hint={`${editingNow.length} in your queue`}>
         <DropZone zone="mine">
           <div className="grid gap-3 sm:grid-cols-2">
             {editingNow.map(c => (
@@ -492,39 +575,25 @@ export default async function EditorBoardPage() {
         </DropZone>
       </Section>
 
+      <Section title="Coming next" count={comingNext.length} hint="recording or prepping">
+        <div className="grid gap-2 sm:grid-cols-2">
+          {comingNext.map(c => (
+            <QuietTile key={c.id} card={c} />
+          ))}
+        </div>
+      </Section>
+
+
       {/*
-        FINISHED IS COLLAPSED, and it is still hers.
+        ── EVERYTHING ELSE ─────────────────────────────────────────────────
 
-        Not dropped: she needs to see that a book she completed is accounted for,
-        and to hand it back when it is genuinely done with. Not expanded either —
-        it is the one section that never needs acting on, and open by default it
-        would push the actual queue below the fold as it grows.
+        Nothing below this line needs acting on today: books nobody holds,
+        books somebody else is posting, books she has finished, and books not
+        recorded yet. They stay on the page because their absence would read as
+        work that had vanished — but they sit under the three sections that are
+        actually hers, and most of them are collapsed.
       */}
-      {finished.length > 0 && (
-        <details className="mb-8 rounded-xl border border-divider bg-surface">
-          <summary className="cursor-pointer list-none px-4 py-3 text-sm text-text-muted hover:text-text-primary">
-            Finished — {finished.length} book{finished.length === 1 ? "" : "s"} you have completed
-          </summary>
-          <div className="grid gap-2 border-t border-divider p-3 sm:grid-cols-2">
-            {finished.map(c => (
-              <QuietTile
-                key={c.id}
-                card={c}
-                note={
-                  c.editing_completed_at
-                    ? `completed ${new Date(c.editing_completed_at).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                      })}`
-                    : "complete"
-                }
-                mine
-              />
-            ))}
-          </div>
-        </details>
-      )}
-
+      <p className="mb-3 mt-10 text-xs uppercase tracking-[1px] text-text-muted">Everything else</p>
       {/*
         NOT "YOUR BOOKS TOO". These are in editing and nobody holds them; whether
         any of them is hers to pick up is a conversation with Dean, not something
@@ -603,13 +672,38 @@ export default async function EditorBoardPage() {
         </div>
       </Section>
 
-      <Section title="Coming next" count={comingNext.length} hint="recording or prepping">
-        <div className="grid gap-2 sm:grid-cols-2">
-          {comingNext.map(c => (
-            <QuietTile key={c.id} card={c} />
-          ))}
-        </div>
-      </Section>
+      {/*
+        FINISHED IS COLLAPSED, and it is still hers.
+
+        Not dropped: she needs to see that a book she completed is accounted for,
+        and to hand it back when it is genuinely done with. Not expanded either —
+        it is the one section that never needs acting on, and open by default it
+        would push the actual queue below the fold as it grows.
+      */}
+      {finished.length > 0 && (
+        <details className="mb-8 rounded-xl border border-divider bg-surface">
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm text-text-muted hover:text-text-primary">
+            Finished — {finished.length} book{finished.length === 1 ? "" : "s"} you have completed
+          </summary>
+          <div className="grid gap-2 border-t border-divider p-3 sm:grid-cols-2">
+            {finished.map(c => (
+              <QuietTile
+                key={c.id}
+                card={c}
+                note={
+                  c.editing_completed_at
+                    ? `completed ${new Date(c.editing_completed_at).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      })}`
+                    : "complete"
+                }
+                mine
+              />
+            ))}
+          </div>
+        </details>
+      )}
 
       {notYet.length > 0 && (
         <details className="mb-8 rounded-xl border border-divider bg-surface">
@@ -629,6 +723,9 @@ export default async function EditorBoardPage() {
           No books yet.
         </p>
       )}
+
+        </div>
+      </div>
     </HubDrag>
   );
 }

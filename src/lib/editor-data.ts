@@ -311,6 +311,8 @@ export type UploadCount = {
    * there is nothing to open, so the badge must not offer a link.
    */
   latest_filed_id: string | null;
+  /** Original names of the takes that are gone, so a badge can say WHICH. */
+  missing_names: string[] | null;
 };
 
 /**

@@ -525,7 +525,9 @@ To close it instead and keep the record, use Close.`)) {
                               key={`${x.card_id}-${x.chapter}-${x.narrator_name}`}
                               className="mb-2"
                               uploadId={x.latest_filed_id!}
-                              gone={x.missing > 0}
+                              filed={x.filed}
+                              missing={x.missing}
+                              missingNames={x.missing_names}
                               label={`${x.filed} take${x.filed === 1 ? "" : "s"} · ${x.narrator_name}`}
                             />
                           ))}

@@ -667,8 +667,351 @@ export function EditorCardClient({
   const field =
     "w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm text-text-primary placeholder-text-faint focus:border-accent-amber/50 focus:outline-none";
 
+  /*
+    ── THREE GROUPS, IN THE ORDER THEY NEED HER ──────────────────────────
+
+    Needs review is the narrator's work come back and is the only group asking
+    for anything. Pending is out with her and is the largest — making it loud is
+    what produced the original "everything is shouting". Already verified is
+    history, and starts collapsed: it is what Dean did not want to scroll past.
+  */
+  const needsReview = pickups.filter(p => p.status === "returned");
+  const pendingList = pickups.filter(p => p.status === "sent");
+  const verifiedList = pickups.filter(p => p.status === "resolved" || p.status === "dismissed");
+
+  /*
+    ONE RENDERER FOR ALL THREE, fed a filtered map. Three copies of the chapter
+    markup would be three places for the send button, the take badges, the
+    fresh-link controls and the note blocks to drift apart.
+  */
+  function ChapterGroups({ only }: { only: (p: EditorPickup) => boolean }) {
+    const groups = new Map<string, EditorPickup[]>();
+    for (const p of pickups.filter(only)) {
+      const list = groups.get(p.chapter) ?? [];
+      list.push(p);
+      groups.set(p.chapter, list);
+    }
+    if (groups.size === 0) return null;
+    return (
+      <section className="space-y-4">
+        {[...groups.entries()].map(([chapter, list]) => {
+          const sendableCount = list.filter(p => isEditableBy(p, userId)).length;
+          return (
+            <div key={chapter} className="rounded-2xl border border-divider bg-surface p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-bold">
+                  Chapter {chapter || "—"}
+                  {/* AGAINST THE CHAPTER IT BELONGS TO. Filed means it is in the
+                      book's folder and she can play it; pending means it is
+                      still in quarantine under a uuid name, so it is said
+                      differently rather than counted together. */}
+                  {(() => {
+                    const u = uploads.find(x => x.chapter === chapter);
+                    if (!u) return null;
+                    return (
+                      <>
+                        {u.filed > 0 && u.latest_filed_id && (
+                          /* DOWNLOAD, not preview. She is putting this into a
+                             DAW; OneDrive's preview page is three clicks from
+                             the file. The missing mark rides along, and a
+                             deleted take still lands on the explanation. */
+                          <TakeLinks
+                            className="ml-2 align-middle font-normal"
+                            uploadId={u.latest_filed_id}
+                            filed={u.filed}
+                            missing={u.missing}
+                            missingNames={u.missing_names}
+                            label={`${u.filed} audio file${u.filed === 1 ? "" : "s"}`}
+                          />
+                        )}
+                        {u.pending > 0 && (
+                          <span className="ml-2 rounded-full border border-surface-border px-2 py-0.5 text-[11px] font-normal text-text-muted">
+                            {u.pending} still filing
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
+                </h3>
+                {sendableCount > 0 && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void sendChapter(chapter)}
+                    className="rounded-lg border border-accent-amber/50 px-3 py-1.5 text-xs font-bold text-accent-amber transition-colors hover:bg-accent-amber/10 disabled:opacity-40"
+                  >
+                    Send {sendableCount} draft{sendableCount === 1 ? "" : "s"}
+                  </button>
+                )}
+              </div>
+
+              {/* REPLACING A LINK, NOT SENDING ONE. Rendered from the link table,
+                  so a chapter that was never sent shows nothing here at all and
+                  the only way to reach a narrator for the first time stays the
+                  Send button above. Per narrator, because the token is. */}
+              <FreshLinkButtons
+                batches={batches.filter(b => b.chapter === chapter)}
+                className="mt-2"
+              />
+
+              {/* ONCE, AGAINST THE CHAPTER — not repeated under every line.
+                  A note about the spliced file is one fact about the chapter,
+                  and five copies of it would read as five findings. */}
+              <NoteBlock notes={notes.filter(n => n.link_id && n.chapter === chapter)} />
+
+              <ul className="mt-3 space-y-2">
+                {list.map(p => {
+                  const editable = isEditableBy(p, userId);
+                  return (
+                    /* Same rule as the panel above: the text column shrinks,
+                       the actions do not, and they only stack on a narrow
+                       viewport. */
+                    <li
+                      key={p.id}
+                      className="flex flex-col items-start justify-between gap-3 rounded-xl border border-divider px-3 py-2 sm:flex-row"
+                    >
+                      <div className="min-w-0 flex-1">
+                        {p.kind === "misread" ? (
+                          <CorrectionDiff
+                            said={p.said}
+                            shouldBe={p.should_be}
+                            clamp
+                            labelClass="w-20 shrink-0 text-[10px] uppercase tracking-wide text-text-muted"
+                            saidClass="text-sm text-text-muted"
+                            shouldBeClass="text-sm font-semibold text-text-primary"
+                          />
+                        ) : (
+                          /* WAS `truncate` — a one-line ellipsis, which on a
+                             note-only pickup cut off the instruction itself.
+                             Two lines and an expand control instead. */
+                          <p className="line-clamp-2 break-words text-sm text-text-primary">{summary(p, noiseTypes.get(p.id))}</p>
+                        )}
+                        <p className="text-[11px] text-text-muted">
+                          {p.timestamp_at} · {p.status}
+                          {p.assigned_narrator_name ? ` · ${p.assigned_narrator_name}` : ""}
+                        </p>
+                        {/* Notes about THIS line — "I could not hear that one",
+                            "closing it, the fix is in". */}
+                        <NoteBlock notes={notes.filter(n => n.pickup_id === p.id)} />
+                      </div>
+                      {p.status === "returned" && (
+                        <div className="flex shrink-0 items-center gap-3">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void closePickup(p.id, "resolved")}
+                            className="rounded-lg bg-accent-amber px-3 py-1.5 text-xs font-bold text-black transition-colors hover:bg-accent-amber-bright disabled:opacity-40"
+                          >
+                            Verify &amp; close
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void closePickup(p.id, "dismissed")}
+                            className="text-xs text-text-body underline-offset-2 hover:text-text-primary hover:underline"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      )}
+                      {editable && (
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => {
+                              setEditingId(p.id);
+                              setDraft({
+                                chapter: p.chapter,
+                                timestamp_at: maskTimestamp(p.timestamp_at),
+                                kind: p.kind,
+                                noise_type: noiseTypes.get(p.id) ?? "",
+                                said: p.said ?? "",
+                                should_be: p.should_be ?? "",
+                                note: p.note ?? "",
+                                assigned_narrator_id: p.assigned_narrator_id ?? "",
+                              });
+                            }}
+                            className="text-xs text-text-muted hover:text-text-primary"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void removePickup(p.id)}
+                            className="text-xs text-alert-red/70 hover:text-alert-red"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
+      </section>
+    );
+  }
+
   return (
-    <div className="mt-6 space-y-6">
+    <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-6">
+      {/*
+        ── PROGRESS IS REFERENCE, NOT THE TASK ──────────────────────────────
+
+        The chapter grid, the count and "Complete and mastered" used to sit at
+        the TOP of the page, above the work — so the first thing she saw was a
+        summary of what she had already done, and the pickups she came to work
+        on started below the fold.
+
+        It is now a column that STICKS while she works down the list. Sticky
+        rather than fixed, so on a short viewport it scrolls with the page
+        instead of covering it, and the whole thing reverts to a normal block
+        below lg — a 288px panel beside a phone-width list would leave neither
+        usable.
+      */}
+      <aside className="order-first mb-6 lg:sticky lg:top-20 lg:order-last lg:mb-0 lg:self-start">
+    <section className="rounded-2xl border border-divider bg-surface p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-bold">Editing progress</h2>
+        <span className="text-xs text-text-muted">
+          {doneCount}
+          {chapterKeys.length > 0 ? ` of ${chapterKeys.length}` : ""} done
+          {editingCompletedAt && <span className="ml-2 text-capacity-light">· complete</span>}
+        </span>
+      </div>
+
+      {progressError && (
+        <p className="mt-2 text-xs text-alert-red">{progressError}</p>
+      )}
+
+      {chapterKeys.length > 0 ? (
+        <>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {chapterKeys.map(key => {
+              const isDone = doneSet.has(key);
+              /*
+                FRONT MATTER IS A CHAPTER HERE. Dedication, Trigger Warnings
+                and Prologue carry no number and every array card has two or
+                three of them — they are real things to edit, and a grid that
+                showed only numbers would silently drop them.
+              */
+              const numeric = /^\d+$/.test(key);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void toggleChapter(key)}
+                  aria-pressed={isDone}
+                  title={isDone ? `${key} — done, click to undo` : `${key} — mark done`}
+                  className={
+                    (isDone
+                      ? "border-accent-amber bg-accent-amber text-black "
+                      : "border-surface-border text-text-muted hover:border-surface-border hover:text-text-primary ") +
+                    "rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 " +
+                    (numeric ? "min-w-[2.4rem] tabular-nums" : "")
+                  }
+                >
+                  {key}
+                </button>
+              );
+            })}
+          </div>
+
+          {/*
+            ASKED ONCE, NEVER AUTOMATIC. Filling the last chapter does not
+            complete the book — she may want a final pass, and a page that
+            decided for her would be wrong exactly when it mattered.
+          */}
+          {allDone && !editingCompletedAt && (
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-accent-amber/40 bg-accent-amber/10 px-3 py-2">
+              <span className="text-xs text-accent-amber-bright">
+                All {chapterKeys.length} chapters done — mark the book complete?
+              </span>
+              {/* THE SAME DIALOG. Filling the last chapter still only
+                  prompts — it does not complete — and the prompt must lead to
+                  the same confirmation as the button below, or there would be
+                  a path to completion that never shows the open pickups. */}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setConfirmingComplete(true)}
+                className="rounded-lg bg-accent-amber px-3 py-1.5 text-xs font-bold text-black hover:bg-accent-amber-bright disabled:opacity-40"
+              >
+                Complete and mastered
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        /*
+          TWO THIRDS OF THE CATALOGUE HAVE NO CHAPTER DATA AT ALL — 22 of 33
+          cards. There is nothing to draw a grid from, so the number field
+          stays and the page says what would make a grid possible, rather
+          than rendering an empty row that reads as a book with no chapters.
+        */
+        <div className="mt-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-xs text-text-muted">
+              Chapters edited
+              <input
+                inputMode="numeric"
+                value={edited}
+                onChange={e => setEdited(e.target.value.replace(/[^0-9]/g, ""))}
+                onBlur={() => void saveProgress()}
+                className={`${field} mt-1 w-20 text-center text-base font-semibold`}
+              />
+            </label>
+            <span className="pt-4 text-sm text-text-muted">of —</span>
+          </div>
+          <p className="text-[11px] text-text-muted">
+            Set the chapter count to track chapters individually.
+          </p>
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-divider pt-3">
+        <label className="text-[11px] text-text-muted">
+          Chapters in the book
+          <input
+            inputMode="numeric"
+            value={total}
+            onChange={e => setTotal(e.target.value.replace(/[^0-9]/g, ""))}
+            onBlur={() => void saveProgress()}
+            placeholder="—"
+            className={`${field} mt-1 w-20 text-center`}
+          />
+        </label>
+        {/*
+          THE BUTTON NAMES THE BUSINESS EVENT, not the database one.
+          "Mark complete" is what the column is called; "complete and
+          mastered" is what Dean is actually declaring, and it is the sentence
+          he uses. Given the weight of a milestone rather than sitting at the
+          same size as the number field beside it.
+        */}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            editingCompletedAt ? void setComplete(false) : setConfirmingComplete(true)
+          }
+          className={
+            editingCompletedAt
+              ? "mt-4 rounded-lg border border-surface-border px-3 py-1.5 text-xs text-text-body transition-colors hover:bg-surface disabled:opacity-40"
+              : "mt-4 rounded-xl bg-accent-amber px-4 py-2 text-sm font-bold text-black transition-colors hover:bg-accent-amber-bright disabled:opacity-40"
+          }
+        >
+          {editingCompletedAt ? "Reopen" : "Complete and mastered"}
+        </button>
+      </div>
+    </section>
+      </aside>
+
+      <div className="min-w-0 space-y-6">
       {error && (
         <p className="rounded-xl border border-alert-red/40 bg-alert-red/10 px-4 py-2.5 text-sm text-alert-red">
           {error}
@@ -686,92 +1029,15 @@ export function EditorCardClient({
           that is actionable right now, and because the email announcing it will
           often have been missed — the page she opens anyway has to carry the
           signal on its own. */}
-      {pickups.some(p => p.status === "returned") && (
-        /* A SURFACE WITH AN AMBER EDGE, not a gold box.
+      {/*
+        THE OLD "waiting on you" PANEL IS GONE, not moved.
 
-           It was a bright gold panel with gold buttons and it dominated the
-           page — the "too much contrast saying LOOK HERE at everything" Dean
-           described. The signal it carries is real and stays: it is the only
-           actionable thing on the page. But the amber is now a left rule and a
-           heading, and the body sits on the ordinary surface, so it reads as
-           the first thing rather than the loudest. */
-        <section className="rounded-2xl border border-surface-border border-l-2 border-l-accent-amber bg-surface p-4">
-          <h2 className="text-sm font-bold text-accent-amber">
-            {pickups.filter(p => p.status === "returned").length} re-recorded, waiting on you
-          </h2>
-          <p className="mt-0.5 text-xs text-text-muted">
-            Listen, then close each one.
-          </p>
-          <ul className="mt-3 space-y-2">
-            {pickups
-              .filter(p => p.status === "returned")
-              .map(p => (
-                /*
-                  THE ACTIONS STAY RIGHT, WHATEVER THE TEXT DOES.
-
-                  This was `flex flex-wrap` with an unsized text column, so once
-                  a correction was long enough the action column wrapped below
-                  it — the buttons on the 09:56 pickup sat under the text while
-                  the two shorter rows above kept theirs on the right. A control
-                  that moves depending on content is a control the eye has to
-                  hunt for.
-
-                  min-w-0 IS THE PART THAT WAS MISSING. A flex child will not
-                  shrink below its content width without it, so the text column
-                  pushed its sibling out rather than wrapping its own text.
-                  flex-1 then lets it take the remaining space and shrink-0
-                  holds the buttons.
-
-                  flex-col sm:flex-row, not flex-wrap: they still stack on a
-                  genuinely narrow viewport, which is right, but never because
-                  the text got long.
-                */
-                <li
-                  key={p.id}
-                  className="flex flex-col items-start justify-between gap-3 rounded-xl border border-surface-border bg-surface-raised px-3 py-2.5 sm:flex-row"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] text-text-muted">
-                      {/^\d/.test(p.chapter.trim()) ? `Chapter ${p.chapter}` : p.chapter} ·{" "}
-                      {p.timestamp_at}
-                      {p.assigned_narrator_name ? ` · ${p.assigned_narrator_name}` : ""}
-                    </p>
-                    {p.kind === "misread" ? (
-                      <CorrectionDiff
-                        said={p.said}
-                        shouldBe={p.should_be}
-                        clamp
-                        labelClass="w-20 shrink-0 text-[10px] uppercase tracking-wide text-text-muted"
-                        saidClass="text-sm text-text-muted"
-                        shouldBeClass="text-sm font-semibold text-text-primary"
-                      />
-                    ) : (
-                      <p className="mt-0.5 break-words text-sm text-text-primary">{summary(p, noiseTypes.get(p.id))}</p>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void closePickup(p.id, "resolved")}
-                      className="rounded-lg bg-accent-amber px-3 py-1.5 text-xs font-bold text-black transition-colors hover:bg-accent-amber-bright disabled:opacity-40"
-                    >
-                      Verify &amp; close
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void closePickup(p.id, "dismissed")}
-                      className="text-xs text-text-body underline-offset-2 hover:text-text-primary hover:underline"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </li>
-              ))}
-          </ul>
-        </section>
-      )}
+        It listed exactly the returned pickups that "Needs review" below now
+        carries, so after the restructure the same corrections appeared twice on
+        one screen — once in a gold box at the top and once in their chapter.
+        Needs review keeps them, because it keeps them WITH their chapter, the
+        take badge and the fresh-link controls, which the panel never had.
+      */}
 
       {/* ── progress, as a GRID OF CHAPTERS ───────────────────────────────
           A COUNT MEANT "THE FIRST N", and that was the problem. The stepper
@@ -779,142 +1045,6 @@ export function EditorCardClient({
           on a pickup forced her to either lie about the number or leave the
           ones after it uncounted. The stored fact is a set now; the count is
           derived from it and still feeds the hub bar and the phone. */}
-      <section className="rounded-2xl border border-divider bg-surface p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-bold">Editing progress</h2>
-          <span className="text-xs text-text-muted">
-            {doneCount}
-            {chapterKeys.length > 0 ? ` of ${chapterKeys.length}` : ""} done
-            {editingCompletedAt && <span className="ml-2 text-capacity-light">· complete</span>}
-          </span>
-        </div>
-
-        {progressError && (
-          <p className="mt-2 text-xs text-alert-red">{progressError}</p>
-        )}
-
-        {chapterKeys.length > 0 ? (
-          <>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {chapterKeys.map(key => {
-                const isDone = doneSet.has(key);
-                /*
-                  FRONT MATTER IS A CHAPTER HERE. Dedication, Trigger Warnings
-                  and Prologue carry no number and every array card has two or
-                  three of them — they are real things to edit, and a grid that
-                  showed only numbers would silently drop them.
-                */
-                const numeric = /^\d+$/.test(key);
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void toggleChapter(key)}
-                    aria-pressed={isDone}
-                    title={isDone ? `${key} — done, click to undo` : `${key} — mark done`}
-                    className={
-                      (isDone
-                        ? "border-accent-amber bg-accent-amber text-black "
-                        : "border-surface-border text-text-muted hover:border-surface-border hover:text-text-primary ") +
-                      "rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 " +
-                      (numeric ? "min-w-[2.4rem] tabular-nums" : "")
-                    }
-                  >
-                    {key}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/*
-              ASKED ONCE, NEVER AUTOMATIC. Filling the last chapter does not
-              complete the book — she may want a final pass, and a page that
-              decided for her would be wrong exactly when it mattered.
-            */}
-            {allDone && !editingCompletedAt && (
-              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-accent-amber/40 bg-accent-amber/10 px-3 py-2">
-                <span className="text-xs text-accent-amber-bright">
-                  All {chapterKeys.length} chapters done — mark the book complete?
-                </span>
-                {/* THE SAME DIALOG. Filling the last chapter still only
-                    prompts — it does not complete — and the prompt must lead to
-                    the same confirmation as the button below, or there would be
-                    a path to completion that never shows the open pickups. */}
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setConfirmingComplete(true)}
-                  className="rounded-lg bg-accent-amber px-3 py-1.5 text-xs font-bold text-black hover:bg-accent-amber-bright disabled:opacity-40"
-                >
-                  Complete and mastered
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          /*
-            TWO THIRDS OF THE CATALOGUE HAVE NO CHAPTER DATA AT ALL — 22 of 33
-            cards. There is nothing to draw a grid from, so the number field
-            stays and the page says what would make a grid possible, rather
-            than rendering an empty row that reads as a book with no chapters.
-          */
-          <div className="mt-3 space-y-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="text-xs text-text-muted">
-                Chapters edited
-                <input
-                  inputMode="numeric"
-                  value={edited}
-                  onChange={e => setEdited(e.target.value.replace(/[^0-9]/g, ""))}
-                  onBlur={() => void saveProgress()}
-                  className={`${field} mt-1 w-20 text-center text-base font-semibold`}
-                />
-              </label>
-              <span className="pt-4 text-sm text-text-muted">of —</span>
-            </div>
-            <p className="text-[11px] text-text-muted">
-              Set the chapter count to track chapters individually.
-            </p>
-          </div>
-        )}
-
-        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-divider pt-3">
-          <label className="text-[11px] text-text-muted">
-            Chapters in the book
-            <input
-              inputMode="numeric"
-              value={total}
-              onChange={e => setTotal(e.target.value.replace(/[^0-9]/g, ""))}
-              onBlur={() => void saveProgress()}
-              placeholder="—"
-              className={`${field} mt-1 w-20 text-center`}
-            />
-          </label>
-          {/*
-            THE BUTTON NAMES THE BUSINESS EVENT, not the database one.
-            "Mark complete" is what the column is called; "complete and
-            mastered" is what Dean is actually declaring, and it is the sentence
-            he uses. Given the weight of a milestone rather than sitting at the
-            same size as the number field beside it.
-          */}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              editingCompletedAt ? void setComplete(false) : setConfirmingComplete(true)
-            }
-            className={
-              editingCompletedAt
-                ? "mt-4 rounded-lg border border-surface-border px-3 py-1.5 text-xs text-text-body transition-colors hover:bg-surface disabled:opacity-40"
-                : "mt-4 rounded-xl bg-accent-amber px-4 py-2 text-sm font-bold text-black transition-colors hover:bg-accent-amber-bright disabled:opacity-40"
-            }
-          >
-            {editingCompletedAt ? "Reopen" : "Complete and mastered"}
-          </button>
-        </div>
-      </section>
-
       {/* ── raise a pickup, COLLAPSED WHEN UNUSED ─────────────────────────
           It filled half the viewport and pushed her chapters below the fold, so
           the page opened on a form rather than on her work. */}
@@ -1090,166 +1220,50 @@ export function EditorCardClient({
         />
       )}
 
-      {/* ------------------------------------------------------------ pickups */}
-      <section className="space-y-4">
-        {[...byChapter.entries()].map(([chapter, list]) => {
-          const sendableCount = list.filter(p => isEditableBy(p, userId)).length;
-          return (
-            <div key={chapter} className="rounded-2xl border border-divider bg-surface p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-bold">
-                  Chapter {chapter || "—"}
-                  {/* AGAINST THE CHAPTER IT BELONGS TO. Filed means it is in the
-                      book's folder and she can play it; pending means it is
-                      still in quarantine under a uuid name, so it is said
-                      differently rather than counted together. */}
-                  {(() => {
-                    const u = uploads.find(x => x.chapter === chapter);
-                    if (!u) return null;
-                    return (
-                      <>
-                        {u.filed > 0 && u.latest_filed_id && (
-                          /* DOWNLOAD, not preview. She is putting this into a
-                             DAW; OneDrive's preview page is three clicks from
-                             the file. The missing mark rides along, and a
-                             deleted take still lands on the explanation. */
-                          <TakeLinks
-                            className="ml-2 align-middle font-normal"
-                            uploadId={u.latest_filed_id}
-                            gone={u.missing > 0}
-                            label={`${u.filed} audio file${u.filed === 1 ? "" : "s"}`}
-                          />
-                        )}
-                        {u.pending > 0 && (
-                          <span className="ml-2 rounded-full border border-surface-border px-2 py-0.5 text-[11px] font-normal text-text-muted">
-                            {u.pending} still filing
-                          </span>
-                        )}
-                      </>
-                    );
-                  })()}
-                </h3>
-                {sendableCount > 0 && (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void sendChapter(chapter)}
-                    className="rounded-lg border border-accent-amber/50 px-3 py-1.5 text-xs font-bold text-accent-amber transition-colors hover:bg-accent-amber/10 disabled:opacity-40"
-                  >
-                    Send {sendableCount} draft{sendableCount === 1 ? "" : "s"}
-                  </button>
-                )}
-              </div>
+      {/* 1. NEEDS REVIEW — the only amber on the page. */}
+      {needsReview.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-2 text-sm font-bold text-accent-amber">
+            Needs review
+            <span className="ml-2 text-[11px] font-normal text-text-muted">
+              {needsReview.length} re-recorded, waiting on you
+            </span>
+          </h2>
+          <div className="rounded-2xl border border-surface-border border-l-2 border-l-accent-amber bg-surface p-1">
+            <ChapterGroups only={p => p.status === "returned"} />
+          </div>
+        </section>
+      )}
 
-              {/* REPLACING A LINK, NOT SENDING ONE. Rendered from the link table,
-                  so a chapter that was never sent shows nothing here at all and
-                  the only way to reach a narrator for the first time stays the
-                  Send button above. Per narrator, because the token is. */}
-              <FreshLinkButtons
-                batches={batches.filter(b => b.chapter === chapter)}
-                className="mt-2"
-              />
+      {/* 2. PENDING — out with the narrator. Neutral: waiting on somebody else
+          is not a problem, and this is the largest group. */}
+      {pendingList.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-2 text-sm font-bold text-text-body">
+            Pending
+            <span className="ml-2 text-[11px] font-normal text-text-muted">
+              {pendingList.length} out with the narrator
+            </span>
+          </h2>
+          <ChapterGroups only={p => p.status === "sent"} />
+        </section>
+      )}
 
-              {/* ONCE, AGAINST THE CHAPTER — not repeated under every line.
-                  A note about the spliced file is one fact about the chapter,
-                  and five copies of it would read as five findings. */}
-              <NoteBlock notes={notes.filter(n => n.link_id && n.chapter === chapter)} />
-
-              <ul className="mt-3 space-y-2">
-                {list.map(p => {
-                  const editable = isEditableBy(p, userId);
-                  return (
-                    /* Same rule as the panel above: the text column shrinks,
-                       the actions do not, and they only stack on a narrow
-                       viewport. */
-                    <li
-                      key={p.id}
-                      className="flex flex-col items-start justify-between gap-3 rounded-xl border border-divider px-3 py-2 sm:flex-row"
-                    >
-                      <div className="min-w-0 flex-1">
-                        {p.kind === "misread" ? (
-                          <CorrectionDiff
-                            said={p.said}
-                            shouldBe={p.should_be}
-                            clamp
-                            labelClass="w-20 shrink-0 text-[10px] uppercase tracking-wide text-text-muted"
-                            saidClass="text-sm text-text-muted"
-                            shouldBeClass="text-sm font-semibold text-text-primary"
-                          />
-                        ) : (
-                          /* WAS `truncate` — a one-line ellipsis, which on a
-                             note-only pickup cut off the instruction itself.
-                             Two lines and an expand control instead. */
-                          <p className="line-clamp-2 break-words text-sm text-text-primary">{summary(p, noiseTypes.get(p.id))}</p>
-                        )}
-                        <p className="text-[11px] text-text-muted">
-                          {p.timestamp_at} · {p.status}
-                          {p.assigned_narrator_name ? ` · ${p.assigned_narrator_name}` : ""}
-                        </p>
-                        {/* Notes about THIS line — "I could not hear that one",
-                            "closing it, the fix is in". */}
-                        <NoteBlock notes={notes.filter(n => n.pickup_id === p.id)} />
-                      </div>
-                      {p.status === "returned" && (
-                        <div className="flex shrink-0 items-center gap-3">
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void closePickup(p.id, "resolved")}
-                            className="rounded-lg bg-accent-amber px-3 py-1.5 text-xs font-bold text-black transition-colors hover:bg-accent-amber-bright disabled:opacity-40"
-                          >
-                            Verify &amp; close
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void closePickup(p.id, "dismissed")}
-                            className="text-xs text-text-body underline-offset-2 hover:text-text-primary hover:underline"
-                          >
-                            Dismiss
-                          </button>
-                        </div>
-                      )}
-                      {editable && (
-                        <div className="flex shrink-0 gap-2">
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => {
-                              setEditingId(p.id);
-                              setDraft({
-                                chapter: p.chapter,
-                                timestamp_at: maskTimestamp(p.timestamp_at),
-                                kind: p.kind,
-                                noise_type: noiseTypes.get(p.id) ?? "",
-                                said: p.said ?? "",
-                                should_be: p.should_be ?? "",
-                                note: p.note ?? "",
-                                assigned_narrator_id: p.assigned_narrator_id ?? "",
-                              });
-                            }}
-                            className="text-xs text-text-muted hover:text-text-primary"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void removePickup(p.id)}
-                            className="text-xs text-alert-red/70 hover:text-alert-red"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          );
-        })}
-      </section>
+      {/* 3. ALREADY VERIFIED — history. Collapsed, and deliberately NOT
+          remembered across reloads: Dean did not ask for that, and a section
+          that reopens because of a choice made last week is worse than one
+          that always starts shut. */}
+      {verifiedList.length > 0 && (
+        <details className="mb-6 rounded-2xl border border-divider bg-surface">
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm text-text-muted hover:text-text-primary">
+            Already verified — {verifiedList.length} closed
+          </summary>
+          <div className="border-t border-divider p-1">
+            <ChapterGroups only={p => p.status === "resolved" || p.status === "dismissed"} />
+          </div>
+        </details>
+      )}
+      </div>
     </div>
   );
 }
