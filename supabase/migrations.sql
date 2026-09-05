@@ -2269,3 +2269,76 @@ $function$;
 -- round(92000 * 0.5 * 220/259) = 39,073. That card is not in this migration.
 -- The prediction "career does not move" was made against a stale baseline, not
 -- broken by this work.
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- A PICKUP CAN NO LONGER LEAVE WITHOUT A TRACE
+--
+-- Neither delete function wrote to activity_events, so a row could be removed
+-- from the one table whose whole purpose is that corrections are not lost, and
+-- nothing anywhere recorded it. The chapter 12 / 01:20 duplicate on A Cowboy's
+-- Runaway went that way on 2026-09-05; there is no record of who removed it.
+--
+-- The TEXT travels with the event, not only the id: once the row is gone, the
+-- id is the one thing that cannot say what was deleted.
+--
+-- NOT APPLIED BY THE ASSISTANT. The MCP connection to this project refuses
+-- privileged writes, so this is here to be run deliberately rather than
+-- applied on somebody's behalf.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+create or replace function public.delete_own_draft_pickup(p_id uuid)
+ returns void language plpgsql security definer set search_path to 'public'
+as $function$
+declare n integer; v record;
+begin
+  perform public.assert_editor_access();
+
+  select card_id, chapter, timestamp_at, kind, said, should_be, note
+    into v
+  from public.pickups
+  where id = p_id and created_by = auth.uid() and status = 'draft';
+
+  delete from public.pickups
+   where id = p_id and created_by = auth.uid() and status = 'draft';
+
+  get diagnostics n = row_count;
+  if n = 0 then
+    raise exception using
+      message = 'That pickup is not yours, or it has already been sent.', errcode = '42501';
+  end if;
+
+  perform public.log_activity(v.card_id, 'pickup_deleted', jsonb_strip_nulls(jsonb_build_object(
+    'pickup_id', p_id, 'chapter', v.chapter, 'timestamp_at', v.timestamp_at,
+    'pickup_kind', v.kind, 'said', nullif(v.said, ''),
+    'should_be', nullif(v.should_be, ''), 'note', nullif(v.note, ''), 'was', 'draft'
+  )));
+end
+$function$;
+
+create or replace function public.delete_pickup(p_id uuid)
+ returns void language plpgsql security definer set search_path to 'public'
+as $function$
+declare n integer; v record;
+begin
+  perform public.assert_board_access();
+
+  select card_id, chapter, timestamp_at, kind, said, should_be, note, status
+    into v
+  from public.pickups where id = p_id;
+
+  delete from public.pickups where id = p_id;
+
+  get diagnostics n = row_count;
+  -- Zero is a refusal, not a quiet success: "already gone" and "deleted" must
+  -- not look the same to whoever pressed the button.
+  if n = 0 then
+    raise exception using message = 'No such pickup.', errcode = '22023';
+  end if;
+
+  perform public.log_activity(v.card_id, 'pickup_deleted', jsonb_strip_nulls(jsonb_build_object(
+    'pickup_id', p_id, 'chapter', v.chapter, 'timestamp_at', v.timestamp_at,
+    'pickup_kind', v.kind, 'said', nullif(v.said, ''),
+    'should_be', nullif(v.should_be, ''), 'note', nullif(v.note, ''), 'was', v.status
+  )));
+end
+$function$;

@@ -675,6 +675,25 @@ export function EditorCardClient({
     what produced the original "everything is shouting". Already verified is
     history, and starts collapsed: it is what Dean did not want to scroll past.
   */
+  /*
+    ── THE FOURTH GROUP, AND WHY IT WAS MISSING ────────────────────────────
+
+    These three predicates — returned, sent, resolved-or-dismissed — replaced a
+    single map built from EVERY pickup when the editor surface was restructured
+    on 2026-09-01. `draft` matches none of them, so a raised pickup went
+    nowhere: no group, and therefore no chapter card, and therefore no send
+    button — because `sendableCount` below counts drafts across lists that by
+    construction hold none, and could only ever be zero.
+
+    Six real corrections sat written, stored and invisible from 2 September.
+    Marizete could not see them; Dean could see them on /pickups and could not
+    send them, because send_chapter_pickups scopes to `created_by = auth.uid()`
+    and they are hers. Neither person could act.
+
+    Drafts first, above the rest: they are the only group asking the person
+    looking at them to do something.
+  */
+  const drafts = pickups.filter(p => p.status === "draft");
   const needsReview = pickups.filter(p => p.status === "returned");
   const pendingList = pickups.filter(p => p.status === "sent");
   const verifiedList = pickups.filter(p => p.status === "resolved" || p.status === "dismissed");
@@ -1219,6 +1238,22 @@ export function EditorCardClient({
             void setComplete(true);
           }}
         />
+      )}
+
+      {/* 0. DRAFTS — raised and not yet sent. The one group whose reader is
+             the person who can clear it. */}
+      {drafts.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-2 text-sm font-bold">
+            Not sent yet
+            <span className="ml-2 text-[11px] font-normal text-text-muted">
+              {drafts.length} raised, waiting to go to the narrator
+            </span>
+          </h2>
+          <div className="rounded-2xl border border-surface-border bg-surface p-1">
+            <ChapterGroups only={p => p.status === "draft"} />
+          </div>
+        </section>
       )}
 
       {/* 1. NEEDS REVIEW — the only amber on the page. */}
